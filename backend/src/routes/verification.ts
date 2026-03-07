@@ -332,9 +332,9 @@ router.post('/document',
             ocr_data: ocrData
           });
           
-          // Update verification status
+          // Update verification status - OCR alone does not complete verification
           await verificationService.updateVerificationRequest(verificationRequest.id, {
-            status: 'verified' // Will be updated by database trigger if needed
+            status: 'processing'
           });
           
           logVerificationEvent('ocr_completed', verificationRequest.id, {
@@ -390,6 +390,7 @@ router.post('/document',
 router.post('/selfie',
   authenticateAPIKey,
   checkSandboxMode,
+  verificationRateLimit,
   upload.single('selfie'),
   validateSelfieUpload,
   catchAsync(async (req: Request, res: Response) => {

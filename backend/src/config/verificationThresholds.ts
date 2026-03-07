@@ -168,19 +168,19 @@ export async function validateScores(scores: {
   const faceMatchingThreshold = await getFaceMatchingThreshold(isSandbox, organizationId);
   const livenessThreshold = await getLivenessThreshold(isSandbox, organizationId);
   
-  const photoConsistencyPassed = !scores.photoConsistency || 
+  const photoConsistencyPassed = scores.photoConsistency === undefined || scores.photoConsistency === null ||
     scores.photoConsistency >= thresholds.PHOTO_CONSISTENCY;
-  
-  const faceMatchingPassed = !scores.faceMatching || 
+
+  const faceMatchingPassed = scores.faceMatching === undefined || scores.faceMatching === null ||
     scores.faceMatching >= faceMatchingThreshold;
-  
-  const livenessPassed = !scores.liveness || 
+
+  const livenessPassed = scores.liveness === undefined || scores.liveness === null ||
     scores.liveness >= livenessThreshold;
-  
-  const crossValidationPassed = !scores.crossValidation || 
+
+  const crossValidationPassed = scores.crossValidation === undefined || scores.crossValidation === null ||
     scores.crossValidation >= thresholds.CROSS_VALIDATION;
-  
-  const qualityPassed = !scores.quality || 
+
+  const qualityPassed = scores.quality === undefined || scores.quality === null ||
     scores.quality >= thresholds.QUALITY.minimum_acceptable;
   
   const overallPassed = photoConsistencyPassed && 
