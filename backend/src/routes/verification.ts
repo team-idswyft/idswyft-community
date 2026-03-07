@@ -1372,7 +1372,24 @@ router.post('/live-capture',
         live_capture_completed: true
       });
       
-      // Process liveness detection and face matching
+      // Respond immediately — face matching / liveness runs in background
+      // (TensorFlow model loading can take >10s; mobile clients time out otherwise)
+      res.status(201).json({
+        verification_id,
+        live_capture_id: liveCapture.id,
+        status: 'processing',
+        message: 'Live capture uploaded successfully. Processing liveness detection and face matching.',
+        next_steps: [
+          'Processing liveness detection and face matching',
+          `Check results with GET /api/verify/results/${verification_id}`
+        ],
+        liveness_check_enabled: true,
+        face_matching_enabled: true,
+        results_url: `/api/verify/results/${verification_id}`
+      });
+
+      // Process liveness detection and face matching (detached — does not block the HTTP response)
+      (async () => {
       if (!(req.isSandbox || false)) {
         try {
           // Get document for face matching
@@ -1691,21 +1708,8 @@ router.post('/live-capture',
           });
         }
       }
-      
-      res.status(201).json({
-        verification_id,
-        live_capture_id: liveCapture.id,
-        status: 'processing',
-        message: 'Live capture uploaded successfully. Processing liveness detection and face matching.',
-        next_steps: [
-          'Processing liveness detection and face matching',
-          `Check results with GET /api/verify/results/${verification_id}`
-        ],
-        liveness_check_enabled: true,
-        face_matching_enabled: true,
-        results_url: `/api/verify/results/${verification_id}`
-      });
-      
+      })().catch(err => logger.error('Live capture background processing failed', { verification_id, error: err instanceof Error ? err.message : err }));
+
     } catch (error) {
       logVerificationEvent('live_capture_failed', verification_id, {
         error: error instanceof Error ? error.message : 'Unknown error'
