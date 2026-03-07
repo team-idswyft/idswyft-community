@@ -792,26 +792,39 @@ router.post('/back-of-id',
                 console.log(`   🔒 Photo validation: ${photoValidationPassed ? 'PASS' : 'FAIL'}`);
                 console.log('   🛡️ Identity fraud protection activated');
               }
+            } else {
+              // No front OCR data to cross-validate — mark complete so the frontend unblocks
+              await verificationService.updateVerificationRequest(verificationRequest.id, {
+                enhanced_verification_completed: true
+              });
             }
           })
-          .catch((error) => {
+          .catch(async (error) => {
             console.error('🚨 Back-of-ID scanning failed:', error);
             logger.error('Back-of-ID scanning failed:', error);
-
-            // CRITICAL FIX: Mark enhanced verification as completed even when scanning fails
-            // This prevents live capture deadlock where users get stuck waiting
-            console.log('🔧 SCANNING FAILURE: Marking enhanced verification as completed to prevent deadlock');
-            verificationService.updateVerificationRequest(verificationRequest.id, {
-              status: 'manual_review',
-              manual_review_reason: 'Back-of-ID scanning failed',
-              enhanced_verification_completed: true
-            });
-            console.log('✅ Enhanced verification marked as completed despite scanning failure - live capture can now proceed');
 
             logVerificationEvent('back_of_id_scanning_failed', verificationRequest.id, {
               backDocumentId: backOfIdDocument.id,
               error: error instanceof Error ? error.message : 'Unknown error'
             });
+
+            // Attempt to set status + flag; if the status update is rejected (e.g. already
+            // terminal), fall back to setting only the flag so the frontend poll can unblock.
+            try {
+              await verificationService.updateVerificationRequest(verificationRequest.id, {
+                status: 'manual_review',
+                manual_review_reason: 'Back-of-ID processing failed',
+                enhanced_verification_completed: true
+              });
+            } catch {
+              try {
+                await verificationService.updateVerificationRequest(verificationRequest.id, {
+                  enhanced_verification_completed: true
+                });
+              } catch (flagErr) {
+                logger.error('Failed to set enhanced_verification_completed after back-of-ID failure', { verificationId: verificationRequest.id, error: flagErr });
+              }
+            }
           });
       } else if (req.isSandbox || false) {
         // For sandbox: Use PDF417 barcode scanning only, fallback to mock data if it fails

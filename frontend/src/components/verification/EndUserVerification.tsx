@@ -249,12 +249,15 @@ const EndUserVerification: React.FC<VerificationProps> = ({
       const data = await apiGet(`/api/verify/results/${verificationId}`);
       if (!mountedRef.current) return;
 
-      if (data.enhanced_verification_completed) {
-        if (data.status === 'failed') {
-          // Cross-validation failed — show failure result immediately
+      const terminalStatuses = ['failed', 'manual_review', 'verified'];
+      const isComplete = data.enhanced_verification_completed || terminalStatuses.includes(data.status);
+
+      if (isComplete) {
+        if (data.status === 'failed' || data.status === 'manual_review') {
+          // Cross-validation failed — show result immediately
           showFinalResult(data);
         } else {
-          // Cross-validation passed — proceed to live capture
+          // Cross-validation passed (or backend flag stuck but status is verified) — proceed to live capture
           setCurrentStep(6);
         }
       } else {
