@@ -141,7 +141,7 @@ export class FaceRecognitionService {
       });
 
       // Use enhanced face service if available
-      if (this.enhancedFaceService && typeof this.enhancedFaceService.compareFaces === 'function') {
+      if (this.enhancedFaceService) {
         logger.info('Using enhanced face recognition for document photo comparison');
         return await this.enhancedFaceService.compareFaces(frontDocumentPath, backDocumentPath);
       }
@@ -169,7 +169,7 @@ export class FaceRecognitionService {
     });
     
     try {
-      if (this.useModernFaceRecognition && typeof this.enhancedFaceService?.compareFaces === 'function') {
+      if (this.useModernFaceRecognition && this.enhancedFaceService) {
         console.log('🔧 Using enhanced face recognition (Sharp-based analysis)...');
         return await this.enhancedFaceService.compareFaces(documentPath, selfiePath);
       } else if (this.useTensorFlowFaceMatching) {
@@ -756,7 +756,7 @@ Important guidelines:
     });
     
     try {
-      if (this.useModernFaceRecognition && this.enhancedFaceService && typeof this.enhancedFaceService.detectLiveness === 'function') {
+      if (this.useModernFaceRecognition && this.enhancedFaceService) {
         console.log('🔧 Using enhanced liveness detection (Sharp-based analysis)...');
         return await this.enhancedFaceService.detectLiveness(imagePath);
       } else if (this.useAiLivenessDetection) {

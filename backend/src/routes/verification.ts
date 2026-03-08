@@ -1390,6 +1390,10 @@ router.post('/live-capture',
 
       // Process liveness detection and face matching (detached — does not block the HTTP response)
       (async () => {
+      // Fetch thresholds once — shared by both production and sandbox branches
+      const contextualThresholds = await getContextualThresholds(req, req.isSandbox || false);
+      const FACE_MATCH_TIMEOUT_MS = 90_000;
+
       if (!(req.isSandbox || false)) {
         try {
           // Get document for face matching
@@ -1461,14 +1465,19 @@ router.post('/live-capture',
             }
             
             // Run face recognition with liveness checks (only against front document)
-            const [matchScore, livenessScore] = await Promise.all([
-              faceRecognitionService.compareFaces(frontDocument?.file_path || document.file_path, liveCapturePath),
-              faceRecognitionService.detectLiveness(liveCapturePath, challenge_response)
+            // Wrapped with a hard timeout — TF model loading can take 30s+ on CPU
+            const [matchScore, livenessScore] = await Promise.race([
+              Promise.all([
+                faceRecognitionService.compareFaces(frontDocument?.file_path || document.file_path, liveCapturePath),
+                faceRecognitionService.detectLiveness(liveCapturePath, challenge_response)
+              ]),
+              new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('Face recognition timed out after 90s')), FACE_MATCH_TIMEOUT_MS)
+              )
             ]);
-            
-            // Use contextual thresholds (organization-specific or defaults)
-            const contextualThresholds = await getContextualThresholds(req, req.isSandbox || false);
-            const faceMatchThreshold = req.isSandbox || false ? 
+
+            // Use contextual thresholds (hoisted at IIFE start)
+            const faceMatchThreshold = req.isSandbox || false ?
               contextualThresholds.FACE_MATCHING.sandbox : 
               contextualThresholds.FACE_MATCHING.production;
             const livenessThreshold = req.isSandbox || false ? 
@@ -1613,61 +1622,53 @@ router.post('/live-capture',
           
           if (document) {
             // Run REAL face recognition with liveness checks - no mocking!
-            const [matchScore, livenessScore] = await Promise.all([
-              faceRecognitionService.compareFaces(document.file_path, liveCapturePath),
-              faceRecognitionService.detectLiveness(liveCapturePath, challenge_response)
+            // Wrapped with a hard timeout — TF model loading can take 30s+ on CPU
+            const sandboxFaceThreshold = contextualThresholds.FACE_MATCHING.sandbox;
+            const sandboxLivenessThreshold = contextualThresholds.LIVENESS.sandbox;
+
+            const [matchScore, livenessScore] = await Promise.race([
+              Promise.all([
+                faceRecognitionService.compareFaces(document.file_path, liveCapturePath),
+                faceRecognitionService.detectLiveness(liveCapturePath, challenge_response)
+              ]),
+              new Promise<never>((_, reject) =>
+                setTimeout(() => reject(new Error('Face recognition timed out after 90s')), FACE_MATCH_TIMEOUT_MS)
+              )
             ]);
-            
+
             console.log('🧪 Sandbox REAL results:', {
               matchScore,
               livenessScore,
               document: document.file_path,
               selfie: liveCapturePath
             });
-            
-            // Determine final status based on REAL scores with sandbox-specific thresholds
-            const isLive = livenessScore > 0.65; // More lenient threshold for sandbox testing
-            const faceMatch = matchScore > 0.8; // Tightened threshold for sandbox testing
+
+            // Determine final status using contextual sandbox thresholds (not hardcoded values)
+            const isLive = livenessScore > sandboxLivenessThreshold;
+            const faceMatch = matchScore > sandboxFaceThreshold;
             const finalStatus = isLive && faceMatch ? 'verified' : 'failed';
-            
+
             // Comprehensive sandbox score analysis logging
             console.log(`🧪📊 Sandbox Verification Score Analysis for ${verification_id}:`);
-            console.log(`   🎯 Face Match Score: ${matchScore.toFixed(3)} (sandbox threshold: 0.8) - ${faceMatch ? '✅ PASS' : '❌ FAIL'}`);
-            console.log(`   🔍 Liveness Score: ${livenessScore.toFixed(3)} (sandbox threshold: 0.65) - ${isLive ? '✅ PASS' : '❌ FAIL'}`);
+            console.log(`   🎯 Face Match Score: ${matchScore.toFixed(3)} (sandbox threshold: ${sandboxFaceThreshold}) - ${faceMatch ? '✅ PASS' : '❌ FAIL'}`);
+            console.log(`   🔍 Liveness Score: ${livenessScore.toFixed(3)} (sandbox threshold: ${sandboxLivenessThreshold}) - ${isLive ? '✅ PASS' : '❌ FAIL'}`);
             console.log(`   📝 Final Status: ${finalStatus.toUpperCase()}`);
             console.log(`   🔗 Document Path: ${document.file_path}`);
             console.log(`   📸 Live Capture Path: ${liveCapturePath}`);
-            
-            // Compare against production thresholds for reference
-            const prodLiveness = livenessScore > 0.75;
-            const prodFaceMatch = matchScore > 0.85;
-            console.log(`   🏭 Production Comparison: Liveness ${prodLiveness ? '✅' : '❌'} (0.75), Face Match ${prodFaceMatch ? '✅' : '❌'} (0.85)`);
-            
-            // Log specific failure reasons for debugging
-            if (!isLive && !faceMatch) {
-              console.log(`   ⚠️  Both liveness and face matching failed (sandbox thresholds)`);
-            } else if (!isLive) {
-              console.log(`   ⚠️  Liveness detection failed (score below 0.7)`);
-            } else if (!faceMatch) {
-              console.log(`   ⚠️  Face matching failed (score below 0.8)`);
-            }
-            
-            // Calculate how close scores are to both sandbox and production thresholds
-            const sandboxLivenessGap = livenessScore - 0.65;
-            const sandboxFaceMatchGap = matchScore - 0.8;
-            const prodLivenessGap = livenessScore - 0.75;
-            const prodFaceMatchGap = matchScore - 0.85;
+
+            // Calculate score gaps
+            const sandboxLivenessGap = livenessScore - sandboxLivenessThreshold;
+            const sandboxFaceMatchGap = matchScore - sandboxFaceThreshold;
             console.log(`   📏 Sandbox Gaps: Liveness ${sandboxLivenessGap >= 0 ? '+' : ''}${sandboxLivenessGap.toFixed(3)}, Face Match ${sandboxFaceMatchGap >= 0 ? '+' : ''}${sandboxFaceMatchGap.toFixed(3)}`);
-            console.log(`   📏 Production Gaps: Liveness ${prodLivenessGap >= 0 ? '+' : ''}${prodLivenessGap.toFixed(3)}, Face Match ${prodFaceMatchGap >= 0 ? '+' : ''}${prodFaceMatchGap.toFixed(3)}`);
-            
+
             await verificationService.updateVerificationRequest(verification_id, {
               face_match_score: matchScore,
               liveness_score: livenessScore,
               status: finalStatus,
-              manual_review_reason: !isLive ? 'Sandbox: Liveness detection failed' : 
+              manual_review_reason: !isLive ? 'Sandbox: Liveness detection failed' :
                                    !faceMatch ? 'Sandbox: Face matching failed' : undefined,
-              failure_reason: !isLive ? `Liveness detection failed - score ${livenessScore.toFixed(2)} below sandbox threshold 0.65` :
-                             !faceMatch ? `Face matching failed - score ${matchScore.toFixed(2)} below sandbox threshold 0.8` : undefined
+              failure_reason: !isLive ? `Liveness detection failed - score ${livenessScore.toFixed(2)} below sandbox threshold ${sandboxLivenessThreshold}` :
+                             !faceMatch ? `Face matching failed - score ${matchScore.toFixed(2)} below sandbox threshold ${sandboxFaceThreshold}` : undefined
             });
             
             logVerificationEvent('sandbox_live_capture_processed', verification_id, {

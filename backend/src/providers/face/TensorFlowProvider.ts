@@ -10,15 +10,10 @@ export class TensorFlowProvider implements FaceMatchingProvider {
   readonly name = 'tensorflow';
 
   async compareFaces(face1: Buffer, face2: Buffer): Promise<number> {
-    try {
-      // Attempt to use the enhanced face recognition service if available
-      const { EnhancedFaceRecognitionService } = await import('../../services/enhancedFaceRecognition.js');
-      const service = new EnhancedFaceRecognitionService();
-      return await service.compareBuffers(face1, face2);
-    } catch {
-      logger.warn('TensorFlowProvider: enhanced service not available, using histogram similarity');
-      return this.histogramSimilarity(face1, face2);
-    }
+    // EnhancedFaceRecognitionService works with file paths, not buffers.
+    // TensorFlowProvider receives buffers from the provider pipeline, so it
+    // falls back directly to histogram similarity.
+    return this.histogramSimilarity(face1, face2);
   }
 
   async detectFace(image: Buffer): Promise<boolean> {

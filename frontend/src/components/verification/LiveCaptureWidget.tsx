@@ -25,6 +25,8 @@ export const LiveCaptureWidget: React.FC<LiveCaptureWidgetProps> = ({
   const animationRef = useRef<number | null>(null);
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
   const mountedRef = useRef(true);
+  const faceHistRef = useRef<number[]>([]);
+  const smoothHistRef = useRef<boolean[]>([]);
 
   const [opencvReady, setOpencvReady] = useState(false);
   const [cameraState, setCameraState] = useState<'prompt' | 'initializing' | 'ready' | 'error'>('prompt');
@@ -170,7 +172,7 @@ export const LiveCaptureWidget: React.FC<LiveCaptureWidgetProps> = ({
     const liveness = Math.max(0.5, Math.min(1, skinR * 3) * 0.6 + (avgBr > 30 && avgBr < 250 ? 1 : 0.7) * 0.2 + Math.min(1, avgVar / 20) * 0.2);
     setLivenessScore(liveness);
 
-    const hist: number[] = ((window as any)._lcwFaceHist = (window as any)._lcwFaceHist || []);
+    const hist = faceHistRef.current;
     hist.push(skinR > 0.02 || warmR > 0.05 ? 1 : 0);
     if (hist.length > 5) hist.shift();
     const stab = hist.reduce((a: number, b: number) => a + b, 0) / Math.max(hist.length, 1);
@@ -191,7 +193,7 @@ export const LiveCaptureWidget: React.FC<LiveCaptureWidgetProps> = ({
   };
 
   const smoothFaceState = (detected: boolean) => {
-    const hist: boolean[] = ((window as any)._lcwSmooth = (window as any)._lcwSmooth || []);
+    const hist = smoothHistRef.current;
     hist.push(detected);
     if (hist.length > 6) hist.shift();
     const pos = hist.filter(Boolean).length;
@@ -286,8 +288,8 @@ export const LiveCaptureWidget: React.FC<LiveCaptureWidgetProps> = ({
     setCaptureAttempts(0);
     setCountdown(null);
     // Clear detection history
-    (window as any)._lcwFaceHist = [];
-    (window as any)._lcwSmooth = [];
+    faceHistRef.current = [];
+    smoothHistRef.current = [];
     setTimeout(initializeCamera, 100);
   };
 

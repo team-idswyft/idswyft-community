@@ -5,7 +5,11 @@
  * inside a try/catch so callers fall back to lighter heuristics.
  */
 export class EnhancedFaceRecognitionService {
-  async compareBuffers(_face1: Buffer, _face2: Buffer): Promise<number> {
+  async compareFaces(_imagePath1: string, _imagePath2: string): Promise<number> {
+    throw new Error('EnhancedFaceRecognitionService: optional dependencies not installed');
+  }
+
+  async detectLiveness(_imagePath: string): Promise<number> {
     throw new Error('EnhancedFaceRecognitionService: optional dependencies not installed');
   }
 }
