@@ -264,11 +264,12 @@ const EndUserVerification: React.FC<VerificationProps> = ({
       const isComplete = data.enhanced_verification_completed || terminalStatuses.includes(data.status);
 
       if (isComplete) {
-        if (data.status === 'failed' || data.status === 'manual_review') {
-          // Cross-validation failed — show result immediately
+        if (data.status === 'failed') {
+          // Hard fraud failure (photo mismatch / data inconsistency) — skip live capture
           showFinalResult(data);
         } else {
-          // Cross-validation passed (or backend flag stuck but status is verified) — proceed to live capture
+          // Cross-validation passed, OR barcode extraction failed (manual_review) but
+          // backend still wants live capture to proceed (enhanced_verification_completed=true).
           setCurrentStep(6);
         }
       } else {

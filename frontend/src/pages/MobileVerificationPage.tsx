@@ -62,7 +62,10 @@ const MobileVerificationPage: React.FC = () => {
       const res = await fetch(`${API_BASE_URL}/api/verify/handoff/${token}/complete`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: result.status, result }),
+        // The handoff session only accepts 'completed' or 'failed'.
+        // Map the verification status: failed → 'failed', everything else → 'completed'.
+        // The full verification result (including the real status) is passed in `result`.
+        body: JSON.stringify({ status: result.status === 'failed' ? 'failed' : 'completed', result }),
       });
       if (!res.ok) {
         console.error('Failed to notify desktop of completion:', res.status);
