@@ -187,21 +187,28 @@ const EndUserVerification: React.FC<VerificationProps> = ({
   };
 
   // ── Step 3: Poll for front OCR completion ─────────────────────────────────
-  const pollFrontOCR = async () => {
+  const MAX_POLL_ATTEMPTS = 60; // 60 × 2s = 2 minutes max
+
+  const pollFrontOCR = async (attempt = 0) => {
     if (!verificationId || !mountedRef.current) return;
+    if (attempt >= MAX_POLL_ATTEMPTS) {
+      toast.error('Verification timed out. Please refresh and try again.');
+      return;
+    }
     try {
       const data = await apiGet(`/api/verify/results/${verificationId}`);
       if (!mountedRef.current) return;
+      const terminalStatuses = ['failed', 'manual_review'];
       if (data.ocr_data && Object.keys(data.ocr_data).length > 0) {
         setFrontOCR(data.ocr_data);
         setCurrentStep(4); // Proceed to back-doc upload
-      } else if (data.status === 'failed') {
+      } else if (terminalStatuses.includes(data.status)) {
         showFinalResult(data);
       } else {
-        setTimeout(pollFrontOCR, 2000);
+        setTimeout(() => pollFrontOCR(attempt + 1), 2000);
       }
     } catch {
-      if (mountedRef.current) setTimeout(pollFrontOCR, 2000);
+      if (mountedRef.current) setTimeout(() => pollFrontOCR(attempt + 1), 2000);
     }
   };
 
@@ -243,8 +250,12 @@ const EndUserVerification: React.FC<VerificationProps> = ({
   };
 
   // ── Step 5: Poll for cross-validation completion ──────────────────────────
-  const pollCrossValidation = async () => {
+  const pollCrossValidation = async (attempt = 0) => {
     if (!verificationId || !mountedRef.current) return;
+    if (attempt >= MAX_POLL_ATTEMPTS) {
+      toast.error('Document validation timed out. Please refresh and try again.');
+      return;
+    }
     try {
       const data = await apiGet(`/api/verify/results/${verificationId}`);
       if (!mountedRef.current) return;
@@ -262,27 +273,32 @@ const EndUserVerification: React.FC<VerificationProps> = ({
         }
       } else {
         // Still processing — keep polling
-        setTimeout(pollCrossValidation, 2000);
+        setTimeout(() => pollCrossValidation(attempt + 1), 2000);
       }
     } catch {
-      if (mountedRef.current) setTimeout(pollCrossValidation, 2000);
+      if (mountedRef.current) setTimeout(() => pollCrossValidation(attempt + 1), 2000);
     }
   };
 
   // ── Step 6: After live capture, poll for final result ─────────────────────
-  const waitForFinalResult = async () => {
+  const waitForFinalResult = async (attempt = 0) => {
     if (!verificationId || !mountedRef.current) return;
+    if (attempt >= MAX_POLL_ATTEMPTS) {
+      toast.error('Live capture verification timed out. Please refresh and try again.');
+      return;
+    }
     try {
       const data = await apiGet(`/api/verify/results/${verificationId}`);
       if (!mountedRef.current) return;
       const terminal = ['verified', 'failed', 'manual_review'];
-      if (terminal.includes(data.status) && data.live_capture_completed) {
+      // Accept terminal status even if live_capture_completed flag is stuck false
+      if (terminal.includes(data.status)) {
         showFinalResult(data);
       } else {
-        setTimeout(waitForFinalResult, 3000);
+        setTimeout(() => waitForFinalResult(attempt + 1), 3000);
       }
     } catch {
-      if (mountedRef.current) setTimeout(waitForFinalResult, 3000);
+      if (mountedRef.current) setTimeout(() => waitForFinalResult(attempt + 1), 3000);
     }
   };
 

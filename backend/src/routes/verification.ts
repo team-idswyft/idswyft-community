@@ -649,19 +649,19 @@ router.post('/back-of-id',
               });
 
               // 🔒 CRITICAL SECURITY CHECK: Compare photos between front and back documents
+              // Fetch thresholds once and reuse for both photo and data validation
+              const contextualThresholds = await getContextualThresholds(req, req.isSandbox || false);
               let photoConsistencyScore = 0;
               let photoValidationPassed = false;
               let photoValidationError = null;
-              
+
               try {
                 console.log('🔒 Starting critical document photo cross-validation for security...');
                 photoConsistencyScore = await faceRecognitionService.compareDocumentPhotos(
                   frontDocument.file_path,
                   backOfIdDocument.file_path
                 );
-                
-                // Use contextual threshold (organization-specific or default)
-                const contextualThresholds = await getContextualThresholds(req, req.isSandbox || false);
+
                 const photoThreshold = contextualThresholds.PHOTO_CONSISTENCY;
                 photoValidationPassed = photoConsistencyScore >= photoThreshold;
                 
@@ -696,8 +696,7 @@ router.post('/back-of-id',
                 }
               });
 
-              // Use contextual validation with state manager
-              const contextualThresholds = await getContextualThresholds(req, req.isSandbox || false);
+              // Use contextual validation with state manager (contextualThresholds already fetched above)
               const crossValidationThreshold = contextualThresholds.CROSS_VALIDATION;
               const dataValidationPassed = crossValidation.validation_results.overall_consistency && 
                                          crossValidation.match_score >= crossValidationThreshold;
