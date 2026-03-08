@@ -237,13 +237,19 @@ export class VerificationStateManager {
       
       const newStatus = VerificationErrorClassifier.getStatusForError(type);
       
-      const updatedContext = await this.updateVerificationContext(verificationId, {
+      // Update inline — do NOT call updateVerificationContext() here because
+      // this method already holds the lock; calling the public method would
+      // try to re-acquire the same (non-reentrant) lock and deadlock.
+      const updatedContext: VerificationContext = {
+        ...context,
         currentStatus: newStatus,
         errors: [...context.errors, error],
-        completedAt: [VerificationStatus.FAILED, VerificationStatus.VERIFIED].includes(newStatus) 
-          ? new Date() : undefined
-      });
-      
+        completedAt: [VerificationStatus.FAILED, VerificationStatus.VERIFIED].includes(newStatus)
+          ? new Date() : undefined,
+        updatedAt: new Date()
+      };
+      await this.stateStore.set(verificationId, updatedContext);
+
       logger.error('Verification error recorded', {
         verificationId,
         errorType: type,
@@ -314,13 +320,17 @@ export class VerificationStateManager {
         });
       }
       
-      const updatedContext = await this.updateVerificationContext(verificationId, {
+      // Update inline — lock already held; calling updateVerificationContext would deadlock.
+      const updatedContext: VerificationContext = {
+        ...context,
         scores: updatedScores,
         currentStatus: newStatus,
-        completedAt: [VerificationStatus.FAILED, VerificationStatus.VERIFIED].includes(newStatus) 
-          ? new Date() : undefined
-      });
-      
+        completedAt: [VerificationStatus.FAILED, VerificationStatus.VERIFIED].includes(newStatus)
+          ? new Date() : undefined,
+        updatedAt: new Date()
+      };
+      await this.stateStore.set(verificationId, updatedContext);
+
       return this.buildVerificationResult(updatedContext);
       
     } finally {
