@@ -793,26 +793,39 @@ router.post('/back-of-id',
                 console.log(`   🔒 Photo validation: ${photoValidationPassed ? 'PASS' : 'FAIL'}`);
                 console.log('   🛡️ Identity fraud protection activated');
               }
+            } else {
+              // No front OCR data to cross-validate — mark complete so the frontend unblocks
+              await verificationService.updateVerificationRequest(verificationRequest.id, {
+                enhanced_verification_completed: true
+              });
             }
           })
-          .catch((error) => {
+          .catch(async (error) => {
             console.error('🚨 Back-of-ID scanning failed:', error);
             logger.error('Back-of-ID scanning failed:', error);
-
-            // CRITICAL FIX: Mark enhanced verification as completed even when scanning fails
-            // This prevents live capture deadlock where users get stuck waiting
-            console.log('🔧 SCANNING FAILURE: Marking enhanced verification as completed to prevent deadlock');
-            verificationService.updateVerificationRequest(verificationRequest.id, {
-              status: 'manual_review',
-              manual_review_reason: 'Back-of-ID scanning failed',
-              enhanced_verification_completed: true
-            });
-            console.log('✅ Enhanced verification marked as completed despite scanning failure - live capture can now proceed');
 
             logVerificationEvent('back_of_id_scanning_failed', verificationRequest.id, {
               backDocumentId: backOfIdDocument.id,
               error: error instanceof Error ? error.message : 'Unknown error'
             });
+
+            // Attempt to set status + flag; if the status update is rejected (e.g. already
+            // terminal), fall back to setting only the flag so the frontend poll can unblock.
+            try {
+              await verificationService.updateVerificationRequest(verificationRequest.id, {
+                status: 'manual_review',
+                manual_review_reason: 'Back-of-ID processing failed',
+                enhanced_verification_completed: true
+              });
+            } catch {
+              try {
+                await verificationService.updateVerificationRequest(verificationRequest.id, {
+                  enhanced_verification_completed: true
+                });
+              } catch (flagErr) {
+                logger.error('Failed to set enhanced_verification_completed after back-of-ID failure', { verificationId: verificationRequest.id, error: flagErr });
+              }
+            }
           });
       } else if (req.isSandbox || false) {
         // For sandbox: Use PDF417 barcode scanning only, fallback to mock data if it fails
@@ -1360,7 +1373,24 @@ router.post('/live-capture',
         live_capture_completed: true
       });
       
-      // Process liveness detection and face matching
+      // Respond immediately — face matching / liveness runs in background
+      // (TensorFlow model loading can take >10s; mobile clients time out otherwise)
+      res.status(201).json({
+        verification_id,
+        live_capture_id: liveCapture.id,
+        status: 'processing',
+        message: 'Live capture uploaded successfully. Processing liveness detection and face matching.',
+        next_steps: [
+          'Processing liveness detection and face matching',
+          `Check results with GET /api/verify/results/${verification_id}`
+        ],
+        liveness_check_enabled: true,
+        face_matching_enabled: true,
+        results_url: `/api/verify/results/${verification_id}`
+      });
+
+      // Process liveness detection and face matching (detached — does not block the HTTP response)
+      (async () => {
       if (!(req.isSandbox || false)) {
         try {
           // Get document for face matching
@@ -1679,21 +1709,8 @@ router.post('/live-capture',
           });
         }
       }
-      
-      res.status(201).json({
-        verification_id,
-        live_capture_id: liveCapture.id,
-        status: 'processing',
-        message: 'Live capture uploaded successfully. Processing liveness detection and face matching.',
-        next_steps: [
-          'Processing liveness detection and face matching',
-          `Check results with GET /api/verify/results/${verification_id}`
-        ],
-        liveness_check_enabled: true,
-        face_matching_enabled: true,
-        results_url: `/api/verify/results/${verification_id}`
-      });
-      
+      })().catch(err => logger.error('Live capture background processing failed', { verification_id, error: err instanceof Error ? err.message : err }));
+
     } catch (error) {
       logVerificationEvent('live_capture_failed', verification_id, {
         error: error instanceof Error ? error.message : 'Unknown error'
