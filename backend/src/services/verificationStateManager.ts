@@ -6,6 +6,7 @@
  */
 
 import { logger } from '@/utils/logger.js';
+import { supabase } from '@/config/database.js';
 import {
   VerificationStatus,
   VerificationStage,
@@ -16,51 +17,111 @@ import {
   VerificationErrorClassifier,
   StateTransition
 } from '@/types/verificationTypes.js';
-import { 
-  VERIFICATION_THRESHOLDS, 
-  validateScores, 
-  getThresholdInfo 
+import {
+  VERIFICATION_THRESHOLDS,
+  validateScores,
+  getThresholdInfo
 } from '@/config/verificationThresholds.js';
 
 /**
- * In-memory state store for verification contexts
- * In production, this should be replaced with Redis or database storage
+ * Write-through verification state store.
+ *
+ * Architecture:
+ * - In-process Map: fast reads, avoids redundant DB round-trips within the same request
+ * - Postgres `verification_contexts`: durable write-through so state survives Railway redeploys
+ * - On a Map miss, context is restored from Postgres before falling back to null
+ *
+ * Locking (P3-F fix):
+ * Promise-chaining queue — each lock chains off the tail of the current queue atomically.
+ * There is no window between checking and claiming: `this.locks.set()` runs synchronously
+ * before any `await`, so concurrent callers queue correctly.
  */
 class VerificationStateStore {
   private states = new Map<string, VerificationContext>();
-  private locks = new Map<string, Promise<any>>();
-  
+  // Each entry is the tail of the lock queue for that verification ID.
+  private locks = new Map<string, Promise<void>>();
+
   async get(verificationId: string): Promise<VerificationContext | null> {
-    return this.states.get(verificationId) || null;
+    // Fast path: in-process cache hit
+    const cached = this.states.get(verificationId);
+    if (cached) return cached;
+
+    // Slow path: restore from Postgres (e.g. after a redeploy)
+    try {
+      const { data, error } = await supabase
+        .from('verification_contexts')
+        .select('context')
+        .eq('verification_id', verificationId)
+        .single();
+
+      if (error || !data) return null;
+
+      const context = data.context as VerificationContext;
+      // Rehydrate Date fields that JSON serialisation turned into strings
+      context.createdAt = new Date(context.createdAt);
+      context.updatedAt = new Date(context.updatedAt);
+      if (context.completedAt) context.completedAt = new Date(context.completedAt);
+
+      this.states.set(verificationId, context);
+      return context;
+    } catch {
+      return null;
+    }
   }
-  
+
   async set(verificationId: string, context: VerificationContext): Promise<void> {
     context.updatedAt = new Date();
+    // Update in-process cache first (fast)
     this.states.set(verificationId, context);
-  }
-  
-  async lock(verificationId: string): Promise<() => void> {
-    // Wait for existing lock to release
-    if (this.locks.has(verificationId)) {
-      await this.locks.get(verificationId);
+
+    // Write-through to Postgres (durable)
+    try {
+      await supabase
+        .from('verification_contexts')
+        .upsert({ verification_id: verificationId, context }, { onConflict: 'verification_id' });
+    } catch (err) {
+      logger.warn('Failed to persist verification context to Postgres', {
+        verificationId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+      // Non-fatal: in-process cache is still valid; the next set() will retry
     }
-    
-    let releaseLock: () => void;
-    const lockPromise = new Promise<void>((resolve) => {
-      releaseLock = resolve;
-    });
-    
-    this.locks.set(verificationId, lockPromise);
-    
+  }
+
+  async lock(verificationId: string): Promise<() => void> {
+    // Promise-chaining queue: atomically append to the tail before awaiting.
+    // No race window — the Map update is synchronous.
+    const prev = this.locks.get(verificationId) ?? Promise.resolve();
+
+    let release!: () => void;
+    const current = new Promise<void>(resolve => { release = resolve; });
+
+    // Chain: next waiter must wait for *this* lock, not just `prev`
+    this.locks.set(verificationId, prev.then(() => current));
+
+    // Wait our turn
+    await prev;
+
     return () => {
-      this.locks.delete(verificationId);
-      releaseLock!();
+      release();
+      // Clean up map entry once our lock is released and no waiter follows
+      if (this.locks.get(verificationId) === current) {
+        this.locks.delete(verificationId);
+      }
     };
   }
-  
+
   async delete(verificationId: string): Promise<void> {
     this.states.delete(verificationId);
     this.locks.delete(verificationId);
+    try {
+      await supabase
+        .from('verification_contexts')
+        .delete()
+        .eq('verification_id', verificationId);
+    } catch {
+      // Non-fatal: row will expire naturally
+    }
   }
 }
 
