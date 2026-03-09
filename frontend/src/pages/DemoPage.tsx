@@ -73,6 +73,20 @@ interface CaptureResult {
   face_matching_enabled: boolean;
 }
 
+const getErrorMessage = (errorData: any, fallback: string): string => {
+  if (!errorData) return fallback;
+  if (typeof errorData === 'string') return errorData;
+  if (typeof errorData.message === 'string') return errorData.message;
+  if (typeof errorData.error === 'string') return errorData.error;
+  if (errorData.error && typeof errorData.error.message === 'string') return errorData.error.message;
+  if (Array.isArray(errorData.errors) && errorData.errors.length > 0) {
+    const first = errorData.errors[0];
+    if (typeof first === 'string') return first;
+    if (first && typeof first.msg === 'string') return first.msg;
+  }
+  return fallback;
+};
+
 const DemoPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const urlApiKey = searchParams.get('api_key');
@@ -337,9 +351,12 @@ const DemoPage: React.FC = () => {
       console.log('🔧 Start verification response status:', response.status);
 
       if (!response.ok) {
-        const errorData = await response.json();
+        const contentType = response.headers.get('content-type') || '';
+        const errorData = contentType.includes('application/json')
+          ? await response.json()
+          : { message: await response.text() };
         console.log('🔧 Start verification error response:', errorData);
-        throw new Error(errorData.error || errorData.message || 'Failed to start verification');
+        throw new Error(getErrorMessage(errorData, 'Failed to start verification'));
       }
 
       const data = await response.json();

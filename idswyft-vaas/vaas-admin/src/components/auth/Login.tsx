@@ -7,6 +7,7 @@ import { apiClient } from '../../services/api';
 import { TotpModal } from './TotpModal';
 
 export default function Login() {
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002/api';
   const { isAuthenticated, loading, error, refreshAuth } = useAuth();
   const navigate = useNavigate();
   const [formData, setFormData] = useState<LoginRequest>({
@@ -20,6 +21,23 @@ export default function Login() {
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState('/idswyft-logo.png');
+
+  useEffect(() => {
+    const loadPlatformLogo = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/assets/platform`);
+        const payload = await response.json();
+        const remoteLogo = payload?.data?.logo_url;
+        if (response.ok && typeof remoteLogo === 'string' && remoteLogo.trim()) {
+          setLogoUrl(remoteLogo);
+        }
+      } catch {
+        // Keep fallback logo if branding endpoint is unavailable.
+      }
+    };
+    loadPlatformLogo();
+  }, [API_BASE_URL]);
 
   // Redirect if already authenticated
   if (isAuthenticated) {
@@ -109,7 +127,7 @@ export default function Login() {
                 </div>
               </div>
               <div>
-                <img src="https://bqrhaxpjlvyjekrwggqx.supabase.co/storage/v1/object/public/assets/logo_new.png" alt="Idswyft VaaS" className="h-8 w-auto" />
+                <img src={logoUrl} alt="Idswyft VaaS" className="h-8 w-auto" />
                 <p className="text-slate-600 font-medium">Admin Portal</p>
               </div>
             </div>
@@ -168,7 +186,7 @@ export default function Login() {
                   <Shield className="w-7 h-7 text-white" />
                 </div>
                 <div>
-                  <img src="https://bqrhaxpjlvyjekrwggqx.supabase.co/storage/v1/object/public/assets/logo_new.png" alt="Idswyft VaaS" className="h-8 w-auto" />
+                  <img src={logoUrl} alt="Idswyft VaaS" className="h-8 w-auto" />
                   <p className="text-slate-600 text-sm">Admin Portal</p>
                 </div>
               </div>

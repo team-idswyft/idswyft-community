@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Outlet, Link, useLocation, Navigate } from 'react-router-dom';
 import {
   Menu,
@@ -106,11 +106,29 @@ const navigationItems = [
 ];
 
 export default function DashboardLayout() {
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002/api';
   const { isAuthenticated, admin, organization, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [searchOpen, setSearchOpen] = useState(false);
+  const [logoUrl, setLogoUrl] = useState('/idswyft-logo.png');
   const location = useLocation();
+
+  useEffect(() => {
+    const loadPlatformLogo = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/assets/platform`);
+        const payload = await response.json();
+        const remoteLogo = payload?.data?.logo_url;
+        if (response.ok && typeof remoteLogo === 'string' && remoteLogo.trim()) {
+          setLogoUrl(remoteLogo);
+        }
+      } catch {
+        // Keep fallback logo if branding endpoint is unavailable.
+      }
+    };
+    loadPlatformLogo();
+  }, [API_BASE_URL]);
 
   // Redirect to login if not authenticated
   if (!isAuthenticated) {
@@ -192,7 +210,7 @@ export default function DashboardLayout() {
   const Sidebar = ({ className = '' }: { className?: string }) => (
     <div className={`flex flex-col h-full sidebar-glass ${className}`}>
       {/* Logo */}
-      <div className="flex items-center px-6 py-6 border-b border-white/20">        <img           src="https://bqrhaxpjlvyjekrwggqx.supabase.co/storage/v1/object/public/assets/logo_new.png"           alt="Idswyft VaaS Admin"           className="h-8 w-auto"        />      </div>
+      <div className="flex items-center px-6 py-6 border-b border-white/20">        <img           src={logoUrl}           alt="Idswyft VaaS Admin"           className="h-8 w-auto"        />      </div>
 
       {/* Organization info */}
       <div className="px-6 py-4 border-b border-white/20 bg-white/10 backdrop-blur-sm">
