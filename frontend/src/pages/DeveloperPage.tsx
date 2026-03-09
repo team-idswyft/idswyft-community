@@ -31,6 +31,24 @@ interface DeveloperStats {
   monthly_limit: number
 }
 
+interface ApiActivity {
+  api_key_id?: string
+  timestamp: string
+  method: string
+  endpoint: string
+  status_code: number
+  response_time_ms: number
+  error_message?: string
+}
+
+interface DeveloperWebhook {
+  id: string
+  url: string
+  is_sandbox: boolean
+  is_active: boolean
+  created_at: string
+}
+
 // ─── Shared styles ────────────────────────────────────────────────────────────
 
 const inputStyle: React.CSSProperties = {
@@ -257,7 +275,12 @@ export function DeveloperPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [newFullKey, setNewFullKey] = useState<string | null>(null)
   const [webhookUrl, setWebhookUrl] = useState('')
+  const [webhooks, setWebhooks] = useState<DeveloperWebhook[]>([])
+  const [webhookLoading, setWebhookLoading] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
+  const [expandedKeyId, setExpandedKeyId] = useState<string | null>(null)
+  const [keyLogs, setKeyLogs] = useState<Record<string, ApiActivity[]>>({})
+  const [logsLoadingForKey, setLogsLoadingForKey] = useState<string | null>(null)
 
   const fetchKeys = async (t: string) => {
     try {
@@ -278,10 +301,23 @@ export function DeveloperPage() {
     } catch { /* network error */ }
   }
 
+  const fetchWebhooks = async (t: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/webhooks`, {
+        headers: { Authorization: `Bearer ${t}` },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setWebhooks(data.webhooks ?? [])
+      }
+    } catch { /* network error */ }
+  }
+
   useEffect(() => {
     if (token) {
       fetchKeys(token)
       fetchStats(token)
+      fetchWebhooks(token)
     }
   }, [token])
 
@@ -315,11 +351,88 @@ export function DeveloperPage() {
     setToken(null)
     setApiKeys([])
     setStats(null)
+    setWebhooks([])
+    setExpandedKeyId(null)
+    setKeyLogs({})
+  }
+
+  const fetchKeyLogs = async (keyId: string) => {
+    if (!token) return
+    setLogsLoadingForKey(keyId)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/activity?api_key_id=${encodeURIComponent(keyId)}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message || 'Failed to load logs')
+      setKeyLogs(prev => ({ ...prev, [keyId]: data.recent_activities ?? [] }))
+    } catch {
+      toast.error('Failed to load API call logs')
+      setKeyLogs(prev => ({ ...prev, [keyId]: [] }))
+    } finally {
+      setLogsLoadingForKey(null)
+    }
+  }
+
+  const toggleKeyLogs = async (keyId: string) => {
+    if (expandedKeyId === keyId) {
+      setExpandedKeyId(null)
+      return
+    }
+    setExpandedKeyId(keyId)
+    if (!keyLogs[keyId]) {
+      await fetchKeyLogs(keyId)
+    }
   }
 
   const copyKey = (key: string) => {
     navigator.clipboard.writeText(key)
     toast.success('Copied to clipboard')
+  }
+
+  const addWebhook = async () => {
+    if (!token) return
+    const url = webhookUrl.trim()
+    if (!url) {
+      toast.error('Enter a webhook URL')
+      return
+    }
+
+    setWebhookLoading(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/webhooks`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ url }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message || 'Failed to add webhook')
+      setWebhooks(prev => [data.webhook, ...prev])
+      setWebhookUrl('')
+      toast.success('Webhook added')
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to add webhook')
+    } finally {
+      setWebhookLoading(false)
+    }
+  }
+
+  const removeWebhook = async (id: string) => {
+    if (!token) return
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/webhooks/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (!res.ok) throw new Error('Failed to remove webhook')
+      setWebhooks(prev => prev.filter(w => w.id !== id))
+      toast.success('Webhook removed')
+    } catch {
+      toast.error('Failed to remove webhook')
+    }
   }
 
   if (!token) {
@@ -421,63 +534,110 @@ export function DeveloperPage() {
                   ))}
                 </tr>
               </thead>
-              <tbody>
+                            <tbody>
                 {apiKeys.map(key => (
-                  <tr key={key.id} style={{ borderBottom: `1px solid ${C.border}` }}>
-                    <td style={{ padding: '12px 16px', color: C.text, fontSize: 14 }}>{key.name}</td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <code style={{ fontFamily: C.mono, fontSize: 12, color: C.muted }}>{key.key_preview}</code>
-                        <button
-                          onClick={() => copyKey(key.key_preview)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.dim, padding: 2 }}
-                        >
-                          <ClipboardDocumentIcon style={{ width: 14, height: 14 }} />
-                        </button>
-                      </div>
-                    </td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <span style={{
-                        background: key.is_sandbox ? 'rgba(251,191,36,0.1)' : C.greenDim,
-                        color: key.is_sandbox ? C.amber : C.green,
-                        border: `1px solid ${key.is_sandbox ? C.amber : C.green}33`,
-                        borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 500,
-                      }}>
-                        {key.is_sandbox ? 'sandbox' : 'live'}
-                      </span>
-                    </td>
-                    <td style={{ padding: '12px 16px', color: C.muted, fontSize: 13 }}>
-                      {new Date(key.created_at).toLocaleDateString()}
-                    </td>
-                    <td style={{ padding: '12px 16px', color: C.muted, fontSize: 13 }}>
-                      {key.last_used_at ? new Date(key.last_used_at).toLocaleDateString() : '—'}
-                    </td>
-                    <td style={{ padding: '12px 16px' }}>
-                      {deleteId === key.id ? (
-                        <div style={{ display: 'flex', gap: 6 }}>
+                  <React.Fragment key={key.id}>
+                    <tr style={{ borderBottom: expandedKeyId === key.id ? 'none' : `1px solid ${C.border}` }}>
+                      <td style={{ padding: '12px 16px', color: C.text, fontSize: 14 }}>{key.name}</td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                          <code style={{ fontFamily: C.mono, fontSize: 12, color: C.muted }}>{key.key_preview}</code>
                           <button
-                            onClick={() => handleDelete(key.id)}
-                            style={{ background: C.redDim, color: C.red, border: `1px solid ${C.red}33`, borderRadius: 4, padding: '4px 10px', cursor: 'pointer', fontSize: 12 }}
+                            onClick={() => copyKey(key.key_preview)}
+                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.dim, padding: 2 }}
                           >
-                            Confirm
-                          </button>
-                          <button
-                            onClick={() => setDeleteId(null)}
-                            style={{ background: 'none', border: `1px solid ${C.border}`, color: C.muted, borderRadius: 4, padding: '4px 10px', cursor: 'pointer', fontSize: 12 }}
-                          >
-                            Cancel
+                            <ClipboardDocumentIcon style={{ width: 14, height: 14 }} />
                           </button>
                         </div>
-                      ) : (
-                        <button
-                          onClick={() => setDeleteId(key.id)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.dim, padding: 4 }}
-                        >
-                          <TrashIcon style={{ width: 15, height: 15 }} />
-                        </button>
-                      )}
-                    </td>
-                  </tr>
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        <span style={{
+                          background: key.is_sandbox ? 'rgba(251,191,36,0.1)' : C.greenDim,
+                          color: key.is_sandbox ? C.amber : C.green,
+                          border: `1px solid ${key.is_sandbox ? C.amber : C.green}33`,
+                          borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 500,
+                        }}>
+                          {key.is_sandbox ? 'sandbox' : 'live'}
+                        </span>
+                      </td>
+                      <td style={{ padding: '12px 16px', color: C.muted, fontSize: 13 }}>
+                        {new Date(key.created_at).toLocaleDateString()}
+                      </td>
+                      <td style={{ padding: '12px 16px', color: C.muted, fontSize: 13 }}>
+                        {key.last_used_at ? new Date(key.last_used_at).toLocaleDateString() : '—'}
+                      </td>
+                      <td style={{ padding: '12px 16px' }}>
+                        {deleteId === key.id ? (
+                          <div style={{ display: 'flex', gap: 6 }}>
+                            <button
+                              onClick={() => handleDelete(key.id)}
+                              style={{ background: C.redDim, color: C.red, border: `1px solid ${C.red}33`, borderRadius: 4, padding: '4px 10px', cursor: 'pointer', fontSize: 12 }}
+                            >
+                              Confirm
+                            </button>
+                            <button
+                              onClick={() => setDeleteId(null)}
+                              style={{ background: 'none', border: `1px solid ${C.border}`, color: C.muted, borderRadius: 4, padding: '4px 10px', cursor: 'pointer', fontSize: 12 }}
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        ) : (
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <button
+                              onClick={() => toggleKeyLogs(key.id)}
+                              style={{ background: 'none', border: 'none', color: C.cyan, cursor: 'pointer', fontSize: 12, padding: 2, fontFamily: C.mono }}
+                            >
+                              {expandedKeyId === key.id ? 'hide logs' : 'view logs'}
+                            </button>
+                            <button
+                              onClick={() => setDeleteId(key.id)}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.dim, padding: 4 }}
+                            >
+                              <TrashIcon style={{ width: 15, height: 15 }} />
+                            </button>
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+
+                    {expandedKeyId === key.id && (
+                      <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+                        <td colSpan={6} style={{ padding: '0 16px 14px 16px', background: C.panel }}>
+                          {logsLoadingForKey === key.id ? (
+                            <div style={{ color: C.muted, fontSize: 12, paddingTop: 4 }}>Loading logs…</div>
+                          ) : (keyLogs[key.id] ?? []).length === 0 ? (
+                            <div style={{ color: C.muted, fontSize: 12, paddingTop: 4 }}>No recent API calls for this key.</div>
+                          ) : (
+                            <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflowX: 'auto' }}>
+                              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                <thead>
+                                  <tr>
+                                    {['Time', 'Method', 'Endpoint', 'Status', 'Latency'].map(h => (
+                                      <th key={h} style={{ padding: '8px 10px', textAlign: 'left', color: C.muted, fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', borderBottom: `1px solid ${C.border}` }}>
+                                        {h}
+                                      </th>
+                                    ))}
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {(keyLogs[key.id] ?? []).map((log, index) => (
+                                    <tr key={`${log.timestamp}-${index}`} style={{ borderBottom: `1px solid ${C.border}` }}>
+                                      <td style={{ padding: '8px 10px', color: C.muted, fontSize: 12, fontFamily: C.mono }}>{new Date(log.timestamp).toLocaleString()}</td>
+                                      <td style={{ padding: '8px 10px', color: C.text, fontSize: 12, fontFamily: C.mono }}>{log.method}</td>
+                                      <td style={{ padding: '8px 10px', color: C.text, fontSize: 12, fontFamily: C.mono }}>{log.endpoint}</td>
+                                      <td style={{ padding: '8px 10px', color: log.status_code >= 400 ? C.red : C.green, fontSize: 12, fontFamily: C.mono }}>{log.status_code}</td>
+                                      <td style={{ padding: '8px 10px', color: C.muted, fontSize: 12, fontFamily: C.mono }}>{log.response_time_ms}ms</td>
+                                    </tr>
+                                  ))}
+                                </tbody>
+                              </table>
+                            </div>
+                          )}
+                        </td>
+                      </tr>
+                    )}
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>
@@ -513,11 +673,46 @@ export function DeveloperPage() {
             />
             <button
               style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text, borderRadius: 6, padding: '10px 18px', cursor: 'pointer', fontSize: 13, flexShrink: 0 }}
-              onClick={() => toast.success('Webhook test sent')}
+              onClick={addWebhook}
+              disabled={webhookLoading}
             >
-              Test
+              {webhookLoading ? 'Adding...' : 'Add'}
             </button>
           </div>
+          {webhooks.length > 0 && (
+            <div style={{ marginTop: 12, border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
+              {webhooks.map((hook, i) => (
+                <div
+                  key={hook.id}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    justifyContent: 'space-between',
+                    gap: 10,
+                    padding: '10px 12px',
+                    borderBottom: i < webhooks.length - 1 ? `1px solid ${C.border}` : 'none',
+                    background: C.surface,
+                  }}
+                >
+                  <code style={{ fontFamily: C.mono, fontSize: 12, color: C.text, wordBreak: 'break-all' }}>{hook.url}</code>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                    <button
+                      style={{ background: 'none', border: `1px solid ${C.border}`, color: C.muted, borderRadius: 6, padding: '6px 10px', cursor: 'pointer', fontSize: 12 }}
+                      onClick={() => toast.success('Webhook test sent')}
+                    >
+                      Test
+                    </button>
+                    <button
+                      style={{ background: 'none', border: `1px solid ${C.border}`, color: C.red, borderRadius: 6, padding: '6px 10px', cursor: 'pointer', fontSize: 12 }}
+                      onClick={() => removeWebhook(hook.id)}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
 
       </div>
@@ -533,3 +728,4 @@ export function DeveloperPage() {
     </div>
   )
 }
+

@@ -527,6 +527,144 @@ router.get('/stats',
   })
 );
 
+// List webhooks for developer (JWT-authenticated developer portal)
+router.get('/webhooks',
+  apiKeyRateLimit,
+  authenticateDeveloperJWT,
+  catchAsync(async (req: Request, res: Response) => {
+    const developer = req.developer;
+    if (!developer) {
+      throw new AuthenticationError('Developer authentication required');
+    }
+
+    const { data: webhooks, error } = await supabase
+      .from('webhooks')
+      .select('id, url, is_sandbox, is_active, created_at')
+      .eq('developer_id', developer.id)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      logger.error('Failed to list webhooks:', error);
+      throw new Error('Failed to list webhooks');
+    }
+
+    res.json({ webhooks: webhooks || [] });
+  })
+);
+
+// Create webhook for developer (JWT-authenticated developer portal)
+router.post('/webhooks',
+  apiKeyRateLimit,
+  authenticateDeveloperJWT,
+  [
+    body('url')
+      .isURL({ protocols: ['https'] })
+      .withMessage('Valid HTTPS webhook URL is required'),
+    body('is_sandbox')
+      .optional()
+      .isBoolean()
+      .withMessage('is_sandbox must be a boolean')
+  ],
+  catchAsync(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw new ValidationError('Validation failed', 'multiple', errors.array());
+    }
+
+    const developer = req.developer;
+    if (!developer) {
+      throw new AuthenticationError('Developer authentication required');
+    }
+
+    const { url, is_sandbox = false } = req.body;
+
+    const { data: existing, error: existingError } = await supabase
+      .from('webhooks')
+      .select('id')
+      .eq('developer_id', developer.id)
+      .eq('url', url)
+      .eq('is_sandbox', is_sandbox)
+      .single();
+
+    if (existingError && existingError.code !== 'PGRST116') {
+      logger.error('Failed to check existing webhook:', existingError);
+      throw new Error('Failed to validate webhook');
+    }
+
+    if (existing) {
+      throw new ValidationError('Webhook already exists for this URL', 'url', url);
+    }
+
+    const { data: webhook, error } = await supabase
+      .from('webhooks')
+      .insert({
+        developer_id: developer.id,
+        url,
+        is_sandbox
+      })
+      .select('id, url, is_sandbox, is_active, created_at')
+      .single();
+
+    if (error || !webhook) {
+      logger.error('Failed to create webhook:', error);
+      throw new Error('Failed to create webhook');
+    }
+
+    res.status(201).json({
+      webhook,
+      message: 'Webhook created successfully'
+    });
+  })
+);
+
+// Delete webhook for developer (JWT-authenticated developer portal)
+router.delete('/webhooks/:webhookId',
+  apiKeyRateLimit,
+  authenticateDeveloperJWT,
+  [
+    param('webhookId')
+      .isUUID()
+      .withMessage('Invalid webhook ID format')
+  ],
+  catchAsync(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw new ValidationError('Validation failed', 'multiple', errors.array());
+    }
+
+    const developer = req.developer;
+    if (!developer) {
+      throw new AuthenticationError('Developer authentication required');
+    }
+
+    const { webhookId } = req.params;
+
+    const { data: existingWebhook, error: checkError } = await supabase
+      .from('webhooks')
+      .select('id')
+      .eq('id', webhookId)
+      .eq('developer_id', developer.id)
+      .single();
+
+    if (checkError || !existingWebhook) {
+      throw new NotFoundError('Webhook');
+    }
+
+    const { error } = await supabase
+      .from('webhooks')
+      .delete()
+      .eq('id', webhookId)
+      .eq('developer_id', developer.id);
+
+    if (error) {
+      logger.error('Failed to delete webhook:', error);
+      throw new Error('Failed to delete webhook');
+    }
+
+    res.json({ message: 'Webhook deleted successfully' });
+  })
+);
+
 // Get API activity logs
 router.get('/activity',
   apiKeyRateLimit,
@@ -537,8 +675,30 @@ router.get('/activity',
       throw new AuthenticationError('Developer authentication required');
     }
 
-    // Get recent activities from memory (fast)
-    const recentActivities = getRecentActivities(developer.id);
+    const apiKeyIdParam = typeof req.query.api_key_id === 'string' ? req.query.api_key_id : undefined;
+
+    // If filtering by key, verify it belongs to the authenticated developer
+    if (apiKeyIdParam) {
+      if (!validator.isUUID(apiKeyIdParam)) {
+        throw new ValidationError('Invalid API key ID format', 'api_key_id', apiKeyIdParam);
+      }
+
+      const { data: ownedKey, error: keyError } = await supabase
+        .from('api_keys')
+        .select('id')
+        .eq('id', apiKeyIdParam)
+        .eq('developer_id', developer.id)
+        .eq('is_active', true)
+        .single();
+
+      if (keyError || !ownedKey) {
+        throw new NotFoundError('API key not found or does not belong to this developer');
+      }
+    }
+
+    // Get recent activities from memory (fast) and optionally filter by API key
+    const recentActivities = getRecentActivities(developer.id)
+      .filter(activity => !apiKeyIdParam || activity.api_key_id === apiKeyIdParam);
     
     // Debug logging for activities
     console.log(`🔍 Developer ${developer.id} activity check:`, {
@@ -571,6 +731,7 @@ router.get('/activity',
 
     // Format recent activities for frontend
     const formattedActivities = recentActivities.slice(0, 50).map(activity => ({
+      api_key_id: activity.api_key_id,
       timestamp: activity.timestamp || new Date(),
       method: activity.method,
       endpoint: activity.endpoint,
