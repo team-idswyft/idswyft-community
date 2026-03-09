@@ -742,10 +742,40 @@ router.get('/activity',
       error_message: activity.error_message
     }));
 
+    // Derive session IDs from endpoint paths and fetch true verification outcomes.
+    const sessionIdRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/ig;
+    const sessionIds = Array.from(
+      new Set(
+        formattedActivities.flatMap(activity => {
+          const matches = activity.endpoint?.match(sessionIdRegex) || [];
+          return matches;
+        })
+      )
+    );
+
+    let sessionOutcomes: Record<string, string> = {};
+    if (sessionIds.length > 0) {
+      const { data: verificationRows, error: sessionError } = await supabase
+        .from('verification_requests')
+        .select('id, status')
+        .eq('developer_id', developer.id)
+        .in('id', sessionIds);
+
+      if (sessionError) {
+        logger.error('Failed to fetch session outcomes:', sessionError);
+      } else {
+        sessionOutcomes = (verificationRows || []).reduce((acc: Record<string, string>, row: any) => {
+          if (row?.id && row?.status) acc[row.id] = row.status;
+          return acc;
+        }, {});
+      }
+    }
+
     res.json({
       statistics: stats,
       recent_activities: formattedActivities,
-      total_activities: recentActivities.length
+      total_activities: recentActivities.length,
+      session_outcomes: sessionOutcomes
     });
   })
 );

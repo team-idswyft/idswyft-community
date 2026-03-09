@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+﻿import React, { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
 import { Link } from 'react-router-dom'
 import { API_BASE_URL } from '../config/api'
@@ -9,7 +9,7 @@ import {
   ClipboardDocumentIcon,
 } from '@heroicons/react/24/outline'
 
-// ─── Types ────────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 interface ApiKey {
   id: string
@@ -39,6 +39,8 @@ interface ApiActivity {
   status_code: number
   response_time_ms: number
   error_message?: string
+  user_agent?: string
+  ip_address?: string
 }
 
 interface DeveloperWebhook {
@@ -49,7 +51,7 @@ interface DeveloperWebhook {
   created_at: string
 }
 
-// ─── Shared styles ────────────────────────────────────────────────────────────
+// â”€â”€â”€ Shared styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 const inputStyle: React.CSSProperties = {
   background: C.surface,
@@ -72,7 +74,7 @@ const labelStyle: React.CSSProperties = {
   fontWeight: 500,
 }
 
-// ─── Auth gate ────────────────────────────────────────────────────────────────
+// â”€â”€â”€ Auth gate â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function AuthGate({ onAuth }: { onAuth: (token: string) => void }) {
   const [mode, setMode] = useState<'login' | 'register'>('login')
@@ -93,7 +95,7 @@ function AuthGate({ onAuth }: { onAuth: (token: string) => void }) {
         })
         const data = await res.json()
         if (!res.ok) throw new Error(data.message || 'Registration failed')
-        // Auto-login after register (passwordless — email only)
+        // Auto-login after register (passwordless â€” email only)
         const loginRes = await fetch(`${API_BASE_URL}/api/auth/developer/login`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
@@ -156,7 +158,7 @@ function AuthGate({ onAuth }: { onAuth: (token: string) => void }) {
             disabled={loading}
             style={{ background: C.cyan, color: C.bg, borderRadius: 8, padding: '11px 0', fontWeight: 600, fontSize: 14, border: 'none', cursor: loading ? 'not-allowed' : 'pointer', opacity: loading ? 0.7 : 1, marginTop: 4 }}
           >
-            {loading ? 'Loading…' : mode === 'login' ? 'Sign in' : 'Create account'}
+            {loading ? 'Loadingâ€¦' : mode === 'login' ? 'Sign in' : 'Create account'}
           </button>
         </form>
 
@@ -174,7 +176,7 @@ function AuthGate({ onAuth }: { onAuth: (token: string) => void }) {
   )
 }
 
-// ─── Create key modal ─────────────────────────────────────────────────────────
+// â”€â”€â”€ Create key modal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 function CreateKeyModal({ onClose, onCreated, token }: {
   onClose: () => void
@@ -255,7 +257,7 @@ function CreateKeyModal({ onClose, onCreated, token }: {
               disabled={loading}
               style={{ flex: 1, background: C.cyan, color: C.bg, border: 'none', borderRadius: 8, padding: '10px 0', fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', fontSize: 14, opacity: loading ? 0.7 : 1 }}
             >
-              {loading ? 'Creating…' : 'Create Key'}
+              {loading ? 'Creatingâ€¦' : 'Create Key'}
             </button>
           </div>
         </form>
@@ -264,7 +266,7 @@ function CreateKeyModal({ onClose, onCreated, token }: {
   )
 }
 
-// ─── Main portal ──────────────────────────────────────────────────────────────
+// â”€â”€â”€ Main portal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
 export function DeveloperPage() {
   useEffect(() => { injectFonts() }, [])
@@ -280,7 +282,11 @@ export function DeveloperPage() {
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [expandedKeyId, setExpandedKeyId] = useState<string | null>(null)
   const [keyLogs, setKeyLogs] = useState<Record<string, ApiActivity[]>>({})
+  const [keySessionOutcomes, setKeySessionOutcomes] = useState<Record<string, Record<string, string>>>({})
   const [logsLoadingForKey, setLogsLoadingForKey] = useState<string | null>(null)
+  const [selectedLog, setSelectedLog] = useState<ApiActivity | null>(null)
+  const [logSearchByKey, setLogSearchByKey] = useState<Record<string, string>>({})
+  const [expandedSessionByKey, setExpandedSessionByKey] = useState<Record<string, string | null>>({})
 
   const fetchKeys = async (t: string) => {
     try {
@@ -289,7 +295,7 @@ export function DeveloperPage() {
       })
       if (res.status === 401) { localStorage.removeItem('developer_token'); setToken(null); return }
       if (res.ok) setApiKeys((await res.json()).api_keys ?? [])
-    } catch { /* network error — backend offline, show empty state */ }
+    } catch { /* network error â€” backend offline, show empty state */ }
   }
 
   const fetchStats = async (t: string) => {
@@ -354,6 +360,7 @@ export function DeveloperPage() {
     setWebhooks([])
     setExpandedKeyId(null)
     setKeyLogs({})
+    setKeySessionOutcomes({})
   }
 
   const fetchKeyLogs = async (keyId: string) => {
@@ -366,6 +373,7 @@ export function DeveloperPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.message || 'Failed to load logs')
       setKeyLogs(prev => ({ ...prev, [keyId]: data.recent_activities ?? [] }))
+      setKeySessionOutcomes(prev => ({ ...prev, [keyId]: data.session_outcomes ?? {} }))
     } catch {
       toast.error('Failed to load API call logs')
       setKeyLogs(prev => ({ ...prev, [keyId]: [] }))
@@ -383,6 +391,77 @@ export function DeveloperPage() {
     if (!keyLogs[keyId]) {
       await fetchKeyLogs(keyId)
     }
+  }
+
+  const inferResourceLabel = (endpoint: string) => {
+    const clean = endpoint.split('?')[0]
+    const parts = clean.split('/').filter(Boolean)
+    if (parts.length === 0) return 'unknown'
+    const apiIndex = parts.indexOf('api')
+    if (apiIndex >= 0 && parts[apiIndex + 1]) return parts[apiIndex + 1]
+    return parts[0]
+  }
+
+  const extractSessionId = (endpoint: string) => {
+    const uuidMatch = endpoint.match(/[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/i)
+    if (uuidMatch) return uuidMatch[0]
+    const queryMatch = endpoint.match(/(?:session_id|verification_id)=([^&]+)/i)
+    if (queryMatch && queryMatch[1]) return decodeURIComponent(queryMatch[1])
+    return 'no-session'
+  }
+
+  const groupLogsBySession = (logs: ApiActivity[]) => {
+    const sorted = [...logs].sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+    const explicit = sorted.map(log => {
+      const sid = extractSessionId(log.endpoint)
+      return sid === 'no-session' ? null : sid
+    })
+
+    const prevSession: Array<string | null> = []
+    const nextSession: Array<string | null> = new Array(sorted.length).fill(null)
+
+    let currentPrev: string | null = null
+    for (let i = 0; i < sorted.length; i++) {
+      if (explicit[i]) currentPrev = explicit[i]
+      prevSession[i] = currentPrev
+    }
+
+    let currentNext: string | null = null
+    for (let i = sorted.length - 1; i >= 0; i--) {
+      if (explicit[i]) currentNext = explicit[i]
+      nextSession[i] = currentNext
+    }
+
+    return sorted.reduce<Record<string, ApiActivity[]>>((acc, log, idx) => {
+      const rawSession = extractSessionId(log.endpoint)
+      const assignedSession =
+        rawSession !== 'no-session'
+          ? rawSession
+          : (prevSession[idx] || nextSession[idx] || 'no-session')
+      if (!acc[assignedSession]) acc[assignedSession] = []
+      acc[assignedSession].push(log)
+      return acc
+    }, {})
+  }
+
+  const toggleSessionGroup = (keyId: string, sessionId: string) => {
+    setExpandedSessionByKey(prev => ({
+      ...prev,
+      [keyId]: prev[keyId] === sessionId ? null : sessionId,
+    }))
+  }
+
+  const inferActionLabel = (method: string, endpoint: string) => {
+    const lowerMethod = method.toUpperCase()
+    const lowerEndpoint = endpoint.toLowerCase()
+    if (lowerMethod === 'POST' && lowerEndpoint.includes('/start')) return 'Start verification flow'
+    if (lowerMethod === 'POST' && lowerEndpoint.includes('/upload')) return 'Upload verification artifact'
+    if (lowerMethod === 'GET' && lowerEndpoint.includes('/status')) return 'Read verification status'
+    if (lowerMethod === 'POST') return 'Create/submit resource'
+    if (lowerMethod === 'GET') return 'Read resource'
+    if (lowerMethod === 'PUT' || lowerMethod === 'PATCH') return 'Update resource'
+    if (lowerMethod === 'DELETE') return 'Delete resource'
+    return 'Process API call'
   }
 
   const copyKey = (key: string) => {
@@ -472,7 +551,7 @@ export function DeveloperPage() {
         {newFullKey && (
           <div style={{ background: C.greenDim, border: `1px solid ${C.green}`, borderRadius: 8, padding: '14px 18px', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12, color: C.green, fontWeight: 600, marginBottom: 4 }}>Key created — copy it now, it won't be shown again</div>
+              <div style={{ fontSize: 12, color: C.green, fontWeight: 600, marginBottom: 4 }}>Key created â€” copy it now, it won't be shown again</div>
               <code style={{ fontFamily: C.mono, fontSize: 13, color: C.text, wordBreak: 'break-all' }}>{newFullKey}</code>
             </div>
             <button
@@ -485,7 +564,7 @@ export function DeveloperPage() {
               onClick={() => setNewFullKey(null)}
               style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: 18, padding: '0 4px' }}
             >
-              ×
+              Ã—
             </button>
           </div>
         )}
@@ -564,7 +643,7 @@ export function DeveloperPage() {
                         {new Date(key.created_at).toLocaleDateString()}
                       </td>
                       <td style={{ padding: '12px 16px', color: C.muted, fontSize: 13 }}>
-                        {key.last_used_at ? new Date(key.last_used_at).toLocaleDateString() : '—'}
+                        {key.last_used_at ? new Date(key.last_used_at).toLocaleDateString() : 'â€”'}
                       </td>
                       <td style={{ padding: '12px 16px' }}>
                         {deleteId === key.id ? (
@@ -605,34 +684,127 @@ export function DeveloperPage() {
                       <tr style={{ borderBottom: `1px solid ${C.border}` }}>
                         <td colSpan={6} style={{ padding: '0 16px 14px 16px', background: C.panel }}>
                           {logsLoadingForKey === key.id ? (
-                            <div style={{ color: C.muted, fontSize: 12, paddingTop: 4 }}>Loading logs…</div>
+                            <div style={{ color: C.muted, fontSize: 12, paddingTop: 4 }}>Loading logsâ€¦</div>
                           ) : (keyLogs[key.id] ?? []).length === 0 ? (
                             <div style={{ color: C.muted, fontSize: 12, paddingTop: 4 }}>No recent API calls for this key.</div>
                           ) : (
-                            <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflowX: 'auto' }}>
-                              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                                <thead>
-                                  <tr>
-                                    {['Time', 'Method', 'Endpoint', 'Status', 'Latency'].map(h => (
-                                      <th key={h} style={{ padding: '8px 10px', textAlign: 'left', color: C.muted, fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', borderBottom: `1px solid ${C.border}` }}>
-                                        {h}
-                                      </th>
-                                    ))}
-                                  </tr>
-                                </thead>
-                                <tbody>
-                                  {(keyLogs[key.id] ?? []).map((log, index) => (
-                                    <tr key={`${log.timestamp}-${index}`} style={{ borderBottom: `1px solid ${C.border}` }}>
-                                      <td style={{ padding: '8px 10px', color: C.muted, fontSize: 12, fontFamily: C.mono }}>{new Date(log.timestamp).toLocaleString()}</td>
-                                      <td style={{ padding: '8px 10px', color: C.text, fontSize: 12, fontFamily: C.mono }}>{log.method}</td>
-                                      <td style={{ padding: '8px 10px', color: C.text, fontSize: 12, fontFamily: C.mono }}>{log.endpoint}</td>
-                                      <td style={{ padding: '8px 10px', color: log.status_code >= 400 ? C.red : C.green, fontSize: 12, fontFamily: C.mono }}>{log.status_code}</td>
-                                      <td style={{ padding: '8px 10px', color: C.muted, fontSize: 12, fontFamily: C.mono }}>{log.response_time_ms}ms</td>
-                                    </tr>
-                                  ))}
-                                </tbody>
-                              </table>
-                            </div>
+                            <>
+                              <div style={{ marginBottom: 10 }}>
+                                <input
+                                  style={{ ...inputStyle, fontSize: 12, padding: '8px 10px' }}
+                                  value={logSearchByKey[key.id] ?? ''}
+                                  onChange={e => setLogSearchByKey(prev => ({ ...prev, [key.id]: e.target.value }))}
+                                  placeholder="Search session ID or endpoint"
+                                />
+                              </div>
+                              {(() => {
+                                const searchTerm = (logSearchByKey[key.id] ?? '').trim().toLowerCase()
+                                const filteredLogs = (keyLogs[key.id] ?? []).filter(log => {
+                                  const sessionId = extractSessionId(log.endpoint).toLowerCase()
+                                  return !searchTerm || sessionId.includes(searchTerm) || log.endpoint.toLowerCase().includes(searchTerm)
+                                })
+
+                                const grouped = groupLogsBySession(filteredLogs)
+
+                                const sessionIds = Object.keys(grouped).sort((a, b) => {
+                                  const aLatest = grouped[a].reduce((max, log) => Math.max(max, new Date(log.timestamp).getTime()), 0)
+                                  const bLatest = grouped[b].reduce((max, log) => Math.max(max, new Date(log.timestamp).getTime()), 0)
+                                  return bLatest - aLatest
+                                })
+
+                                if (sessionIds.length === 0) {
+                                  return <div style={{ color: C.muted, fontSize: 12, paddingTop: 4 }}>No sessions matched your search.</div>
+                                }
+
+                                return (
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                                    {sessionIds.map(sessionId => {
+                                      const logs = grouped[sessionId]
+                                      const latestTs = logs.reduce((max, log) => Math.max(max, new Date(log.timestamp).getTime()), 0)
+                                      const isOpen = expandedSessionByKey[key.id] === sessionId
+                                      const verificationOutcome = (keySessionOutcomes[key.id] ?? {})[sessionId]
+                                      const normalizedOutcome = verificationOutcome ? verificationOutcome.toLowerCase() : ''
+                                      const isFailedOutcome = normalizedOutcome === 'failed'
+                                      const isSuccessOutcome = normalizedOutcome === 'verified'
+                                      const outcomeLabel = isFailedOutcome
+                                        ? 'failed'
+                                        : isSuccessOutcome
+                                          ? 'succeeded'
+                                          : verificationOutcome || 'in_progress'
+
+                                      return (
+                                        <div key={sessionId} style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
+                                          <button
+                                            onClick={() => toggleSessionGroup(key.id, sessionId)}
+                                            style={{ width: '100%', background: C.surface, border: 'none', borderBottom: isOpen ? `1px solid ${C.border}` : 'none', textAlign: 'left', padding: '10px 12px', cursor: 'pointer' }}
+                                          >
+                                            <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
+                                              <div>
+                                                <div style={{ fontFamily: C.mono, fontSize: 12, color: C.text }}>
+                                                  Session: {sessionId === 'no-session' ? 'unscoped request' : sessionId}
+                                                </div>
+                                                <div style={{ fontSize: 11, color: C.muted, marginTop: 2, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
+                                                  <span>{logs.length} call{logs.length > 1 ? 's' : ''} • last activity {new Date(latestTs).toLocaleString()}</span>
+                                                  <span
+                                                    style={{
+                                                      background: isFailedOutcome ? C.redDim : isSuccessOutcome ? C.greenDim : C.surface,
+                                                      color: isFailedOutcome ? C.red : isSuccessOutcome ? C.green : C.muted,
+                                                      border: `1px solid ${isFailedOutcome ? `${C.red}33` : isSuccessOutcome ? `${C.green}33` : C.border}`,
+                                                      borderRadius: 4,
+                                                      padding: '1px 6px',
+                                                      fontSize: 10,
+                                                      fontFamily: C.mono,
+                                                      textTransform: 'uppercase',
+                                                      letterSpacing: '0.04em',
+                                                    }}
+                                                  >
+                                                    {outcomeLabel}
+                                                  </span>
+                                                </div>
+                                              </div>
+                                              <div style={{ color: C.cyan, fontSize: 12, fontFamily: C.mono }}>
+                                                {isOpen ? 'hide' : 'open'}
+                                              </div>
+                                            </div>
+                                          </button>
+
+                                          {isOpen && (
+                                            <div style={{ overflowX: 'auto' }}>
+                                              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                                <thead>
+                                                  <tr>
+                                                    {['Time', 'Method', 'Endpoint', 'Status', 'Latency'].map(h => (
+                                                      <th key={h} style={{ padding: '8px 10px', textAlign: 'left', color: C.muted, fontSize: 10, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', borderBottom: `1px solid ${C.border}` }}>
+                                                        {h}
+                                                      </th>
+                                                    ))}
+                                                  </tr>
+                                                </thead>
+                                                <tbody>
+                                                  {logs.map((log, index) => (
+                                                    <tr
+                                                      key={`${sessionId}-${log.timestamp}-${index}`}
+                                                      style={{ borderBottom: `1px solid ${C.border}`, cursor: 'pointer' }}
+                                                      onClick={() => setSelectedLog(log)}
+                                                    >
+                                                      <td style={{ padding: '8px 10px', color: C.muted, fontSize: 12, fontFamily: C.mono }}>{new Date(log.timestamp).toLocaleString()}</td>
+                                                      <td style={{ padding: '8px 10px', color: C.text, fontSize: 12, fontFamily: C.mono }}>{log.method}</td>
+                                                      <td style={{ padding: '8px 10px', color: C.text, fontSize: 12, fontFamily: C.mono }}>{log.endpoint}</td>
+                                                      <td style={{ padding: '8px 10px', color: log.status_code >= 400 ? C.red : C.green, fontSize: 12, fontFamily: C.mono }}>{log.status_code}</td>
+                                                      <td style={{ padding: '8px 10px', color: C.muted, fontSize: 12, fontFamily: C.mono }}>{log.response_time_ms}ms</td>
+                                                    </tr>
+                                                  ))}
+                                                </tbody>
+                                              </table>
+                                            </div>
+                                          )}
+                                        </div>
+                                      )
+                                    })}
+                                  </div>
+                                )
+                              })()}
+                            </>
                           )}
                         </td>
                       </tr>
@@ -652,7 +824,7 @@ export function DeveloperPage() {
           </pre>
           <div style={{ marginTop: 12 }}>
             <Link to="/docs" style={{ color: C.cyan, fontSize: 13, textDecoration: 'none' }}>
-              Full documentation →
+              Full documentation â†’
             </Link>
           </div>
         </div>
@@ -725,7 +897,84 @@ export function DeveloperPage() {
           onCreated={handleCreated}
         />
       )}
+
+      {selectedLog && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 60 }}
+          onClick={() => setSelectedLog(null)}
+        >
+          <div
+            style={{ width: '100%', maxWidth: 760, background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 24 }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+              <div>
+                <div style={{ fontFamily: C.mono, fontSize: 11, color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                  API Call Debug Details
+                </div>
+                <div style={{ color: C.text, fontSize: 16, fontWeight: 600, marginTop: 4 }}>
+                  {selectedLog.method} {selectedLog.endpoint}
+                </div>
+              </div>
+              <button
+                onClick={() => setSelectedLog(null)}
+                style={{ background: 'none', border: `1px solid ${C.border}`, color: C.muted, borderRadius: 6, padding: '6px 10px', cursor: 'pointer', fontSize: 12 }}
+              >
+                Close
+              </button>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12, marginBottom: 16 }}>
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12 }}>
+                <div style={{ color: C.muted, fontSize: 11, marginBottom: 4 }}>Session ID</div>
+                <div style={{ color: C.text, fontFamily: C.mono, fontSize: 13 }}>
+                  {extractSessionId(selectedLog.endpoint) === 'no-session' ? 'not detected in endpoint' : extractSessionId(selectedLog.endpoint)}
+                </div>
+              </div>
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12 }}>
+                <div style={{ color: C.muted, fontSize: 11, marginBottom: 4 }}>Resource</div>
+                <div style={{ color: C.text, fontFamily: C.mono, fontSize: 13 }}>{inferResourceLabel(selectedLog.endpoint)}</div>
+              </div>
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12 }}>
+                <div style={{ color: C.muted, fontSize: 11, marginBottom: 4 }}>Action</div>
+                <div style={{ color: C.text, fontSize: 13 }}>{inferActionLabel(selectedLog.method, selectedLog.endpoint)}</div>
+              </div>
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12 }}>
+                <div style={{ color: C.muted, fontSize: 11, marginBottom: 4 }}>Status / Latency</div>
+                <div style={{ color: selectedLog.status_code >= 400 ? C.red : C.green, fontFamily: C.mono, fontSize: 13 }}>
+                  {selectedLog.status_code} in {selectedLog.response_time_ms}ms
+                </div>
+              </div>
+              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12 }}>
+                <div style={{ color: C.muted, fontSize: 11, marginBottom: 4 }}>Timestamp</div>
+                <div style={{ color: C.text, fontFamily: C.mono, fontSize: 13 }}>{new Date(selectedLog.timestamp).toLocaleString()}</div>
+              </div>
+            </div>
+
+            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12, marginBottom: 12 }}>
+              <div style={{ color: C.muted, fontSize: 11, marginBottom: 6 }}>Client Context</div>
+              <div style={{ color: C.text, fontSize: 13, marginBottom: 6 }}>
+                IP: <code style={{ fontFamily: C.mono, color: C.muted }}>{selectedLog.ip_address || 'not captured'}</code>
+              </div>
+              <div style={{ color: C.text, fontSize: 13 }}>
+                User-Agent: <code style={{ fontFamily: C.mono, color: C.muted }}>{selectedLog.user_agent || 'not captured'}</code>
+              </div>
+            </div>
+
+            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12 }}>
+              <div style={{ color: C.muted, fontSize: 11, marginBottom: 6 }}>Outcome</div>
+              <div style={{ color: selectedLog.status_code >= 400 ? C.red : C.green, fontSize: 13 }}>
+                {selectedLog.error_message || (selectedLog.status_code >= 400 ? 'Request failed' : 'Request completed successfully')}
+              </div>
+              <div style={{ color: C.muted, fontSize: 12, marginTop: 8 }}>
+                Request/response body payloads are not currently captured in this log stream.
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
+
 
