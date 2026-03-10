@@ -56,7 +56,7 @@ export function TotpModal({ tempToken, onSuccess, onCancel }: Props) {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
+    <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/70 backdrop-blur-sm">
       <div className="bg-[#0f1420] border border-white/10 rounded-xl p-8 w-full max-w-sm shadow-2xl">
         <h2 className="text-xl font-semibold mb-2">Two-Factor Authentication</h2>
         <p className="text-sm text-gray-500 mb-6">

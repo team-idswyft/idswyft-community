@@ -254,7 +254,7 @@ export default function Webhooks() {
 
   const getStatusIcon = (webhook: Webhook) => {
     if (!webhook.enabled) {
-      return <XCircle className="w-4 h-4 text-gray-400" />;
+      return <XCircle className="w-4 h-4 text-slate-500" />;
     }
     
     if (webhook.failure_count > 0) {
@@ -276,26 +276,26 @@ export default function Webhooks() {
       {/* Enhanced Header */}
       <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start space-y-4 lg:space-y-0">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Webhook Management</h1>
-          <p className="text-gray-600 mt-1">Monitor and manage webhook endpoints for real-time event notifications</p>
+          <h1 className="text-3xl font-bold text-slate-100">Webhook Management</h1>
+          <p className="text-slate-400 mt-1">Monitor and manage webhook endpoints for real-time event notifications</p>
           
           {/* Stats Bar */}
           <div className="flex items-center space-x-6 mt-4">
             <div className="flex items-center space-x-2">
               <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-              <span className="text-sm text-gray-600">Total: {webhookStats.total}</span>
+              <span className="text-sm text-slate-400">Total: {webhookStats.total}</span>
             </div>
             <div className="flex items-center space-x-2">
               <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-              <span className="text-sm text-gray-600">Active: {webhookStats.active}</span>
+              <span className="text-sm text-slate-400">Active: {webhookStats.active}</span>
             </div>
             <div className="flex items-center space-x-2">
               <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-              <span className="text-sm text-gray-600">Failing: {webhookStats.failing}</span>
+              <span className="text-sm text-slate-400">Failing: {webhookStats.failing}</span>
             </div>
             <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-gray-400 rounded-full"></div>
-              <span className="text-sm text-gray-600">Disabled: {webhookStats.disabled}</span>
+              <div className="w-3 h-3 bg-slate-500 rounded-full"></div>
+              <span className="text-sm text-slate-400">Disabled: {webhookStats.disabled}</span>
             </div>
           </div>
         </div>
@@ -340,18 +340,18 @@ export default function Webhooks() {
 
       {/* Enhanced Filters and Search */}
       <div className="content-card-glass">
-        <div className="p-4 border-b border-gray-200">
+        <div className="p-4 border-b border-white/10">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
             <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-4">
               {/* Search */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 w-4 h-4" />
                 <input
                   type="text"
                   placeholder="Search webhooks..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full sm:w-64"
+                  className="pl-10 pr-4 py-2 border border-white/15 rounded-md focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 w-full sm:w-64"
                 />
               </div>
 
@@ -359,7 +359,7 @@ export default function Webhooks() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="px-3 py-2 border border-white/15 rounded-md focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
               >
                 <option value="all">All Status</option>
                 <option value="active">Active</option>
@@ -367,7 +367,7 @@ export default function Webhooks() {
                 <option value="disabled">Disabled</option>
               </select>
 
-              <div className="text-sm text-gray-500">
+              <div className="text-sm text-slate-500">
                 Showing {filteredWebhooks.length} of {webhooks.length} webhooks
               </div>
             </div>
@@ -375,7 +375,7 @@ export default function Webhooks() {
             {/* Bulk Actions */}
             {selectedWebhooks.length > 0 && (
               <div className="flex items-center space-x-2">
-                <span className="text-sm text-gray-600">
+                <span className="text-sm text-slate-400">
                   {selectedWebhooks.length} selected
                 </span>
                 
@@ -414,9 +414,9 @@ export default function Webhooks() {
           </div>
         ) : filteredWebhooks.length === 0 ? (
           <div className="text-center py-12">
-            <Globe className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">No webhooks configured</h3>
-            <p className="text-gray-600 mb-4">
+            <Globe className="w-12 h-12 text-slate-500 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-slate-100 mb-2">No webhooks configured</h3>
+            <p className="text-slate-400 mb-4">
               Set up webhook endpoints to receive real-time notifications about verification events
             </p>
             <button
@@ -430,65 +430,65 @@ export default function Webhooks() {
         ) : (
           <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50">
+              <thead className="bg-slate-900/60">
                 <tr>
                   <th className="px-6 py-3">
                     <input
                       type="checkbox"
                       checked={selectedWebhooks.length === filteredWebhooks.length && filteredWebhooks.length > 0}
                       onChange={(e) => selectAllWebhooks(e.target.checked)}
-                      className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                      className="h-4 w-4 text-cyan-300 focus:ring-cyan-500 border-white/15 rounded"
                     />
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Webhook URL
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Events
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Status & Health
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Last Activity
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white/30 backdrop-blur-sm divide-y divide-white/20">
+              <tbody className="bg-slate-900/55 backdrop-blur-sm divide-y divide-white/20">
                 {filteredWebhooks.map((webhook) => (
-                  <tr key={webhook.id} className="hover:bg-gray-50">
+                  <tr key={webhook.id} className="hover:bg-slate-900/60">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <input
                         type="checkbox"
                         checked={selectedWebhooks.includes(webhook.id)}
                         onChange={() => toggleWebhookSelection(webhook.id)}
-                        className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
+                        className="h-4 w-4 text-cyan-300 focus:ring-cyan-500 border-white/15 rounded"
                       />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <Globe className="w-5 h-5 text-gray-400 mr-3" />
+                        <Globe className="w-5 h-5 text-slate-500 mr-3" />
                         <div>
-                          <div className="text-sm font-medium text-gray-900">
+                          <div className="text-sm font-medium text-slate-100">
                             {webhook.url}
                           </div>
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-slate-500">
                             ID: {webhook.id.substring(0, 8)}...
                           </div>
-                          <span className="text-xs text-gray-400">
+                          <span className="text-xs text-slate-500">
                             {webhook.max_retries ?? 3} retries · {webhook.retry_backoff_minutes ?? 5} min backoff
                           </span>
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
+                      <div className="text-sm text-slate-100">
                         {webhook.events.length} event{webhook.events.length !== 1 ? 's' : ''}
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-slate-500">
                         {webhook.events.slice(0, 2).join(', ')}
                         {webhook.events.length > 2 && ` +${webhook.events.length - 2} more`}
                       </div>
@@ -499,7 +499,7 @@ export default function Webhooks() {
                           {getStatusIcon(webhook)}
                           <span className={`ml-2 text-sm font-medium ${
                             !webhook.enabled 
-                              ? 'text-gray-500' 
+                              ? 'text-slate-500' 
                               : webhook.failure_count > 0 
                                 ? 'text-yellow-600' 
                                 : 'text-green-600'
@@ -513,7 +513,7 @@ export default function Webhooks() {
                           </span>
                         </div>
                         {webhook.enabled && (
-                          <div className="text-xs text-gray-500">
+                          <div className="text-xs text-slate-500">
                             {webhook.last_success_at 
                               ? `Last success: ${formatDate(webhook.last_success_at).split(',')[0]}`
                               : 'Never delivered'
@@ -522,7 +522,7 @@ export default function Webhooks() {
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                       {webhook.last_success_at ? (
                         <div>
                           <div>Success: {formatDate(webhook.last_success_at)}</div>
@@ -552,7 +552,7 @@ export default function Webhooks() {
                         
                         <button
                           onClick={() => testWebhook(webhook.id)}
-                          className="text-blue-600 hover:text-blue-900"
+                          className="text-cyan-300 hover:text-cyan-200"
                           title="Send test"
                         >
                           <RefreshCw className="w-4 h-4" />
@@ -560,7 +560,7 @@ export default function Webhooks() {
                         
                         <button
                           onClick={() => toggleWebhook(webhook.id, !webhook.enabled)}
-                          className={webhook.enabled ? "text-yellow-600 hover:text-yellow-900" : "text-green-600 hover:text-green-900"}
+                          className={webhook.enabled ? "text-amber-300 hover:text-amber-200" : "text-emerald-300 hover:text-emerald-200"}
                           title={webhook.enabled ? "Disable" : "Enable"}
                         >
                           {webhook.enabled ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
@@ -571,7 +571,7 @@ export default function Webhooks() {
                             setSelectedWebhook(webhook);
                             setShowCreateModal(true);
                           }}
-                          className="text-gray-600 hover:text-gray-900"
+                          className="text-slate-400 hover:text-slate-100"
                           title="Edit"
                         >
                           <Edit className="w-4 h-4" />
@@ -743,20 +743,20 @@ function WebhookFormModal({ webhook, onClose, onSuccess }: WebhookFormModalProps
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white">
+    <div className="fixed inset-0 z-[120] overflow-y-auto h-full w-full bg-slate-950/70 backdrop-blur-sm">
+      <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-slate-900">
         <div className="flex justify-between items-start mb-6">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">
+            <h3 className="text-lg font-semibold text-slate-100">
               {webhook ? 'Edit Webhook' : 'Add New Webhook'}
             </h3>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-slate-500 mt-1">
               Configure webhook endpoint to receive real-time notifications
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-slate-500 hover:text-slate-400"
           >
             <XCircle className="w-6 h-6" />
           </button>
@@ -766,7 +766,7 @@ function WebhookFormModal({ webhook, onClose, onSuccess }: WebhookFormModalProps
           <div>
             <label className="form-label">Webhook URL *</label>
             <div className="relative">
-              <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 w-4 h-4" />
               <input
                 type="url"
                 className={`form-input pl-10 ${errors.url ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}`}
@@ -779,7 +779,7 @@ function WebhookFormModal({ webhook, onClose, onSuccess }: WebhookFormModalProps
               />
             </div>
             {errors.url && <p className="mt-1 text-sm text-red-600">{errors.url}</p>}
-            <p className="mt-1 text-sm text-gray-500">
+            <p className="mt-1 text-sm text-slate-500">
               HTTPS URLs are recommended for security
             </p>
           </div>
@@ -787,7 +787,7 @@ function WebhookFormModal({ webhook, onClose, onSuccess }: WebhookFormModalProps
           <div>
             <label className="form-label">Secret Key (Optional)</label>
             <div className="relative">
-              <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 w-4 h-4" />
               <input
                 type={showSecretKey ? 'text' : 'password'}
                 className="form-input pl-10 pr-20"
@@ -799,7 +799,7 @@ function WebhookFormModal({ webhook, onClose, onSuccess }: WebhookFormModalProps
                 <button
                   type="button"
                   onClick={() => setShowSecretKey(!showSecretKey)}
-                  className="text-gray-400 hover:text-gray-600"
+                  className="text-slate-500 hover:text-slate-400"
                 >
                   {showSecretKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
                 </button>
@@ -807,7 +807,7 @@ function WebhookFormModal({ webhook, onClose, onSuccess }: WebhookFormModalProps
                   <button
                     type="button"
                     onClick={copySecretKey}
-                    className="text-gray-400 hover:text-gray-600"
+                    className="text-slate-500 hover:text-slate-400"
                     title="Copy secret key"
                   >
                     <Copy className="w-4 h-4" />
@@ -816,7 +816,7 @@ function WebhookFormModal({ webhook, onClose, onSuccess }: WebhookFormModalProps
               </div>
             </div>
             <div className="flex justify-between items-center mt-1">
-              <p className="text-sm text-gray-500">
+              <p className="text-sm text-slate-500">
                 {webhook?.id
                   ? 'Leave blank to keep the existing secret. Enter a new value to rotate it.'
                   : 'Used to verify webhook authenticity (HMAC-SHA256)'}
@@ -834,7 +834,7 @@ function WebhookFormModal({ webhook, onClose, onSuccess }: WebhookFormModalProps
           <div>
             <label className="form-label">Events to Listen For *</label>
             {errors.events && <p className="mb-2 text-sm text-red-600">{errors.events}</p>}
-            <div className="space-y-2 max-h-48 overflow-y-auto border border-gray-200 rounded-lg p-3">
+            <div className="space-y-2 max-h-48 overflow-y-auto border border-white/10 rounded-lg p-3">
               {WEBHOOK_EVENTS.map((event) => (
                 <div key={event.value} className="flex items-start">
                   <input
@@ -842,11 +842,11 @@ function WebhookFormModal({ webhook, onClose, onSuccess }: WebhookFormModalProps
                     id={event.value}
                     checked={formData.events.includes(event.value)}
                     onChange={() => toggleEvent(event.value)}
-                    className="mt-1 h-4 w-4 text-primary-600 focus:ring-primary-500 border-gray-300 rounded"
+                    className="mt-1 h-4 w-4 text-primary-600 focus:ring-primary-500 border-white/15 rounded"
                   />
                   <label htmlFor={event.value} className="ml-3 text-sm cursor-pointer">
-                    <div className="font-medium text-gray-900">{event.label}</div>
-                    <div className="text-gray-500">{event.description}</div>
+                    <div className="font-medium text-slate-100">{event.label}</div>
+                    <div className="text-slate-500">{event.description}</div>
                   </label>
                 </div>
               ))}
@@ -855,7 +855,7 @@ function WebhookFormModal({ webhook, onClose, onSuccess }: WebhookFormModalProps
 
           {webhookSecret && formData.url.startsWith('https://') && (
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-slate-300 mb-1">
                 Signing Secret
               </label>
               <div className="flex items-center gap-2">
@@ -863,17 +863,17 @@ function WebhookFormModal({ webhook, onClose, onSuccess }: WebhookFormModalProps
                   type="text"
                   readOnly
                   value={webhookSecret}
-                  className="flex-1 font-mono text-xs border rounded-lg px-3 py-2 bg-gray-50"
+                  className="flex-1 font-mono text-xs border rounded-lg px-3 py-2 bg-slate-900/60"
                 />
                 <button
                   type="button"
                   onClick={() => navigator.clipboard.writeText(webhookSecret)}
-                  className="px-3 py-2 text-sm border rounded-lg hover:bg-gray-50"
+                  className="px-3 py-2 text-sm border rounded-lg hover:bg-slate-900/60"
                 >
                   Copy
                 </button>
               </div>
-              <p className="text-xs text-gray-400 mt-1">
+              <p className="text-xs text-slate-500 mt-1">
                 Compute <code>HMAC-SHA256(secret, rawBody)</code> and compare to the{' '}
                 <code>X-Webhook-Signature</code> header to verify payloads.
               </p>
@@ -882,7 +882,7 @@ function WebhookFormModal({ webhook, onClose, onSuccess }: WebhookFormModalProps
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-slate-300 mb-1">
                 Max Retries
               </label>
               <input
@@ -898,7 +898,7 @@ function WebhookFormModal({ webhook, onClose, onSuccess }: WebhookFormModalProps
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+              <label className="block text-sm font-medium text-slate-300 mb-1">
                 Retry Backoff (minutes)
               </label>
               <input
@@ -915,7 +915,7 @@ function WebhookFormModal({ webhook, onClose, onSuccess }: WebhookFormModalProps
             </div>
           </div>
 
-          <div className="flex justify-end space-x-4 pt-4 border-t border-gray-200">
+          <div className="flex justify-end space-x-4 pt-4 border-t border-white/10">
             <button
               type="button"
               onClick={onClose}
@@ -963,7 +963,7 @@ function WebhookDeliveriesModal({ webhook, deliveries, onClose }: WebhookDeliver
       case 'retrying':
         return `${baseClass} bg-yellow-100 text-yellow-800`;
       default:
-        return `${baseClass} bg-gray-100 text-gray-800`;
+        return `${baseClass} bg-slate-800/70 text-slate-200`;
     }
   };
 
@@ -979,18 +979,18 @@ function WebhookDeliveriesModal({ webhook, deliveries, onClose }: WebhookDeliver
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-10 mx-auto p-5 border w-11/12 max-w-5xl shadow-lg rounded-md bg-white">
+    <div className="fixed inset-0 z-[120] overflow-y-auto h-full w-full bg-slate-950/70 backdrop-blur-sm">
+      <div className="relative top-10 mx-auto p-5 border w-11/12 max-w-5xl shadow-lg rounded-md bg-slate-900">
         <div className="flex justify-between items-start mb-6">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">Webhook Deliveries</h3>
-            <p className="text-sm text-gray-500 mt-1">
+            <h3 className="text-lg font-semibold text-slate-100">Webhook Deliveries</h3>
+            <p className="text-sm text-slate-500 mt-1">
               Recent delivery attempts for {webhook.url}
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-slate-500 hover:text-slate-400"
           >
             <XCircle className="w-6 h-6" />
           </button>
@@ -998,40 +998,40 @@ function WebhookDeliveriesModal({ webhook, deliveries, onClose }: WebhookDeliver
 
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-slate-900/60">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Event
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Response
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Attempts
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Timestamp
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
+            <tbody className="bg-slate-900 divide-y divide-gray-200">
               {deliveries.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={5} className="px-6 py-4 text-center text-slate-500">
                     No deliveries found for this webhook
                   </td>
                 </tr>
               ) : (
                 deliveries.map((delivery) => (
-                  <tr key={delivery.id} className="hover:bg-gray-50">
+                  <tr key={delivery.id} className="hover:bg-slate-900/60">
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">
+                      <div className="text-sm font-medium text-slate-100">
                         {delivery.event_type}
                       </div>
-                      <div className="text-xs text-gray-500">
+                      <div className="text-xs text-slate-500">
                         ID: {delivery.id.substring(0, 8)}...
                       </div>
                     </td>
@@ -1041,7 +1041,7 @@ function WebhookDeliveriesModal({ webhook, deliveries, onClose }: WebhookDeliver
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
+                      <div className="text-sm text-slate-100">
                         {delivery.http_status_code ? (
                           <span className={
                             delivery.http_status_code < 300 
@@ -1060,15 +1060,15 @@ function WebhookDeliveriesModal({ webhook, deliveries, onClose }: WebhookDeliver
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-100">
                       {delivery.attempts}/{delivery.max_retries}
                       {delivery.next_retry_at && (
-                        <div className="text-xs text-gray-500">
+                        <div className="text-xs text-slate-500">
                           Next: {formatDate(delivery.next_retry_at)}
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                       <div>{formatDate(delivery.created_at)}</div>
                       {delivery.delivered_at && (
                         <div className="text-xs text-green-600">
@@ -1123,21 +1123,21 @@ function WebhookHealthModal({ webhooks, onClose }: WebhookHealthModalProps) {
   });
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-10 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
+    <div className="fixed inset-0 z-[120] overflow-y-auto h-full w-full bg-slate-950/70 backdrop-blur-sm">
+      <div className="relative top-10 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-slate-900">
         <div className="flex justify-between items-start mb-6">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
+            <h3 className="text-lg font-semibold text-slate-100 flex items-center">
               <Activity className="h-5 w-5 mr-2 text-green-600" />
               Webhook Health Dashboard
             </h3>
-            <p className="text-sm text-gray-500 mt-1">
+            <p className="text-sm text-slate-500 mt-1">
               Overview of webhook performance and health status
             </p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-slate-500 hover:text-slate-400"
           >
             <XCircle className="w-6 h-6" />
           </button>
@@ -1145,42 +1145,42 @@ function WebhookHealthModal({ webhooks, onClose }: WebhookHealthModalProps) {
 
         {/* Health Overview Cards */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-4">
             <div className="flex items-center">
-              <Globe className="h-8 w-8 text-blue-600" />
+              <Globe className="h-8 w-8 text-cyan-300" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-blue-600">Total Webhooks</p>
-                <p className="text-2xl font-bold text-blue-900">{healthStats.total}</p>
+                <p className="text-sm font-medium text-cyan-300">Total Webhooks</p>
+                <p className="text-2xl font-bold text-slate-100">{healthStats.total}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
+          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4">
             <div className="flex items-center">
               <CheckCircle className="h-8 w-8 text-green-600" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-green-600">Healthy</p>
-                <p className="text-2xl font-bold text-green-900">{healthStats.healthy}</p>
+                <p className="text-sm font-medium text-emerald-300">Healthy</p>
+                <p className="text-2xl font-bold text-slate-100">{healthStats.healthy}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
             <div className="flex items-center">
               <AlertTriangle className="h-8 w-8 text-yellow-600" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-yellow-600">Failing</p>
-                <p className="text-2xl font-bold text-yellow-900">{healthStats.failing}</p>
+                <p className="text-sm font-medium text-amber-300">Failing</p>
+                <p className="text-2xl font-bold text-slate-100">{healthStats.failing}</p>
               </div>
             </div>
           </div>
 
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4">
+          <div className="bg-slate-900/60 border border-white/10 rounded-lg p-4">
             <div className="flex items-center">
-              <XCircle className="h-8 w-8 text-gray-600" />
+              <XCircle className="h-8 w-8 text-slate-400" />
               <div className="ml-4">
-                <p className="text-sm font-medium text-gray-600">Disabled</p>
-                <p className="text-2xl font-bold text-gray-900">{healthStats.disabled}</p>
+                <p className="text-sm font-medium text-slate-400">Disabled</p>
+                <p className="text-2xl font-bold text-slate-100">{healthStats.disabled}</p>
               </div>
             </div>
           </div>
@@ -1188,9 +1188,9 @@ function WebhookHealthModal({ webhooks, onClose }: WebhookHealthModalProps) {
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Critical Issues */}
-          <div className="bg-white border border-gray-200 rounded-lg">
-            <div className="p-4 border-b border-gray-200">
-              <h4 className="text-lg font-semibold text-gray-900 flex items-center">
+          <div className="bg-slate-900 border border-white/10 rounded-lg">
+            <div className="p-4 border-b border-white/10">
+              <h4 className="text-lg font-semibold text-slate-100 flex items-center">
                 <AlertTriangle className="h-4 w-4 mr-2 text-red-500" />
                 Critical Issues
               </h4>
@@ -1199,14 +1199,14 @@ function WebhookHealthModal({ webhooks, onClose }: WebhookHealthModalProps) {
               {criticalWebhooks.length === 0 ? (
                 <div className="text-center py-4">
                   <CheckCircle className="h-8 w-8 text-green-500 mx-auto mb-2" />
-                  <p className="text-sm text-gray-600">No critical issues found</p>
+                  <p className="text-sm text-slate-400">No critical issues found</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {criticalWebhooks.map(webhook => (
-                    <div key={webhook.id} className="flex items-center justify-between p-3 bg-red-50 rounded-lg">
+                    <div key={webhook.id} className="flex items-center justify-between p-3 bg-rose-500/10 rounded-lg border border-rose-500/20">
                       <div>
-                        <p className="text-sm font-medium text-gray-900">{webhook.url}</p>
+                        <p className="text-sm font-medium text-slate-100">{webhook.url}</p>
                         <p className="text-xs text-red-600">{webhook.failure_count} consecutive failures</p>
                       </div>
                       <AlertTriangle className="h-4 w-4 text-red-500" />
@@ -1218,9 +1218,9 @@ function WebhookHealthModal({ webhooks, onClose }: WebhookHealthModalProps) {
           </div>
 
           {/* Stale Webhooks */}
-          <div className="bg-white border border-gray-200 rounded-lg">
-            <div className="p-4 border-b border-gray-200">
-              <h4 className="text-lg font-semibold text-gray-900 flex items-center">
+          <div className="bg-slate-900 border border-white/10 rounded-lg">
+            <div className="p-4 border-b border-white/10">
+              <h4 className="text-lg font-semibold text-slate-100 flex items-center">
                 <Clock className="h-4 w-4 mr-2 text-yellow-500" />
                 Stale Webhooks
               </h4>
@@ -1229,14 +1229,14 @@ function WebhookHealthModal({ webhooks, onClose }: WebhookHealthModalProps) {
               {staleWebhooks.length === 0 ? (
                 <div className="text-center py-4">
                   <Activity className="h-8 w-8 text-green-500 mx-auto mb-2" />
-                  <p className="text-sm text-gray-600">All webhooks have recent activity</p>
+                  <p className="text-sm text-slate-400">All webhooks have recent activity</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {staleWebhooks.slice(0, 5).map(webhook => (
-                    <div key={webhook.id} className="flex items-center justify-between p-3 bg-yellow-50 rounded-lg">
+                    <div key={webhook.id} className="flex items-center justify-between p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
                       <div>
-                        <p className="text-sm font-medium text-gray-900">{webhook.url}</p>
+                        <p className="text-sm font-medium text-slate-100">{webhook.url}</p>
                         <p className="text-xs text-yellow-600">
                           {!webhook.last_success_at && !webhook.last_failure_at 
                             ? 'Never received events' 
@@ -1248,7 +1248,7 @@ function WebhookHealthModal({ webhooks, onClose }: WebhookHealthModalProps) {
                     </div>
                   ))}
                   {staleWebhooks.length > 5 && (
-                    <p className="text-xs text-gray-500 text-center">
+                    <p className="text-xs text-slate-500 text-center">
                       +{staleWebhooks.length - 5} more stale webhooks
                     </p>
                   )}
@@ -1259,12 +1259,12 @@ function WebhookHealthModal({ webhooks, onClose }: WebhookHealthModalProps) {
         </div>
 
         {/* Health Recommendations */}
-        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
-          <h4 className="text-sm font-semibold text-blue-900 mb-2 flex items-center">
+        <div className="mt-6 bg-cyan-500/10 border border-cyan-500/25 rounded-lg p-4">
+          <h4 className="text-sm font-semibold text-cyan-200 mb-2 flex items-center">
             <Shield className="h-4 w-4 mr-2" />
             Health Recommendations
           </h4>
-          <ul className="text-sm text-blue-800 space-y-1">
+          <ul className="text-sm text-cyan-200 space-y-1">
             {criticalWebhooks.length > 0 && (
               <li>• Review and fix {criticalWebhooks.length} webhook(s) with high failure rates</li>
             )}

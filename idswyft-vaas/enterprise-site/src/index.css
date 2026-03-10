@@ -1,81 +1,102 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=IBM+Plex+Mono:wght@400;500&display=swap');
 
 @theme {
-  --font-sans: 'Inter', system-ui, sans-serif;
-  
-  --color-primary-50: #eff6ff;
-  --color-primary-100: #dbeafe;
-  --color-primary-500: #3b82f6;
-  --color-primary-600: #2563eb;
-  --color-primary-700: #1d4ed8;
-  --color-primary-900: #1e3a8a;
-  
-  --color-secondary-50: #f8fafc;
-  --color-secondary-100: #f1f5f9;
-  --color-secondary-500: #64748b;
-  --color-secondary-600: #475569;
-  --color-secondary-700: #334155;
-  --color-secondary-900: #0f172a;
+  --font-display: 'Syne', sans-serif;
+  --font-sans: 'DM Sans', system-ui, sans-serif;
+  --font-mono: 'IBM Plex Mono', 'Fira Code', monospace;
 }
 
-/* Base styles */
 body {
   font-family: var(--font-sans);
-  font-feature-settings: "rlig" 1, "calt" 1;
+  background: #05080f;
+  color: #f1f5f9;
   margin: 0;
   min-height: 100vh;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
-/* Component classes */
-.btn {
-  @apply inline-flex items-center px-6 py-3 rounded-lg text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
+/* ── Typography ── */
+.font-display {
+  font-family: var(--font-display);
 }
 
-.btn-primary {
-  @apply bg-blue-600 text-white hover:bg-blue-700 focus:ring-blue-500 shadow-lg hover:shadow-xl;
+.font-mono {
+  font-family: var(--font-mono);
 }
 
-.btn-secondary {
-  @apply bg-white text-gray-900 hover:bg-gray-50 focus:ring-gray-500 border border-gray-300 shadow-sm hover:shadow-md;
+/* ── Scan pulse: simulates a document scanner beam sweeping across the hero ── */
+@keyframes scanPulse {
+  0%   { transform: translateX(-120%); opacity: 0; }
+  8%   { opacity: 1; }
+  92%  { opacity: 0.7; }
+  100% { transform: translateX(120vw); opacity: 0; }
 }
 
-.btn-outline {
-  @apply border border-blue-600 text-blue-600 hover:bg-blue-50 focus:ring-blue-500;
+.scan-pulse {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 0;
+  width: 240px;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(34, 211, 238, 0.03) 20%,
+    rgba(34, 211, 238, 0.07) 50%,
+    rgba(34, 211, 238, 0.03) 80%,
+    transparent 100%
+  );
+  animation: scanPulse 7s ease-in-out infinite 0.5s;
 }
 
-.gradient-text {
-  @apply bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent;
+/* ── Verified pulse: for the "live" status indicator ── */
+@keyframes verifiedPing {
+  0%   { transform: scale(1); opacity: 0.9; }
+  70%  { transform: scale(2.2); opacity: 0; }
+  100% { transform: scale(1); opacity: 0; }
 }
 
-.section-padding {
-  @apply px-4 sm:px-6 lg:px-8;
+.verified-ping::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  background: #10b981;
+  animation: verifiedPing 2s ease-out infinite;
 }
 
-.container-max {
-  @apply max-w-7xl mx-auto;
+/* ── Code block styling ── */
+.code-block {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  line-height: 1.7;
+  tab-size: 2;
 }
 
-/* Hero section animations */
-@keyframes fadeInUp {
-  from {
-    opacity: 0;
-    transform: translateY(30px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+/* ── Smooth scrolling ── */
+html {
+  scroll-behavior: smooth;
 }
 
-.animate-fadeInUp {
-  animation: fadeInUp 0.6s ease-out;
+/* ── Custom scrollbar (subtle, matches dark theme) ── */
+::-webkit-scrollbar {
+  width: 6px;
+}
+::-webkit-scrollbar-track {
+  background: #05080f;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 3px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(34, 211, 238, 0.3);
 }
 
-.animate-delay-200 {
-  animation-delay: 200ms;
-}
-
-.animate-delay-400 {
-  animation-delay: 400ms;
+/* ── Selection color ── */
+::selection {
+  background: rgba(34, 211, 238, 0.2);
+  color: #f1f5f9;
 }

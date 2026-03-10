@@ -509,7 +509,7 @@ function VerificationDetailsModal({ verification, onClose, onStatusUpdate }: Ver
   const results = verification.results || {};
   
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
+    <div className="fixed inset-0 z-[120] overflow-y-auto h-full w-full bg-slate-950/70 backdrop-blur-sm">
       <div className="relative top-10 mx-auto p-5 border w-11/12 max-w-6xl shadow-lg rounded-md bg-white min-h-[80vh]">
         {/* Header */}
         <div className="flex justify-between items-start mb-6">

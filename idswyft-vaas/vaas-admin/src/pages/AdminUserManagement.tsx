@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import apiClient from '../services/api';
+import Modal from '../components/ui/Modal';
 import type { 
   AdminRole,
   AdminPermission,
@@ -45,11 +46,11 @@ const ITEMS_PER_PAGE = 20;
 
 // Status colors
 const statusColors = {
-  active: 'bg-green-100 text-green-800',
-  inactive: 'bg-gray-100 text-gray-800',
-  pending: 'bg-yellow-100 text-yellow-800',
-  suspended: 'bg-red-100 text-red-800',
-  locked: 'bg-orange-100 text-orange-800'
+  active: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30',
+  inactive: 'bg-slate-500/15 text-slate-300 border border-slate-500/30',
+  pending: 'bg-amber-500/15 text-amber-300 border border-amber-500/30',
+  suspended: 'bg-rose-500/15 text-rose-300 border border-rose-500/30',
+  locked: 'bg-orange-500/15 text-orange-300 border border-orange-500/30'
 };
 
 // Status icons
@@ -345,22 +346,22 @@ export default function AdminUserManagement() {
     return (
       <div className="p-6">
         <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-64 mb-6"></div>
+          <div className="h-8 bg-slate-700/70 rounded w-64 mb-6"></div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             {[1, 2, 3, 4].map(i => (
               <div key={i} className="stat-card-glass p-6">
-                <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
-                <div className="h-8 bg-gray-200 rounded w-16"></div>
+                <div className="h-4 bg-slate-700/70 rounded w-24 mb-2"></div>
+                <div className="h-8 bg-slate-700/70 rounded w-16"></div>
               </div>
             ))}
           </div>
           <div className="content-card-glass">
             <div className="p-6 border-b border-white/20">
-              <div className="h-6 bg-gray-200 rounded w-32"></div>
+              <div className="h-6 bg-slate-700/70 rounded w-32"></div>
             </div>
             <div className="p-6">
               {[1, 2, 3, 4, 5].map(i => (
-                <div key={i} className="h-16 bg-gray-100 rounded mb-4"></div>
+                <div key={i} className="h-16 bg-slate-800/70 rounded mb-4"></div>
               ))}
             </div>
           </div>
@@ -374,10 +375,10 @@ export default function AdminUserManagement() {
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
         <div className="flex items-center">
-          <Users className="h-8 w-8 text-blue-600 mr-3" />
+          <Users className="h-8 w-8 text-cyan-300 mr-3" />
           <div>
-            <h1 className="text-3xl font-bold text-gray-900">Team Management</h1>
-            <p className="text-gray-600 mt-1">Manage admin users, roles, and permissions</p>
+            <h1 className="text-3xl font-bold text-slate-100">Team Management</h1>
+            <p className="text-slate-400 mt-1">Manage admin users, roles, and permissions</p>
           </div>
         </div>
         
@@ -385,7 +386,7 @@ export default function AdminUserManagement() {
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 flex items-center"
+            className="px-4 py-2 border border-white/15 rounded-md text-slate-300 bg-slate-900/70 hover:bg-slate-900/60 disabled:opacity-50 flex items-center"
           >
             <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
@@ -393,7 +394,7 @@ export default function AdminUserManagement() {
           
           <button
             onClick={() => setShowCreateModal(true)}
-            className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 flex items-center"
+            className="px-4 py-2 bg-cyan-600 text-white rounded-md hover:bg-cyan-500 flex items-center"
           >
             <UserPlus className="h-4 w-4 mr-2" />
             Add Team Member
@@ -407,17 +408,17 @@ export default function AdminUserManagement() {
           <div className="stat-card-glass p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 text-sm">Total Admins</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.total_admins}</p>
+                <p className="text-slate-400 text-sm">Total Admins</p>
+                <p className="text-2xl font-bold text-slate-100">{stats.total_admins}</p>
               </div>
-              <Users className="h-8 w-8 text-blue-600" />
+              <Users className="h-8 w-8 text-cyan-300" />
             </div>
           </div>
           
           <div className="stat-card-glass p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 text-sm">Active</p>
+                <p className="text-slate-400 text-sm">Active</p>
                 <p className="text-2xl font-bold text-green-600">{stats.active_admins}</p>
               </div>
               <UserCheck className="h-8 w-8 text-green-600" />
@@ -427,7 +428,7 @@ export default function AdminUserManagement() {
           <div className="stat-card-glass p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 text-sm">Pending Invites</p>
+                <p className="text-slate-400 text-sm">Pending Invites</p>
                 <p className="text-2xl font-bold text-yellow-600">{stats.pending_invites}</p>
               </div>
               <Mail className="h-8 w-8 text-yellow-600" />
@@ -437,7 +438,7 @@ export default function AdminUserManagement() {
           <div className="stat-card-glass p-6">
             <div className="flex items-center justify-between">
               <div>
-                <p className="text-gray-600 text-sm">Suspended</p>
+                <p className="text-slate-400 text-sm">Suspended</p>
                 <p className="text-2xl font-bold text-red-600">{stats.suspended_admins}</p>
               </div>
               <UserX className="h-8 w-8 text-red-600" />
@@ -452,14 +453,14 @@ export default function AdminUserManagement() {
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-500" />
                 <input
                   type="text"
                   placeholder="Search by name, email, or role..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                  className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="pl-10 pr-4 py-2 w-full border border-white/15 rounded-md focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
                 />
               </div>
             </div>
@@ -467,7 +468,7 @@ export default function AdminUserManagement() {
             <div className="flex gap-2">
               <button
                 onClick={handleSearch}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                className="px-4 py-2 bg-cyan-600 text-white rounded-md hover:bg-cyan-500"
               >
                 Search
               </button>
@@ -475,8 +476,8 @@ export default function AdminUserManagement() {
                 onClick={() => setShowFilters(!showFilters)}
                 className={`px-4 py-2 border rounded-md flex items-center ${
                   showFilters 
-                    ? 'bg-blue-50 border-blue-300 text-blue-700' 
-                    : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50'
+                    ? 'bg-cyan-500/12 border-cyan-400/35 text-cyan-200' 
+                    : 'border-white/15 text-slate-300 bg-slate-900/70 hover:bg-slate-900/60'
                 }`}
               >
                 <Filter className="h-4 w-4 mr-2" />
@@ -489,15 +490,15 @@ export default function AdminUserManagement() {
 
         {/* Advanced Filters */}
         {showFilters && (
-          <div className="p-6 bg-gray-50 border-t">
+          <div className="p-6 bg-slate-900/60 border-t">
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {/* Role Filter */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Role</label>
                 <select
                   value={filters.role_id || ''}
                   onChange={(e) => handleFilterChange('role_id', e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full border border-white/15 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
                 >
                   <option value="">All Roles</option>
                   {roles.map(role => (
@@ -508,11 +509,11 @@ export default function AdminUserManagement() {
 
               {/* Status Filter */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Status</label>
                 <select
                   value={filters.status || ''}
                   onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full border border-white/15 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
                 >
                   <option value="">All Statuses</option>
                   <option value="active">Active</option>
@@ -525,12 +526,12 @@ export default function AdminUserManagement() {
 
               {/* Last Login From */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Last Login From</label>
+                <label className="block text-sm font-medium text-slate-300 mb-1">Last Login From</label>
                 <input
                   type="datetime-local"
                   value={filters.last_login_from || ''}
                   onChange={(e) => handleFilterChange('last_login_from', e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full border border-white/15 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
                 />
               </div>
 
@@ -542,7 +543,7 @@ export default function AdminUserManagement() {
                     setSearch('');
                     loadUsers(1, {});
                   }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                  className="w-full px-4 py-2 border border-white/15 rounded-md text-slate-300 bg-slate-900/70 hover:bg-slate-900/60"
                 >
                   Clear All
                 </button>
@@ -556,11 +557,11 @@ export default function AdminUserManagement() {
       <div className="content-card-glass mb-6">
         <div className="px-6 py-4 border-b">
           <div className="flex justify-between items-center">
-            <h2 className="text-lg font-semibold text-gray-900">
+            <h2 className="text-lg font-semibold text-slate-100">
               Team Members ({total.toLocaleString()} total)
             </h2>
             {loading && (
-              <div className="flex items-center text-gray-500">
+              <div className="flex items-center text-slate-500">
                 <RefreshCw className="h-4 w-4 animate-spin mr-2" />
                 Loading...
               </div>
@@ -570,55 +571,55 @@ export default function AdminUserManagement() {
 
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50">
+            <thead className="bg-slate-900/60">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   User
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Role
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Last Login
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white/30 backdrop-blur-sm divide-y divide-white/20">
+            <tbody className="bg-slate-900/55 backdrop-blur-sm divide-y divide-white/20">
               {users.map((user) => {
                 const StatusIcon = statusIcons[user.status];
                 const canModify = admin?.id !== user.id; // Prevent self-modification
                 
                 return (
-                  <tr key={user.id} className="hover:bg-gray-50">
+                  <tr key={user.id} className="hover:bg-slate-900/60">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
                         <div className="h-10 w-10 flex-shrink-0">
-                          <div className="h-10 w-10 rounded-full bg-blue-100 flex items-center justify-center">
-                            <span className="text-blue-600 font-medium text-sm">
+                          <div className="h-10 w-10 rounded-full bg-cyan-500/15 border border-cyan-400/30 flex items-center justify-center">
+                            <span className="text-cyan-300 font-medium text-sm">
                               {user.first_name.charAt(0)}{user.last_name.charAt(0)}
                             </span>
                           </div>
                         </div>
                         <div className="ml-4">
-                          <div className="text-sm font-medium text-gray-900">
+                          <div className="text-sm font-medium text-slate-100">
                             {user.first_name} {user.last_name}
                           </div>
-                          <div className="text-sm text-gray-500">{user.email}</div>
+                          <div className="text-sm text-slate-500">{user.email}</div>
                           {user.phone_number && (
-                            <div className="text-xs text-gray-400">{user.phone_number}</div>
+                            <div className="text-xs text-slate-500">{user.phone_number}</div>
                           )}
                         </div>
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-gray-900">{user.role.display_name}</div>
-                      <div className="text-sm text-gray-500 truncate max-w-32">{user.role.description}</div>
+                      <div className="text-sm font-medium text-slate-100">{user.role.display_name}</div>
+                      <div className="text-sm text-slate-500 truncate max-w-32">{user.role.description}</div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[user.status]}`}>
@@ -634,17 +635,17 @@ export default function AdminUserManagement() {
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-100">
                       {user.last_login_at ? (
                         <div>
                           <div className="font-medium">{getRelativeTime(user.last_login_at)}</div>
-                          <div className="text-gray-500 text-xs">{formatTimestamp(user.last_login_at)}</div>
+                          <div className="text-slate-500 text-xs">{formatTimestamp(user.last_login_at)}</div>
                           {user.last_ip_address && (
-                            <div className="text-gray-400 text-xs">{user.last_ip_address}</div>
+                            <div className="text-slate-500 text-xs">{user.last_ip_address}</div>
                           )}
                         </div>
                       ) : (
-                        <span className="text-gray-400">Never</span>
+                        <span className="text-slate-500">Never</span>
                       )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
@@ -654,7 +655,7 @@ export default function AdminUserManagement() {
                             setSelectedUser(user);
                             setShowUserModal(true);
                           }}
-                          className="text-blue-600 hover:text-blue-900"
+                          className="text-cyan-300 hover:text-cyan-200"
                           title="View Details"
                         >
                           <Eye className="h-4 w-4" />
@@ -675,7 +676,7 @@ export default function AdminUserManagement() {
                                 });
                                 setShowEditModal(true);
                               }}
-                              className="text-indigo-600 hover:text-indigo-900"
+                              className="text-cyan-300 hover:text-cyan-200"
                               title="Edit User"
                             >
                               <Edit className="h-4 w-4" />
@@ -684,7 +685,7 @@ export default function AdminUserManagement() {
                             {user.status === 'active' ? (
                               <button
                                 onClick={() => handleSuspendUser(user)}
-                                className="text-red-600 hover:text-red-900"
+                                className="text-rose-300 hover:text-rose-200"
                                 title="Suspend User"
                               >
                                 <UserX className="h-4 w-4" />
@@ -692,7 +693,7 @@ export default function AdminUserManagement() {
                             ) : user.status === 'suspended' ? (
                               <button
                                 onClick={() => handleActivateUser(user)}
-                                className="text-green-600 hover:text-green-900"
+                                className="text-emerald-300 hover:text-emerald-200"
                                 title="Activate User"
                               >
                                 <UserCheck className="h-4 w-4" />
@@ -702,7 +703,7 @@ export default function AdminUserManagement() {
                             {user.status === 'locked' && (
                               <button
                                 onClick={() => handleUnlockUser(user)}
-                                className="text-yellow-600 hover:text-yellow-900"
+                                className="text-amber-300 hover:text-amber-200"
                                 title="Unlock User"
                               >
                                 <Unlock className="h-4 w-4" />
@@ -714,7 +715,7 @@ export default function AdminUserManagement() {
                                 setSelectedUser(user);
                                 setShowDeleteModal(true);
                               }}
-                              className="text-red-600 hover:text-red-900"
+                              className="text-rose-300 hover:text-rose-200"
                               title="Delete User"
                             >
                               <Trash2 className="h-4 w-4" />
@@ -732,9 +733,9 @@ export default function AdminUserManagement() {
 
         {users.length === 0 && !loading && (
           <div className="text-center py-12">
-            <Users className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No team members found</h3>
-            <p className="mt-1 text-sm text-gray-500">
+            <Users className="mx-auto h-12 w-12 text-slate-500" />
+            <h3 className="mt-2 text-sm font-medium text-slate-100">No team members found</h3>
+            <p className="mt-1 text-sm text-slate-500">
               {Object.keys(filters).length > 0 || search
                 ? 'Try adjusting your search criteria or filters.'
                 : 'Get started by adding your first team member.'}
@@ -743,7 +744,7 @@ export default function AdminUserManagement() {
               <div className="mt-6">
                 <button
                   onClick={() => setShowCreateModal(true)}
-                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+                  className="inline-flex items-center px-4 py-2 border border-transparent shadow-sm text-sm font-medium rounded-md text-white bg-cyan-600 hover:bg-cyan-500"
                 >
                   <UserPlus className="h-4 w-4 mr-2" />
                   Add Team Member
@@ -755,9 +756,9 @@ export default function AdminUserManagement() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="px-6 py-4 border-t bg-gray-50">
+          <div className="px-6 py-4 border-t bg-slate-900/60">
             <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-700">
+              <div className="text-sm text-slate-300">
                 Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to{' '}
                 {Math.min(currentPage * ITEMS_PER_PAGE, total)} of{' '}
                 {total.toLocaleString()} results
@@ -767,7 +768,7 @@ export default function AdminUserManagement() {
                 <button
                   onClick={() => loadUsers(currentPage - 1)}
                   disabled={currentPage === 1 || loading}
-                  className="px-3 py-1 border border-gray-300 rounded text-sm text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                  className="px-3 py-1 border border-white/15 rounded text-sm text-slate-300 bg-slate-900/70 hover:bg-slate-900/60 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                 >
                   <ChevronLeft className="h-4 w-4" />
                   Previous
@@ -783,8 +784,8 @@ export default function AdminUserManagement() {
                         disabled={loading}
                         className={`px-3 py-1 text-sm rounded ${
                           page === currentPage
-                            ? 'bg-blue-600 text-white'
-                            : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                            ? 'bg-cyan-600 text-white'
+                            : 'text-slate-300 bg-slate-900/70 border border-white/15 hover:bg-slate-900/60'
                         } disabled:opacity-50`}
                       >
                         {page}
@@ -796,7 +797,7 @@ export default function AdminUserManagement() {
                 <button
                   onClick={() => loadUsers(currentPage + 1)}
                   disabled={currentPage === totalPages || loading}
-                  className="px-3 py-1 border border-gray-300 rounded text-sm text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                  className="px-3 py-1 border border-white/15 rounded text-sm text-slate-300 bg-slate-900/70 hover:bg-slate-900/60 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                 >
                   Next
                   <ChevronRight className="h-4 w-4" />
@@ -811,25 +812,25 @@ export default function AdminUserManagement() {
       {invites.length > 0 && (
         <div className="content-card-glass mb-6">
           <div className="px-6 py-4 border-b">
-            <h3 className="text-lg font-semibold text-gray-900">Pending Invites ({invites.length})</h3>
+            <h3 className="text-lg font-semibold text-slate-100">Pending Invites ({invites.length})</h3>
           </div>
-          <div className="divide-y divide-gray-200">
+          <div className="divide-y divide-white/10">
             {invites.map((invite) => (
               <div key={invite.id} className="px-6 py-4 flex items-center justify-between">
                 <div className="flex-1">
-                  <div className="text-sm font-medium text-gray-900">{invite.email}</div>
-                  <div className="text-sm text-gray-500">
+                  <div className="text-sm font-medium text-slate-100">{invite.email}</div>
+                  <div className="text-sm text-slate-500">
                     {invite.role.display_name} • Invited by {invite.invited_by_name}
                   </div>
-                  <div className="text-xs text-gray-400">
+                  <div className="text-xs text-slate-500">
                     Expires {formatTimestamp(invite.expires_at)}
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
                   <span className={`px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                    invite.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
-                    invite.status === 'expired' ? 'bg-red-100 text-red-800' :
-                    'bg-gray-100 text-gray-800'
+                    invite.status === 'pending' ? 'bg-amber-500/15 text-amber-300 border border-amber-500/30' :
+                    invite.status === 'expired' ? 'bg-rose-500/15 text-rose-300 border border-rose-500/30' :
+                    'bg-slate-500/15 text-slate-300 border border-slate-500/30'
                   }`}>
                     {invite.status.charAt(0).toUpperCase() + invite.status.slice(1)}
                   </span>
@@ -837,13 +838,13 @@ export default function AdminUserManagement() {
                     <>
                       <button
                         onClick={() => handleResendInvite(invite)}
-                        className="text-blue-600 hover:text-blue-900 text-sm"
+                        className="text-cyan-300 hover:text-cyan-200 text-sm"
                       >
                         Resend
                       </button>
                       <button
                         onClick={() => handleRevokeInvite(invite)}
-                        className="text-red-600 hover:text-red-900 text-sm"
+                        className="text-rose-300 hover:text-rose-200 text-sm"
                       >
                         Revoke
                       </button>
@@ -857,103 +858,93 @@ export default function AdminUserManagement() {
       )}
 
       {/* Create User Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white rounded-lg shadow-xl max-w-md w-full">
-            <div className="px-6 py-4 border-b">
-              <h3 className="text-lg font-semibold text-gray-900">Add Team Member</h3>
+      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Add Team Member" size="md">
+        <div className="space-y-4">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+            <div>
+              <label className="form-label">First Name</label>
+              <input
+                type="text"
+                value={createFormData.first_name}
+                onChange={(e) => setCreateFormData({ ...createFormData, first_name: e.target.value })}
+                className="form-input px-3 py-2.5"
+              />
             </div>
-            
-            <div className="px-6 py-4 space-y-4">
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">First Name</label>
-                  <input
-                    type="text"
-                    value={createFormData.first_name}
-                    onChange={(e) => setCreateFormData({...createFormData, first_name: e.target.value})}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Last Name</label>
-                  <input
-                    type="text"
-                    value={createFormData.last_name}
-                    onChange={(e) => setCreateFormData({...createFormData, last_name: e.target.value})}
-                    className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  />
-                </div>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Email</label>
-                <input
-                  type="email"
-                  value={createFormData.email}
-                  onChange={(e) => setCreateFormData({...createFormData, email: e.target.value})}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Role</label>
-                <select
-                  value={createFormData.role_id}
-                  onChange={(e) => setCreateFormData({...createFormData, role_id: e.target.value})}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="">Select Role</option>
-                  {roles.map(role => (
-                    <option key={role.id} value={role.id}>{role.display_name}</option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Phone Number (Optional)</label>
-                <input
-                  type="tel"
-                  value={createFormData.phone_number || ''}
-                  onChange={(e) => setCreateFormData({...createFormData, phone_number: e.target.value})}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                />
-              </div>
-
-              <div className="flex items-center">
-                <input
-                  type="checkbox"
-                  checked={createFormData.send_invite}
-                  onChange={(e) => setCreateFormData({...createFormData, send_invite: e.target.checked})}
-                  className="h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                />
-                <label className="ml-2 block text-sm text-gray-900">
-                  Send invitation email immediately
-                </label>
-              </div>
-            </div>
-            
-            <div className="px-6 py-4 border-t bg-gray-50 flex justify-end space-x-3">
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleCreateUser}
-                disabled={!createFormData.email || !createFormData.first_name || !createFormData.last_name || !createFormData.role_id}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Add Member
-              </button>
+            <div>
+              <label className="form-label">Last Name</label>
+              <input
+                type="text"
+                value={createFormData.last_name}
+                onChange={(e) => setCreateFormData({ ...createFormData, last_name: e.target.value })}
+                className="form-input px-3 py-2.5"
+              />
             </div>
           </div>
+
+          <div>
+            <label className="form-label">Email</label>
+            <input
+              type="email"
+              value={createFormData.email}
+              onChange={(e) => setCreateFormData({ ...createFormData, email: e.target.value })}
+              className="form-input px-3 py-2.5"
+            />
+          </div>
+
+          <div>
+            <label className="form-label">Role</label>
+            <select
+              value={createFormData.role_id}
+              onChange={(e) => setCreateFormData({ ...createFormData, role_id: e.target.value })}
+              className="form-input px-3 py-2.5"
+            >
+              <option value="">Select Role</option>
+              {roles.map((role) => (
+                <option key={role.id} value={role.id}>
+                  {role.display_name}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div>
+            <label className="form-label">Phone Number (Optional)</label>
+            <input
+              type="tel"
+              value={createFormData.phone_number || ''}
+              onChange={(e) => setCreateFormData({ ...createFormData, phone_number: e.target.value })}
+              className="form-input px-3 py-2.5"
+            />
+          </div>
+
+          <label className="flex items-center gap-2 rounded-lg border border-white/10 bg-slate-800/70 px-3 py-2.5 text-sm text-slate-300">
+            <input
+              type="checkbox"
+              checked={createFormData.send_invite}
+              onChange={(e) => setCreateFormData({ ...createFormData, send_invite: e.target.checked })}
+              className="h-4 w-4 rounded border-white/20 bg-slate-900 text-cyan-400"
+            />
+            Send invitation email immediately
+          </label>
+
+          <div className="flex justify-end gap-3 pt-2">
+            <button onClick={() => setShowCreateModal(false)} className="btn btn-secondary">
+              Cancel
+            </button>
+            <button
+              onClick={handleCreateUser}
+              disabled={!createFormData.email || !createFormData.first_name || !createFormData.last_name || !createFormData.role_id}
+              className="btn btn-primary"
+            >
+              Add Member
+            </button>
+          </div>
         </div>
-      )}
+      </Modal>
 
       {/* Additional modals would be implemented here: Edit Modal, User Details Modal, Role Management Modal, Delete Confirmation Modal */}
       
     </div>
   );
 }
+

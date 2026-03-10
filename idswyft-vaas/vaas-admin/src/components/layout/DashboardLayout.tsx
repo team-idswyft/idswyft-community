@@ -25,84 +25,19 @@ import {
 import { useAuth } from '../../contexts/AuthContext';
 
 const navigationItems = [
-  {
-    name: 'Dashboard',
-    href: '/dashboard',
-    icon: LayoutDashboard,
-    current: false,
-  },
-  {
-    name: 'Verifications',
-    href: '/verifications',
-    icon: CheckCircle,
-    current: false,
-  },
-  {
-    name: 'End Users',
-    href: '/users',
-    icon: Users,
-    current: false,
-  },
-  {
-    name: 'Webhooks',
-    href: '/webhooks',
-    icon: Webhook,
-    current: false,
-  },
-  {
-    name: 'Analytics',
-    href: '/analytics',
-    icon: BarChart3,
-    current: false,
-  },
-  {
-    name: 'Organization',
-    href: '/organization',
-    icon: Building,
-    current: false,
-  },
-  {
-    name: 'Billing',
-    href: '/billing',
-    icon: CreditCard,
-    current: false,
-  },
-  {
-    name: 'API Keys',
-    href: '/api-keys',
-    icon: Key,
-    current: false,
-  },
-  {
-    name: 'Audit Logs',
-    href: '/audit-logs',
-    icon: Shield,
-    current: false,
-  },
-  {
-    name: 'Sessions',
-    href: '/sessions',
-    icon: Monitor,
-    current: false,
-  },
-  {
-    name: 'Provider Metrics',
-    href: '/provider-metrics',
-    icon: BarChart3,
-    current: false,
-  },
-  {
-    name: 'Team',
-    href: '/team',
-    icon: UserCog,
-    current: false,
-  },
-  {
-    name: 'Verification Settings',
-    href: '/settings',
-    icon: Settings,
-    current: false,
-  },
+  { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, current: false },
+  { name: 'Verifications', href: '/verifications', icon: CheckCircle, current: false },
+  { name: 'End Users', href: '/users', icon: Users, current: false },
+  { name: 'Webhooks', href: '/webhooks', icon: Webhook, current: false },
+  { name: 'Analytics', href: '/analytics', icon: BarChart3, current: false },
+  { name: 'Organization', href: '/organization', icon: Building, current: false },
+  { name: 'Billing', href: '/billing', icon: CreditCard, current: false },
+  { name: 'API Keys', href: '/api-keys', icon: Key, current: false },
+  { name: 'Audit Logs', href: '/audit-logs', icon: Shield, current: false },
+  { name: 'Sessions', href: '/sessions', icon: Monitor, current: false },
+  { name: 'Provider Metrics', href: '/provider-metrics', icon: BarChart3, current: false },
+  { name: 'Team', href: '/team', icon: UserCog, current: false },
+  { name: 'Verification Settings', href: '/settings', icon: Settings, current: false },
 ];
 
 export default function DashboardLayout() {
@@ -130,7 +65,6 @@ export default function DashboardLayout() {
     loadPlatformLogo();
   }, [API_BASE_URL]);
 
-  // Redirect to login if not authenticated
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
@@ -143,61 +77,57 @@ export default function DashboardLayout() {
     }
   };
 
-  // Update current navigation item based on location
-  const updatedNavigation = navigationItems.map(item => ({
+  const updatedNavigation = navigationItems.map((item) => ({
     ...item,
     current: location.pathname.startsWith(item.href),
   }));
 
-  const AdminMenu = () => (
+  const currentPage = updatedNavigation.find((item) => item.current);
+
+  const AdminMenu = ({ compact = false }: { compact?: boolean }) => (
     <div className="relative">
       <button
         onClick={() => setUserMenuOpen(!userMenuOpen)}
-        className="flex items-center space-x-3 p-3 rounded-2xl hover:bg-white/30 hover:backdrop-blur-sm transition-all duration-300 w-full text-left"
+        className={`w-full rounded-xl border border-white/10 bg-slate-950/50 px-3 py-2 text-left transition hover:border-cyan-400/40 hover:bg-slate-900/70 ${compact ? '' : 'min-w-[220px]'}`}
       >
-        <div className="relative">
-          <div className="w-10 h-10 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-2xl flex items-center justify-center shadow-lg">
-            <User className="w-5 h-5 text-white" />
+        <div className="flex items-center gap-3">
+          <div className="flex h-9 w-9 items-center justify-center rounded-lg border border-cyan-400/35 bg-cyan-400/10 text-cyan-200">
+            <User className="h-4 w-4" />
           </div>
-          <div className="absolute -top-1 -right-1 w-4 h-4 bg-green-400 rounded-full border-2 border-white flex items-center justify-center">
-            <div className="w-2 h-2 bg-green-600 rounded-full"></div>
+          <div className="min-w-0 flex-1">
+            <div className="truncate text-sm font-semibold text-slate-100">
+              {admin?.first_name} {admin?.last_name}
+            </div>
+            <div className="truncate text-xs text-slate-400">{admin?.role}</div>
           </div>
+          <ChevronDown className={`h-4 w-4 text-slate-500 transition-transform ${userMenuOpen ? 'rotate-180' : ''}`} />
         </div>
-        <div className="flex-1 min-w-0">
-          <div className="text-sm font-semibold text-slate-800 truncate">
-            {admin?.first_name} {admin?.last_name}
-          </div>
-          <div className="text-xs text-slate-600 truncate">{admin?.role}</div>
-        </div>
-        <ChevronDown className={`w-4 h-4 text-slate-500 transition-transform duration-300 hover:text-slate-700 ${userMenuOpen ? 'rotate-180' : ''}`} />
       </button>
 
       {userMenuOpen && (
-        <div className="absolute bottom-full left-0 w-full mb-3 animate-scale-in">
-          <div className="user-menu-glass p-1">
-            <div className="p-4 border-b border-white/20">
-              <div className="text-sm font-semibold text-slate-800">
-                {admin?.first_name} {admin?.last_name}
-              </div>
-              <div className="text-xs text-slate-600 mt-1">{admin?.email}</div>
-              <div className="text-xs font-medium text-blue-600 mt-2 flex items-center">
-                <Building className="w-3 h-3 mr-1" />
+        <div className="absolute bottom-full left-0 z-50 mb-2 w-full animate-scale-in">
+          <div className="user-menu-glass rounded-xl p-1">
+            <div className="border-b border-white/10 px-3 py-3">
+              <div className="text-sm font-semibold text-slate-100">{admin?.first_name} {admin?.last_name}</div>
+              <div className="mt-0.5 text-xs text-slate-400">{admin?.email}</div>
+              <div className="mt-2 inline-flex items-center gap-1 rounded-full border border-cyan-400/30 bg-cyan-400/10 px-2 py-0.5 text-[11px] font-semibold text-cyan-200">
+                <Building className="h-3 w-3" />
                 {organization?.name}
               </div>
             </div>
             <div className="p-1">
               <Link
                 to="/profile"
-                className="flex items-center px-3 py-2.5 text-sm text-slate-700 hover:bg-white/30 rounded-xl transition-all duration-200"
+                className="flex items-center gap-2 rounded-lg px-3 py-2 text-sm text-slate-300 transition hover:bg-slate-800/80 hover:text-slate-100"
               >
-                <User className="w-4 h-4 mr-3 text-slate-500" />
+                <User className="h-4 w-4" />
                 Profile Settings
               </Link>
               <button
                 onClick={handleLogout}
-                className="w-full flex items-center px-3 py-2.5 text-sm text-red-600 hover:bg-red-50/50 rounded-xl transition-all duration-200"
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-rose-300 transition hover:bg-rose-500/10 hover:text-rose-200"
               >
-                <LogOut className="w-4 h-4 mr-3" />
+                <LogOut className="h-4 w-4" />
                 Sign out
               </button>
             </div>
@@ -208,174 +138,129 @@ export default function DashboardLayout() {
   );
 
   const Sidebar = ({ className = '' }: { className?: string }) => (
-    <div className={`flex flex-col h-full sidebar-glass ${className}`}>
-      {/* Logo */}
-      <div className="flex items-center px-6 py-6 border-b border-white/20">        <img           src={logoUrl}           alt="Idswyft VaaS Admin"           className="h-8 w-auto"        />      </div>
+    <aside className={`sidebar-glass flex h-full flex-col ${className}`}>
+      <div className="border-b border-white/10 px-6 py-5">
+        <img src={logoUrl} alt="Idswyft VaaS Admin" className="h-8 w-auto" />
+      </div>
 
-      {/* Organization info */}
-      <div className="px-6 py-4 border-b border-white/20 bg-white/10 backdrop-blur-sm">
-        <div className="text-xs font-semibold text-slate-600 uppercase tracking-wider mb-2">Organization</div>
-        <div className="text-sm font-bold text-slate-800">{organization?.name}</div>
-        <div className="flex items-center mt-3">
-          <div className={`w-2 h-2 rounded-full mr-2 ${
-            organization?.billing_status === 'active' ? 'bg-green-500 animate-pulse' : 'bg-red-500'
-          }`}></div>
-          <span className={`text-xs font-semibold px-2 py-1 rounded-full ${
-            organization?.billing_status === 'active' 
-              ? 'organization-status-active'
-              : 'organization-status-inactive'
-          }`}>
+      <div className="border-b border-white/10 px-6 py-4">
+        <div className="text-[11px] font-semibold uppercase tracking-[0.12em] text-slate-500">Organization</div>
+        <div className="mt-1 truncate text-sm font-semibold text-slate-100">{organization?.name}</div>
+        <div className="mt-3 flex items-center gap-2">
+          <div className={`h-2 w-2 rounded-full ${organization?.billing_status === 'active' ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+          <span className={organization?.billing_status === 'active' ? 'organization-status-active' : 'organization-status-inactive'}>
             {organization?.billing_status?.replace('_', ' ').toUpperCase()}
           </span>
         </div>
       </div>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-4 py-6 space-y-2">
-        {updatedNavigation.map((item, index) => {
+      <nav className="flex-1 space-y-1 px-3 py-4">
+        {updatedNavigation.map((item) => {
           const Icon = item.icon;
           return (
             <Link
               key={item.name}
               to={item.href}
-              className={`sidebar-nav-item ${
-                item.current ? 'sidebar-nav-active' : 'sidebar-nav-inactive'
-              }`}
-              style={{
-                animationDelay: `${index * 50}ms`
-              }}
+              className={`sidebar-nav-item ${item.current ? 'sidebar-nav-active' : 'sidebar-nav-inactive'}`}
             >
-              <div className={`w-5 h-5 mr-3 transition-transform duration-300 hover:scale-110 ${
-                item.current ? 'text-blue-600' : 'text-slate-500 hover:text-slate-700'
-              }`}>
-                <Icon />
-              </div>
-              <span className="font-medium">{item.name}</span>
-              {item.current && (
-                <div className="ml-auto w-2 h-2 bg-blue-500 rounded-full animate-pulse"></div>
-              )}
+              <Icon className={`mr-3 h-4 w-4 ${item.current ? 'text-cyan-200' : 'text-slate-500'}`} />
+              <span className="truncate">{item.name}</span>
+              {item.current && <span className="ml-auto h-1.5 w-1.5 rounded-full bg-cyan-300" />}
             </Link>
           );
         })}
       </nav>
 
-      {/* User menu at bottom */}
-      <div className="px-4 py-4 border-t border-white/20 bg-white/5">
+      <div className="border-t border-white/10 p-3">
         <AdminMenu />
       </div>
-    </div>
+    </aside>
   );
-
-  const currentPage = updatedNavigation.find(item => item.current);
 
   return (
     <div className="dashboard-bg">
-      {/* Decorative background elements */}
-      <div className="absolute inset-0 overflow-hidden pointer-events-none">
-        <div className="absolute top-20 right-10 w-64 h-64 bg-gradient-to-br from-blue-400/10 to-indigo-600/10 rounded-full blur-3xl"></div>
-        <div className="absolute bottom-20 left-10 w-80 h-80 bg-gradient-to-tr from-indigo-400/10 to-purple-600/10 rounded-full blur-3xl"></div>
-      </div>
-
-      <div className="h-screen flex relative z-10">
-        {/* Mobile sidebar backdrop */}
+      <div className="relative flex h-screen">
         {sidebarOpen && (
-          <div
-            className="fixed inset-0 z-40 lg:hidden"
+          <button
+            aria-label="Close navigation"
+            className="fixed inset-0 z-40 bg-slate-950/65 backdrop-blur-[1px] lg:hidden"
             onClick={() => setSidebarOpen(false)}
-          >
-            <div className="absolute inset-0 bg-slate-900/50 backdrop-blur-sm"></div>
-          </div>
+          />
         )}
 
-        {/* Mobile sidebar */}
         <div
-          className={`fixed inset-y-0 left-0 z-50 w-72 transform transition-transform duration-300 ease-in-out lg:hidden ${
+          className={`fixed inset-y-0 left-0 z-50 w-72 transform transition-transform duration-300 lg:hidden ${
             sidebarOpen ? 'translate-x-0' : '-translate-x-full'
           }`}
         >
-          <div className="absolute top-0 right-0 -mr-12 pt-2">
-            <button
-              onClick={() => setSidebarOpen(false)}
-              className="ml-1 flex items-center justify-center h-10 w-10 rounded-full focus:outline-none focus:ring-2 focus:ring-inset focus:ring-white/50 bg-white/10 backdrop-blur-sm"
-            >
-              <X className="h-6 w-6 text-white" />
-            </button>
-          </div>
+          <button
+            onClick={() => setSidebarOpen(false)}
+            className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-md border border-white/10 bg-slate-900/90 text-slate-300"
+          >
+            <X className="h-4 w-4" />
+          </button>
           <Sidebar />
         </div>
 
-        {/* Desktop sidebar */}
         <div className="hidden lg:flex lg:w-72 lg:flex-col">
           <Sidebar className="animate-slide-in-left" />
         </div>
 
-        {/* Main content area */}
-        <div className="flex-1 flex flex-col overflow-hidden">
-          {/* Top navigation bar */}
+        <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
           <header className="header-glass">
-            <div className="flex items-center justify-between px-6 py-4">
-              <div className="flex items-center space-x-4">
+            <div className="flex items-center justify-between gap-4 px-5 py-4 lg:px-6">
+              <div className="flex min-w-0 items-center gap-3">
                 <button
                   onClick={() => setSidebarOpen(true)}
-                  className="text-slate-600 hover:text-slate-800 lg:hidden p-2 rounded-xl hover:bg-white/30 transition-all duration-200"
+                  className="rounded-md border border-white/10 bg-slate-900/80 p-2 text-slate-300 transition hover:border-cyan-400/40 hover:text-cyan-200 lg:hidden"
                 >
-                  <Menu className="h-6 w-6" />
+                  <Menu className="h-5 w-5" />
                 </button>
-                
-                <div className="animate-slide-in-up">
-                  <h1 className="text-2xl font-bold text-slate-800 lg:ml-0">
-                    {currentPage?.name || 'Dashboard'}
-                  </h1>
+                <div className="min-w-0">
+                  <h1 className="truncate text-xl font-semibold text-slate-100 lg:text-2xl">{currentPage?.name || 'Dashboard'}</h1>
                   {organization && (
-                    <div className="flex items-center mt-1">
-                      <Building className="w-3 h-3 text-slate-500 mr-1" />
-                      <span className="text-sm text-slate-600 font-medium">{organization.name}</span>
+                    <div className="mt-1 inline-flex max-w-full items-center gap-1 text-xs text-slate-400">
+                      <Building className="h-3.5 w-3.5" />
+                      <span className="truncate">{organization.name}</span>
                     </div>
                   )}
                 </div>
               </div>
 
-              <div className="flex items-center space-x-3">
-                {/* Search button */}
-                <button 
+              <div className="flex items-center gap-2 lg:gap-3">
+                <button
                   onClick={() => setSearchOpen(!searchOpen)}
-                  className="p-2.5 rounded-xl text-slate-600 hover:text-slate-800 hover:bg-white/40 transition-all duration-200 glass-shimmer"
+                  className={`rounded-md border p-2 transition ${
+                    searchOpen
+                      ? 'border-cyan-400/50 bg-cyan-400/10 text-cyan-200'
+                      : 'border-white/10 bg-slate-900/70 text-slate-400 hover:border-cyan-400/40 hover:text-cyan-200'
+                  }`}
                 >
-                  <Search className="h-5 w-5" />
+                  <Search className="h-4 w-4" />
                 </button>
 
-                {/* Quick action button */}
                 <Link
                   to="/verifications/start"
-                  className="hidden sm:flex items-center space-x-2 px-4 py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-xl shadow-lg hover:shadow-xl transition-all duration-300 hover:scale-105 font-medium"
+                  className="hidden items-center gap-2 rounded-md border border-cyan-400/55 bg-cyan-400/10 px-3.5 py-2 text-sm font-semibold text-cyan-200 transition hover:bg-cyan-400/16 sm:inline-flex"
                 >
                   <Plus className="h-4 w-4" />
-                  <span>New Verification</span>
+                  New Verification
                 </Link>
 
-                {/* Notifications */}
-                <div className="relative">
-                  <button className="p-2.5 rounded-xl text-slate-600 hover:text-slate-800 hover:bg-white/40 transition-all duration-200 glass-shimmer">
-                    <Bell className="h-5 w-5" />
-                    <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center">
-                      <div className="w-2 h-2 bg-white rounded-full"></div>
-                    </div>
-                  </button>
-                </div>
+                <button className="relative rounded-md border border-white/10 bg-slate-900/70 p-2 text-slate-400 transition hover:border-cyan-400/40 hover:text-cyan-200">
+                  <Bell className="h-4 w-4" />
+                  <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border border-slate-950 bg-rose-400" />
+                </button>
 
-                {/* Desktop user menu */}
                 <div className="hidden lg:block">
-                  <AdminMenu />
+                  <AdminMenu compact />
                 </div>
               </div>
             </div>
           </header>
 
-          {/* Page content */}
           <main className="flex-1 overflow-auto">
-            <div className="animate-fade-in">
-              <Outlet />
-            </div>
+            <Outlet />
           </main>
         </div>
       </div>

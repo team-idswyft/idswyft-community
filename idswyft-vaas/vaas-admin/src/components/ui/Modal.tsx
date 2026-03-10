@@ -74,7 +74,7 @@ export default function Modal({
 
   const modalContent = (
     <div
-      className="fixed inset-0 z-50 overflow-y-auto backdrop-blur-sm"
+      className="fixed inset-0 z-[120] overflow-y-auto bg-slate-950/72 backdrop-blur-sm"
       onClick={handleOverlayClick}
       role="dialog"
       aria-modal="true"
@@ -85,19 +85,19 @@ export default function Modal({
         <div
           className={`
             relative w-full ${sizeClasses[size]} max-h-[90vh]
-            bg-slate-300 rounded-2xl shadow-2xl transform transition-all duration-300
-            flex flex-col border border-white/10
+            bg-slate-900 rounded-2xl shadow-2xl transform transition-all duration-300
+            flex flex-col border border-white/10 text-slate-100
             ${className}
           `}
           onClick={(e) => e.stopPropagation()}
         >
           {/* Modal Header */}
           {(title || showCloseButton) && (
-            <div className="flex items-center justify-between p-6 border-b border-white/10 flex-shrink-0 bg-slate-200 rounded-t-2xl">
+            <div className="flex items-center justify-between p-6 border-b border-white/10 flex-shrink-0 bg-slate-900 rounded-t-2xl">
               {title && (
                 <div className="flex items-center space-x-3">
-                  <div className="w-1 h-6 bg-gradient-to-b from-blue-500 to-indigo-600 rounded-full"></div>
-                  <h2 id="modal-title" className="text-xl font-semibold text-gray-900 tracking-tight">
+                  <div className="w-1 h-6 bg-gradient-to-b from-cyan-400 to-cyan-600 rounded-full"></div>
+                  <h2 id="modal-title" className="text-xl font-semibold text-slate-100 tracking-tight">
                     {title}
                   </h2>
                 </div>
@@ -105,7 +105,7 @@ export default function Modal({
               {showCloseButton && (
                 <button
                   onClick={onClose}
-                  className="p-2.5 text-gray-400 hover:text-gray-600 hover:bg-white hover:shadow-md rounded-xl transition-all duration-200 border border-transparent hover:border-gray-200"
+                  className="p-2.5 text-slate-400 hover:text-slate-100 hover:bg-slate-800 rounded-xl transition-all duration-200 border border-transparent hover:border-white/10"
                   aria-label="Close modal"
                 >
                   <X className="w-5 h-5" />
@@ -115,7 +115,7 @@ export default function Modal({
           )}
 
           {/* Modal Content */}
-          <div className={`overflow-y-auto flex-1 bg-slate-300 ${title || showCloseButton ? "p-6" : "p-0"} ${!title && !showCloseButton ? "rounded-2xl" : "rounded-b-2xl"}`}>
+          <div className={`overflow-y-auto flex-1 bg-slate-900 ${title || showCloseButton ? "p-6" : "p-0"} ${!title && !showCloseButton ? "rounded-2xl" : "rounded-b-2xl"}`}>
             {children}
           </div>
         </div>
@@ -148,22 +148,22 @@ export function ConfirmationModal({
   confirmVariant?: 'primary' | 'danger' | 'warning';
 }) {
   const confirmButtonClass = {
-    primary: 'px-4 py-2.5 bg-gradient-to-r from-blue-600 to-blue-700 hover:from-blue-700 hover:to-blue-800 text-white font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow-md',
-    danger: 'px-4 py-2.5 bg-gradient-to-r from-red-600 to-red-700 hover:from-red-700 hover:to-red-800 text-white font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow-md',
-    warning: 'px-4 py-2.5 bg-gradient-to-r from-yellow-600 to-yellow-700 hover:from-yellow-700 hover:to-yellow-800 text-white font-medium rounded-lg transition-all duration-200 shadow-sm hover:shadow-md'
+    primary: 'px-4 py-2.5 bg-cyan-500 hover:bg-cyan-400 text-slate-950 font-semibold rounded-lg transition-all duration-200',
+    danger: 'px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white font-semibold rounded-lg transition-all duration-200',
+    warning: 'px-4 py-2.5 bg-amber-500 hover:bg-amber-400 text-slate-950 font-semibold rounded-lg transition-all duration-200'
   }[confirmVariant];
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title} size="sm">
       <div className="space-y-6">
-        <div className="bg-gray-50 rounded-lg p-4 border border-gray-100">
-          <p className="text-gray-700 leading-relaxed">{message}</p>
+        <div className="bg-slate-800 rounded-lg p-4 border border-white/10">
+          <p className="text-slate-300 leading-relaxed">{message}</p>
         </div>
 
         <div className="flex justify-end space-x-3 pt-2">
           <button
             onClick={onClose}
-            className="px-4 py-2.5 text-gray-700 bg-white hover:bg-gray-50 font-medium rounded-lg transition-all duration-200 border border-gray-300 hover:border-gray-400 shadow-sm hover:shadow-md"
+            className="px-4 py-2.5 text-slate-200 bg-slate-800 hover:bg-slate-700 font-medium rounded-lg transition-all duration-200 border border-white/10"
           >
             {cancelText}
           </button>

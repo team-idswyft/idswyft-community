@@ -108,12 +108,17 @@ export function HomePage() {
     <div style={{ background: C.bg, color: C.text, fontFamily: C.sans }}>
 
       {/* 1. HERO */}
-      <section style={{
+      <section className="landing-hero" style={{
         minHeight: '100vh',
         display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
         padding: '96px 24px 64px', textAlign: 'center',
       }}>
+        <div className="landing-hero-geometry" aria-hidden="true">
+          <div className="geo geo-square" />
+          <div className="geo geo-diamond" />
+          <div className="geo geo-circle" />
+        </div>
         <div style={{ fontFamily: C.mono, fontSize: 12, color: C.muted, letterSpacing: '0.08em', marginBottom: 32 }}>
           idswyft / identity-verification
         </div>
@@ -139,14 +144,14 @@ export function HomePage() {
             View Docs →
           </Link>
         </div>
-        <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
+        <div className="landing-cards-row" style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
           {[
             { value: '99.8%', label: 'Accuracy' },
             { value: '<200ms', label: 'Response' },
             { value: '200+', label: 'Doc Types' },
             { value: 'MIT', label: 'License' },
           ].map(({ value, label }) => (
-            <div key={label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 20px', fontFamily: C.mono, fontSize: 13 }}>
+            <div className="landing-card" key={label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 20px', fontFamily: C.mono, fontSize: 13 }}>
               <span style={{ color: C.cyan, fontWeight: 600 }}>{value}</span>
               <span style={{ color: C.muted, marginLeft: 8 }}>{label}</span>
             </div>
@@ -206,7 +211,7 @@ export function HomePage() {
             Built-in capabilities
           </h2>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
+        <div className="landing-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
           {[
             { title: 'OCR Extraction',       desc: 'Name, DOB, document number, expiry — extracted and structured from any government ID.' },
             { title: 'Back-of-ID / Barcode', desc: 'QR codes, PDF417 barcodes, and MRZ zones cross-validated against front-side data.' },
@@ -215,7 +220,7 @@ export function HomePage() {
             { title: 'Webhooks',              desc: 'Real-time POST callbacks on status changes — verified, failed, or manual_review.' },
             { title: 'GDPR Compliant',        desc: 'Configurable data retention, deletion endpoints, and encrypted storage at rest.' },
           ].map(({ title, desc }) => (
-            <div key={title} style={{ background: C.panel, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.cyan}`, borderRadius: 8, padding: '24px 20px' }}>
+            <div className="landing-card" key={title} style={{ background: C.panel, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.cyan}`, borderRadius: 8, padding: '24px 20px' }}>
               <div style={{ fontFamily: C.mono, fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 8 }}>{title}</div>
               <div style={{ fontSize: 14, color: C.muted, lineHeight: 1.6 }}>{desc}</div>
             </div>
@@ -230,8 +235,8 @@ export function HomePage() {
             Two ways to integrate
           </h2>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
-          <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 10, padding: 28 }}>
+        <div className="landing-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
+          <div className="landing-card" style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 10, padding: 28 }}>
             <div style={{ fontFamily: C.mono, fontSize: 13, color: C.cyan, marginBottom: 12 }}>Option A</div>
             <div style={{ fontWeight: 600, fontSize: 16, color: C.text, marginBottom: 10 }}>Ready-Made Verification Page</div>
             <div style={{ fontSize: 14, color: C.muted, lineHeight: 1.6, marginBottom: 16 }}>
@@ -239,7 +244,7 @@ export function HomePage() {
             </div>
             <Link to="/docs" style={{ color: C.cyan, fontSize: 13, textDecoration: 'none' }}>See hosted flow docs →</Link>
           </div>
-          <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 10, padding: 28 }}>
+          <div className="landing-card" style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 10, padding: 28 }}>
             <div style={{ fontFamily: C.mono, fontSize: 13, color: C.muted, marginBottom: 12 }}>Option B</div>
             <div style={{ fontWeight: 600, fontSize: 16, color: C.text, marginBottom: 10 }}>Custom API Integration</div>
             <div style={{ fontSize: 14, color: C.muted, lineHeight: 1.6, marginBottom: 16 }}>

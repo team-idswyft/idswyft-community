@@ -518,4 +518,135 @@ svg {
     opacity: 1;
     transform: translateY(0);
   }
-}}
+}
+
+/* ===== LANDING PAGE SUBTLE MOTION ===== */
+.landing-hero {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.landing-hero-geometry {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+}
+
+.landing-hero > *:not(.landing-hero-geometry) {
+  position: relative;
+  z-index: 1;
+}
+
+.landing-hero-geometry .geo {
+  position: absolute;
+  border: 1px solid rgba(34, 211, 238, 0.14);
+  background: transparent;
+  will-change: transform, opacity;
+  animation: heroGeoDrift 24s ease-in-out infinite;
+  filter: blur(0.2px);
+}
+
+.landing-hero-geometry .geo-square {
+  width: 120px;
+  height: 120px;
+  top: 16%;
+  left: 12%;
+}
+
+.landing-hero-geometry .geo-diamond {
+  width: 92px;
+  height: 92px;
+  right: 14%;
+  top: 24%;
+  transform: rotate(45deg);
+  animation-delay: -8s;
+  animation-name: heroGeoDriftDiamond;
+}
+
+.landing-hero-geometry .geo-circle {
+  width: 132px;
+  height: 132px;
+  border-radius: 999px;
+  right: 20%;
+  bottom: 16%;
+  animation-delay: -12s;
+}
+
+.landing-card {
+  opacity: 1;
+  transform: translateY(0);
+  animation: landingCardFloat 7.5s ease-in-out infinite;
+  transition: transform 220ms ease, box-shadow 220ms ease;
+}
+
+.landing-card:hover {
+  transform: translateY(-2px);
+}
+
+.landing-cards-grid .landing-card:nth-child(2),
+.landing-cards-row .landing-card:nth-child(2) {
+  animation-delay: 420ms;
+}
+
+.landing-cards-grid .landing-card:nth-child(3),
+.landing-cards-row .landing-card:nth-child(3) {
+  animation-delay: 880ms;
+}
+
+.landing-cards-grid .landing-card:nth-child(4),
+.landing-cards-row .landing-card:nth-child(4) {
+  animation-delay: 1300ms;
+}
+
+.landing-cards-grid .landing-card:nth-child(5),
+.landing-cards-row .landing-card:nth-child(5) {
+  animation-delay: 1760ms;
+}
+
+.landing-cards-grid .landing-card:nth-child(6),
+.landing-cards-row .landing-card:nth-child(6) {
+  animation-delay: 2200ms;
+}
+
+@keyframes heroGeoDrift {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) rotate(0deg);
+    opacity: 0.18;
+  }
+  50% {
+    transform: translate3d(0, -4px, 0) rotate(1deg);
+    opacity: 0.3;
+  }
+}
+
+@keyframes heroGeoDriftDiamond {
+  0%, 100% {
+    transform: translate3d(0, 0, 0) rotate(45deg);
+    opacity: 0.18;
+  }
+  50% {
+    transform: translate3d(0, -4px, 0) rotate(46deg);
+    opacity: 0.3;
+  }
+}
+
+@keyframes landingCardFloat {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .landing-hero-geometry .geo,
+  .landing-card {
+    animation: none;
+    transform: none;
+    opacity: 1;
+  }
+}
+}

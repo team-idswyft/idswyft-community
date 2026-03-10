@@ -132,3 +132,6 @@ AUDIT_REPORT.md
 
 # Internal design docs & plans (never committed)
 docs/
+
+# Local test credentials
+TEST_ADMIN_CREDENTIALS.md

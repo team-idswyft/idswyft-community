@@ -166,9 +166,9 @@ export default function Users() {
       case 'in_progress':
         return <Clock className="w-4 h-4 text-blue-500" />;
       case 'expired':
-        return <XCircle className="w-4 h-4 text-gray-500" />;
+        return <XCircle className="w-4 h-4 text-slate-500" />;
       default:
-        return <Clock className="w-4 h-4 text-gray-400" />;
+        return <Clock className="w-4 h-4 text-slate-500" />;
     }
   };
 
@@ -183,13 +183,13 @@ export default function Users() {
       case 'manual_review':
         return `${baseClass} bg-yellow-100 text-yellow-800`;
       case 'in_progress':
-        return `${baseClass} bg-blue-100 text-blue-800`;
+        return `${baseClass} bg-cyan-500/15 text-cyan-200`;
       case 'pending':
-        return `${baseClass} bg-blue-100 text-blue-800`;
+        return `${baseClass} bg-cyan-500/15 text-cyan-200`;
       case 'expired':
-        return `${baseClass} bg-gray-100 text-gray-800`;
+        return `${baseClass} bg-slate-800/70 text-slate-200`;
       default:
-        return `${baseClass} bg-gray-100 text-gray-800`;
+        return `${baseClass} bg-slate-800/70 text-slate-200`;
     }
   };
 
@@ -228,8 +228,8 @@ export default function Users() {
     <div className="p-6 space-y-8">
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-semibold text-gray-900">End Users</h1>
-          <p className="text-gray-600 mt-1">Manage and monitor end user accounts and verification status</p>
+          <h1 className="text-2xl font-semibold text-slate-100">End Users</h1>
+          <p className="text-slate-400 mt-1">Manage and monitor end user accounts and verification status</p>
         </div>
         
         <div className="flex space-x-3">
@@ -257,7 +257,7 @@ export default function Users() {
           <div>
             <label className="form-label">Search</label>
             <div className="relative">
-              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+              <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 w-4 h-4" />
               <input
                 type="text"
                 className="form-input pl-10"
@@ -331,32 +331,32 @@ export default function Users() {
       <div className="content-card-glass">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-gray-50">
+            <thead className="bg-slate-900/60">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   User
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Contact
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Verification Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Tags
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Created
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white/30 backdrop-blur-sm divide-y divide-white/20">
+            <tbody className="bg-slate-900/55 backdrop-blur-sm divide-y divide-white/20">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={6} className="px-6 py-4 text-center text-slate-500">
                     <div className="flex items-center justify-center">
                       <div className="w-5 h-5 border-2 border-primary-600 border-t-transparent rounded-full animate-spin mr-2"></div>
                       Loading users...
@@ -365,27 +365,27 @@ export default function Users() {
                 </tr>
               ) : !users || users.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500">
+                  <td colSpan={6} className="px-6 py-4 text-center text-slate-500">
                     No users found matching your criteria
                   </td>
                 </tr>
               ) : (
                 users.map((user) => (
-                  <tr key={user.id} className="hover:bg-gray-50">
+                  <tr key={user.id} className="hover:bg-slate-900/60">
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <User className="w-8 h-8 text-gray-400 mr-3" />
+                        <User className="w-8 h-8 text-slate-500 mr-3" />
                         <div>
-                          <div className="text-sm font-medium text-gray-900">
+                          <div className="text-sm font-medium text-slate-100">
                             {user.first_name && user.last_name 
                               ? `${user.first_name} ${user.last_name}` 
                               : user.email || 'Anonymous User'}
                           </div>
-                          <div className="text-sm text-gray-500">
+                          <div className="text-sm text-slate-500">
                             ID: {user.id.substring(0, 8)}...
                           </div>
                           {user.external_id && (
-                            <div className="text-xs text-gray-400">
+                            <div className="text-xs text-slate-500">
                               External: {user.external_id}
                             </div>
                           )}
@@ -393,16 +393,16 @@ export default function Users() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
+                      <div className="text-sm text-slate-100">
                         {user.email && (
                           <div className="flex items-center mb-1">
-                            <Mail className="w-3 h-3 mr-1 text-gray-400" />
+                            <Mail className="w-3 h-3 mr-1 text-slate-500" />
                             {user.email}
                           </div>
                         )}
                         {user.phone && (
                           <div className="flex items-center">
-                            <Phone className="w-3 h-3 mr-1 text-gray-400" />
+                            <Phone className="w-3 h-3 mr-1 text-slate-500" />
                             {user.phone}
                           </div>
                         )}
@@ -416,7 +416,7 @@ export default function Users() {
                         </span>
                       </div>
                       {user.verification_completed_at && (
-                        <div className="text-xs text-gray-500 mt-1">
+                        <div className="text-xs text-slate-500 mt-1">
                           Completed: {formatDate(user.verification_completed_at)}
                         </div>
                       )}
@@ -445,23 +445,23 @@ export default function Users() {
                           user.tags.slice(0, 3).map((tag, index) => (
                             <span
                               key={index}
-                              className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-blue-100 text-blue-800"
+                              className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-cyan-500/15 text-cyan-200"
                             >
                               <Tag className="w-3 h-3 mr-1" />
                               {tag}
                             </span>
                           ))
                         ) : (
-                          <span className="text-sm text-gray-400">No tags</span>
+                          <span className="text-sm text-slate-500">No tags</span>
                         )}
                         {user.tags && user.tags.length > 3 && (
-                          <span className="text-xs text-gray-500">
+                          <span className="text-xs text-slate-500">
                             +{user.tags.length - 3} more
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
                       <div className="flex items-center">
                         <Calendar className="w-4 h-4 mr-1" />
                         {formatDate(user.created_at)}
@@ -484,7 +484,7 @@ export default function Users() {
                             setSelectedUser(user);
                             setShowEditForm(true);
                           }}
-                          className="text-blue-600 hover:text-blue-900"
+                          className="text-cyan-300 hover:text-cyan-200"
                           title="Edit User"
                         >
                           <Edit2 className="w-4 h-4" />
@@ -495,14 +495,14 @@ export default function Users() {
                               setSelectedUser(user);
                               setShowInvitationModal(true);
                             }}
-                            className="text-green-600 hover:text-green-900 bg-green-50 hover:bg-green-100 p-1.5 rounded"
+                            className="text-emerald-300 hover:text-emerald-200 bg-emerald-500/15 hover:bg-emerald-500/25 p-1.5 rounded"
                             title="Send Verification Link"
                           >
                             <Send className="w-4 h-4" />
                           </button>
                         )}
                         {!user.email && (
-                          <div className="text-gray-400 p-1.5" title="No email address - cannot send invitation">
+                          <div className="text-slate-500 p-1.5" title="No email address - cannot send invitation">
                             <Send className="w-4 h-4 opacity-30" />
                           </div>
                         )}
@@ -524,26 +524,26 @@ export default function Users() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="bg-white/50 backdrop-blur-sm px-4 py-3 flex items-center justify-between border-t border-white/20 sm:px-6">
+          <div className="bg-slate-900/70 backdrop-blur-sm px-4 py-3 flex items-center justify-between border-t border-white/20 sm:px-6">
             <div className="flex-1 flex justify-between sm:hidden">
               <button
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
-                className="relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                className="relative inline-flex items-center px-4 py-2 border border-white/15 text-sm font-medium rounded-md text-slate-300 bg-slate-900 hover:bg-slate-900/60 disabled:opacity-50"
               >
                 Previous
               </button>
               <button
                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                 disabled={currentPage === totalPages}
-                className="ml-3 relative inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50"
+                className="ml-3 relative inline-flex items-center px-4 py-2 border border-white/15 text-sm font-medium rounded-md text-slate-300 bg-slate-900 hover:bg-slate-900/60 disabled:opacity-50"
               >
                 Next
               </button>
             </div>
             <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm text-gray-700">
+                <p className="text-sm text-slate-300">
                   Page <span className="font-medium">{currentPage}</span> of{' '}
                   <span className="font-medium">{totalPages}</span>
                 </p>
@@ -553,14 +553,14 @@ export default function Users() {
                   <button
                     onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                     disabled={currentPage === 1}
-                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-white/15 bg-slate-900 text-sm font-medium text-slate-500 hover:bg-slate-900/60 disabled:opacity-50"
                   >
                     Previous
                   </button>
                   <button
                     onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                     disabled={currentPage === totalPages}
-                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-gray-300 bg-white text-sm font-medium text-gray-500 hover:bg-gray-50 disabled:opacity-50"
+                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-white/15 bg-slate-900 text-sm font-medium text-slate-500 hover:bg-slate-900/60 disabled:opacity-50"
                   >
                     Next
                   </button>
@@ -624,20 +624,20 @@ export default function Users() {
 
       {/* Send Verification Invitation Modal */}
       {showInvitationModal && selectedUser && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div className="fixed inset-0 z-[120] overflow-y-auto h-full w-full bg-slate-950/70 backdrop-blur-sm">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-slate-900">
             <div className="flex items-center mb-4">
               <Send className="w-6 h-6 text-green-500 mr-3" />
-              <h3 className="text-lg font-semibold text-gray-900">Send Verification Link</h3>
+              <h3 className="text-lg font-semibold text-slate-100">Send Verification Link</h3>
             </div>
             
             <div className="mb-6">
-              <p className="text-gray-600 mb-4">
+              <p className="text-slate-400 mb-4">
                 Send a verification invitation email to <strong>{selectedUser.first_name} {selectedUser.last_name}</strong> at <strong>{selectedUser.email}</strong>.
               </p>
               
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
-                <h4 className="text-sm font-medium text-blue-800 mb-2">What happens next:</h4>
+              <div className="bg-cyan-500/10 border border-cyan-500/25 rounded-lg p-4 mb-4">
+                <h4 className="text-sm font-medium text-cyan-200 mb-2">What happens next:</h4>
                 <ul className="text-sm text-blue-700 space-y-1">
                   <li>• User receives an email with a verification link</li>
                   <li>• Link is valid for 7 days</li>
@@ -647,13 +647,13 @@ export default function Users() {
               </div>
               
               <div className="mb-4">
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+                <label className="block text-sm font-medium text-slate-300 mb-2">
                   Custom Message (Optional)
                 </label>
                 <textarea
                   id="customMessage"
                   rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="w-full px-3 py-2 border border-white/15 rounded-md focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
                   placeholder="Add a personalized message to the invitation email..."
                 />
               </div>
@@ -665,7 +665,7 @@ export default function Users() {
                   setShowInvitationModal(false);
                   setSelectedUser(null);
                 }}
-                className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                className="px-4 py-2 border border-white/15 rounded-md text-slate-300 bg-slate-900 hover:bg-slate-900/60"
                 disabled={sendingInvitation}
               >
                 Cancel
@@ -690,13 +690,13 @@ export default function Users() {
 
       {/* Delete Confirmation Modal */}
       {deleteConfirm && (
-        <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
+        <div className="fixed inset-0 z-[120] overflow-y-auto h-full w-full bg-slate-950/70 backdrop-blur-sm">
+          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-slate-900">
             <div className="flex items-center mb-4">
               <AlertTriangle className="w-6 h-6 text-red-500 mr-3" />
-              <h3 className="text-lg font-semibold text-gray-900">Delete User</h3>
+              <h3 className="text-lg font-semibold text-slate-100">Delete User</h3>
             </div>
-            <p className="text-gray-600 mb-6">
+            <p className="text-slate-400 mb-6">
               Are you sure you want to delete this user? This action cannot be undone.
             </p>
             <div className="flex justify-end space-x-3">
@@ -748,16 +748,16 @@ function UserDetailsModal({ user, onClose, onUserUpdated }: UserDetailsModalProp
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-8 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-[120] overflow-y-auto h-full w-full bg-slate-950/70 backdrop-blur-sm">
+      <div className="relative top-8 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-slate-900 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-start mb-6">
           <div>
-            <h3 className="text-lg font-semibold text-gray-900">User Details</h3>
-            <p className="text-sm text-gray-500 mt-1">ID: {user.id}</p>
+            <h3 className="text-lg font-semibold text-slate-100">User Details</h3>
+            <p className="text-sm text-slate-500 mt-1">ID: {user.id}</p>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-slate-500 hover:text-slate-400"
           >
             <XCircle className="w-6 h-6" />
           </button>
@@ -766,14 +766,14 @@ function UserDetailsModal({ user, onClose, onUserUpdated }: UserDetailsModalProp
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* User Information */}
           <div className="space-y-4">
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h4 className="font-medium text-gray-900 mb-3 flex items-center">
+            <div className="bg-slate-900/60 p-4 rounded-lg">
+              <h4 className="font-medium text-slate-100 mb-3 flex items-center">
                 <User className="w-4 h-4 mr-2" />
                 User Information
               </h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Name:</span>
+                  <span className="text-slate-500">Name:</span>
                   <span className="font-medium">
                     {user.first_name && user.last_name 
                       ? `${user.first_name} ${user.last_name}` 
@@ -781,30 +781,30 @@ function UserDetailsModal({ user, onClose, onUserUpdated }: UserDetailsModalProp
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Email:</span>
+                  <span className="text-slate-500">Email:</span>
                   <span className="font-medium">{user.email || 'Not provided'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Phone:</span>
+                  <span className="text-slate-500">Phone:</span>
                   <span className="font-medium">{user.phone || 'Not provided'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">External ID:</span>
+                  <span className="text-slate-500">External ID:</span>
                   <span className="font-medium">{user.external_id || 'Not provided'}</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Status:</span>
+                  <span className="text-slate-500">Status:</span>
                   <span className={`font-medium ${user.verification_status === 'verified' ? 'text-green-600' : user.verification_status === 'failed' ? 'text-red-600' : 'text-yellow-600'}`}>
                     {user.verification_status.replace('_', ' ')}
                   </span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-gray-500">Created:</span>
+                  <span className="text-slate-500">Created:</span>
                   <span className="font-medium">{new Date(user.created_at).toLocaleDateString()}</span>
                 </div>
                 {user.verification_completed_at && (
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Verified:</span>
+                    <span className="text-slate-500">Verified:</span>
                     <span className="font-medium">{new Date(user.verification_completed_at).toLocaleDateString()}</span>
                   </div>
                 )}
@@ -812,8 +812,8 @@ function UserDetailsModal({ user, onClose, onUserUpdated }: UserDetailsModalProp
             </div>
 
             {/* Tags */}
-            <div className="bg-gray-50 p-4 rounded-lg">
-              <h4 className="font-medium text-gray-900 mb-3 flex items-center">
+            <div className="bg-slate-900/60 p-4 rounded-lg">
+              <h4 className="font-medium text-slate-100 mb-3 flex items-center">
                 <Tag className="w-4 h-4 mr-2" />
                 Tags
               </h4>
@@ -822,25 +822,25 @@ function UserDetailsModal({ user, onClose, onUserUpdated }: UserDetailsModalProp
                   user.tags.map((tag, index) => (
                     <span
                       key={index}
-                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-cyan-500/15 text-cyan-200"
                     >
                       {tag}
                     </span>
                   ))
                 ) : (
-                  <span className="text-gray-500 text-sm">No tags assigned</span>
+                  <span className="text-slate-500 text-sm">No tags assigned</span>
                 )}
               </div>
             </div>
 
             {/* Metadata */}
             {user.metadata && Object.keys(user.metadata).length > 0 && (
-              <div className="bg-gray-50 p-4 rounded-lg">
-                <h4 className="font-medium text-gray-900 mb-3">Custom Metadata</h4>
+              <div className="bg-slate-900/60 p-4 rounded-lg">
+                <h4 className="font-medium text-slate-100 mb-3">Custom Metadata</h4>
                 <div className="space-y-2 text-sm">
                   {Object.entries(user.metadata).map(([key, value]) => (
                     <div key={key} className="flex justify-between">
-                      <span className="text-gray-500">{key}:</span>
+                      <span className="text-slate-500">{key}:</span>
                       <span className="font-medium">{String(value)}</span>
                     </div>
                   ))}
@@ -851,7 +851,7 @@ function UserDetailsModal({ user, onClose, onUserUpdated }: UserDetailsModalProp
 
           {/* Verification History */}
           <div>
-            <h4 className="font-medium text-gray-900 mb-3 flex items-center">
+            <h4 className="font-medium text-slate-100 mb-3 flex items-center">
               <Shield className="w-4 h-4 mr-2" />
               Verification History
             </h4>
@@ -861,11 +861,11 @@ function UserDetailsModal({ user, onClose, onUserUpdated }: UserDetailsModalProp
                 Loading verifications...
               </div>
             ) : verifications.length === 0 ? (
-              <p className="text-gray-500 text-center py-8">No verifications found</p>
+              <p className="text-slate-500 text-center py-8">No verifications found</p>
             ) : (
               <div className="space-y-3 max-h-96 overflow-y-auto">
                 {verifications.map((verification, index) => (
-                  <div key={index} className="border border-gray-200 rounded-lg p-3">
+                  <div key={index} className="border border-white/10 rounded-lg p-3">
                     <div className="flex items-center justify-between mb-2">
                       <span className="text-sm font-medium">
                         Verification #{verification.id?.substring(0, 8)}...
@@ -878,7 +878,7 @@ function UserDetailsModal({ user, onClose, onUserUpdated }: UserDetailsModalProp
                         {verification.status}
                       </span>
                     </div>
-                    <div className="text-xs text-gray-500">
+                    <div className="text-xs text-slate-500">
                       {new Date(verification.created_at).toLocaleDateString()}
                     </div>
                   </div>
@@ -974,13 +974,13 @@ function UserFormModal({ title, user, onClose, onSubmit }: UserFormModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 bg-gray-600 bg-opacity-50 overflow-y-auto h-full w-full z-50">
-      <div className="relative top-8 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white max-h-[90vh] overflow-y-auto">
+    <div className="fixed inset-0 z-[120] overflow-y-auto h-full w-full bg-slate-950/70 backdrop-blur-sm">
+      <div className="relative top-8 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-slate-900 max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-start mb-6">
-          <h3 className="text-lg font-semibold text-gray-900">{title}</h3>
+          <h3 className="text-lg font-semibold text-slate-100">{title}</h3>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="text-slate-500 hover:text-slate-400"
           >
             <XCircle className="w-6 h-6" />
           </button>
@@ -1071,13 +1071,13 @@ function UserFormModal({ title, user, onClose, onSubmit }: UserFormModalProps) {
                 {formData.tags.map((tag, index) => (
                   <span
                     key={index}
-                    className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800"
+                    className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-cyan-500/15 text-cyan-200"
                   >
                     {tag}
                     <button
                       type="button"
                       onClick={() => removeTag(tag)}
-                      className="ml-1 hover:text-blue-600"
+                      className="ml-1 hover:text-cyan-300"
                     >
                       ×
                     </button>
@@ -1118,7 +1118,7 @@ function UserFormModal({ title, user, onClose, onSubmit }: UserFormModalProps) {
               </div>
               <div className="space-y-2">
                 {Object.entries(formData.metadata).map(([key, value]) => (
-                  <div key={key} className="flex items-center justify-between bg-gray-50 p-2 rounded">
+                  <div key={key} className="flex items-center justify-between bg-slate-900/60 p-2 rounded">
                     <span className="text-sm">
                       <strong>{key}:</strong> {value}
                     </span>
@@ -1157,3 +1157,4 @@ function UserFormModal({ title, user, onClose, onSubmit }: UserFormModalProps) {
     </div>
   );
 }
+
