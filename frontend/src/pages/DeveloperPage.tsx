@@ -7,6 +7,8 @@ import {
   TrashIcon,
   PlusIcon,
   ClipboardDocumentIcon,
+  ChevronRightIcon,
+  ChevronDownIcon,
 } from '@heroicons/react/24/outline'
 
 // â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -46,10 +48,18 @@ interface ApiActivity {
 interface DeveloperWebhook {
   id: string
   url: string
+  events?: string[]
   is_sandbox: boolean
   is_active: boolean
   created_at: string
 }
+
+const WEBHOOK_EVENTS = [
+  'verification.started',
+  'verification.completed',
+  'verification.failed',
+  'verification.manual_review',
+]
 
 // â”€â”€â”€ Shared styles â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 
@@ -277,6 +287,7 @@ export function DeveloperPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [newFullKey, setNewFullKey] = useState<string | null>(null)
   const [webhookUrl, setWebhookUrl] = useState('')
+  const [selectedWebhookEvents, setSelectedWebhookEvents] = useState<string[]>([...WEBHOOK_EVENTS])
   const [webhooks, setWebhooks] = useState<DeveloperWebhook[]>([])
   const [webhookLoading, setWebhookLoading] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -476,6 +487,10 @@ export function DeveloperPage() {
       toast.error('Enter a webhook URL')
       return
     }
+    if (selectedWebhookEvents.length === 0) {
+      toast.error('Select at least one webhook event')
+      return
+    }
 
     setWebhookLoading(true)
     try {
@@ -485,12 +500,13 @@ export function DeveloperPage() {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url }),
+        body: JSON.stringify({ url, events: selectedWebhookEvents }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.message || 'Failed to add webhook')
       setWebhooks(prev => [data.webhook, ...prev])
       setWebhookUrl('')
+      setSelectedWebhookEvents([...WEBHOOK_EVENTS])
       toast.success('Webhook added')
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Failed to add webhook')
@@ -665,9 +681,14 @@ export function DeveloperPage() {
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <button
                               onClick={() => toggleKeyLogs(key.id)}
-                              style={{ background: 'none', border: 'none', color: C.cyan, cursor: 'pointer', fontSize: 12, padding: 2, fontFamily: C.mono }}
+                              style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', color: C.cyan, cursor: 'pointer', fontSize: 12, padding: 2, fontFamily: C.mono }}
                             >
-                              {expandedKeyId === key.id ? 'hide logs' : 'view logs'}
+                              {expandedKeyId === key.id ? (
+                                <ChevronDownIcon style={{ width: 12, height: 12 }} />
+                              ) : (
+                                <ChevronRightIcon style={{ width: 12, height: 12 }} />
+                              )}
+                              logs
                             </button>
                             <button
                               onClick={() => setDeleteId(key.id)}
@@ -851,6 +872,32 @@ export function DeveloperPage() {
               {webhookLoading ? 'Adding...' : 'Add'}
             </button>
           </div>
+          <div style={{ marginTop: 12, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12 }}>
+            <div style={{ color: C.muted, fontSize: 12, marginBottom: 8 }}>Events to send</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
+              {WEBHOOK_EVENTS.map(eventName => {
+                const checked = selectedWebhookEvents.includes(eventName)
+                return (
+                  <label key={eventName} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={checked}
+                      onChange={e => {
+                        const isChecked = e.target.checked
+                        setSelectedWebhookEvents(prev => (
+                          isChecked
+                            ? [...prev, eventName]
+                            : prev.filter(item => item !== eventName)
+                        ))
+                      }}
+                      style={{ accentColor: C.cyan, width: 14, height: 14 }}
+                    />
+                    <span style={{ color: C.text, fontSize: 12, fontFamily: C.mono }}>{eventName}</span>
+                  </label>
+                )
+              })}
+            </div>
+          </div>
           {webhooks.length > 0 && (
             <div style={{ marginTop: 12, border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
               {webhooks.map((hook, i) => (
@@ -866,7 +913,29 @@ export function DeveloperPage() {
                     background: C.surface,
                   }}
                 >
-                  <code style={{ fontFamily: C.mono, fontSize: 12, color: C.text, wordBreak: 'break-all' }}>{hook.url}</code>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
+                    <code style={{ fontFamily: C.mono, fontSize: 12, color: C.text, wordBreak: 'break-all' }}>{hook.url}</code>
+                    {hook.events && hook.events.length > 0 && (
+                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                        {hook.events.map(eventName => (
+                          <span
+                            key={`${hook.id}-${eventName}`}
+                            style={{
+                              background: C.panel,
+                              border: `1px solid ${C.border}`,
+                              borderRadius: 999,
+                              padding: '2px 8px',
+                              color: C.muted,
+                              fontSize: 10,
+                              fontFamily: C.mono,
+                            }}
+                          >
+                            {eventName}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
                     <button
                       style={{ background: 'none', border: `1px solid ${C.border}`, color: C.muted, borderRadius: 6, padding: '6px 10px', cursor: 'pointer', fontSize: 12 }}
