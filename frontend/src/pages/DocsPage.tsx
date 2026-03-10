@@ -53,18 +53,109 @@ const Callout = ({ type = 'note', children }: { type?: 'note' | 'warning' | 'dan
   );
 };
 
-const Pre = ({ code, label }: { code: string; label?: string }) => (
-  <div style={{ borderRadius: 8, border: `1px solid ${C.border}`, overflow: 'hidden', marginBottom: 16 }}>
-    {label && (
-      <div style={{ background: C.surface, padding: '6px 20px', borderBottom: `1px solid ${C.border}`, fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.07em', textTransform: 'uppercase' }}>
-        {label}
+const CODE_FONT = "'Cascadia Code', 'Fira Code', 'JetBrains Mono', Menlo, Monaco, Consolas, monospace";
+type CodeLanguage = 'js' | 'python' | 'bash' | 'json' | 'text';
+
+const inferLanguage = (code: string, label?: string): CodeLanguage => {
+  const lowerLabel = (label || '').toLowerCase();
+  const trimmed = code.trim();
+  if (lowerLabel.includes('response') || trimmed.startsWith('{') || trimmed.startsWith('[')) return 'json';
+  if (trimmed.startsWith('curl')) return 'bash';
+  return 'text';
+};
+
+const highlightLine = (line: string, language: CodeLanguage) => {
+  const keywords = new Set(
+    language === 'js'
+      ? ['const', 'let', 'await', 'async', 'new', 'return', 'if', 'else', 'true', 'false', 'null']
+      : language === 'python'
+        ? ['import', 'with', 'as', 'for', 'in', 'if', 'else', 'True', 'False', 'None']
+        : language === 'json'
+          ? ['true', 'false', 'null']
+          : ['curl', '-X', '-H', '-d']
+  );
+
+  const commentPattern = language === 'python' ? /(#.*$)/ : /(\/\/.*$)/;
+  const commentMatch = line.match(commentPattern);
+  const codePart = commentMatch ? line.slice(0, commentMatch.index) : line;
+  const commentPart = commentMatch ? line.slice(commentMatch.index) : '';
+  const tokens = codePart.split(/(\s+|[()[\]{}.,:=])/).filter(token => token.length > 0);
+
+  return (
+    <>
+      {tokens.map((token, idx) => {
+        if (/^\s+$/.test(token)) return <span key={`ws-${idx}`} style={{ whiteSpace: 'pre' }}>{token}</span>;
+
+        const plain = token.replace(/[()[\]{}.,:=]/g, '');
+        const isString = /^f?["'`].*["'`]$/.test(plain);
+        const isNumber = /^\d+$/.test(plain);
+        const isKeyword = keywords.has(plain);
+        const isFunction = /^(fetch|requests|post|get|print|open|FormData|JSON|stringify|console|log)$/.test(plain);
+
+        const color = isString
+          ? C.amber
+          : isKeyword
+            ? C.cyan
+            : isFunction
+              ? C.green
+              : isNumber
+                ? C.red
+                : C.code;
+
+        return <span key={`tok-${idx}`} style={{ color, fontWeight: isKeyword ? 600 : 400 }}>{token}</span>;
+      })}
+      {commentPart && <span style={{ color: C.muted }}>{commentPart}</span>}
+    </>
+  );
+};
+
+const IDECodeBlock = ({ code, language, fileName }: { code: string; language: CodeLanguage; fileName: string }) => {
+  const lines = code.split('\n');
+  return (
+    <div style={{ background: C.codeBg }}>
+      <div style={{ borderBottom: `1px solid ${C.border}`, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: C.surface }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: C.red, opacity: 0.8 }} />
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: C.amber, opacity: 0.8 }} />
+          <span style={{ width: 8, height: 8, borderRadius: '50%', background: C.green, opacity: 0.8 }} />
+        </div>
+        <div style={{ fontFamily: CODE_FONT, fontSize: '0.68rem', color: C.muted }}>{fileName}</div>
+        <div style={{ width: 38 }} />
       </div>
-    )}
-    <pre style={{ margin: 0, padding: '18px 24px', fontFamily: C.mono, fontSize: '0.79rem', lineHeight: 1.75, color: C.code, background: C.codeBg, overflowX: 'auto', whiteSpace: 'pre' }}>
-      {code}
-    </pre>
-  </div>
-);
+      <div style={{ overflowX: 'hidden' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+          <tbody>
+            {lines.map((line, idx) => (
+              <tr key={`${fileName}-${idx + 1}`}>
+                <td style={{ width: 50, textAlign: 'right', verticalAlign: 'top', padding: '0 10px 0 0', color: C.dim, fontFamily: CODE_FONT, fontSize: '0.72rem', userSelect: 'none', borderRight: `1px solid ${C.border}`, background: C.surface }}>
+                  {idx + 1}
+                </td>
+                <td style={{ padding: '0 16px 0 12px', color: C.code, fontFamily: CODE_FONT, fontSize: '0.79rem', lineHeight: 1.75, whiteSpace: 'pre-wrap', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                  {line ? highlightLine(line, language) : ' '}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+const Pre = ({ code, label }: { code: string; label?: string }) => {
+  const language = inferLanguage(code, label);
+  const extension = language === 'json' ? 'json' : language === 'bash' ? 'sh' : 'txt';
+  return (
+    <div style={{ borderRadius: 8, border: `1px solid ${C.border}`, overflow: 'hidden', marginBottom: 16 }}>
+      {label && (
+        <div style={{ background: C.surface, padding: '6px 20px', borderBottom: `1px solid ${C.border}`, fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.07em', textTransform: 'uppercase' }}>
+          {label}
+        </div>
+      )}
+      <IDECodeBlock code={code} language={language} fileName={`snippet.${extension}`} />
+    </div>
+  );
+};
 
 const SectionAnchor = ({ id }: { id: string }) => <div id={id} style={{ scrollMarginTop: 88 }} />;
 
@@ -132,14 +223,16 @@ const CodeTabs = ({ js, python, tab, onChange }: { js: string; python: string; t
   <div style={{ borderRadius: 8, border: `1px solid ${C.border}`, overflow: 'hidden', marginBottom: 16 }}>
     <div style={{ display: 'flex', background: C.surface, borderBottom: `1px solid ${C.border}` }}>
       {(['js', 'python'] as const).map(t => (
-        <button key={t} onClick={() => onChange(t)} style={{ padding: '8px 18px', fontFamily: C.mono, fontSize: '0.75rem', fontWeight: 500, color: tab === t ? C.cyan : C.muted, background: 'none', border: 'none', borderBottom: tab === t ? `2px solid ${C.cyan}` : '2px solid transparent', cursor: 'pointer', transition: 'color 0.15s' }}>
+        <button key={t} onClick={() => onChange(t)} style={{ padding: '8px 18px', fontFamily: CODE_FONT, fontSize: '0.75rem', fontWeight: 500, color: tab === t ? C.cyan : C.muted, background: 'none', border: 'none', borderBottom: tab === t ? `2px solid ${C.cyan}` : '2px solid transparent', cursor: 'pointer', transition: 'color 0.15s' }}>
           {t === 'js' ? 'JavaScript' : 'Python'}
         </button>
       ))}
     </div>
-    <pre style={{ margin: 0, padding: '20px 24px', fontFamily: C.mono, fontSize: '0.79rem', lineHeight: 1.75, color: C.code, background: C.codeBg, overflowX: 'auto', whiteSpace: 'pre' }}>
-      {tab === 'js' ? js : python}
-    </pre>
+    <IDECodeBlock
+      code={tab === 'js' ? js : python}
+      language={tab === 'js' ? 'js' : 'python'}
+      fileName={tab === 'js' ? 'quickstart.js' : 'quickstart.py'}
+    />
   </div>
 );
 
@@ -228,7 +321,7 @@ export const DocsPage: React.FC = () => {
       </div>
 
       {/* ── Two-column layout ── */}
-      <div style={{ display: 'flex', maxWidth: 1360, margin: '0 auto' }}>
+      <div style={{ display: 'flex', maxWidth: 1440, margin: '0 auto' }}>
 
         {/* Sidebar */}
         <aside className="hidden lg:block" style={{ width: 230, flexShrink: 0, position: 'sticky', top: 57, height: 'calc(100vh - 57px)', overflowY: 'auto', borderRight: `1px solid ${C.border}`, padding: '28px 0', background: C.sidebar }}>
@@ -241,7 +334,7 @@ export const DocsPage: React.FC = () => {
         </aside>
 
         {/* Main content */}
-        <main style={{ flex: 1, padding: '48px 52px', maxWidth: 860, minWidth: 0 }}>
+        <main style={{ flex: 1, padding: '48px 52px', maxWidth: 980, minWidth: 0 }}>
 
           {/* ══ QUICK START ══════════════════════════════════════════════════ */}
           <SectionAnchor id="quick-start" />
