@@ -65,9 +65,56 @@ print(result["status"])  # 'verified' | 'failed' | 'manual_review'`
 function CodeStrip() {
   const [tab, setTab] = useState<'js' | 'py'>('js')
   const code = tab === 'js' ? JS_CODE : PY_CODE
+  const codeLines = code.split('\n')
+  const codeFont = "'Cascadia Code', 'Fira Code', 'JetBrains Mono', Menlo, Monaco, Consolas, monospace"
+  const keywords = new Set(
+    tab === 'js'
+      ? ['const', 'await', 'async', 'method', 'headers', 'body', 'return', 'then', 'new']
+      : ['import', 'with', 'as', 'for', 'in']
+  )
+
+  const renderHighlightedLine = (line: string) => {
+    const commentMatch = line.match(/(\s\/\/.*$|\s#.*$|^\/\/.*$|^#.*$)/)
+    const codePart = commentMatch ? line.slice(0, commentMatch.index) : line
+    const commentPart = commentMatch ? line.slice(commentMatch.index) : ''
+    const tokens = codePart.split(/(\s+|[()[\]{}.,:=])/).filter(token => token.length > 0)
+
+    return (
+      <>
+        {tokens.map((token, idx) => {
+          if (/^\s+$/.test(token)) {
+            return <span key={`ws-${idx}`} style={{ whiteSpace: 'pre' }}>{token}</span>
+          }
+
+          const plain = token.replace(/[()[\]{}.,:=]/g, '')
+          const isString = /^f?["'`].*["'`]$/.test(plain)
+          const isNumber = /^\d+$/.test(plain)
+          const isFunction = /^(fetch|print|open|FormData|console|log|requests|post|get|stringify|json)$/.test(plain)
+          const isKeyword = keywords.has(plain)
+
+          const color = isString
+            ? C.amber
+            : isKeyword
+              ? C.cyan
+              : isFunction
+                ? C.green
+                : isNumber
+                  ? C.red
+                  : C.code
+
+          return (
+            <span key={`tok-${idx}`} style={{ color, fontWeight: isKeyword ? 600 : 400 }}>
+              {token}
+            </span>
+          )
+        })}
+        {commentPart && <span style={{ color: C.muted }}>{commentPart}</span>}
+      </>
+    )
+  }
 
   return (
-    <section style={{ padding: '64px 24px', maxWidth: 720, margin: '0 auto' }}>
+    <section style={{ padding: '64px 24px', maxWidth: 980, margin: '0 auto' }}>
       <div style={{ textAlign: 'center', marginBottom: 32 }}>
         <h2 style={{ fontFamily: C.mono, fontSize: 24, fontWeight: 600, color: C.text, marginBottom: 8 }}>
           Quickstart
@@ -79,7 +126,7 @@ function CodeStrip() {
           {(['js', 'py'] as const).map(t => (
             <button key={t} onClick={() => setTab(t)} style={{
               background: 'none', border: 'none', cursor: 'pointer', padding: '10px 16px',
-              fontFamily: C.mono, fontSize: 12,
+              fontFamily: codeFont, fontSize: 12,
               color: tab === t ? C.cyan : C.muted,
               borderBottom: tab === t ? `2px solid ${C.cyan}` : '2px solid transparent',
               marginBottom: -1,
@@ -88,9 +135,57 @@ function CodeStrip() {
             </button>
           ))}
         </div>
-        <pre style={{ margin: 0, padding: '20px 24px', fontFamily: C.mono, fontSize: 13, color: C.code, lineHeight: 1.7, overflowX: 'auto' }}>
-          <code>{code}</code>
-        </pre>
+        <div style={{ borderBottom: `1px solid ${C.border}`, padding: '10px 14px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', background: C.surface }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: C.red, opacity: 0.8 }} />
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: C.amber, opacity: 0.8 }} />
+            <span style={{ width: 8, height: 8, borderRadius: '50%', background: C.green, opacity: 0.8 }} />
+          </div>
+          <div style={{ fontFamily: codeFont, fontSize: 11, color: C.muted }}>
+            quickstart.{tab === 'js' ? 'js' : 'py'}
+          </div>
+          <div style={{ width: 40 }} />
+        </div>
+        <div style={{ overflowX: 'hidden' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse', tableLayout: 'fixed' }}>
+            <tbody>
+              {codeLines.map((line, index) => (
+                <tr key={`${tab}-line-${index + 1}`}>
+                  <td
+                    style={{
+                      width: 44,
+                      textAlign: 'right',
+                      verticalAlign: 'top',
+                      padding: '0 10px 0 0',
+                      color: C.dim,
+                      fontFamily: codeFont,
+                      fontSize: 12,
+                      userSelect: 'none',
+                      borderRight: `1px solid ${C.border}`,
+                      background: C.surface,
+                    }}
+                  >
+                    {index + 1}
+                  </td>
+                  <td
+                    style={{
+                      padding: '0 16px 0 12px',
+                      color: C.code,
+                      fontFamily: codeFont,
+                      fontSize: 13,
+                      lineHeight: 1.75,
+                      whiteSpace: 'pre-wrap',
+                      wordBreak: 'break-word',
+                      overflowWrap: 'anywhere',
+                    }}
+                  >
+                    {line ? renderHighlightedLine(line) : ' '}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
       <div style={{ textAlign: 'right', marginTop: 12 }}>
         <Link to="/docs" style={{ color: C.cyan, fontSize: 13, textDecoration: 'none' }}>
