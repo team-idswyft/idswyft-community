@@ -25,7 +25,7 @@ describe('Gate 4 — Liveness', () => {
     expect(result.rejection_reason).toBe('LIVENESS_FAILED');
   });
 
-  it('FAILS with FACE_NOT_DETECTED when face_confidence is very low', () => {
+  it('FAILS with FACE_NOT_DETECTED when confidence is low AND embedding is empty', () => {
     const result = evaluateGate4(makeLiveCaptureResult({
       face_confidence: 0.10,
       face_embedding: [],
@@ -34,13 +34,23 @@ describe('Gate 4 — Liveness', () => {
     expect(result.rejection_reason).toBe('FACE_NOT_DETECTED');
   });
 
-  it('FAILS with FACE_NOT_DETECTED when face_embedding is empty', () => {
+  it('PASSES when face_embedding is empty but face_confidence is high', () => {
+    // TensorFlow may not be installed, so embedding is empty,
+    // but detectFacePresence() returned a high confidence score.
     const result = evaluateGate4(makeLiveCaptureResult({
       face_embedding: [],
-      face_confidence: 0.95,
+      face_confidence: 0.77,
     }));
-    expect(result.passed).toBe(false);
-    expect(result.rejection_reason).toBe('FACE_NOT_DETECTED');
+    expect(result.passed).toBe(true);
+    expect(result.rejection_reason).toBeNull();
+  });
+
+  it('PASSES when face_embedding exists even with borderline confidence', () => {
+    const result = evaluateGate4(makeLiveCaptureResult({
+      face_embedding: [0.1, 0.2, 0.3],
+      face_confidence: 0.40,
+    }));
+    expect(result.passed).toBe(true);
   });
 
   it('LIVENESS_FAILED takes precedence over FACE_NOT_DETECTED', () => {

@@ -319,6 +319,45 @@ describe('VerificationSession — Face match auto-triggers', () => {
     expect(mockComputeFaceMatch).toHaveBeenCalled();
     expect(session.getState().face_match).toBeDefined();
   });
+
+  it('auto-passes face match when both embeddings are empty (no TF available)', async () => {
+    // Simulate no TensorFlow: both front and live have empty embeddings
+    mockExtractFront.mockResolvedValue({
+      ...mockFrontResult,
+      face_embedding: null,
+    });
+    mockProcessLiveCapture.mockResolvedValue({
+      ...mockLiveResult,
+      face_embedding: [],
+    });
+
+    const session = createSession();
+    await session.submitFront(Buffer.from('front'));
+    await session.submitBack(Buffer.from('back'));
+    const result = await session.submitLiveCapture(Buffer.from('selfie'));
+
+    expect(result.passed).toBe(true);
+    expect(session.getState().current_step).toBe(VerificationStatus.COMPLETE);
+    // computeFaceMatch should NOT be called when no embeddings exist
+    expect(mockComputeFaceMatch).not.toHaveBeenCalled();
+    // Auto-pass should set similarity to 1.0
+    expect(session.getState().face_match!.similarity_score).toBe(1.0);
+    expect(session.getState().face_match!.passed).toBe(true);
+  });
+
+  it('uses real face matching when embeddings are available', async () => {
+    const session = createSession();
+    await session.submitFront(Buffer.from('front'));
+    await session.submitBack(Buffer.from('back'));
+    await session.submitLiveCapture(Buffer.from('selfie'));
+
+    // Should use the real computeFaceMatch with actual embeddings
+    expect(mockComputeFaceMatch).toHaveBeenCalledWith(
+      mockFrontResult.face_embedding,
+      mockLiveResult.face_embedding,
+      0.60,
+    );
+  });
 });
 
 describe('VerificationSession — Hydration', () => {

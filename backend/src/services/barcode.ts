@@ -368,7 +368,8 @@ export class BarcodeService {
   }
 
   /**
-   * Detect and decode PDF417 barcode from image using ZXing library
+   * Detect and decode PDF417 barcode from image using ZXing library.
+   * Tries multiple preprocessing strategies for robustness with real-world photos.
    */
   private async detectPDF417WithZXing(imagePath: string): Promise<string | null> {
     if (!ZXing || !Jimp) {
@@ -377,79 +378,137 @@ export class BarcodeService {
     }
 
     try {
-      console.log('📄 Starting ZXing PDF417 barcode detection...');
-      
-      // Download and process image
+      console.log('📄 Starting ZXing PDF417 barcode detection (multi-strategy)...');
+
+      // Download source image once
       const imageBuffer = await this.storageService.downloadFile(imagePath);
-      const image = await Jimp.read(imageBuffer);
-      
-      // Preprocess image for better barcode detection
-      image
-        .greyscale()
-        .contrast(0.5)
-        .normalize();
-      
-      // Convert to format needed by ZXing
-      const { width, height } = image.bitmap;
-      const imageData = new Uint8ClampedArray(image.bitmap.data);
-      
-      console.log(`📄 Scanning image ${width}x${height} for PDF417 barcode...`);
-      
-      // Try different ZXing readers
-      const readers = [
-        new ZXing.PDF417Reader(),
-        new ZXing.MultiFormatReader()
-      ];
-      
-      for (const reader of readers) {
-        try {
-          // Set up hints for better detection
-          const hints = new Map();
-          hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.PDF_417]);
-          hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
-          hints.set(ZXing.DecodeHintType.PURE_BARCODE, false);
-          
-          // Create luminance source - convert RGBA to grayscale
-          const grayscaleData = new Uint8ClampedArray(width * height);
-          for (let i = 0; i < grayscaleData.length; i++) {
-            const pixelIndex = i * 4;
-            // Convert RGBA to grayscale using standard formula
-            grayscaleData[i] = Math.round(
-              0.299 * imageData[pixelIndex] +     // R
-              0.587 * imageData[pixelIndex + 1] + // G
-              0.114 * imageData[pixelIndex + 2]   // B
-            );
-          }
-          
-          const luminanceSource = new ZXing.PlanarYUVLuminanceSource(
-            grayscaleData, width, height, 0, 0, width, height, false
-          );
-          const binaryBitmap = new ZXing.BinaryBitmap(new ZXing.HybridBinarizer(luminanceSource));
-          
-          const result = reader.decode(binaryBitmap, hints);
-          
-          if (result && result.getText()) {
-            const decodedText = result.getText();
-            console.log(`✅ PDF417 barcode decoded successfully with ${reader.constructor.name}!`, {
-              length: decodedText.length,
-              preview: decodedText.substring(0, 100) + '...'
-            });
-            
-            return decodedText;
-          }
-          
-        } catch (readerError) {
-          console.log(`📄 ${reader.constructor.name} failed:`, readerError instanceof Error ? readerError.message : String(readerError));
-        }
+      const sourceImage = await Jimp.read(imageBuffer);
+      const { width: srcW, height: srcH } = sourceImage.bitmap;
+      console.log(`📄 Source image: ${srcW}x${srcH}`);
+
+      // Build a set of preprocessed images to try
+      const strategies = this.buildPreprocessingStrategies(sourceImage);
+
+      for (const { name, image } of strategies) {
+        const decoded = this.tryDecodeBarcode(image, name);
+        if (decoded) return decoded;
       }
-      
-      console.log('❌ No PDF417 barcode found in image with any reader');
+
+      console.log('❌ No PDF417 barcode found after all preprocessing strategies');
       return null;
-      
+
     } catch (error) {
       console.warn('📄 ZXing PDF417 detection failed:', error);
       return null;
     }
+  }
+
+  /**
+   * Build multiple preprocessed copies of the source image.
+   * Each strategy targets a different class of real-world photo quality.
+   */
+  private buildPreprocessingStrategies(sourceImage: any): Array<{ name: string; image: any }> {
+    const strategies: Array<{ name: string; image: any }> = [];
+
+    // Strategy 1: Greyscale + moderate contrast (the original approach)
+    const s1 = sourceImage.clone().greyscale().contrast(0.5).normalize();
+    strategies.push({ name: 'grey+contrast(0.5)+norm', image: s1 });
+
+    // Strategy 2: High contrast — helps with washed-out photos
+    const s2 = sourceImage.clone().greyscale().contrast(0.8).normalize();
+    strategies.push({ name: 'grey+contrast(0.8)+norm', image: s2 });
+
+    // Strategy 3: Low contrast — prevents blowout on already high-contrast images
+    const s3 = sourceImage.clone().greyscale().contrast(0.3).normalize();
+    strategies.push({ name: 'grey+contrast(0.3)+norm', image: s3 });
+
+    // Strategy 4: Negative contrast — inverted can help when barcode is light-on-dark
+    const s4 = sourceImage.clone().greyscale().contrast(-0.3).normalize();
+    strategies.push({ name: 'grey+contrast(-0.3)+norm', image: s4 });
+
+    // Strategy 5: Brightness boost — underexposed photos from phone cameras
+    const s5 = sourceImage.clone().greyscale().brightness(0.2).contrast(0.5).normalize();
+    strategies.push({ name: 'grey+bright(0.2)+contrast(0.5)', image: s5 });
+
+    // Strategy 6: Upscale small images — PDF417 has dense data needing resolution
+    const { width } = sourceImage.bitmap;
+    if (width < 1200) {
+      const s6 = sourceImage.clone()
+        .resize(Math.max(width * 2, 1600), Jimp.default.AUTO)
+        .greyscale()
+        .contrast(0.5)
+        .normalize();
+      strategies.push({ name: 'upscale+grey+contrast(0.5)', image: s6 });
+    }
+
+    // Strategy 7: Raw greyscale only — sometimes preprocessing hurts more than helps
+    const s7 = sourceImage.clone().greyscale();
+    strategies.push({ name: 'grey-only', image: s7 });
+
+    // Strategy 8: Inverted — white-on-black barcodes
+    const s8 = sourceImage.clone().greyscale().invert().contrast(0.3).normalize();
+    strategies.push({ name: 'inverted+contrast(0.3)', image: s8 });
+
+    return strategies;
+  }
+
+  /**
+   * Attempt barcode decode on a single preprocessed image using both binarizers.
+   * Returns decoded text or null.
+   */
+  private tryDecodeBarcode(image: any, strategyName: string): string | null {
+    const { width, height } = image.bitmap;
+    const imageData = new Uint8ClampedArray(image.bitmap.data);
+
+    // Convert RGBA to grayscale luminance
+    const grayscaleData = new Uint8ClampedArray(width * height);
+    for (let i = 0; i < grayscaleData.length; i++) {
+      const px = i * 4;
+      grayscaleData[i] = Math.round(
+        0.299 * imageData[px] + 0.587 * imageData[px + 1] + 0.114 * imageData[px + 2]
+      );
+    }
+
+    const luminanceSource = new ZXing.PlanarYUVLuminanceSource(
+      grayscaleData, width, height, 0, 0, width, height, false
+    );
+
+    // Try both binarizers — HybridBinarizer adapts locally, GlobalHistogramBinarizer uses global threshold
+    const binarizers = [
+      { name: 'Hybrid', binarizer: new ZXing.HybridBinarizer(luminanceSource) },
+      { name: 'GlobalHistogram', binarizer: new ZXing.GlobalHistogramBinarizer(luminanceSource) },
+    ];
+
+    const readers = [
+      new ZXing.PDF417Reader(),
+      new ZXing.MultiFormatReader(),
+    ];
+
+    const hints = new Map();
+    hints.set(ZXing.DecodeHintType.POSSIBLE_FORMATS, [ZXing.BarcodeFormat.PDF_417]);
+    hints.set(ZXing.DecodeHintType.TRY_HARDER, true);
+    hints.set(ZXing.DecodeHintType.PURE_BARCODE, false);
+
+    for (const { name: binName, binarizer } of binarizers) {
+      const binaryBitmap = new ZXing.BinaryBitmap(binarizer);
+      for (const reader of readers) {
+        try {
+          const result = reader.decode(binaryBitmap, hints);
+          if (result && result.getText()) {
+            const decodedText = result.getText();
+            console.log(`✅ PDF417 decoded: strategy="${strategyName}", binarizer=${binName}, reader=${reader.constructor.name}`, {
+              length: decodedText.length,
+              preview: decodedText.substring(0, 80) + '...',
+            });
+            return decodedText;
+          }
+        } catch {
+          // Expected — most strategy+reader combos will fail
+        }
+      }
+    }
+
+    return null;
   }
 
   /**
