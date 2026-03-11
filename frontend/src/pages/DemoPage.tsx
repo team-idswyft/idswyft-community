@@ -486,7 +486,15 @@ const DemoPage: React.FC = () => {
         if (response.ok) {
           const data = await response.json();
           setVerificationRequest(data);
-          
+
+          // Check for terminal failure states
+          const status = (data.status || '').toLowerCase();
+          if (status === 'hard_rejected' || status === 'failed') {
+            clearInterval(pollInterval);
+            toast.error(data.rejection_reason || data.failure_reason || 'Document verification failed');
+            return;
+          }
+
           // Check if OCR data is available
           if (data.ocr_data && Object.keys(data.ocr_data).length > 0) {
             clearInterval(pollInterval);

@@ -4,7 +4,6 @@ import { VerificationService } from './verification.js';
 import { ProviderMetricsService } from './providerMetrics.js';
 import { OCRData } from '@/types/index.js';
 import { createOCRProvider } from '@/providers/ocr/index.js';
-import { TesseractProvider } from '@/providers/ocr/TesseractProvider.js';
 import type { OCRProvider } from '@/providers/types.js';
 
 export class OCRService {
@@ -34,46 +33,22 @@ export class OCRService {
       let ocrData: OCRData;
       const start = Date.now();
 
-      try {
-        ocrData = await this.provider.processDocument(fileBuffer, documentType);
-        const scores = Object.values(ocrData.confidence_scores || {});
-        const avgConfidence = scores.length > 0 ? scores.reduce((s, v) => s + v, 0) / scores.length : undefined;
+      ocrData = await this.provider.processDocument(fileBuffer, documentType);
+      const scores = Object.values(ocrData.confidence_scores || {});
+      const avgConfidence = scores.length > 0 ? scores.reduce((s, v) => s + v, 0) / scores.length : undefined;
 
-        await this.metricsService.record({
-          providerName: this.provider.name,
-          providerType: 'ocr',
-          verificationId: documentId,
-          latencyMs: Date.now() - start,
-          success: true,
-          confidenceScore: avgConfidence,
-        });
-      } catch (providerError) {
-        await this.metricsService.record({
-          providerName: this.provider.name,
-          providerType: 'ocr',
-          verificationId: documentId,
-          latencyMs: Date.now() - start,
-          success: false,
-          errorType: providerError instanceof Error ? providerError.constructor.name : 'Unknown',
-        });
-
-        if (this.provider.name !== 'tesseract') {
-          logger.warn('Primary OCR provider failed, falling back to Tesseract', {
-            documentId,
-            provider: this.provider.name,
-            error: providerError instanceof Error ? providerError.message : 'Unknown',
-          });
-          const fallback = new TesseractProvider();
-          ocrData = await fallback.processDocument(fileBuffer, documentType);
-          ocrData.confidence_scores = { ...ocrData.confidence_scores, fallback_used: 1 };
-        } else {
-          throw providerError;
-        }
-      }
+      await this.metricsService.record({
+        providerName: this.provider.name,
+        providerType: 'ocr',
+        verificationId: documentId,
+        latencyMs: Date.now() - start,
+        success: true,
+        confidenceScore: avgConfidence,
+      });
 
       await this.verificationService.updateDocument(documentId, {
         ocr_extracted: true,
-        quality_score: this.provider.name === 'openai' ? 0.92 : 0.5,
+        quality_score: 0.5,
       });
 
       logger.info('OCR processing completed', {

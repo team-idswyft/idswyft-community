@@ -58,12 +58,12 @@ export const authenticateAPIKey = catchAsync(async (req: Request, res: Response,
   
   // Extract key prefix and hash the full key
   const keyPrefix = apiKey.substring(0, 8);
-  
+
   const keyHash = crypto
     .createHmac('sha256', config.apiKeySecret)
     .update(apiKey)
     .digest('hex');
-  
+
   try {
     // Find API key in database
     const { data: apiKeyRecord, error: keyError } = await supabase
@@ -75,7 +75,7 @@ export const authenticateAPIKey = catchAsync(async (req: Request, res: Response,
       .eq('key_hash', keyHash)
       .eq('is_active', true)
       .single();
-    
+
     if (keyError || !apiKeyRecord) {
       logger.warn('Invalid API key attempted', {
         keyPrefix,
@@ -185,14 +185,28 @@ export const authenticateUser = catchAsync(async (req: Request, res: Response, n
         .insert({ id: userId })
         .select('*')
         .single();
-      
+
       if (createError) {
-        logger.error('Failed to create user:', createError);
-        throw new AuthenticationError('Failed to authenticate user');
+        // Handle race condition: another request created the user concurrently
+        if (createError.code === '23505') {
+          const { data: existingUser } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', userId)
+            .single();
+          if (existingUser) {
+            user = existingUser;
+          } else {
+            throw new AuthenticationError('Failed to authenticate user');
+          }
+        } else {
+          logger.error('Failed to create user:', createError);
+          throw new AuthenticationError('Failed to authenticate user');
+        }
+      } else {
+        user = newUser;
+        logger.info('New user created', { userId, developerId: req.developer.id });
       }
-      
-      user = newUser;
-      logger.info('New user created', { userId, developerId: req.developer.id });
     } else if (error) {
       logger.error('User authentication error:', error);
       throw new AuthenticationError('Failed to authenticate user');

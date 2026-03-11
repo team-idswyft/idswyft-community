@@ -475,9 +475,25 @@ export function DeveloperPage() {
     return 'Process API call'
   }
 
-  const copyKey = (key: string) => {
-    navigator.clipboard.writeText(key)
-    toast.success('Copied to clipboard')
+  const copyKey = async (key: string) => {
+    try {
+      if (navigator.clipboard && window.isSecureContext) {
+        await navigator.clipboard.writeText(key)
+      } else {
+        // Fallback for non-HTTPS contexts (e.g. LAN IP in development)
+        const textarea = document.createElement('textarea')
+        textarea.value = key
+        textarea.style.position = 'fixed'
+        textarea.style.opacity = '0'
+        document.body.appendChild(textarea)
+        textarea.select()
+        document.execCommand('copy')
+        document.body.removeChild(textarea)
+      }
+      toast.success('Copied to clipboard')
+    } catch {
+      toast.error('Failed to copy — try selecting and copying manually')
+    }
   }
 
   const addWebhook = async () => {

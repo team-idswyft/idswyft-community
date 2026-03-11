@@ -539,7 +539,7 @@ router.get('/webhooks',
 
     const { data: webhooks, error } = await supabase
       .from('webhooks')
-      .select('id, url, is_sandbox, is_active, created_at')
+      .select('id, url, is_sandbox, is_active, created_at, events')
       .eq('developer_id', developer.id)
       .order('created_at', { ascending: false });
 
@@ -600,7 +600,7 @@ router.post('/webhooks',
       .insert({
         developer_id: developer.id,
         url,
-        is_sandbox
+        is_sandbox,
       })
       .select('id, url, is_sandbox, is_active, created_at')
       .single();
