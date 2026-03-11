@@ -165,11 +165,13 @@ export class PaddleOCRProvider implements OCRProvider {
       const startIdx = dlNumberLineIndex >= 0 ? dlNumberLineIndex + 1 : 0;
 
       for (let i = startIdx; i < flatLines.length && i < startIdx + 4; i++) {
-        const text = flatLines[i].text.trim();
-        // Skip lines that look like class designations, addresses (contain digits), or labels
+        // Strip leading field numbers common on US DLs (e.g. "2OBED" → "OBED", "1LORISSON" → "LORISSON")
+        const text = flatLines[i].text.trim().replace(/^\d{1,2}\s*/, '');
+        // Skip lines that look like class designations or labels
         if (/^class\b/i.test(text)) continue;
-        if (/\d/.test(text)) break; // address or DOB line — stop
         if (/[:\-]/.test(text)) break; // label line — stop
+        // Address lines: digits in the middle/end (e.g. "84020 TRYON PARK RD") — stop
+        if (/\d{3,}/.test(text)) break;
         // UPPERCASE text that looks like a name (letters, spaces, hyphens, apostrophes)
         if (/^[A-Z][A-Z\s\-']+$/.test(text) && text.length >= 2) {
           nameLines.push(text);

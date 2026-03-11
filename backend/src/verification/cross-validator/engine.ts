@@ -77,6 +77,29 @@ export function crossValidate(
   const frontOcr = front.ocr as Record<string, unknown>;
   const backPayload = (back.qr_payload || {}) as Record<string, unknown>;
 
+  // If barcode returned all-empty fields, we can't cross-validate — auto-REVIEW
+  const backHasData = Object.values(backPayload).some(
+    v => typeof v === 'string' && v.trim().length > 0
+  );
+  if (!backHasData) {
+    const emptyFieldScores: Record<string, { score: number; passed: boolean; weight: number }> = {};
+    for (const [field, config] of Object.entries(FIELD_WEIGHTS)) {
+      emptyFieldScores[field] = { score: 0, passed: false, weight: config.weight };
+    }
+
+    // Check document expiry from front OCR only
+    const frontExpiry = extractFrontField(frontOcr, 'expiry_date');
+    const documentExpired = frontExpiry ? isExpired(frontExpiry, '') : false;
+
+    return {
+      overall_score: 0,
+      field_scores: emptyFieldScores,
+      has_critical_failure: false,
+      document_expired: documentExpired,
+      verdict: documentExpired ? 'REJECT' : 'REVIEW',
+    };
+  }
+
   const fieldScores: Record<string, { score: number; passed: boolean; weight: number }> = {};
   let overallScore = 0;
   let hasCriticalFailure = false;
