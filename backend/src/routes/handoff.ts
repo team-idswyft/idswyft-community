@@ -22,8 +22,13 @@ router.post('/create', catchAsync(async (req: Request, res: Response) => {
     .insert({ token, api_key, user_id, expires_at: expiresAt.toISOString() });
 
   if (error) {
-    logger.error('Failed to create handoff session', error);
-    throw new Error('Failed to create handoff session');
+    logger.error('Failed to create handoff session', {
+      code: error.code,
+      message: error.message,
+      details: error.details,
+      hint: error.hint,
+    });
+    throw new Error(`Failed to create handoff session: ${error.message}`);
   }
 
   res.status(201).json({ token, expires_at: expiresAt.toISOString() });
