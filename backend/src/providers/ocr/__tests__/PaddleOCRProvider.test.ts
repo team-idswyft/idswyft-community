@@ -157,6 +157,46 @@ describe('PaddleOCRProvider', () => {
       const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
       expect(data.address).toBe('123 Main Street, Springfield');
     });
+
+    it('extracts DL number from "DLn" format (US driver license)', async () => {
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'NORTHUSA', confidence: 0.97 }, { text: 'DRIVER LICENSE', confidence: 0.99 }, { text: 'CAROLINA', confidence: 0.98 }],
+          [{ text: '4d DLn', confidence: 0.82 }, { text: '000046688716', confidence: 0.99 }],
+          [{ text: 'Class C', confidence: 0.97 }],
+          [{ text: 'LORISSON', confidence: 1.0 }],
+          [{ text: 'OBED', confidence: 0.91 }],
+          [{ text: '84020 TRYON PARK RD', confidence: 0.97 }],
+          [{ text: '3 Date of birth', confidence: 0.98 }, { text: 'N Sex Eyes', confidence: 0.85 }],
+          [{ text: '09/29/1979', confidence: 1.0 }, { text: 'M', confidence: 1.0 }, { text: 'BLK', confidence: 1.0 }],
+          [{ text: '16 Height', confidence: 0.98 }],
+          [{ text: "5'-09\"", confidence: 0.98 }, { text: 'BLK', confidence: 0.97 }],
+          [{ text: 'SEP', confidence: 0.99 }, { text: '4a Iss', confidence: 0.97 }, { text: '46 Exp', confidence: 0.94 }],
+          [{ text: '5 DD 0041761301', confidence: 0.98 }, { text: '08/14/2025', confidence: 1.0 }, { text: '09/29/2033', confidence: 1.0 }],
+        ]),
+      );
+
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+
+      expect(data.document_number).toBe('000046688716');
+      expect(data.name).toBe('OBED LORISSON');
+      expect(data.date_of_birth).toBe('1979-09-29');
+      expect(data.expiration_date).toBe('2033-09-29');
+    });
+
+    it('picks last date as expiry when multiple dates on same line', async () => {
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'License No:', confidence: 0.9 }, { text: 'D9876543', confidence: 0.9 }],
+          [{ text: 'DOB:', confidence: 0.9 }, { text: '03/15/1985', confidence: 0.9 }],
+          [{ text: 'Exp', confidence: 0.9 }],
+          [{ text: '01/01/2024 12/31/2030', confidence: 0.9 }],
+        ]),
+      );
+
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+      expect(data.expiration_date).toBe('2030-12-31');
+    });
   });
 
   describe('national_id extraction', () => {
@@ -176,6 +216,33 @@ describe('PaddleOCRProvider', () => {
       expect(data.date_of_birth).toBeDefined();
       expect(data.document_number).toBe('NID12345678');
       expect(data.issuing_authority).toBe('MINISTRY OF INTERIOR');
+    });
+  });
+
+  describe('national_id auto-detects driver license', () => {
+    it('redirects to DL extraction when text contains DRIVER LICENSE', async () => {
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'DRIVER LICENSE', confidence: 0.99 }],
+          [{ text: '4d DLn', confidence: 0.82 }, { text: '000012345678', confidence: 0.99 }],
+          [{ text: 'Class C', confidence: 0.97 }],
+          [{ text: 'SMITH', confidence: 1.0 }],
+          [{ text: 'JOHN', confidence: 0.91 }],
+          [{ text: '123 MAIN ST', confidence: 0.97 }],
+          [{ text: 'Date of birth', confidence: 0.98 }],
+          [{ text: '01/15/1990', confidence: 1.0 }],
+          [{ text: '46 Exp', confidence: 0.94 }],
+          [{ text: '06/01/2035', confidence: 1.0 }],
+        ]),
+      );
+
+      const data = await provider.processDocument(Buffer.from('img'), 'national_id');
+
+      // Should have used DL extraction despite being called as national_id
+      expect(data.document_number).toBe('000012345678');
+      expect(data.name).toBe('JOHN SMITH');
+      expect(data.date_of_birth).toBe('1990-01-15');
+      expect(data.expiration_date).toBe('2035-06-01');
     });
   });
 

@@ -119,7 +119,36 @@ export class PaddleOCRProvider implements OCRProvider {
   private extractDriversLicenseData(lines: RecognitionResult[][], ocrData: OCRData): void {
     const flatLines = this.flattenLines(lines);
 
-    // Name — multiple label patterns common on DL
+    // ── DL number ──
+    // US DLs use varied labels: "DLn", "DL", "License No", "LIC#", etc.
+    // First try direct regex for "DLn/DL# + digits" which is the most reliable pattern.
+    let dlNumberLineIndex = -1;
+    for (let i = 0; i < flatLines.length; i++) {
+      const m = flatLines[i].text.match(/(?:DLn?|DL\s*#?|LIC\s*#?)\s*([0-9]{6,15})/i);
+      if (m) {
+        ocrData.document_number = m[1];
+        ocrData.confidence_scores!.document_number = flatLines[i].confidence;
+        dlNumberLineIndex = i;
+        break;
+      }
+    }
+
+    // Fallback: try label-based extraction
+    if (!ocrData.document_number) {
+      this.findField(flatLines, [/license\s*no/i, /driver\s*license/i, /number/i], (value, conf) => {
+        const cleaned = value.replace(/\s+/g, '');
+        if (/^[A-Z0-9\-]{6,15}$/i.test(cleaned) && !/\d{2}[\/\-\.]\d{2}/.test(cleaned)) {
+          ocrData.document_number = cleaned;
+          ocrData.confidence_scores!.document_number = conf;
+        }
+      });
+      if (ocrData.document_number) {
+        dlNumberLineIndex = flatLines.findIndex(l => ocrData.document_number && l.text.includes(ocrData.document_number));
+      }
+    }
+
+    // ── Name ──
+    // First try labeled patterns
     this.findField(flatLines, [/full\s*name/i, /\bname\b/i, /\bfn\b/i, /\bln\b/i], (value, conf) => {
       if (value.length > 3) {
         ocrData.name = value.replace(/\s+/g, ' ');
@@ -127,25 +156,52 @@ export class PaddleOCRProvider implements OCRProvider {
       }
     });
 
+    // Fallback for US DLs: name lines are UPPERCASE-only, appear after the DL number
+    // and before address/DOB lines. Typically 1-2 lines of just a name (last, then first).
+    if (!ocrData.name) {
+      const nameLines: string[] = [];
+      let nameConf = 0;
+      let nameCount = 0;
+      const startIdx = dlNumberLineIndex >= 0 ? dlNumberLineIndex + 1 : 0;
+
+      for (let i = startIdx; i < flatLines.length && i < startIdx + 4; i++) {
+        const text = flatLines[i].text.trim();
+        // Skip lines that look like class designations, addresses (contain digits), or labels
+        if (/^class\b/i.test(text)) continue;
+        if (/\d/.test(text)) break; // address or DOB line — stop
+        if (/[:\-]/.test(text)) break; // label line — stop
+        // UPPERCASE text that looks like a name (letters, spaces, hyphens, apostrophes)
+        if (/^[A-Z][A-Z\s\-']+$/.test(text) && text.length >= 2) {
+          nameLines.push(text);
+          nameConf += flatLines[i].confidence;
+          nameCount++;
+        }
+      }
+
+      if (nameLines.length > 0) {
+        // US DLs typically show LAST then FIRST — join as "FIRST LAST"
+        ocrData.name = nameLines.length > 1
+          ? nameLines.slice(1).join(' ') + ' ' + nameLines[0]
+          : nameLines[0];
+        ocrData.confidence_scores!.name = nameConf / nameCount;
+      }
+    }
+
+    // ── Date of birth ──
     this.findDateField(flatLines, [/dob/i, /date\s*of\s*birth/i, /birth/i, /born/i], (value, conf) => {
       ocrData.date_of_birth = value;
       ocrData.confidence_scores!.date_of_birth = conf;
     });
 
-    this.findField(flatLines, [/license\s*no/i, /driver\s*license/i, /\bdl\b/i, /\bid\b/i, /number/i], (value, conf) => {
-      const cleaned = value.replace(/\s+/g, '');
-      // Must look like a license number (alphanumeric 6-15), not a date
-      if (/^[A-Z0-9\-]{6,15}$/i.test(cleaned) && !/\d{2}[\/\-\.]\d{2}/.test(cleaned)) {
-        ocrData.document_number = cleaned;
-        ocrData.confidence_scores!.document_number = conf;
-      }
-    });
-
-    this.findDateField(flatLines, [/expires/i, /expiry/i, /exp\b/i, /valid\s*until/i], (value, conf) => {
+    // ── Expiry date ──
+    // For US DLs, "Exp" often appears on a label line with the actual date on the next line.
+    // When multiple dates appear on the same line, the LAST one is typically the expiry.
+    this.findLastDateField(flatLines, [/expires/i, /expiry/i, /\bexp\b/i, /valid\s*until/i], (value, conf) => {
       ocrData.expiration_date = value;
       ocrData.confidence_scores!.expiration_date = conf;
     });
 
+    // ── Address ──
     this.findField(flatLines, [/address/i, /addr/i], (value, conf) => {
       if (value.length > 5) {
         ocrData.address = value.replace(/\s+/g, ' ');
@@ -153,6 +209,7 @@ export class PaddleOCRProvider implements OCRProvider {
       }
     });
 
+    // ── Sex ──
     this.findField(flatLines, [/sex/i, /gender/i], (value, conf) => {
       const letter = value.match(/^[MF]/i);
       if (letter) {
@@ -161,11 +218,15 @@ export class PaddleOCRProvider implements OCRProvider {
       }
     });
 
+    // ── Height ──
     this.findField(flatLines, [/height/i, /hgt/i, /\bht\b/i], (value, conf) => {
-      ocrData.height = value.trim();
+      // Clean: extract just the measurement (e.g. "5'-09"" from "5'-09" BLK")
+      const heightMatch = value.match(/\d['′]\s*-?\s*\d{1,2}"?/);
+      ocrData.height = heightMatch ? heightMatch[0] : value.trim();
       ocrData.confidence_scores!.height = conf;
     });
 
+    // ── Eye color ──
     this.findField(flatLines, [/eyes?/i, /eye\s*color/i], (value, conf) => {
       const color = value.match(/^[A-Z]{2,4}/i);
       if (color) {
@@ -178,6 +239,12 @@ export class PaddleOCRProvider implements OCRProvider {
   private extractNationalIdData(lines: RecognitionResult[][], ocrData: OCRData): void {
     const flatLines = this.flattenLines(lines);
 
+    // Check if this is actually a driver's license mislabeled as national_id
+    const fullText = flatLines.map(l => l.text).join(' ');
+    if (/driver\s*license|driver'?s?\s*lic/i.test(fullText) || /\bDLn?\b/i.test(fullText)) {
+      return this.extractDriversLicenseData(lines, ocrData);
+    }
+
     this.findField(flatLines, [/full\s*name/i, /\bname\b/i], (value, conf) => {
       ocrData.name = value;
       ocrData.confidence_scores!.name = conf;
@@ -188,7 +255,7 @@ export class PaddleOCRProvider implements OCRProvider {
       ocrData.confidence_scores!.date_of_birth = conf;
     });
 
-    this.findField(flatLines, [/id\s*no/i, /national\s*id/i, /identity/i], (value, conf) => {
+    this.findField(flatLines, [/id\s*no/i, /national\s*id/i, /identity/i, /\bdln?\b/i], (value, conf) => {
       const cleaned = value.replace(/\s+/g, '');
       if (/^[A-Z0-9\-]{6,20}$/i.test(cleaned)) {
         ocrData.document_number = cleaned;
@@ -201,7 +268,7 @@ export class PaddleOCRProvider implements OCRProvider {
       ocrData.confidence_scores!.issuing_authority = conf;
     });
 
-    this.findDateField(flatLines, [/expiry/i, /expires/i, /valid\s*until/i], (value, conf) => {
+    this.findDateField(flatLines, [/expiry/i, /expires/i, /valid\s*until/i, /\bexp\b/i], (value, conf) => {
       ocrData.expiration_date = value;
       ocrData.confidence_scores!.expiration_date = conf;
     });
@@ -311,11 +378,34 @@ export class PaddleOCRProvider implements OCRProvider {
     });
   }
 
+  /**
+   * Like findDateField but extracts the LAST date on the matched line/next-line.
+   * Useful for US DLs where issue date and expiry date appear on the same line
+   * (e.g. "08/14/2025 09/29/2033"), and expiry is the last one.
+   */
+  private findLastDateField(
+    lines: Array<{ text: string; confidence: number }>,
+    patterns: RegExp[],
+    onMatch: (value: string, confidence: number) => void,
+  ): void {
+    this.findField(lines, patterns, (value, conf) => {
+      const dateStr = this.extractLastDate(value);
+      if (dateStr) onMatch(dateStr, conf);
+    });
+  }
+
   /** Pull a date out of arbitrary text and standardise to YYYY-MM-DD. */
   private extractDate(text: string): string | null {
     const m = text.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
     if (!m) return null;
     return standardizeDateFormat(m[0]);
+  }
+
+  /** Pull the LAST date from text (for lines with multiple dates). */
+  private extractLastDate(text: string): string | null {
+    const matches = [...text.matchAll(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/g)];
+    if (matches.length === 0) return null;
+    return standardizeDateFormat(matches[matches.length - 1][0]);
   }
 }
 
