@@ -35,6 +35,12 @@ export interface VerificationThresholds {
     minimum_acceptable: number;
     high_confidence: number;
   };
+
+  // Front-document face presence thresholds
+  FACE_PRESENCE: {
+    minimum_confidence: number;
+    high_confidence: number;
+  };
   
   // PDF417 barcode validation thresholds
   PDF417: {
@@ -53,8 +59,8 @@ export const VERIFICATION_THRESHOLDS: VerificationThresholds = {
   
   // Face matching thresholds (document photo vs selfie)
   FACE_MATCHING: {
-    production: 0.85,  // Stricter for production
-    sandbox: 0.80      // Slightly more lenient for testing
+    production: 0.60,  // Per architecture spec: cosine similarity threshold
+    sandbox: 0.55      // Slightly more lenient for testing
   },
   
   // Liveness detection thresholds (anti-spoofing)
@@ -64,7 +70,7 @@ export const VERIFICATION_THRESHOLDS: VerificationThresholds = {
   },
   
   // Cross-validation between front and back document data
-  CROSS_VALIDATION: 0.70,
+  CROSS_VALIDATION: 0.75,
   
   // Document quality assessment
   QUALITY: {
@@ -76,6 +82,12 @@ export const VERIFICATION_THRESHOLDS: VerificationThresholds = {
   OCR_CONFIDENCE: {
     minimum_acceptable: 0.60,  // Below this may need manual review
     high_confidence: 0.85      // Above this = very reliable
+  },
+
+  // Face presence on the front document
+  FACE_PRESENCE: {
+    minimum_confidence: 0.45,
+    high_confidence: 0.75
   },
   
   // PDF417 barcode confidence levels
@@ -133,6 +145,12 @@ export async function getFaceMatchingThreshold(
     thresholds.FACE_MATCHING.production;
 }
 
+export function getFaceMatchingThresholdSync(isSandbox: boolean = false): number {
+  return isSandbox ?
+    VERIFICATION_THRESHOLDS.FACE_MATCHING.sandbox :
+    VERIFICATION_THRESHOLDS.FACE_MATCHING.production;
+}
+
 /**
  * Get liveness detection threshold for current environment
  * Now supports dynamic organization-specific overrides
@@ -145,6 +163,12 @@ export async function getLivenessThreshold(
   return isSandbox ? 
     thresholds.LIVENESS.sandbox : 
     thresholds.LIVENESS.production;
+}
+
+export function getLivenessThresholdSync(isSandbox: boolean = false): number {
+  return isSandbox ?
+    VERIFICATION_THRESHOLDS.LIVENESS.sandbox :
+    VERIFICATION_THRESHOLDS.LIVENESS.production;
 }
 
 /**
@@ -168,19 +192,21 @@ export async function validateScores(scores: {
   const faceMatchingThreshold = await getFaceMatchingThreshold(isSandbox, organizationId);
   const livenessThreshold = await getLivenessThreshold(isSandbox, organizationId);
   
-  const photoConsistencyPassed = scores.photoConsistency === undefined || scores.photoConsistency === null ||
+  // undefined/null scores are treated as FAILING — a missing score means
+  // the check was never performed, which is not a pass condition
+  const photoConsistencyPassed = scores.photoConsistency != null &&
     scores.photoConsistency >= thresholds.PHOTO_CONSISTENCY;
 
-  const faceMatchingPassed = scores.faceMatching === undefined || scores.faceMatching === null ||
+  const faceMatchingPassed = scores.faceMatching != null &&
     scores.faceMatching >= faceMatchingThreshold;
 
-  const livenessPassed = scores.liveness === undefined || scores.liveness === null ||
+  const livenessPassed = scores.liveness != null &&
     scores.liveness >= livenessThreshold;
 
-  const crossValidationPassed = scores.crossValidation === undefined || scores.crossValidation === null ||
+  const crossValidationPassed = scores.crossValidation != null &&
     scores.crossValidation >= thresholds.CROSS_VALIDATION;
 
-  const qualityPassed = scores.quality === undefined || scores.quality === null ||
+  const qualityPassed = scores.quality != null &&
     scores.quality >= thresholds.QUALITY.minimum_acceptable;
   
   const overallPassed = photoConsistencyPassed && 
@@ -216,6 +242,7 @@ export async function getThresholdInfo(isSandbox: boolean = false, organizationI
     cross_validation: thresholds.CROSS_VALIDATION,
     quality_minimum: thresholds.QUALITY.minimum_acceptable,
     ocr_minimum: thresholds.OCR_CONFIDENCE.minimum_acceptable,
+    face_presence_minimum: thresholds.FACE_PRESENCE.minimum_confidence,
     pdf417_minimum: thresholds.PDF417.minimum_confidence
   };
 }

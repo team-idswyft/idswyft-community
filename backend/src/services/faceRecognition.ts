@@ -56,8 +56,10 @@ export class FaceRecognitionService {
   private enhancedFaceService: any = null;
   private isInitialized = false;
   private faceModel: TensorFlowModel | null = null;
-  private useAiFaceMatching: boolean;
-  private useAiLivenessDetection: boolean;
+  /** @deprecated AI face matching removed in v2 engine — only detectFacePresence is used */
+  private useAiFaceMatching = false;
+  /** @deprecated AI liveness removed in v2 engine — only detectFacePresence is used */
+  private useAiLivenessDetection = false;
   private useTensorFlowFaceMatching: boolean;
   private useModernFaceRecognition: boolean;
   private faceDetector: any = null;
@@ -81,10 +83,13 @@ export class FaceRecognitionService {
       this.useModernFaceRecognition = false;
     }
     
-    // Configure fallback methods
-    this.useAiFaceMatching = false;
-    this.useAiLivenessDetection = false; // Disable OpenAI liveness detection
-    this.useTensorFlowFaceMatching = true; // Fallback TensorFlow face matching
+    // Configure local methods (AI fallbacks removed in v2 engine)
+    this.useTensorFlowFaceMatching = !!tf;
+
+    // Enhanced service can be a stub in this repo; require explicit opt-in.
+    if (process.env.ENABLE_ENHANCED_FACE_RECOGNITION !== 'true') {
+      this.useModernFaceRecognition = false;
+    }
     
     if (this.useModernFaceRecognition) {
       console.log('🔧 Enhanced Face Recognition enabled (Advanced image analysis with Sharp)');
@@ -94,11 +99,7 @@ export class FaceRecognitionService {
       console.log('🔍 Traditional face matching enabled (feature comparison)');
     }
     
-    if (this.useAiLivenessDetection) {
-      console.log('🤖 AI-powered liveness detection enabled (OpenAI GPT-4o Vision)');
-    } else {
-      console.log('🔍 Traditional liveness detection enabled (image analysis)');
-    }
+    console.log('🔍 Liveness detection enabled (local image analysis)');
   }
   
   private async initialize(): Promise<void> {
@@ -140,14 +141,35 @@ export class FaceRecognitionService {
         backDoc: backDocumentPath
       });
 
-      // Use enhanced face service if available
-      if (this.enhancedFaceService) {
+      // Use enhanced face service if available, but gracefully fallback if unavailable at runtime.
+      if (this.useModernFaceRecognition && this.enhancedFaceService) {
         logger.info('Using enhanced face recognition for document photo comparison');
-        return await this.enhancedFaceService.compareFaces(frontDocumentPath, backDocumentPath);
+        try {
+          return await this.enhancedFaceService.compareFaces(frontDocumentPath, backDocumentPath);
+        } catch (enhancedErr) {
+          logger.warn('Enhanced document photo comparison unavailable, falling back', {
+            error: enhancedErr instanceof Error ? enhancedErr.message : String(enhancedErr)
+          });
+        }
+      }
+
+      if (this.useAiFaceMatching) {
+        logger.info('Using AI fallback for document photo comparison');
+        try {
+          return await this.compareWithAI(frontDocumentPath, backDocumentPath);
+        } catch (aiErr) {
+          logger.warn('AI document photo comparison failed, falling back', {
+            error: aiErr instanceof Error ? aiErr.message : String(aiErr)
+          });
+        }
       }
 
       // Fallback to basic face comparison
       logger.info('Using fallback face recognition for document photo comparison');
+      if (!Jimp) {
+        logger.warn('No local image backend available for document photo comparison; returning secure low score');
+        return 0.0;
+      }
       return await this.compareWithTraditional(frontDocumentPath, backDocumentPath);
 
     } catch (error) {
@@ -159,7 +181,8 @@ export class FaceRecognitionService {
   async compareFaces(documentPath: string, selfiePath: string): Promise<number> {
     await this.initialize();
     
-    const method = this.useModernFaceRecognition ? 'Enhanced' : 
+    const method = this.useModernFaceRecognition ? 'Enhanced' :
+                   this.useAiFaceMatching ? 'AI' :
                    this.useTensorFlowFaceMatching ? 'TensorFlow' : 'Traditional';
     
     logger.info('Starting face comparison', {
@@ -170,15 +193,45 @@ export class FaceRecognitionService {
     
     try {
       if (this.useModernFaceRecognition && this.enhancedFaceService) {
-        console.log('🔧 Using enhanced face recognition (Sharp-based analysis)...');
-        return await this.enhancedFaceService.compareFaces(documentPath, selfiePath);
-      } else if (this.useTensorFlowFaceMatching) {
-        console.log('🧠 Using TensorFlow-powered face matching...');
-        return await this.compareWithTensorFlow(documentPath, selfiePath);
-      } else {
-        console.log('🔍 Using traditional face matching...');
-        return await this.compareWithTraditional(documentPath, selfiePath);
+        console.log('Using enhanced face recognition (Sharp-based analysis)...');
+        try {
+          return await this.enhancedFaceService.compareFaces(documentPath, selfiePath);
+        } catch (enhancedErr) {
+          logger.warn('Enhanced face comparison unavailable, falling back', {
+            error: enhancedErr instanceof Error ? enhancedErr.message : String(enhancedErr)
+          });
+        }
       }
+
+      if (this.useAiFaceMatching) {
+        console.log('Using AI-powered face matching...');
+        try {
+          return await this.compareWithAI(documentPath, selfiePath);
+        } catch (aiErr) {
+          logger.warn('AI face comparison failed, falling back', {
+            error: aiErr instanceof Error ? aiErr.message : String(aiErr)
+          });
+        }
+      }
+
+      if (this.useTensorFlowFaceMatching && tf) {
+        console.log('Using TensorFlow-powered face matching...');
+        try {
+          return await this.compareWithTensorFlow(documentPath, selfiePath);
+        } catch (tfErr) {
+          logger.warn('TensorFlow face comparison failed, falling back', {
+            error: tfErr instanceof Error ? tfErr.message : String(tfErr)
+          });
+        }
+      }
+
+      if (!Jimp) {
+        logger.warn('No local face-matching backend available; returning secure low score');
+        return 0.0;
+      }
+
+      console.log('Using traditional face matching...');
+      return await this.compareWithTraditional(documentPath, selfiePath);
     } catch (error) {
       logger.error('Face comparison failed:', error);
       
@@ -186,7 +239,39 @@ export class FaceRecognitionService {
       return 0.0;
     }
   }
-  
+
+  async compareFacesDeterministic(documentPath: string, selfiePath: string): Promise<number> {
+    await this.initialize();
+
+    logger.info('Starting deterministic face comparison', {
+      documentPath,
+      selfiePath,
+      method: this.useTensorFlowFaceMatching ? 'TensorFlow' : 'Traditional'
+    });
+
+    try {
+      if (this.useTensorFlowFaceMatching && tf) {
+        try {
+          return await this.compareWithTensorFlow(documentPath, selfiePath);
+        } catch (tfErr) {
+          logger.warn('Deterministic TensorFlow face comparison failed, falling back', {
+            error: tfErr instanceof Error ? tfErr.message : String(tfErr)
+          });
+        }
+      }
+
+      if (!Jimp) {
+        logger.warn('No deterministic local face-matching backend available; returning secure low score');
+        return 0.0;
+      }
+
+      return await this.compareWithTraditional(documentPath, selfiePath);
+    } catch (error) {
+      logger.error('Deterministic face comparison failed:', error);
+      return 0.0;
+    }
+  }
+
   private async compareWithAI(documentPath: string, selfiePath: string): Promise<number> {
     try {
       console.log('🤖 Starting AI face comparison...');
@@ -757,18 +842,59 @@ Important guidelines:
     
     try {
       if (this.useModernFaceRecognition && this.enhancedFaceService) {
-        console.log('🔧 Using enhanced liveness detection (Sharp-based analysis)...');
-        return await this.enhancedFaceService.detectLiveness(imagePath);
-      } else if (this.useAiLivenessDetection) {
-        console.log('🤖 Using AI-powered liveness detection...');
-        return await this.detectLivenessWithAI(imagePath, challengeResponse);
-      } else {
-        console.log('🔍 Using traditional liveness detection...');
-        return await this.detectLivenessWithTraditional(imagePath, challengeResponse);
+        console.log('Using enhanced liveness detection (Sharp-based analysis)...');
+        try {
+          return await this.enhancedFaceService.detectLiveness(imagePath);
+        } catch (enhancedErr) {
+          logger.warn('Enhanced liveness unavailable, falling back', {
+            error: enhancedErr instanceof Error ? enhancedErr.message : String(enhancedErr)
+          });
+        }
       }
+
+      if (this.useAiLivenessDetection) {
+        console.log('Using AI-powered liveness detection...');
+        try {
+          return await this.detectLivenessWithAI(imagePath, challengeResponse);
+        } catch (aiErr) {
+          logger.warn('AI liveness detection failed, falling back', {
+            error: aiErr instanceof Error ? aiErr.message : String(aiErr)
+          });
+        }
+      }
+
+      if (!Jimp) {
+        logger.warn('No local liveness backend available; returning secure low score');
+        return 0.0;
+      }
+
+      console.log('Using traditional liveness detection...');
+      return await this.detectLivenessWithTraditional(imagePath, challengeResponse);
     } catch (error) {
       logger.error('Liveness detection failed:', error);
       // Return failure score instead of mock - security critical
+      return 0.0;
+    }
+  }
+
+  async detectLivenessDeterministic(imagePath: string, challengeResponse?: string): Promise<number> {
+    await this.initialize();
+
+    logger.info('Starting deterministic liveness detection', {
+      imagePath,
+      challengeResponse,
+      method: 'Traditional'
+    });
+
+    try {
+      if (!Jimp) {
+        logger.warn('No deterministic local liveness backend available; returning secure low score');
+        return 0.0;
+      }
+
+      return await this.detectLivenessWithTraditional(imagePath, challengeResponse);
+    } catch (error) {
+      logger.error('Deterministic liveness detection failed:', error);
       return 0.0;
     }
   }
@@ -2208,6 +2334,36 @@ Provide response in JSON format:
     } catch (error) {
       logger.error('Failed to extract face image:', error);
       return null;
+    }
+  }
+
+  async detectFacePresence(imagePath: string): Promise<number> {
+    await this.initialize();
+
+    try {
+      if (!Jimp) {
+        logger.warn('Jimp not available for deterministic face presence detection');
+        return 0.0;
+      }
+
+      const imageBuffer = await this.storageService.downloadFile(imagePath);
+      const image = await Jimp.read(imageBuffer);
+      const { width, height } = image.bitmap;
+      const centerX = width / 2;
+      const centerY = height / 2;
+      const radius = Math.min(width, height) * 0.42;
+
+      if (tf && blazeface) {
+        const tfScore = await this.detectFaceWithTensorFlow(image, centerX, centerY, radius);
+        if (tfScore > 0) {
+          return tfScore;
+        }
+      }
+
+      return await this.detectFaceWithTraditionalMethods(image, centerX, centerY, radius);
+    } catch (error) {
+      logger.error('Failed to detect face presence:', error);
+      return 0.0;
     }
   }
 

@@ -21,7 +21,8 @@ export class VerificationService {
       .insert({
         user_id: data.user_id,
         developer_id: data.developer_id,
-        status: 'pending'
+        status: 'pending',
+        is_sandbox: data.is_sandbox ?? false,
       })
       .select('*')
       .single();

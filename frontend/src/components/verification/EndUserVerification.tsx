@@ -129,7 +129,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
     if (!apiKey || !userId) { toast.error('Missing required parameters'); return; }
     setIsLoading(true);
     try {
-      const res = await fetch(`${API_BASE_URL}/api/verify/start`, {
+      const res = await fetch(`${API_BASE_URL}/api/v2/verify/initialize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
         body: JSON.stringify({ user_id: userId }),
@@ -163,11 +163,10 @@ const EndUserVerification: React.FC<VerificationProps> = ({
     setIsLoading(true);
     try {
       const formData = new FormData();
-      formData.append('verification_id', verificationId);
       formData.append('document_type', documentType);
       formData.append('document', frontFile);
 
-      const res = await fetch(`${API_BASE_URL}/api/verify/document`, {
+      const res = await fetch(`${API_BASE_URL}/api/v2/verify/${verificationId}/front-document`, {
         method: 'POST',
         headers: { 'X-API-Key': apiKey },
         body: formData,
@@ -196,13 +195,12 @@ const EndUserVerification: React.FC<VerificationProps> = ({
       return;
     }
     try {
-      const data = await apiGet(`/api/verify/results/${verificationId}`);
+      const data = await apiGet(`/api/v2/verify/${verificationId}/status`);
       if (!mountedRef.current) return;
-      const terminalStatuses = ['failed', 'manual_review'];
       if (data.ocr_data && Object.keys(data.ocr_data).length > 0) {
         setFrontOCR(data.ocr_data);
         setCurrentStep(4); // Proceed to back-doc upload
-      } else if (terminalStatuses.includes(data.status)) {
+      } else if (data.final_result === 'failed' || data.final_result === 'manual_review') {
         showFinalResult(data);
       } else {
         setTimeout(() => pollFrontOCR(attempt + 1), 2000);
@@ -226,11 +224,10 @@ const EndUserVerification: React.FC<VerificationProps> = ({
     setIsLoading(true);
     try {
       const formData = new FormData();
-      formData.append('back_of_id', backFile);
-      formData.append('verification_id', verificationId);
+      formData.append('document', backFile);
       formData.append('document_type', documentType);
 
-      const res = await fetch(`${API_BASE_URL}/api/verify/back-of-id`, {
+      const res = await fetch(`${API_BASE_URL}/api/v2/verify/${verificationId}/back-document`, {
         method: 'POST',
         headers: { 'X-API-Key': apiKey },
         body: formData,
@@ -257,19 +254,19 @@ const EndUserVerification: React.FC<VerificationProps> = ({
       return;
     }
     try {
-      const data = await apiGet(`/api/verify/results/${verificationId}`);
+      const data = await apiGet(`/api/v2/verify/${verificationId}/status`);
       if (!mountedRef.current) return;
 
-      const terminalStatuses = ['failed', 'manual_review', 'verified'];
-      const isComplete = data.enhanced_verification_completed || terminalStatuses.includes(data.status);
+      // Cross-validation is auto-triggered during back-document upload in v2.
+      // Check if results are available or if a terminal state was reached.
+      const isComplete = !!data.cross_validation_results || data.final_result !== null;
 
       if (isComplete) {
-        if (data.status === 'failed') {
-          // Hard fraud failure (photo mismatch / data inconsistency) — skip live capture
+        if (data.final_result === 'failed') {
+          // Hard fraud failure (data inconsistency) — skip live capture
           showFinalResult(data);
         } else {
-          // Cross-validation passed, OR barcode extraction failed (manual_review) but
-          // backend still wants live capture to proceed (enhanced_verification_completed=true).
+          // Cross-validation passed or needs review — proceed to live capture.
           setCurrentStep(6);
         }
       } else {
@@ -289,11 +286,10 @@ const EndUserVerification: React.FC<VerificationProps> = ({
       return;
     }
     try {
-      const data = await apiGet(`/api/verify/results/${verificationId}`);
+      const data = await apiGet(`/api/v2/verify/${verificationId}/status`);
       if (!mountedRef.current) return;
-      const terminal = ['verified', 'failed', 'manual_review'];
-      // Accept terminal status even if live_capture_completed flag is stuck false
-      if (terminal.includes(data.status)) {
+      // In v2, final_result is non-null when verification reaches a terminal state
+      if (data.final_result !== null) {
         showFinalResult(data);
       } else {
         setTimeout(() => waitForFinalResult(attempt + 1), 3000);
@@ -310,13 +306,15 @@ const EndUserVerification: React.FC<VerificationProps> = ({
     setCurrentStep(7);
 
     if (onComplete) {
+      // v2: data.final_result has user-facing status ('verified'|'failed'|'manual_review'),
+      // data.status has internal machine state ('COMPLETE'|'HARD_REJECTED'|etc.)
       onComplete({
         verification_id: data.verification_id,
-        status: data.status,
+        status: data.final_result ?? data.status,
         user_id: data.user_id,
         confidence_score: data.confidence_score,
-        face_match_score: data.face_match_score,
-        liveness_score: data.liveness_score,
+        face_match_score: data.face_match_results?.score ?? data.face_match_score,
+        liveness_score: data.liveness_results?.liveness_score ?? data.liveness_score,
         isAuthentic: data.isAuthentic,
         authenticityScore: data.authenticityScore,
         tamperFlags: data.tamperFlags,
@@ -577,7 +575,8 @@ const EndUserVerification: React.FC<VerificationProps> = ({
           );
         }
 
-        const status = finalResult.status;
+        // v2: final_result has user-facing status, status has internal machine state
+        const status = finalResult.final_result ?? finalResult.status;
         const isVerified = status === 'verified';
         const isFailed = status === 'failed';
 
@@ -606,22 +605,23 @@ const EndUserVerification: React.FC<VerificationProps> = ({
                 <span className={styles.textSec}>Status</span>
                 <span className={`font-semibold capitalize ${isVerified ? 'text-green-600' : isFailed ? 'text-red-600' : 'text-yellow-600'}`}>{status}</span>
               </div>
-              {finalResult.cross_validation_score != null && (
+              {/* v2: scores are in nested objects; fall back to v1 flat fields */}
+              {(finalResult.cross_validation_results?.weighted_score ?? finalResult.cross_validation_score) != null && (
                 <div className="flex justify-between">
                   <span className={styles.textSec}>Doc Cross-Check</span>
-                  <span className={`font-medium ${styles.text}`}>{Math.round(finalResult.cross_validation_score * 100)}%</span>
+                  <span className={`font-medium ${styles.text}`}>{Math.round((finalResult.cross_validation_results?.weighted_score ?? finalResult.cross_validation_score) * 100)}%</span>
                 </div>
               )}
-              {finalResult.face_match_score != null && (
+              {(finalResult.face_match_results?.score ?? finalResult.face_match_score) != null && (
                 <div className="flex justify-between">
                   <span className={styles.textSec}>Face Match</span>
-                  <span className={`font-medium ${styles.text}`}>{Math.round(finalResult.face_match_score * 100)}%</span>
+                  <span className={`font-medium ${styles.text}`}>{Math.round((finalResult.face_match_results?.score ?? finalResult.face_match_score) * 100)}%</span>
                 </div>
               )}
-              {finalResult.liveness_score != null && (
+              {(finalResult.liveness_results?.liveness_score ?? finalResult.liveness_score) != null && (
                 <div className="flex justify-between">
                   <span className={styles.textSec}>Liveness</span>
-                  <span className={`font-medium ${styles.text}`}>{Math.round(finalResult.liveness_score * 100)}%</span>
+                  <span className={`font-medium ${styles.text}`}>{Math.round((finalResult.liveness_results?.liveness_score ?? finalResult.liveness_score) * 100)}%</span>
                 </div>
               )}
               {finalResult.confidence_score != null && (
