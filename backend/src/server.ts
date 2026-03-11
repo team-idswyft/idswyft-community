@@ -14,7 +14,6 @@ import { generateAPIKey, authenticateAPIKey } from './middleware/auth.js';
 import { apiActivityLogger } from './middleware/apiLogger.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { logger } from './utils/logger.js';
-import verificationRoutes from './routes/verification.js';
 import newVerificationRoutes from './routes/newVerification.js';
 import developerRoutes from './routes/developer.js';
 import adminRoutes from './routes/admin.js';
@@ -90,8 +89,7 @@ app.use(limiter);
 app.use('/api', apiActivityLogger);
 
 // Mount API routes
-app.use('/api/verify', verificationRoutes);
-app.use('/api/v2/verify', newVerificationRoutes); // New clean verification engine
+app.use('/api/v2/verify', newVerificationRoutes);
 app.use('/api/verify/handoff', handoffRoutes);
 app.use('/api/developer', developerRoutes);
 // CSRF protection for state-changing admin endpoints (cookie-based session auth)
@@ -141,15 +139,17 @@ app.get('/api/docs', (req, res) => {
         'GET /api/health': 'Health check endpoint'
       },
       verification: {
-        'POST /api/verify/start': 'Start a new verification session',
-        'POST /api/verify/document': 'Upload identity document for verification (now with robust OCR processing)',
-        'POST /api/verify/back-of-id': 'Upload back-of-ID for enhanced verification (now with robust barcode scanning)',
-        'POST /api/verify/selfie': 'Upload selfie for face matching',
-        'POST /api/verify/live-capture': 'Upload live capture for liveness detection (now with robust state management)',
-        'GET /api/verify/results/:verification_id': 'Get complete verification results',
-        'GET /api/verify/status/:user_id': 'Get verification status (deprecated)',
-        'GET /api/verify/history/:user_id': 'Get verification history for user',
-        'POST /api/verify/generate-live-token': 'Generate live capture token'
+        'POST /api/v2/verify/initialize': 'Start a new verification session',
+        'POST /api/v2/verify/:id/front-document': 'Upload front of ID document for OCR extraction',
+        'POST /api/v2/verify/:id/back-document': 'Upload back of ID for barcode/MRZ extraction + auto cross-validation',
+        'POST /api/v2/verify/:id/live-capture': 'Upload selfie for liveness detection + auto face matching',
+        'GET /api/v2/verify/:id/status': 'Get complete verification status and results',
+      },
+      handoff: {
+        'POST /api/verify/handoff/create': 'Create mobile handoff session',
+        'GET /api/verify/handoff/session/:token': 'Retrieve handoff session by token',
+        'PATCH /api/verify/handoff/complete/:token': 'Mark handoff session as complete',
+        'GET /api/verify/handoff/status/:handoffId': 'Poll handoff completion status',
       },
       developer: {
         'POST /api/developer/register': 'Register as a developer',
@@ -183,9 +183,9 @@ app.get('/api/docs', (req, res) => {
     },
     notes: {
       'Rate Limiting': 'All endpoints are rate limited',
-      'CORS': 'Cross-origin requests are supported', 
-      'Sandbox Mode': 'Use sandbox=true parameter for testing',
-      'Enhanced Verification': 'back-of-id endpoint provides additional security validation'
+      'CORS': 'Cross-origin requests are supported',
+      'Verification Flow': '5-step pipeline: front-document → back-document (auto cross-validation) → live-capture (auto face-match) → status',
+      'Hard Rejection': 'Any gate failure produces an immediate hard rejection — the session cannot proceed'
     }
   });
 });

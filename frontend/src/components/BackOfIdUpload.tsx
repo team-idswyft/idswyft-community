@@ -59,12 +59,11 @@ export const BackOfIdUpload: React.FC<BackOfIdUploadProps> = ({
 
     try {
       const formData = new FormData();
-      formData.append('back_of_id', file);
-      formData.append('verification_id', verificationId);
+      formData.append('document', file);
       formData.append('document_type', documentType);
 
       // Build URL with sandbox query parameter if needed
-      const url = new URL(`${API_BASE_URL}/api/verify/back-of-id`);
+      const url = new URL(`${API_BASE_URL}/api/v2/verify/${verificationId}/back-document`);
       if (shouldUseSandbox()) {
         url.searchParams.append('sandbox', 'true');
       }

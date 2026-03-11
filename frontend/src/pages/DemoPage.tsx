@@ -37,7 +37,8 @@ interface Document {
 interface VerificationRequest {
   id: string;
   verification_id?: string;
-  status: 'pending' | 'processing' | 'verified' | 'failed' | 'manual_review';
+  status: string;
+  final_result?: 'verified' | 'failed' | 'manual_review' | null;
   documents: Document[];
   selfie_id?: string;
   created_at: string;
@@ -50,6 +51,9 @@ interface VerificationRequest {
     nationality?: string;
     place_of_birth?: string;
   };
+  cross_validation_results?: { weighted_score?: number; [key: string]: any } | null;
+  face_match_results?: { score?: number; [key: string]: any } | null;
+  liveness_results?: { liveness_score?: number; [key: string]: any } | null;
 }
 
 interface LiveCaptureSession {
@@ -214,7 +218,7 @@ const DemoPage: React.FC = () => {
 
   const loadVerificationResults = async (verificationId: string) => {
     try {
-      const url = new URL(`${API_BASE_URL}/api/verify/results/${verificationId}`);
+      const url = new URL(`${API_BASE_URL}/api/v2/verify/${verificationId}/status`);
       if (shouldUseSandbox()) {
         url.searchParams.append('sandbox', 'true');
       }
@@ -339,7 +343,7 @@ const DemoPage: React.FC = () => {
       console.log('🔧 API Key (first 10):', apiKey?.substring(0, 10));
       console.log('🔧 Request body:', requestBody);
 
-      const response = await fetch(`${API_BASE_URL}/api/verify/start`, {
+      const response = await fetch(`${API_BASE_URL}/api/v2/verify/initialize`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -413,13 +417,12 @@ const DemoPage: React.FC = () => {
     try {
       const formData = new FormData();
       formData.append('document', selectedFile);
-      formData.append('verification_id', verificationId);
       formData.append('document_type', documentType || 'national_id');
-      
+
       const useSandbox = shouldUseSandbox();
-      
+
       // Build URL with sandbox query parameter if needed
-      const url = new URL(`${API_BASE_URL}/api/verify/document`);
+      const url = new URL(`${API_BASE_URL}/api/v2/verify/${verificationId}/front-document`);
       if (useSandbox) {
         url.searchParams.append('sandbox', 'true');
       }
@@ -469,7 +472,7 @@ const DemoPage: React.FC = () => {
   const pollForOCRResults = () => {
     const pollInterval = setInterval(async () => {
       try {
-        const url = new URL(`${API_BASE_URL}/api/verify/results/${verificationId}`);
+        const url = new URL(`${API_BASE_URL}/api/v2/verify/${verificationId}/status`);
         if (shouldUseSandbox()) {
           url.searchParams.append('sandbox', 'true');
         }
@@ -921,41 +924,18 @@ const DemoPage: React.FC = () => {
         throw new Error('Failed to capture image');
       }
 
-      // Convert blob to base64
-      const base64Image = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => {
-          const base64 = reader.result as string;
-          // Remove data URL prefix (e.g., "data:image/jpeg;base64,")
-          const base64Data = base64.split(',')[1];
-          resolve(base64Data);
-        };
-        reader.onerror = reject;
-        reader.readAsDataURL(blob);
-      });
+      // v2: Send blob directly as multipart FormData (no base64 round-trip)
+      const formData = new FormData();
+      formData.append('selfie', blob, 'selfie.jpg');
 
-      const useSandbox = shouldUseSandbox();
-      const url = new URL(`${API_BASE_URL}/api/verify/live-capture`);
-      if (useSandbox) {
-        url.searchParams.append('sandbox', 'true');
-      }
+      console.log('📸 Capturing selfie...', { verificationId });
 
-      console.log('📸 Capturing selfie...', { verificationId, sandbox: useSandbox });
-
-      const requestBody = {
-        verification_id: verificationId,
-        live_image_data: base64Image,
-        challenge_response: 'blink',
-        ...(useSandbox && { sandbox: true })
-      };
-
-      const response = await fetch(url.toString(), {
+      const response = await fetch(`${API_BASE_URL}/api/v2/verify/${verificationId}/live-capture`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'X-API-Key': apiKey,
         },
-        body: JSON.stringify(requestBody),
+        body: formData,
       });
 
       if (!response.ok) {
@@ -1011,7 +991,7 @@ const DemoPage: React.FC = () => {
   const skipLiveCapture = async () => {
     try {
       // Get results from the verification
-      const url = new URL(`${API_BASE_URL}/api/verify/results/${verificationId}`);
+      const url = new URL(`${API_BASE_URL}/api/v2/verify/${verificationId}/status`);
       if (shouldUseSandbox()) {
         url.searchParams.append('sandbox', 'true');
       }
@@ -1468,7 +1448,8 @@ const DemoPage: React.FC = () => {
         );
 
       case 5:
-        const status = verificationRequest?.status;
+        // v2: final_result has user-facing status, status has internal machine state
+        const status = verificationRequest?.final_result ?? verificationRequest?.status;
         const isVerified = status === 'verified';
         const isFailed = status === 'failed';
         const statusTone = isVerified ? C.green : isFailed ? C.red : C.amber;
@@ -1496,7 +1477,7 @@ const DemoPage: React.FC = () => {
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: C.muted }}>Status</span>
-                    <span style={{ color: statusTone, fontWeight: 600, textTransform: 'capitalize' }}>{verificationRequest.status}</span>
+                    <span style={{ color: statusTone, fontWeight: 600, textTransform: 'capitalize' }}>{verificationRequest.final_result ?? verificationRequest.status}</span>
                   </div>
                   <div style={{ display: 'flex', justifyContent: 'space-between' }}>
                     <span style={{ color: C.muted }}>Created</span>

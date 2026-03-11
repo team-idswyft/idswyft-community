@@ -1,6 +1,6 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
-import { API_BASE_URL, shouldUseSandbox } from '../config/api';
+import { API_BASE_URL } from '../config/api';
 import {
   CameraIcon,
   CheckCircleIcon,
@@ -153,7 +153,7 @@ export const LiveCapturePage: React.FC = () => {
     
     const poll = async () => {
       try {
-        const response = await fetch(`${API_BASE_URL}/api/verify/results/${verificationId}`, {
+        const response = await fetch(`${API_BASE_URL}/api/v2/verify/${verificationId}/status`, {
           headers: {
             'X-API-Key': apiKey,
             'Content-Type': 'application/json'
@@ -167,16 +167,15 @@ export const LiveCapturePage: React.FC = () => {
         const results = await response.json();
         setVerificationResults(results);
         
-        // Check if verification is in a final state
-        const finalStates = ['verified', 'failed', 'manual_review'];
-        if (finalStates.includes(results.status)) {
+        // Check if verification is in a final state (v2: use final_result)
+        if (results.final_result !== null && results.final_result !== undefined) {
           setIsPolling(false);
           return; // Stop polling
         }
-        
+
         // Continue polling if still processing
         attempts++;
-        if (attempts < maxAttempts && results.status === 'processing') {
+        if (attempts < maxAttempts && !results.final_result) {
           setTimeout(poll, 5000); // Poll every 5 seconds
         } else {
           setIsPolling(false);
@@ -726,35 +725,32 @@ export const LiveCapturePage: React.FC = () => {
 
     try {
       const canvas = canvasRef.current;
-      const imageData = canvas.toDataURL('image/jpeg', 0.8);
-      const base64Data = imageData.split(',')[1];
 
       console.log('📸 Capturing frame for verification...');
-      
-      const useSandbox = shouldUseSandbox(apiKey || undefined);
-      const requestBody = {
-        verification_id: sessionData.verification_id,
-        live_image_data: base64Data,
-        challenge_response: sessionData.liveness_challenge.type,
-        ...(useSandbox && { sandbox: true })
-      };
-      
-      console.log('🔧 Sandbox mode:', useSandbox);
+
+      // Convert canvas to blob for v2 multipart upload
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (b) => { if (b) resolve(b); else reject(new Error('Failed to capture image')); },
+          'image/jpeg', 0.8,
+        );
+      });
+
+      const formData = new FormData();
+      formData.append('selfie', blob, 'selfie.jpg');
+
       console.log('🔧 API Key (first 10 chars):', apiKey?.substring(0, 10));
       console.log('🔧 Verification ID:', sessionData.verification_id);
-      console.log('🔧 Request body keys:', Object.keys(requestBody));
-      console.log('🔧 Full request body:', JSON.stringify(requestBody, null, 2).substring(0, 200) + '...');
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 30000); // 30 second timeout
 
-      const response = await fetch(`${API_BASE_URL}/api/verify/live-capture`, {
+      const response = await fetch(`${API_BASE_URL}/api/v2/verify/${sessionData.verification_id}/live-capture`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
           'X-API-Key': apiKey,
         },
-        body: JSON.stringify(requestBody),
+        body: formData,
         signal: controller.signal
       });
 

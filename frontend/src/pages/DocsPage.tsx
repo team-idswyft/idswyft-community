@@ -341,7 +341,7 @@ export const DocsPage: React.FC = () => {
           <H2>Quick Start</H2>
           <Lead>
             The verification flow is a 5-call sequence. Every processing step is asynchronous —
-            you submit, then poll <code style={{ fontFamily: C.mono, color: C.cyan, fontSize: '0.82rem' }}>GET /api/verify/results/:id</code> until
+            you submit, then poll <code style={{ fontFamily: C.mono, color: C.cyan, fontSize: '0.82rem' }}>GET /api/v2/verify/:id/status</code> until
             the relevant field appears. Below is the complete flow.
           </Lead>
 
@@ -353,77 +353,72 @@ const KEY  = 'your-api-key';
 const headers = { 'X-API-Key': KEY };
 
 // ─── 1. Start session ───────────────────────────────────────────
-const { verification_id } = await fetch(\`\${BASE}/api/verify/start\`, {
+const { verification_id } = await fetch(\`\${BASE}/api/v2/verify/initialize\`, {
   method: 'POST',
   headers: { ...headers, 'Content-Type': 'application/json' },
   body: JSON.stringify({ user_id: 'user-uuid' }),
 }).then(r => r.json());
 
-// ─── 2. Upload front document (OCR runs async) ──────────────────
+// ─── 2. Upload front document ───────────────────────────────────
 const fd1 = new FormData();
-fd1.append('verification_id', verification_id);
 fd1.append('document_type', 'drivers_license');
 fd1.append('document', frontFile);       // File from <input type="file">
-await fetch(\`\${BASE}/api/verify/document\`, { method: 'POST', headers, body: fd1 });
+await fetch(\`\${BASE}/api/v2/verify/\${verification_id}/front-document\`, { method: 'POST', headers, body: fd1 });
 
 // ─── 3. Poll until OCR finishes ─────────────────────────────────
 let r;
 do {
   await new Promise(ok => setTimeout(ok, 2000));
-  r = await fetch(\`\${BASE}/api/verify/results/\${verification_id}\`, { headers }).then(r => r.json());
+  r = await fetch(\`\${BASE}/api/v2/verify/\${verification_id}/status\`, { headers }).then(r => r.json());
 } while (!r.ocr_data);
 
-// ─── 4. Upload back-of-ID (cross-validation runs async) ─────────
+// ─── 4. Upload back-of-ID (cross-validation auto-triggers) ──────
 const fd2 = new FormData();
-fd2.append('verification_id', verification_id);
 fd2.append('document_type', 'drivers_license');
-fd2.append('back_of_id', backFile);
-await fetch(\`\${BASE}/api/verify/back-of-id\`, { method: 'POST', headers, body: fd2 });
+fd2.append('document', backFile);        // field name is 'document' (not 'back_of_id')
+await fetch(\`\${BASE}/api/v2/verify/\${verification_id}/back-document\`, { method: 'POST', headers, body: fd2 });
 
 // ─── 5. Poll until cross-validation finishes ────────────────────
 do {
   await new Promise(ok => setTimeout(ok, 2000));
-  r = await fetch(\`\${BASE}/api/verify/results/\${verification_id}\`, { headers }).then(r => r.json());
-} while (!r.enhanced_verification_completed);
+  r = await fetch(\`\${BASE}/api/v2/verify/\${verification_id}/status\`, { headers }).then(r => r.json());
+} while (!r.cross_validation_results);
 
-if (r.status === 'failed') throw new Error('Cross-validation failed: ' + r.failure_reason);
+if (r.final_result === 'failed') throw new Error('Cross-validation failed: ' + r.failure_reason);
 
-// ─── 6. Submit live capture ──────────────────────────────────────
-// capturedBase64 = base64 string from your camera (no data URI prefix)
-await fetch(\`\${BASE}/api/verify/live-capture\`, {
+// ─── 6. Submit live capture (file upload) ────────────────────────
+const fd3 = new FormData();
+fd3.append('selfie', selfieBlob, 'selfie.jpg');  // Blob from canvas.toBlob()
+await fetch(\`\${BASE}/api/v2/verify/\${verification_id}/live-capture\`, {
   method: 'POST',
-  headers: { ...headers, 'Content-Type': 'application/json' },
-  body: JSON.stringify({ verification_id, live_image_data: capturedBase64 }),
+  headers,
+  body: fd3,
 });
 
 // ─── 7. Poll for final result ────────────────────────────────────
-const DONE = ['verified', 'failed', 'manual_review'];
 do {
   await new Promise(ok => setTimeout(ok, 2000));
-  r = await fetch(\`\${BASE}/api/verify/results/\${verification_id}\`, { headers }).then(r => r.json());
-} while (!r.live_capture_completed || !DONE.includes(r.status));
+  r = await fetch(\`\${BASE}/api/v2/verify/\${verification_id}/status\`, { headers }).then(r => r.json());
+} while (!r.final_result);
 
-console.log(r.status);           // 'verified' | 'failed' | 'manual_review'
-console.log(r.face_match_score); // 0.0 – 1.0
-console.log(r.liveness_score);   // 0.0 – 1.0
-console.log(r.ocr_data.name);    // "Jane Smith"`}
-            python={`import requests, time, base64
+console.log(r.final_result);               // 'verified' | 'failed' | 'manual_review'
+console.log(r.face_match_results?.score);   // 0.0 – 1.0
+console.log(r.ocr_data.name);              // "Jane Smith"`}
+            python={`import requests, time
 
 BASE = '${apiUrl}'
 HEADERS = {'X-API-Key': 'your-api-key'}
 
-def poll(vid, until_key=None, until_status=None, extra_check=None):
-    """Poll /results until condition is met."""
-    done = ['verified', 'failed', 'manual_review']
+def poll(vid, until_key=None, until_final=False):
+    """Poll /status until condition is met."""
     while True:
         time.sleep(2)
-        r = requests.get(f'{BASE}/api/verify/results/{vid}', headers=HEADERS).json()
+        r = requests.get(f'{BASE}/api/v2/verify/{vid}/status', headers=HEADERS).json()
         if until_key and r.get(until_key): return r
-        if until_status and r.get('status') in done and r.get('live_capture_completed'): return r
-        if extra_check and extra_check(r): return r
+        if until_final and r.get('final_result') is not None: return r
 
 # ─── 1. Start session ───────────────────────────────────────────
-session = requests.post(f'{BASE}/api/verify/start',
+session = requests.post(f'{BASE}/api/v2/verify/initialize',
     headers={**HEADERS, 'Content-Type': 'application/json'},
     json={'user_id': 'user-uuid'}
 ).json()
@@ -431,38 +426,35 @@ vid = session['verification_id']
 
 # ─── 2. Upload front document ───────────────────────────────────
 with open('front.jpg', 'rb') as f:
-    requests.post(f'{BASE}/api/verify/document', headers=HEADERS,
-        data={'verification_id': vid, 'document_type': 'drivers_license'},
+    requests.post(f'{BASE}/api/v2/verify/{vid}/front-document', headers=HEADERS,
+        data={'document_type': 'drivers_license'},
         files={'document': f})
 
 # ─── 3. Poll until OCR is ready ─────────────────────────────────
 r = poll(vid, until_key='ocr_data')
 print('Name:', r['ocr_data']['name'])
 
-# ─── 4. Upload back-of-ID ───────────────────────────────────────
+# ─── 4. Upload back-of-ID (cross-validation auto-triggers) ──────
 with open('back.jpg', 'rb') as f:
-    requests.post(f'{BASE}/api/verify/back-of-id', headers=HEADERS,
-        data={'verification_id': vid, 'document_type': 'drivers_license'},
-        files={'back_of_id': f})
+    requests.post(f'{BASE}/api/v2/verify/{vid}/back-document', headers=HEADERS,
+        data={'document_type': 'drivers_license'},
+        files={'document': f})
 
 # ─── 5. Poll until cross-validation finishes ────────────────────
-r = poll(vid, until_key='enhanced_verification_completed')
-if r['status'] == 'failed':
+r = poll(vid, until_key='cross_validation_results')
+if r.get('final_result') == 'failed':
     raise Exception('Cross-validation failed: ' + r.get('failure_reason', ''))
 
-# ─── 6. Submit live capture ─────────────────────────────────────
+# ─── 6. Submit live capture (file upload) ────────────────────────
 with open('selfie.jpg', 'rb') as f:
-    img_b64 = base64.b64encode(f.read()).decode()
-requests.post(f'{BASE}/api/verify/live-capture',
-    headers={**HEADERS, 'Content-Type': 'application/json'},
-    json={'verification_id': vid, 'live_image_data': img_b64})
+    requests.post(f'{BASE}/api/v2/verify/{vid}/live-capture', headers=HEADERS,
+        files={'selfie': f})
 
 # ─── 7. Poll for final result ────────────────────────────────────
-r = poll(vid, until_status=True)
-print(r['status'])            # verified / failed / manual_review
-print(r['face_match_score'])  # 0.0 – 1.0
-print(r['liveness_score'])    # 0.0 – 1.0
-print(r['ocr_data']['name'])  # "Jane Smith"`}
+r = poll(vid, until_final=True)
+print(r['final_result'])                  # verified / failed / manual_review
+print(r.get('face_match_results', {}))    # match scores
+print(r['ocr_data']['name'])              # "Jane Smith"`}
           />
 
           <Divider />
@@ -485,7 +477,7 @@ print(r['ocr_data']['name'])  # "Jane Smith"`}
             </div>
           </div>
 
-          <Pre label="Curl example" code={`curl -X POST ${apiUrl}/api/verify/start \\
+          <Pre label="Curl example" code={`curl -X POST ${apiUrl}/api/v2/verify/initialize \\
   -H "X-API-Key: sk_live_your_key" \\
   -H "Content-Type: application/json" \\
   -d '{"user_id": "550e8400-e29b-41d4-a716-446655440000"}'`} />
@@ -504,12 +496,12 @@ print(r['ocr_data']['name'])  # "Jane Smith"`}
           <Lead>
             Each verification is a session with a unique ID. You move through steps sequentially —
             each step unlocks the next. All heavy processing (OCR, cross-validation, liveness) is
-            asynchronous: submit the data, then poll <code style={{ fontFamily: C.mono, color: C.cyan, fontSize: '0.82rem' }}>GET /api/verify/results/:id</code> to check progress.
+            asynchronous: submit the data, then poll <code style={{ fontFamily: C.mono, color: C.cyan, fontSize: '0.82rem' }}>GET /api/v2/verify/:id/status</code> to check progress.
           </Lead>
 
           {/* Step 1 */}
           <SectionAnchor id="step-1" />
-          <EndpointCard step={1} method="POST" path="/api/verify/start" title="Start a Verification Session">
+          <EndpointCard step={1} method="POST" path="/api/v2/verify/initialize" title="Start a Verification Session">
             <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
               Creates a new verification session for a user. Returns a <code style={{ fontFamily: C.mono, color: C.cyan }}>verification_id</code> that
               ties together all subsequent uploads and results. One session = one complete identity check.
@@ -518,7 +510,7 @@ print(r['ocr_data']['name'])  # "Jane Smith"`}
               <FieldRow name="user_id" type="UUID string" req={true} desc="Your unique identifier for the user being verified." />
               <FieldRow name="sandbox" type="boolean" req={false} desc="Set true to use sandbox mode. Defaults to false." />
             </div>
-            <Pre label="Request" code={`curl -X POST ${apiUrl}/api/verify/start \\
+            <Pre label="Request" code={`curl -X POST ${apiUrl}/api/v2/verify/initialize \\
   -H "X-API-Key: your-key" \\
   -H "Content-Type: application/json" \\
   -d '{"user_id": "550e8400-e29b-41d4-a716-446655440000"}'`} />
@@ -527,10 +519,10 @@ print(r['ocr_data']['name'])  # "Jane Smith"`}
   "status": "started",
   "user_id": "550e8400-e29b-41d4-a716-446655440000",
   "next_steps": [
-    "Upload document with POST /api/verify/document",
-    "Upload back-of-ID with POST /api/verify/back-of-id",
-    "Complete live capture with POST /api/verify/live-capture",
-    "Check results with GET /api/verify/results/:verification_id"
+    "Upload document with POST /api/v2/verify/:id/front-document",
+    "Upload back-of-ID with POST /api/v2/verify/:id/back-document",
+    "Complete live capture with POST /api/v2/verify/:id/live-capture",
+    "Check results with GET /api/v2/verify/:id/status"
   ],
   "created_at": "2026-03-06T12:00:00Z"
 }`} />
@@ -538,22 +530,20 @@ print(r['ocr_data']['name'])  # "Jane Smith"`}
 
           {/* Step 2 */}
           <SectionAnchor id="step-2" />
-          <EndpointCard step={2} method="POST" path="/api/verify/document" title="Upload Front Document">
+          <EndpointCard step={2} method="POST" path="/api/v2/verify/:id/front-document" title="Upload Front Document">
             <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
               Upload the <strong style={{ color: C.text }}>front face</strong> of the identity document (passport, driver's license, national ID).
               OCR extraction and image quality analysis run asynchronously after upload.
               The response does <em>not</em> yet contain OCR data — poll
-              <code style={{ fontFamily: C.mono, color: C.cyan }}> GET /results/:id</code> until
+              <code style={{ fontFamily: C.mono, color: C.cyan }}> GET /api/v2/verify/:id/status</code> until
               <code style={{ fontFamily: C.mono, color: C.cyan }}> ocr_data</code> is present before moving to Step 3.
             </p>
             <div style={{ marginBottom: 12 }}>
-              <FieldRow name="verification_id" type="UUID string" req={true} desc="The ID returned from Step 1." />
               <FieldRow name="document_type" type="string" req={true} desc="'passport' | 'drivers_license' | 'national_id' | 'other'" />
               <FieldRow name="document" type="File" req={true} desc="JPEG, PNG, WebP, or PDF. Max 10 MB." />
             </div>
-            <Pre label="Request" code={`curl -X POST ${apiUrl}/api/verify/document \\
+            <Pre label="Request" code={`curl -X POST ${apiUrl}/api/v2/verify/550e8400-e29b-41d4-a716-446655440001/front-document \\
   -H "X-API-Key: your-key" \\
-  -F "verification_id=550e8400-e29b-41d4-a716-446655440001" \\
   -F "document_type=drivers_license" \\
   -F "document=@front.jpg"`} />
             <Pre label="Response  —  HTTP 201" code={`{
@@ -577,14 +567,14 @@ print(r['ocr_data']['name'])  # "Jane Smith"`}
 }`} />
             <Callout type="note">
               OCR data is <strong>not in this response</strong>. Poll
-              <code style={{ fontFamily: C.mono }}> GET /api/verify/results/:id</code> every 2 seconds
+              <code style={{ fontFamily: C.mono }}> GET /api/v2/verify/:id/status</code> every 2 seconds
               until the <code style={{ fontFamily: C.mono }}>ocr_data</code> field is populated, then proceed to Step 3.
             </Callout>
           </EndpointCard>
 
           {/* Step 3 */}
           <SectionAnchor id="step-3" />
-          <EndpointCard step={3} method="POST" path="/api/verify/back-of-id" title="Upload Back-of-ID"
+          <EndpointCard step={3} method="POST" path="/api/v2/verify/:id/back-document" title="Upload Back-of-ID"
             badge={{ label: 'required', color: C.red, bg: C.redDim }}>
             <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
               Upload the <strong style={{ color: C.text }}>back face</strong> of the ID for barcode/QR scanning and cross-validation
@@ -605,15 +595,13 @@ print(r['ocr_data']['name'])  # "Jane Smith"`}
             </div>
 
             <div style={{ marginBottom: 12 }}>
-              <FieldRow name="verification_id" type="UUID string" req={true} desc="The ID returned from Step 1." />
               <FieldRow name="document_type" type="string" req={true} desc="Must match the document_type used in Step 2." />
-              <FieldRow name="back_of_id" type="File" req={true} desc="JPEG, PNG, or WebP. Max 10 MB." />
+              <FieldRow name="document" type="File" req={true} desc="JPEG, PNG, or WebP. Max 10 MB. Field name is 'document'." />
             </div>
-            <Pre label="Request" code={`curl -X POST ${apiUrl}/api/verify/back-of-id \\
+            <Pre label="Request" code={`curl -X POST ${apiUrl}/api/v2/verify/550e8400-e29b-41d4-a716-446655440001/back-document \\
   -H "X-API-Key: your-key" \\
-  -F "verification_id=550e8400-e29b-41d4-a716-446655440001" \\
   -F "document_type=drivers_license" \\
-  -F "back_of_id=@back.jpg"`} />
+  -F "document=@back.jpg"`} />
             <Pre label="Response  —  HTTP 201" code={`{
   "verification_id": "550e8400-e29b-41d4-a716-446655440001",
   "back_of_id_document_id": "doc_back456",
@@ -627,13 +615,14 @@ print(r['ocr_data']['name'])  # "Jane Smith"`}
   "next_steps": [
     "Processing barcode/QR code scanning",
     "Cross-validating with front-of-ID data",
-    "Check results with GET /api/verify/results/550e8400-..."
+    "Check results with GET /api/v2/verify/550e8400-.../status"
   ]
 }`} />
             <Callout type="warning">
-              Poll <code style={{ fontFamily: C.mono }}>GET /results/:id</code> until{' '}
-              <code style={{ fontFamily: C.mono }}>enhanced_verification_completed: true</code>.
-              If <code style={{ fontFamily: C.mono }}>status</code> becomes{' '}
+              Cross-validation now auto-triggers during back-document upload. Poll{' '}
+              <code style={{ fontFamily: C.mono }}>GET /api/v2/verify/:id/status</code> until{' '}
+              <code style={{ fontFamily: C.mono }}>cross_validation_results</code> is populated.
+              If <code style={{ fontFamily: C.mono }}>final_result</code> is{' '}
               <StatusPill status="failed" />, cross-validation did not pass — do not proceed to live capture.
               Check <code style={{ fontFamily: C.mono }}>failure_reason</code> for details.
             </Callout>
@@ -641,14 +630,13 @@ print(r['ocr_data']['name'])  # "Jane Smith"`}
 
           {/* Step 4 */}
           <SectionAnchor id="step-4" />
-          <EndpointCard step={4} method="POST" path="/api/verify/live-capture" title="Submit Live Capture"
+          <EndpointCard step={4} method="POST" path="/api/v2/verify/:id/live-capture" title="Submit Live Capture"
             badge={{ label: 'AI-enhanced', color: C.purple, bg: C.purpleDim }}>
             <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
-              Submit a <strong style={{ color: C.text }}>base64-encoded camera frame</strong> for liveness detection and
+              Submit a <strong style={{ color: C.text }}>selfie image file</strong> for liveness detection and
               face matching against the front document photo. Only available after cross-validation passes.
-              Liveness + face matching are asynchronous — the response returns immediately with
-              <code style={{ fontFamily: C.mono, color: C.cyan }}> status: "processing"</code>.
-              Final scores come from <code style={{ fontFamily: C.mono, color: C.cyan }}>GET /results/:id</code>.
+              Uses multipart file upload with field name <code style={{ fontFamily: C.mono, color: C.cyan }}>selfie</code>.
+              Final scores come from <code style={{ fontFamily: C.mono, color: C.cyan }}>GET /api/v2/verify/:id/status</code>.
             </p>
 
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
@@ -663,18 +651,11 @@ print(r['ocr_data']['name'])  # "Jane Smith"`}
             </div>
 
             <div style={{ marginBottom: 12 }}>
-              <FieldRow name="verification_id" type="UUID string" req={true} desc="Must have cross-validation completed (enhanced_verification_completed: true)." />
-              <FieldRow name="live_image_data" type="base64 string" req={true} desc="Base64-encoded JPEG. Do NOT include the data URI prefix (data:image/jpeg;base64,...)." />
-              <FieldRow name="challenge_response" type="string" req={false} desc="The liveness challenge the user performed, e.g. 'smile', 'blink_twice'." />
+              <FieldRow name="selfie" type="File" req={true} desc="JPEG or PNG selfie image. Max 10 MB." />
             </div>
-            <Pre label="Request" code={`curl -X POST ${apiUrl}/api/verify/live-capture \\
+            <Pre label="Request" code={`curl -X POST ${apiUrl}/api/v2/verify/550e8400-e29b-41d4-a716-446655440001/live-capture \\
   -H "X-API-Key: your-key" \\
-  -H "Content-Type: application/json" \\
-  -d '{
-    "verification_id": "550e8400-e29b-41d4-a716-446655440001",
-    "live_image_data": "/9j/4AAQSkZJRgABA...",
-    "challenge_response": "smile"
-  }'`} />
+  -F "selfie=@selfie.jpg"`} />
             <Pre label="Response  —  HTTP 201" code={`{
   "verification_id": "550e8400-e29b-41d4-a716-446655440001",
   "live_capture_id": "550e8400-e29b-41d4-a716-446655440099",
@@ -682,20 +663,20 @@ print(r['ocr_data']['name'])  # "Jane Smith"`}
   "message": "Live capture uploaded successfully. Processing liveness detection and face matching.",
   "liveness_check_enabled": true,
   "face_matching_enabled": true,
-  "results_url": "/api/verify/results/550e8400-e29b-41d4-a716-446655440001"
+  "results_url": "/api/v2/verify/550e8400-e29b-41d4-a716-446655440001/status"
 }`} />
             <Callout type="note">
-              Scores are <strong>not in this response</strong>. Poll{' '}
-              <code style={{ fontFamily: C.mono }}>GET /results/:id</code> until{' '}
-              <code style={{ fontFamily: C.mono }}>live_capture_completed: true</code> AND{' '}
-              <code style={{ fontFamily: C.mono }}>status</code> is{' '}
-              <StatusPill status="verified" />, <StatusPill status="failed" />, or <StatusPill status="manual_review" />.
+              Poll{' '}
+              <code style={{ fontFamily: C.mono }}>GET /api/v2/verify/:id/status</code> until{' '}
+              <code style={{ fontFamily: C.mono }}>final_result</code> is non-null ({' '}
+              <StatusPill status="verified" />, <StatusPill status="failed" />, or <StatusPill status="manual_review" />).
+              Face match and liveness scores are in the status response.
             </Callout>
           </EndpointCard>
 
           {/* Step 5 */}
           <SectionAnchor id="step-5" />
-          <EndpointCard step={5} method="GET" path="/api/verify/results/:verification_id" title="Get Verification Results">
+          <EndpointCard step={5} method="GET" path="/api/v2/verify/:id/status" title="Get Verification Results">
             <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
               The single source of truth for a verification session. Use this endpoint for polling at each
               processing stage and for reading the final result. Returns the full record including OCR data,
@@ -706,8 +687,8 @@ print(r['ocr_data']['name'])  # "Jane Smith"`}
               <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>Polling conditions</div>
               {[
                 { after: 'After Step 2 (front doc)', condition: 'ocr_data is not null', next: 'proceed to Step 3' },
-                { after: 'After Step 3 (back-of-ID)', condition: 'enhanced_verification_completed === true', next: 'check status; if not "failed", proceed to Step 4' },
-                { after: 'After Step 4 (live capture)', condition: 'live_capture_completed === true AND status in ["verified","failed","manual_review"]', next: 'verification complete' },
+                { after: 'After Step 3 (back-of-ID)', condition: 'cross_validation_results is not null', next: 'check final_result; if not "failed", proceed to Step 4' },
+                { after: 'After Step 4 (live capture)', condition: 'final_result is not null', next: 'verification complete' },
               ].map(r => (
                 <div key={r.after} style={{ display: 'flex', gap: 12, padding: '8px 0', borderTop: `1px solid ${C.border}`, flexWrap: 'wrap' }}>
                   <span style={{ fontFamily: C.sans, fontSize: '0.78rem', color: C.muted, width: 160, flexShrink: 0 }}>{r.after}</span>
@@ -717,7 +698,7 @@ print(r['ocr_data']['name'])  # "Jane Smith"`}
               ))}
             </div>
 
-            <Pre label="Request" code={`curl -X GET ${apiUrl}/api/verify/results/550e8400-e29b-41d4-a716-446655440001 \\
+            <Pre label="Request" code={`curl -X GET ${apiUrl}/api/v2/verify/550e8400-e29b-41d4-a716-446655440001/status \\
   -H "X-API-Key: your-key"`} />
             <Pre label="Response  —  completed verification" code={`{
   "verification_id": "550e8400-e29b-41d4-a716-446655440001",
@@ -778,7 +759,7 @@ print(r['ocr_data']['name'])  # "Jane Smith"`}
             badge={{ label: 'legacy', color: C.dim, bg: 'rgba(74,85,104,0.13)' }}>
             <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
               Upload a pre-captured selfie file for face matching. This is the legacy static-upload endpoint.
-              For new integrations, use <code style={{ fontFamily: C.mono, color: C.cyan }}>POST /api/verify/live-capture</code> which
+              For new integrations, use <code style={{ fontFamily: C.mono, color: C.cyan }}>POST /api/v2/verify/:id/live-capture</code> which
               includes real-time liveness detection via camera.
             </p>
             <div style={{ marginBottom: 12 }}>
@@ -790,7 +771,7 @@ print(r['ocr_data']['name'])  # "Jane Smith"`}
   "status":  "processing",    // face matching runs async
   "message": "Selfie uploaded successfully. Face recognition started.",
   "selfie_id": "selfie_abc789",
-  "next_steps": "Check verification status with /api/verify/results/:verification_id"
+  "next_steps": "Check verification status with /api/v2/verify/:id/status"
 }`} />
           </EndpointCard>
 

@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react';
-import { API_BASE_URL, shouldUseSandbox } from '../../config/api';
+import { API_BASE_URL } from '../../config/api';
 
 declare global {
   interface Window { cv: any; }
@@ -241,19 +241,19 @@ export const LiveCaptureWidget: React.FC<LiveCaptureWidgetProps> = ({
     setLoading(true);
     setCaptureAttempts(n => n + 1);
     try {
-      const base64 = canvas.toDataURL('image/jpeg', 0.8).split(',')[1];
-      const useSandbox = shouldUseSandbox(apiKey);
-      const body: Record<string, unknown> = {
-        verification_id: verificationId,
-        live_image_data: base64,
-        challenge_response: 'blink_twice',
-      };
-      if (useSandbox) body.sandbox = true;
+      const blob = await new Promise<Blob>((resolve, reject) => {
+        canvas.toBlob(
+          (b) => { if (b) resolve(b); else reject(new Error('Failed to capture image')); },
+          'image/jpeg', 0.8,
+        );
+      });
+      const formData = new FormData();
+      formData.append('selfie', blob, 'selfie.jpg');
 
-      const res = await fetch(`${API_BASE_URL}/api/verify/live-capture`, {
+      const res = await fetch(`${API_BASE_URL}/api/v2/verify/${verificationId}/live-capture`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
-        body: JSON.stringify(body),
+        headers: { 'X-API-Key': apiKey },
+        body: formData,
         signal: AbortSignal.timeout(30000),
       });
 
