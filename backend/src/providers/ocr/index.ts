@@ -1,22 +1,19 @@
 import { OCRProvider } from '../types.js';
+import { PaddleOCRProvider } from './PaddleOCRProvider.js';
 import { TesseractProvider } from './TesseractProvider.js';
-import { OpenAIProvider } from './OpenAIProvider.js';
 
 export function createOCRProvider(): OCRProvider {
-  const name = process.env.OCR_PROVIDER ?? (process.env.OPENAI_API_KEY ? 'openai' : 'tesseract');
+  const name = process.env.OCR_PROVIDER ?? 'paddle';
 
   switch (name) {
-    case 'openai':
-      return new OpenAIProvider();
-    case 'azure':
-      throw new Error('Azure Vision provider not yet implemented. Set OCR_PROVIDER=openai or OCR_PROVIDER=tesseract');
-    case 'aws-textract':
-      throw new Error('AWS Textract provider not yet implemented.');
+    case 'paddle':
+      return new PaddleOCRProvider();
     case 'tesseract':
-    default:
       return new TesseractProvider();
+    default:
+      return new PaddleOCRProvider();
   }
 }
 
+export { PaddleOCRProvider } from './PaddleOCRProvider.js';
 export { TesseractProvider } from './TesseractProvider.js';
-export { OpenAIProvider } from './OpenAIProvider.js';

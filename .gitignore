@@ -106,6 +106,9 @@ backend/models/*.shard*
 # Tesseract training data
 *.traineddata
 
+# PaddleOCR ONNX model cache (auto-downloaded by ppu-paddle-ocr)
+.cache/ppu-paddle-ocr/
+
 # SDKs distribution
 sdks/*/dist/
 sdks/*/build/
