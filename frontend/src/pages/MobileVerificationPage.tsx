@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { API_BASE_URL } from '../config/api';
+import IDCameraCapture from '../components/IDCameraCapture';
 
 // ─── Design system CSS ─────────────────────────────────────────────────────
 const css = `
@@ -25,6 +26,8 @@ const css = `
 @keyframes sPulse    { 0%,100%{box-shadow:0 0 32px rgba(0,212,180,0.18)} 50%{box-shadow:0 0 64px rgba(0,212,180,0.38)} }
 @keyframes fadeUp    { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
 @keyframes slideIn   { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
+@keyframes focusPulse { 0%,100%{opacity:0.6} 50%{opacity:1} }
+@keyframes shutterFlash { 0%{opacity:0} 10%{opacity:0.8} 100%{opacity:0} }
 
 .mv-fade-up { animation: fadeUp 0.38s ease both; }
 `;
@@ -390,6 +393,11 @@ const MobileVerificationPage: React.FC = () => {
   const [selfieFile, setSelfieFile] = useState<File | null>(null);
   const [selfiePreviewUrl, setSelfiePreviewUrl] = useState<string | null>(null);
 
+  // Guided camera state
+  const [showCamera, setShowCamera] = useState(false);
+  const [cameraVariant, setCameraVariant] = useState<'front' | 'back'>('front');
+  const [cameraSupported, setCameraSupported] = useState(true);
+
   // Checking screen messages
   const [checkingMsg, setCheckingMsg] = useState('Verifying your document…');
 
@@ -401,9 +409,10 @@ const MobileVerificationPage: React.FC = () => {
 
   const screen: Screen = SCREENS[screenIdx];
 
-  // ── Cleanup ────────────────────────────────────────────────────────────
+  // ── Cleanup + camera support check ──────────────────────────────────────
   useEffect(() => {
     mountedRef.current = true;
+    setCameraSupported(!!navigator.mediaDevices?.getUserMedia);
     return () => {
       mountedRef.current = false;
       if (frontPreviewUrl) URL.revokeObjectURL(frontPreviewUrl);
@@ -484,6 +493,38 @@ const MobileVerificationPage: React.FC = () => {
     setFrontPreviewUrl(URL.createObjectURL(file));
     setStepError(null);
   };
+
+  // ── Guided camera callbacks ─────────────────────────────────────────────
+  const openCamera = useCallback((variant: 'front' | 'back') => {
+    setCameraVariant(variant);
+    setShowCamera(true);
+  }, []);
+
+  const handleCameraCapture = useCallback((file: File) => {
+    setShowCamera(false);
+    if (cameraVariant === 'front') {
+      if (frontPreviewUrl) URL.revokeObjectURL(frontPreviewUrl);
+      setFrontFile(file);
+      setFrontPreviewUrl(URL.createObjectURL(file));
+    } else {
+      if (backPreviewUrl) URL.revokeObjectURL(backPreviewUrl);
+      setBackFile(file);
+      setBackPreviewUrl(URL.createObjectURL(file));
+    }
+    setStepError(null);
+  }, [cameraVariant, frontPreviewUrl, backPreviewUrl]);
+
+  const handleCameraClose = useCallback(() => {
+    setShowCamera(false);
+  }, []);
+
+  const handleCameraFallback = useCallback(() => {
+    setShowCamera(false);
+    setCameraSupported(false);
+    // Auto-click the hidden file input as fallback
+    const inputId = cameraVariant === 'front' ? 'mv-front-upload' : 'mv-back-upload';
+    setTimeout(() => document.getElementById(inputId)?.click(), 100);
+  }, [cameraVariant]);
 
   const uploadFront = async () => {
     if (!frontFile || !verificationId || !apiKey) return;
@@ -812,12 +853,15 @@ const MobileVerificationPage: React.FC = () => {
             <div style={{ marginTop: 12 }} />
             <IDViewfinder variant="front" processing={isProcessing} processingLabel="READING FRONT" previewUrl={frontPreviewUrl} />
 
-            {/* Hidden file input */}
+            {/* Hidden file input (fallback when camera unsupported) */}
             <input type="file" accept="image/*" capture="environment" id="mv-front-upload" style={{ display: 'none' }}
               onChange={handleFrontSelect} />
 
             {!frontFile ? (
-              <PrimaryBtn onClick={() => document.getElementById('mv-front-upload')?.click()} disabled={isProcessing}>
+              <PrimaryBtn
+                onClick={() => cameraSupported ? openCamera('front') : document.getElementById('mv-front-upload')?.click()}
+                disabled={isProcessing}
+              >
                 Take Photo of Front
               </PrimaryBtn>
             ) : (
@@ -858,11 +902,15 @@ const MobileVerificationPage: React.FC = () => {
             <div style={{ marginTop: 12 }} />
             <IDViewfinder variant="back" processing={isProcessing} processingLabel="READING BARCODE" previewUrl={backPreviewUrl} />
 
+            {/* Hidden file input (fallback when camera unsupported) */}
             <input type="file" accept="image/*" capture="environment" id="mv-back-upload" style={{ display: 'none' }}
               onChange={handleBackSelect} />
 
             {!backFile ? (
-              <PrimaryBtn onClick={() => document.getElementById('mv-back-upload')?.click()} disabled={isProcessing}>
+              <PrimaryBtn
+                onClick={() => cameraSupported ? openCamera('back') : document.getElementById('mv-back-upload')?.click()}
+                disabled={isProcessing}
+              >
                 Take Photo of Back
               </PrimaryBtn>
             ) : (
@@ -975,6 +1023,16 @@ const MobileVerificationPage: React.FC = () => {
               </p>
             )}
           </div>
+        )}
+
+        {/* ── Guided Camera Overlay ─────────────────────────────────── */}
+        {showCamera && (
+          <IDCameraCapture
+            variant={cameraVariant}
+            onCapture={handleCameraCapture}
+            onClose={handleCameraClose}
+            onFallback={handleCameraFallback}
+          />
         )}
 
         {/* ── Screen 4: Complete ──────────────────────────────────────── */}

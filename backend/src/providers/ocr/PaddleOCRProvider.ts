@@ -366,7 +366,7 @@ export class PaddleOCRProvider implements OCRProvider {
 
     // Step 2: Extract each field using label map + fallbacks
     if (!ocrData.document_number) {
-      ocrData.document_number = this.extractDlNumber(flatLines, labelMap);
+      ocrData.document_number = this.extractDlNumber(flatLines, labelMap) ?? undefined;
       if (ocrData.document_number)
         ocrData.confidence_scores!.document_number =
           labelMap.get('dl_number')?.confidence ?? 0.8;
@@ -418,11 +418,11 @@ export class PaddleOCRProvider implements OCRProvider {
     const map = new Map<string, FlatLine & { lineIndex: number }>();
 
     const labelPatterns: Array<[string, RegExp]> = [
-      ['dl_number',   /(?:4d\b|DLn?\b|DL\s*#|LIC\s*#|LICENSE\s*(?:NO|NUMBER|#)|ID\s*NO)/i],
+      ['dl_number',   /(?:4d\b|DLn?\b|DL\s*#|LIC\s*#|LICENSE\s*(?:NO|NUMBER|#)|ID\s*NO|ID(?=\s*\d)|(?:^|\s)I(?=\d{3}\s*\d{3}))/i],
       ['last_name',   /\b(?:LN|LAST\s*NAME|FAMILY\s*NAME|SURNAME)\b/i],
       ['first_name',  /\b(?:FN|FIRST\s*NAME|GIVEN\s*NAME)\b/i],
       ['full_name',   /\b(?:FULL\s*)?NAME\b/i],
-      ['dob',         /\b(?:DOB|DATE\s*OF\s*BIRTH|BIRTH\s*DATE|BORN|3\s+DATE)\b/i],
+      ['dob',         /(?:\bDOB\b|DOB(?=\d)|DATE\s*OF\s*BIRTH|BIRTH\s*DATE|\bBORN\b|3\s+DATE)/i],
       ['expiry',      /\b(?:EXP(?:IRY|IRES)?|EXPIRATION|VALID\s*UNTIL|4b\b)\b/i],
       ['issued',      /\b(?:ISS(?:UED)?|ISSUE\s*DATE|4a\b)\b/i],
       ['address',     /\bADDR(?:ESS)?\b/i],
@@ -462,12 +462,21 @@ export class PaddleOCRProvider implements OCRProvider {
       );
       if (directM) return directM[1].replace(/[\s\-]/g, '');
 
+      // Try "ID" prefix followed by spaced digits: "ID793 398 654" → "793398654"
+      const idPrefixM = labelLine.text.match(
+        /\bID\s*((?:\d[\d\s]{5,16}\d))/i,
+      );
+      if (idPrefixM) {
+        const cleaned = idPrefixM[1].replace(/[\s\-]/g, '');
+        if (cleaned.length >= 7 && cleaned.length <= 15) return cleaned;
+      }
+
       // Also try "ID NO." style and other labeled patterns
       // NOTE: LICENSE must come BEFORE LIC — regex alternation picks the first match,
       // and LIC\s*#? would match just "Lic" from "License" if tried first.
       const candidate = this.valueAfterLabel(
         labelLine.text,
-        /(?:LICENSE\s*(?:NO|NUMBER|#)|ID\s*NO\.?|4d|DLn?|DL\s*#?|LIC\s*#?)/i,
+        /(?:LICENSE\s*(?:NO|NUMBER|#)|ID\s*NO\.?|ID(?=\s*\d)|4d|DLn?|DL\s*#?|LIC\s*#?)/i,
       );
       const dlNum = this.parseDlNumber(candidate ?? labelLine.text);
       if (dlNum) return dlNum;
@@ -486,10 +495,14 @@ export class PaddleOCRProvider implements OCRProvider {
       /\b([A-Z]{1,2}\d{7,14})\b/,
       // Pure digits 7-12 (NC, NY, PA, TX, CO, NJ numeric, OH, GA, etc.)
       /\b(\d{7,12})\b/,
+      // Spaced digit groups: "793 398 654" → "793398654" (NY and other states)
+      /\b(\d{3}\s+\d{3}\s+\d{3})\b/,
       // Colorado: ##-###-####
       /\b(\d{2}-\d{3}-\d{4})\b/,
       // New York: ###-###-###
       /\b(\d{3}-\d{3}-\d{3})\b/,
+      // "ID" or "I" (OCR misread) prefix + spaced digits: "I793 398 654" or "ID793 398 654"
+      /\bI[D]?\s*(\d[\d\s]{5,16}\d)\b/i,
       // Washington: WDL prefix
       /\b(WDL[A-Z0-9]{9,12})\b/i,
     ];
@@ -526,8 +539,17 @@ export class PaddleOCRProvider implements OCRProvider {
     // Remove leading label if still attached
     // NOTE: LICENSE must come BEFORE LIC to avoid partial "Lic" match
     const withoutLabel = cleaned.replace(
-      /^(?:LICENSE\s*(?:NO|NUMBER|#)|ID\s*NO\.?|4d|DLn?|DL\s*#?|LIC\s*#?)\s*/i, ''
+      /^(?:LICENSE\s*(?:NO|NUMBER|#)|ID\s*NO\.?|ID(?=\s*\d)|4d|DLn?|DL\s*#?|LIC\s*#?)\s*/i, ''
     ).trim();
+
+    // Try matching spaced digit groups first: "793 398 654" → "793398654"
+    const spacedM = withoutLabel.match(/^(\d[\d\s]{5,16}\d)/);
+    if (spacedM) {
+      const collapsed = spacedM[1].replace(/\s/g, '');
+      if (collapsed.length >= 6 && collapsed.length <= 15 && !this.looksLikeDate(collapsed)) {
+        return collapsed;
+      }
+    }
 
     // Must be alphanumeric, 6–15 chars, no date-like pattern
     const m = withoutLabel.match(/^([A-Z0-9\-]{6,15})/i);
@@ -730,7 +752,8 @@ export class PaddleOCRProvider implements OCRProvider {
 
     // Strategy A: Value on same line as DOB label
     if (dobLabelLine) {
-      const afterLabel = this.valueAfterLabel(dobLabelLine.text, /\b(?:DOB|DATE\s*OF\s*BIRTH|BIRTH\s*DATE|BORN)\b/i);
+      // Handle both "DOB 09/29/1979" and "DOB09/29/1979" (no space)
+      const afterLabel = this.valueAfterLabel(dobLabelLine.text, /(?:\bDOB\b|DOB(?=\d)|DATE\s*OF\s*BIRTH|BIRTH\s*DATE|\bBORN\b)/i);
       if (afterLabel) {
         const dates = findAllDates(afterLabel);
         if (dates.length > 0) {
@@ -750,16 +773,16 @@ export class PaddleOCRProvider implements OCRProvider {
 
     // Strategy C: Look for lines where DOB label + date on same row
     for (const line of lines) {
-      if (!/\bDOB\b/i.test(line.text)) continue;
+      if (!/DOB/i.test(line.text)) continue;
       const allDates = findAllDates(line.text);
       if (allDates.length >= 1) {
         return { value: allDates[0], confidence: line.confidence };
       }
     }
 
-    // Strategy D: Scan for a date preceded by a DOB-like label
+    // Strategy D: Scan for a date preceded by a DOB-like label (with or without separator)
     for (const line of lines) {
-      const m = line.text.match(/(?:DOB|BIRTH|BORN)[:\s]+(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i);
+      const m = line.text.match(/(?:DOB|BIRTH|BORN)[:\s]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i);
       if (m) {
         return {
           value:      standardizeDateFormat(m[1]),
