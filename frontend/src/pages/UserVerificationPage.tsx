@@ -163,12 +163,11 @@ const UserVerificationPage: React.FC = () => {
       <div style={{ maxWidth: 560, width: '100%' }}>
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <span style={{
-            fontFamily: C.mono, fontSize: '1.3rem', fontWeight: 600, color: C.text,
-            letterSpacing: '-0.02em',
-          }}>
-            <span style={{ color: C.cyan }}>id</span>swyft
-          </span>
+          <img
+            src="/idswyft-logo.png"
+            alt="Idswyft"
+            style={{ height: 36, margin: '0 auto' }}
+          />
         </div>
 
         {/* View-only warning */}
