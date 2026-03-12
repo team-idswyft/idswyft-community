@@ -77,8 +77,35 @@ export function compareIdNumber(front: string, back: string): number {
 }
 
 /**
+ * Token-subset similarity for name comparison.
+ * When all tokens of the shorter name appear in the longer name, the extra
+ * tokens are likely OCR noise or a middle name the barcode omitted.
+ * Returns 0.95 for a full subset match, 0 otherwise.
+ */
+export function tokenSubsetSimilarity(str1: string, str2: string): number {
+  const tokens1 = str1.split(/\s+/).filter(Boolean);
+  const tokens2 = str2.split(/\s+/).filter(Boolean);
+
+  if (tokens1.length === 0 || tokens2.length === 0) return 0;
+
+  // Determine which is shorter
+  const [shorter, longer] = tokens1.length <= tokens2.length
+    ? [tokens1, tokens2] : [tokens2, tokens1];
+
+  // Every token in the shorter name must appear in the longer name
+  const allPresent = shorter.every(token =>
+    longer.some(t => t === token || levenshteinSimilarity(t, token) >= 0.85)
+  );
+
+  return allPresent ? 0.95 : 0;
+}
+
+/**
  * Compare full names.
- * Per spec: max(levenshtein_similarity, token_set_similarity) after normalization.
+ * Uses max of three strategies:
+ *   1. Levenshtein similarity (handles typos)
+ *   2. Token-set similarity (handles reordered names)
+ *   3. Token-subset similarity (handles OCR injecting extra words)
  * Diacritics stripped before comparison.
  */
 export function compareName(front: string, back: string): number {
@@ -90,8 +117,9 @@ export function compareName(front: string, back: string): number {
 
   const levScore = levenshteinSimilarity(normFront, normBack);
   const tokenScore = tokenSetSimilarity(normFront, normBack);
+  const subsetScore = tokenSubsetSimilarity(normFront, normBack);
 
-  return Math.max(levScore, tokenScore);
+  return Math.max(levScore, tokenScore, subsetScore);
 }
 
 /**
