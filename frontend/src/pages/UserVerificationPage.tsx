@@ -1,130 +1,269 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import EndUserVerification from '../components/verification/EndUserVerification';
+import { ContinueOnPhone } from '../components/ContinueOnPhone';
+import { C, injectFonts } from '../theme';
 
-/**
- * Production-ready verification page for end users
- * This is what developers would embed in their applications
- */
+// ─── State machine ─────────────────────────────────────────────────
+// 'choice'     → user picks mobile or desktop
+// 'mobile-qr'  → ContinueOnPhone in full-page dark wrapper
+// 'desktop'    → EndUserVerification with dark theme
+// ────────────────────────────────────────────────────────────────────
+type Phase = 'choice' | 'mobile-qr' | 'desktop';
+
 const UserVerificationPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  
-  // Get parameters from URL (how developers would pass them)
+
   const apiKey = searchParams.get('api_key') || process.env.REACT_APP_IDSWYFT_API_KEY || '';
   const userId = searchParams.get('user_id') || '';
   const redirectUrl = searchParams.get('redirect_url') || '';
-  const theme = (searchParams.get('theme') as 'light' | 'dark') || 'light';
+  const theme = (searchParams.get('theme') as 'light' | 'dark') || 'dark';
   const showBackButton = searchParams.get('show_back') !== 'false';
 
-  // Handle verification completion
+  const viewOnly = !apiKey || !userId;
+
+  const [phase, setPhase] = useState<Phase>('choice');
+
+  useEffect(() => { injectFonts(); }, []);
+
+  // ── Handlers ──────────────────────────────────────────────────────
   const handleVerificationComplete = (result: any) => {
-    console.log('Verification completed:', result);
-    
-    // Example: Send result to parent application
     if (window.parent !== window) {
-      window.parent.postMessage({
-        type: 'VERIFICATION_COMPLETE',
-        result
-      }, '*');
+      window.parent.postMessage({ type: 'VERIFICATION_COMPLETE', result }, '*');
+    }
+    if (redirectUrl) {
+      setTimeout(() => { window.location.href = redirectUrl; }, 1500);
     }
   };
 
-  // Handle custom redirect
   const handleRedirect = (url: string) => {
-    console.log('Redirecting to:', url);
-    
-    // Example: Custom redirect logic
-    setTimeout(() => {
-      window.location.href = url;
-    }, 1500);
+    setTimeout(() => { window.location.href = url; }, 1500);
   };
 
-  // Handle back button
   const handleGoBack = () => {
-    if (window.history.length > 1) {
-      navigate(-1);
-    } else {
-      window.close();
-    }
+    if (window.history.length > 1) navigate(-1);
+    else window.close();
   };
 
-  // Validation
-  if (!apiKey || !userId) {
+  // ── Back button (dark-themed) ─────────────────────────────────────
+  const BackBtn = () =>
+    showBackButton ? (
+      <div className="absolute top-6 left-6 z-50">
+        <button
+          onClick={() => phase === 'choice' ? handleGoBack() : setPhase('choice')}
+          style={{
+            fontFamily: C.sans,
+            fontSize: '0.82rem',
+            fontWeight: 500,
+            color: C.muted,
+            background: C.surface,
+            border: `1px solid ${C.border}`,
+            borderRadius: 10,
+            padding: '8px 16px',
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            cursor: 'pointer',
+          }}
+        >
+          <ArrowLeftIcon style={{ width: 14, height: 14 }} />
+          {phase === 'choice' ? 'Back' : 'Back to options'}
+        </button>
+      </div>
+    ) : null;
+
+  // ── View-only banner ──────────────────────────────────────────────
+  const ViewOnlyBanner = () => (
+    <div style={{
+      background: C.amberDim,
+      border: `1px solid ${C.amber}35`,
+      borderRadius: 10,
+      padding: '12px 18px',
+      marginBottom: 24,
+      display: 'flex',
+      gap: 10,
+      alignItems: 'flex-start',
+    }}>
+      <span style={{ color: C.amber, fontSize: '1rem', flexShrink: 0, marginTop: 1 }}>⚠</span>
+      <div>
+        <p style={{
+          fontFamily: C.sans, fontSize: '0.82rem', fontWeight: 600, color: C.amber,
+          margin: '0 0 4px',
+        }}>
+          Preview Mode
+        </p>
+        <p style={{
+          fontFamily: C.sans, fontSize: '0.78rem', color: C.muted,
+          margin: '0 0 8px', lineHeight: 1.5,
+        }}>
+          This page requires <code style={{ fontFamily: C.mono, fontSize: '0.72rem', color: C.cyan }}>api_key</code> and{' '}
+          <code style={{ fontFamily: C.mono, fontSize: '0.72rem', color: C.cyan }}>user_id</code> URL
+          parameters to start a real verification. You're seeing a read-only preview.
+        </p>
+        <div style={{
+          fontFamily: C.mono, fontSize: '0.68rem', color: C.dim,
+          background: C.bg, borderRadius: 6, padding: '6px 10px',
+          wordBreak: 'break-all',
+        }}>
+          /user-verification?api_key=<span style={{ color: C.cyan }}>sk_live_xxx</span>&user_id=<span style={{ color: C.cyan }}>user-uuid</span>
+        </div>
+      </div>
+    </div>
+  );
+
+  // ── Phase: mobile-qr ──────────────────────────────────────────────
+  if (!viewOnly && phase === 'mobile-qr') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-100">
-        {/* Custom Back Button */}
-        {showBackButton && (
-          <div className="absolute top-6 left-6 z-10">
-            <button
-              onClick={handleGoBack}
-              className="inline-flex items-center px-4 py-2 bg-white/80 backdrop-blur-sm text-gray-700 rounded-xl shadow-lg border border-white/20 hover:bg-white/90 hover:shadow-xl transition-all duration-200 group"
-            >
-              <ArrowLeftIcon className="w-4 h-4 mr-2 group-hover:-translate-x-0.5 transition-transform" />
-              Back
-            </button>
-          </div>
-        )}
-        
-        <div className="flex items-center justify-center min-h-screen px-4">
-          <div className="max-w-md w-full bg-white/80 backdrop-blur-sm rounded-2xl shadow-2xl border border-white/20 p-8 text-center">
-            <div className="w-16 h-16 mx-auto mb-6 bg-gradient-to-br from-red-500 to-red-600 rounded-full flex items-center justify-center">
-              <span className="text-white text-2xl">⚠️</span>
-            </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-3">
-              Missing Required Parameters
-            </h2>
-            <p className="text-gray-600 mb-6 leading-relaxed">
-              This verification page requires an API key and user ID to function properly.
-            </p>
-            <div className="bg-gray-50/80 rounded-xl p-4 text-sm text-gray-600 space-y-3">
-              <div>
-                <p className="font-medium text-gray-900 mb-2">Required URL parameters:</p>
-                <ul className="space-y-1 text-left">
-                  <li className="flex items-center"><code className="bg-white px-2 py-1 rounded text-xs font-mono">api_key</code><span className="ml-2">Your API key</span></li>
-                  <li className="flex items-center"><code className="bg-white px-2 py-1 rounded text-xs font-mono">user_id</code><span className="ml-2">User identifier</span></li>
-                </ul>
-              </div>
-              <div>
-                <p className="font-medium text-gray-900 mb-2">Optional parameters:</p>
-                <ul className="space-y-1 text-left">
-                  <li className="flex items-center"><code className="bg-white px-2 py-1 rounded text-xs font-mono">redirect_url</code><span className="ml-2">Redirect destination</span></li>
-                  <li className="flex items-center"><code className="bg-white px-2 py-1 rounded text-xs font-mono">theme</code><span className="ml-2">light or dark</span></li>
-                </ul>
-              </div>
-            </div>
-          </div>
+      <div style={{ background: C.bg, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+        <BackBtn />
+        <div style={{ maxWidth: 440, width: '100%' }}>
+          <ContinueOnPhone
+            apiKey={apiKey}
+            userId={userId}
+            onComplete={(result) => {
+              handleVerificationComplete({
+                verification_id: result.verification_id ?? 'mobile-handoff',
+                user_id: result.user_id ?? userId,
+                status: result.status ?? 'manual_review',
+                confidence_score: result.confidence_score,
+                face_match_score: result.face_match_score,
+                liveness_score: result.liveness_score,
+              });
+            }}
+          />
         </div>
       </div>
     );
   }
 
+  // ── Phase: desktop ────────────────────────────────────────────────
+  if (!viewOnly && phase === 'desktop') {
+    return (
+      <div className="relative min-h-screen">
+        <BackBtn />
+        <EndUserVerification
+          apiKey={apiKey}
+          userId={userId}
+          redirectUrl={redirectUrl}
+          theme={theme}
+          onComplete={handleVerificationComplete}
+          onRedirect={handleRedirect}
+          allowedDocumentTypes={['passport', 'drivers_license', 'national_id']}
+        />
+      </div>
+    );
+  }
+
+  // ── Phase: choice (default) — also shown in view-only mode ────────
   return (
-    <div className="relative min-h-screen">
-      {/* Custom Back Button */}
-      {showBackButton && (
-        <div className="absolute top-6 left-6 z-50">
-          <button
-            onClick={handleGoBack}
-            className="inline-flex items-center px-4 py-2 bg-white/80 backdrop-blur-sm text-gray-700 rounded-xl shadow-lg border border-white/20 hover:bg-white/90 hover:shadow-xl transition-all duration-200 group"
-          >
-            <ArrowLeftIcon className="w-4 h-4 mr-2 group-hover:-translate-x-0.5 transition-transform" />
-            Back
-          </button>
+    <div style={{ background: C.bg, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <BackBtn />
+      <div style={{ maxWidth: 560, width: '100%' }}>
+        {/* Logo */}
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <span style={{
+            fontFamily: C.mono, fontSize: '1.3rem', fontWeight: 600, color: C.text,
+            letterSpacing: '-0.02em',
+          }}>
+            <span style={{ color: C.cyan }}>id</span>swyft
+          </span>
         </div>
-      )}
-      
-      {/* Verification Component */}
-      <EndUserVerification
-        apiKey={apiKey}
-        userId={userId}
-        redirectUrl={redirectUrl}
-        theme={theme}
-        onComplete={handleVerificationComplete}
-        onRedirect={handleRedirect}
-        allowedDocumentTypes={['passport', 'drivers_license', 'national_id']}
-      />
+
+        {/* View-only warning */}
+        {viewOnly && <ViewOnlyBanner />}
+
+        {/* Heading */}
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <h1 style={{ fontFamily: C.sans, fontSize: '1.6rem', fontWeight: 600, color: C.text, margin: '0 0 8px' }}>
+            Verify Your Identity
+          </h1>
+          <p style={{ fontFamily: C.sans, fontSize: '0.92rem', color: C.muted, margin: 0 }}>
+            Choose how you'd like to complete verification
+          </p>
+        </div>
+
+        {/* Cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+          {/* ── Mobile card (recommended) ── */}
+          <div style={{
+            background: C.surface, border: `1.5px solid ${C.cyanBorder}`,
+            borderRadius: 14, padding: 24, display: 'flex', flexDirection: 'column', gap: 14,
+            opacity: viewOnly ? 0.6 : 1,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+              <span style={{
+                fontFamily: C.mono, fontSize: '0.6rem', fontWeight: 600,
+                letterSpacing: '0.08em', padding: '2px 8px', borderRadius: 4,
+                background: C.cyanDim, color: C.cyan, border: `1px solid ${C.cyanBorder}`,
+              }}>
+                RECOMMENDED
+              </span>
+            </div>
+            <div style={{ fontSize: '2rem' }}>📱</div>
+            <div>
+              <h3 style={{ fontFamily: C.sans, fontSize: '1rem', fontWeight: 600, color: C.text, margin: '0 0 6px' }}>
+                Continue on Your Phone
+              </h3>
+              <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
+                {['Better camera quality', 'Guided capture experience', 'Higher success rate'].map(b => (
+                  <li key={b} style={{ fontFamily: C.sans, fontSize: '0.78rem', color: C.muted, display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <span style={{ color: C.green, fontSize: '0.65rem' }}>✓</span> {b}
+                  </li>
+                ))}
+              </ul>
+            </div>
+            <button
+              onClick={() => !viewOnly && setPhase('mobile-qr')}
+              disabled={viewOnly}
+              style={{
+                marginTop: 'auto', width: '100%', padding: '12px 0',
+                background: viewOnly ? C.dim : C.cyan,
+                color: viewOnly ? C.muted : '#080c14',
+                fontFamily: C.sans, fontSize: '0.88rem', fontWeight: 600,
+                border: 'none', borderRadius: 10,
+                cursor: viewOnly ? 'not-allowed' : 'pointer',
+              }}
+            >
+              Scan QR Code
+            </button>
+          </div>
+
+          {/* ── Desktop card (secondary) ── */}
+          <div style={{
+            background: C.surface, border: `1px solid ${C.border}`,
+            borderRadius: 14, padding: 24, display: 'flex', flexDirection: 'column', gap: 14,
+            opacity: viewOnly ? 0.6 : 1,
+          }}>
+            <div style={{ height: 20 }} /> {/* spacer to align with RECOMMENDED pill */}
+            <div style={{ fontSize: '2rem' }}>💻</div>
+            <div>
+              <h3 style={{ fontFamily: C.sans, fontSize: '1rem', fontWeight: 600, color: C.text, margin: '0 0 6px' }}>
+                Use This Device
+              </h3>
+              <p style={{ fontFamily: C.sans, fontSize: '0.78rem', color: C.muted, margin: 0, lineHeight: 1.55 }}>
+                Upload photos and use your webcam to complete verification on this computer.
+              </p>
+            </div>
+            <button
+              onClick={() => !viewOnly && setPhase('desktop')}
+              disabled={viewOnly}
+              style={{
+                marginTop: 'auto', width: '100%', padding: '12px 0',
+                background: 'transparent',
+                color: viewOnly ? C.dim : C.text,
+                fontFamily: C.sans, fontSize: '0.88rem', fontWeight: 600,
+                border: `1px solid ${viewOnly ? C.border : C.borderStrong}`,
+                borderRadius: 10,
+                cursor: viewOnly ? 'not-allowed' : 'pointer',
+              }}
+            >
+              Continue on Desktop
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 };

@@ -104,15 +104,15 @@ const EndUserVerification: React.FC<VerificationProps> = ({
   // ── Theme ──────────────────────────────────────────────────────────────────
   const isDark = theme === 'dark';
   const styles = {
-    bg: isDark ? 'bg-gray-900' : 'bg-gray-50',
-    cardBg: isDark ? 'bg-gray-800' : 'bg-white',
-    text: isDark ? 'text-white' : 'text-gray-900',
-    textSec: isDark ? 'text-gray-300' : 'text-gray-600',
-    border: isDark ? 'border-gray-700' : 'border-gray-200',
+    bg: isDark ? 'bg-[#080c14]' : 'bg-gray-50',
+    cardBg: isDark ? 'bg-[#0b0f19]' : 'bg-white',
+    text: isDark ? 'text-[#dde2ec]' : 'text-gray-900',
+    textSec: isDark ? 'text-[#8896aa]' : 'text-gray-600',
+    border: isDark ? 'border-[rgba(255,255,255,0.07)]' : 'border-gray-200',
     input: isDark
-      ? 'border-gray-600 focus:border-blue-400 bg-gray-700 text-white'
+      ? 'border-[rgba(255,255,255,0.13)] focus:border-cyan-400 bg-[#0f1420] text-[#dde2ec]'
       : 'border-gray-300 focus:border-blue-500 text-gray-900',
-    button: 'bg-blue-600 hover:bg-blue-700 text-white',
+    button: isDark ? 'bg-cyan-500 hover:bg-cyan-600 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white',
   };
 
   // ── API helpers ────────────────────────────────────────────────────────────
@@ -336,7 +336,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
       <div className="relative">
         <div className={`h-1.5 rounded-full ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`}>
           <div
-            className="h-1.5 bg-gradient-to-r from-blue-500 to-blue-600 rounded-full transition-all duration-700 ease-out"
+            className={`h-1.5 bg-gradient-to-r ${isDark ? 'from-cyan-400 to-cyan-500' : 'from-blue-500 to-blue-600'} rounded-full transition-all duration-700 ease-out`}
             style={{ width: `${((currentStep - 1) / (STEPS.length - 1)) * 100}%` }}
           />
         </div>
@@ -345,10 +345,10 @@ const EndUserVerification: React.FC<VerificationProps> = ({
             <div key={step} className="relative">
               <div className={`w-4 h-4 rounded-full border-2 transition-all duration-300 ${
                 currentStep > step
-                  ? 'bg-blue-500 border-blue-500'
+                  ? isDark ? 'bg-cyan-500 border-cyan-500' : 'bg-blue-500 border-blue-500'
                   : currentStep === step
-                  ? 'bg-blue-500 border-blue-500'
-                  : isDark ? 'bg-gray-700 border-gray-600' : 'bg-white border-gray-300'
+                  ? isDark ? 'bg-cyan-500 border-cyan-500' : 'bg-blue-500 border-blue-500'
+                  : isDark ? 'bg-[#0f1420] border-[rgba(255,255,255,0.13)]' : 'bg-white border-gray-300'
               }`}>
                 {currentStep > step && (
                   <svg className="w-2.5 h-2.5 text-white absolute top-px left-px" fill="currentColor" viewBox="0 0 20 20">
@@ -364,7 +364,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
         </div>
       </div>
       <div className="text-center mt-8">
-        <span className={`text-sm font-medium ${isDark ? 'text-blue-400' : 'text-blue-600'}`}>
+        <span className={`text-sm font-medium ${isDark ? 'text-cyan-400' : 'text-blue-600'}`}>
           {STEPS.find(s => s.step === currentStep)?.label}
         </span>
         <span className={`text-xs ml-2 ${styles.textSec}`}>
@@ -381,7 +381,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => void,
     label: string,
   ) => (
-    <div className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all hover:border-blue-400 ${styles.border}`}>
+    <div className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all ${isDark ? 'hover:border-cyan-400' : 'hover:border-blue-400'} ${styles.border}`}>
       <input type="file" accept="image/*" onChange={onChange} className="hidden" id={id} />
       <label htmlFor={id} className="cursor-pointer block">
         {previewUrl ? (
@@ -433,7 +433,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
       case 1:
         return (
           <div className="text-center py-8">
-            <div className="w-14 h-14 mx-auto mb-5 bg-gradient-to-br from-blue-500 to-blue-600 rounded-full flex items-center justify-center">
+            <div className={`w-14 h-14 mx-auto mb-5 bg-gradient-to-br ${isDark ? 'from-cyan-400 to-cyan-500' : 'from-blue-500 to-blue-600'} rounded-full flex items-center justify-center`}>
               <svg className="w-7 h-7 text-white animate-spin" fill="none" viewBox="0 0 24 24">
                 <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
@@ -458,7 +458,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
               <select
                 value={documentType}
                 onChange={e => setDocumentType(e.target.value)}
-                className={`w-full px-4 py-2.5 rounded-xl border ${styles.input} focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all`}
+                className={`w-full px-4 py-2.5 rounded-xl border ${styles.input} focus:ring-2 ${isDark ? 'focus:ring-cyan-500' : 'focus:ring-blue-500'} focus:border-transparent transition-all`}
               >
                 {allowedDocumentTypes.includes('national_id') && <option value="national_id">National ID</option>}
                 {allowedDocumentTypes.includes('passport') && <option value="passport">Passport</option>}
@@ -472,7 +472,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
               <button
                 onClick={uploadFrontDocument}
                 disabled={isLoading}
-                className="w-full py-3.5 px-6 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium rounded-xl hover:from-blue-600 hover:to-blue-700 disabled:opacity-50 transition-all"
+                className={`w-full py-3.5 px-6 bg-gradient-to-r ${isDark ? 'from-cyan-400 to-cyan-500 hover:from-cyan-500 hover:to-cyan-600' : 'from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700'} text-white font-medium rounded-xl disabled:opacity-50 transition-all`}
               >
                 {isLoading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -492,7 +492,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
       case 3:
         return (
           <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-5" />
+            <div className={`animate-spin rounded-full h-10 w-10 border-b-2 ${isDark ? 'border-cyan-400' : 'border-blue-600'} mx-auto mb-5`} />
             <h2 className={`text-xl font-semibold mb-2 ${styles.text}`}>Reading Your ID</h2>
             <p className={`text-sm ${styles.textSec}`}>Extracting information from the front of your document…</p>
             <p className={`text-xs mt-2 ${styles.textSec}`}>Please don't close this window</p>
@@ -516,7 +516,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
               <button
                 onClick={uploadBackDocument}
                 disabled={isLoading}
-                className="w-full py-3.5 px-6 bg-gradient-to-r from-blue-500 to-blue-600 text-white font-medium rounded-xl hover:from-blue-600 hover:to-blue-700 disabled:opacity-50 transition-all"
+                className={`w-full py-3.5 px-6 bg-gradient-to-r ${isDark ? 'from-cyan-400 to-cyan-500 hover:from-cyan-500 hover:to-cyan-600' : 'from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700'} text-white font-medium rounded-xl disabled:opacity-50 transition-all`}
               >
                 {isLoading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -536,7 +536,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
       case 5:
         return (
           <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-5" />
+            <div className={`animate-spin rounded-full h-10 w-10 border-b-2 ${isDark ? 'border-cyan-400' : 'border-blue-600'} mx-auto mb-5`} />
             <h2 className={`text-xl font-semibold mb-2 ${styles.text}`}>Verifying Your Documents</h2>
             <p className={`text-sm ${styles.textSec}`}>Cross-checking the front and back of your ID…</p>
             <div className={`mt-4 text-xs ${styles.textSec} space-y-1`}>
@@ -568,7 +568,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
           // Still waiting for live capture result
           return (
             <div className="text-center py-8">
-              <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-5" />
+              <div className={`animate-spin rounded-full h-10 w-10 border-b-2 ${isDark ? 'border-cyan-400' : 'border-blue-600'} mx-auto mb-5`} />
               <h2 className={`text-xl font-semibold mb-2 ${styles.text}`}>Processing Verification</h2>
               <p className={`text-sm ${styles.textSec}`}>Analyzing your live photo…</p>
             </div>
@@ -646,9 +646,9 @@ const EndUserVerification: React.FC<VerificationProps> = ({
 
   // ── Root render ────────────────────────────────────────────────────────────
   return (
-    <div className={`min-h-screen ${isDark ? 'bg-gray-900' : 'bg-gray-50'} ${className} flex items-center justify-center p-4`}>
+    <div className={`min-h-screen ${isDark ? 'bg-[#080c14]' : 'bg-gray-50'} ${className} flex items-center justify-center p-4`}>
       <div className="w-full max-w-lg">
-        <div className={`${isDark ? 'bg-gray-800 border-gray-700' : 'bg-white border-gray-200'} rounded-3xl shadow-xl border overflow-hidden`}>
+        <div className={`${isDark ? 'bg-[#0b0f19] border-[rgba(255,255,255,0.07)]' : 'bg-white border-gray-200'} rounded-3xl shadow-xl border overflow-hidden`}>
           <div className="p-8">
             {showMobileChoice ? (
               <div className="py-4">
@@ -663,7 +663,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
                     </div>
                     <button
                       onClick={() => { setShowMobileChoice(false); startVerification(); }}
-                      className="mt-1 w-full py-2.5 px-4 bg-blue-600 text-white rounded-xl text-sm font-medium hover:bg-blue-700 transition-colors"
+                      className={`mt-1 w-full py-2.5 px-4 ${isDark ? 'bg-cyan-500 hover:bg-cyan-600' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-xl text-sm font-medium transition-colors`}
                     >
                       Start on This Device
                     </button>
