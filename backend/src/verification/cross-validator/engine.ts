@@ -101,27 +101,48 @@ export function crossValidate(
   }
 
   const fieldScores: Record<string, { score: number; passed: boolean; weight: number }> = {};
-  let overallScore = 0;
   let hasCriticalFailure = false;
+  let matchedWeight = 0;   // sum of weights for fields present on both sides
+  let weightedScore = 0;   // sum of (score * weight) for matched fields
+
+  console.log('🔎 ── Cross-Validation Start ──────────────────────');
 
   for (const [field, config] of Object.entries(FIELD_WEIGHTS)) {
     const frontValue = extractFrontField(frontOcr, field);
     const backValue = extractBackField(backPayload, field);
 
+    const bothPresent = frontValue.trim().length > 0 && backValue.trim().length > 0;
+
+    if (!bothPresent && !config.critical) {
+      // Non-critical field missing on one side — skip, don't penalize
+      fieldScores[field] = { score: 0, passed: false, weight: config.weight };
+      console.log(`⏭️  ${field} (w=${config.weight}, critical=false): SKIPPED (missing on ${!frontValue.trim() ? 'front' : 'back'})`);
+      console.log(`     front: "${frontValue}" | back: "${backValue}"`);
+      continue;
+    }
+
+    // Critical fields MUST be present on both sides — missing = failure
     const comparator = COMPARATORS[field];
     const score = comparator ? comparator(frontValue, backValue) : 0;
     const passed = score >= config.passThreshold;
 
     fieldScores[field] = { score, passed, weight: config.weight };
-    overallScore += score * config.weight;
+    matchedWeight += config.weight;
+    weightedScore += score * config.weight;
 
     if (config.critical && !passed) {
       hasCriticalFailure = true;
     }
+
+    const status = passed ? '✅' : (config.critical ? '❌ CRITICAL' : '⚠️');
+    console.log(`${status} ${field} (w=${config.weight}, critical=${config.critical}): score=${score.toFixed(3)}, passed=${passed}`);
+    console.log(`     front: "${frontValue}" | back: "${backValue}"`);
   }
 
-  // Round to avoid floating point drift
-  overallScore = Math.round(overallScore * 100) / 100;
+  // Normalize score: only count fields that were actually compared
+  const overallScore = matchedWeight > 0
+    ? Math.round((weightedScore / matchedWeight) * 100) / 100
+    : 0;
 
   // Check document expiry
   const frontExpiry = extractFrontField(frontOcr, 'expiry_date');
@@ -137,6 +158,13 @@ export function crossValidate(
   } else {
     verdict = 'REVIEW';
   }
+
+  console.log('🔎 ── Cross-Validation Result ─────────────────────');
+  console.log(`   Matched weight: ${matchedWeight.toFixed(2)} / 1.00 (${Object.keys(fieldScores).filter(f => fieldScores[f].score > 0 || FIELD_WEIGHTS[f]?.critical).length} fields compared)`);
+  console.log(`   Overall score: ${overallScore} (PASS >= ${THRESHOLD_PASS}, REVIEW >= ${THRESHOLD_REVIEW})`);
+  console.log(`   Critical failure: ${hasCriticalFailure}, Document expired: ${documentExpired}`);
+  console.log(`   Verdict: ${verdict}`);
+  console.log('🔎 ────────────────────────────────────────────────');
 
   return {
     overall_score: overallScore,
