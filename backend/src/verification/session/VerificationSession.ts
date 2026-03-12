@@ -164,15 +164,16 @@ export class VerificationSession {
     const liveEmbedding = liveResult.face_embedding;
     const threshold = this.deps.faceMatchThreshold ?? 0.60;
 
-    // When embeddings are unavailable (TensorFlow not installed), skip face matching.
-    // Gate 4 already verified face presence via confidence score.
+    // Skip face matching when either embedding is unavailable.
+    // ID card photos are often too small for face-api to extract an embedding
+    // (Gate 1 already soft-checked this). Cross-validation (Gate 3) still
+    // protects against fraud when face match cannot be performed.
     const hasIdEmbedding = idEmbedding && idEmbedding.length > 0;
     const hasLiveEmbedding = liveEmbedding && liveEmbedding.length > 0;
 
     let faceMatchResult: FaceMatchResult;
-    if (!hasIdEmbedding && !hasLiveEmbedding) {
-      // No embedding infrastructure available — auto-pass face match.
-      // Cross-validation (Gate 3) still protects against fraud.
+    if (!hasIdEmbedding || !hasLiveEmbedding) {
+      // Cannot compare — auto-pass face match.
       faceMatchResult = {
         similarity_score: 1.0,
         passed: true,

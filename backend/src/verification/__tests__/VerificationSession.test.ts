@@ -159,10 +159,10 @@ describe('VerificationSession — Flow Enforcement', () => {
   });
 
   it('throws SessionFlowError when calling any method after HARD_REJECTED', async () => {
-    // Make Gate 1 fail
+    // Make Gate 1 fail — all OCR fields empty (the only hard reject left in lenient Gate 1)
     mockExtractFront.mockResolvedValue({
       ...mockFrontResult,
-      ocr_confidence: 0.20,
+      ocr: { full_name: '', date_of_birth: '', id_number: '', expiry_date: '' },
     });
 
     const session = createSession();
@@ -178,7 +178,7 @@ describe('VerificationSession — Flow Enforcement', () => {
 });
 
 describe('VerificationSession — Hard Rejection', () => {
-  it('transitions to HARD_REJECTED when Gate 1 fails (low OCR confidence)', async () => {
+  it('PASSES Gate 1 with low OCR confidence (soft check — lenient gate)', async () => {
     mockExtractFront.mockResolvedValue({
       ...mockFrontResult,
       ocr_confidence: 0.20,
@@ -186,10 +186,9 @@ describe('VerificationSession — Hard Rejection', () => {
 
     const session = createSession();
     const result = await session.submitFront(Buffer.from('front'));
-    expect(result.passed).toBe(false);
-    expect(result.rejection_reason).toBe('FRONT_LOW_CONFIDENCE');
-    expect(session.getState().current_step).toBe(VerificationStatus.HARD_REJECTED);
-    expect(session.getState().rejection_reason).toBe('FRONT_LOW_CONFIDENCE');
+    // Gate 1 is lenient — low OCR confidence is a soft warning, not a hard reject
+    expect(result.passed).toBe(true);
+    expect(session.getState().current_step).toBe(VerificationStatus.AWAITING_BACK);
   });
 
   it('transitions to HARD_REJECTED when Gate 1 fails (missing fields)', async () => {
@@ -280,9 +279,10 @@ describe('VerificationSession — Hard Rejection', () => {
 
 describe('VerificationSession — HARD_REJECTED is terminal', () => {
   it('no method can advance past HARD_REJECTED', async () => {
+    // All OCR fields empty — the only hard reject in lenient Gate 1
     mockExtractFront.mockResolvedValue({
       ...mockFrontResult,
-      ocr_confidence: 0.20,
+      ocr: { full_name: '', date_of_birth: '', id_number: '', expiry_date: '' },
     });
 
     const session = createSession();
@@ -341,6 +341,29 @@ describe('VerificationSession — Face match auto-triggers', () => {
     // computeFaceMatch should NOT be called when no embeddings exist
     expect(mockComputeFaceMatch).not.toHaveBeenCalled();
     // Auto-pass should set similarity to 1.0
+    expect(session.getState().face_match!.similarity_score).toBe(1.0);
+    expect(session.getState().face_match!.passed).toBe(true);
+  });
+
+  it('auto-passes face match when ID has no face embedding but selfie does', async () => {
+    // Simulate: small ID photo — face-api cannot detect the face on the card,
+    // but the selfie has a good face embedding.
+    mockExtractFront.mockResolvedValue({
+      ...mockFrontResult,
+      face_embedding: null,
+      face_confidence: 0,
+    });
+    // Live capture has a valid embedding (selfie face detected)
+    mockProcessLiveCapture.mockResolvedValue(mockLiveResult);
+
+    const session = createSession();
+    await session.submitFront(Buffer.from('front'));
+    await session.submitBack(Buffer.from('back'));
+    const result = await session.submitLiveCapture(Buffer.from('selfie'));
+
+    expect(result.passed).toBe(true);
+    expect(session.getState().current_step).toBe(VerificationStatus.COMPLETE);
+    expect(mockComputeFaceMatch).not.toHaveBeenCalled();
     expect(session.getState().face_match!.similarity_score).toBe(1.0);
     expect(session.getState().face_match!.passed).toBe(true);
   });

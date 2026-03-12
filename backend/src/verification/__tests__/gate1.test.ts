@@ -19,48 +19,77 @@ function makeFrontResult(overrides: Partial<FrontExtractionResult> = {}): FrontE
 }
 
 describe('Gate 1 — Front Document Quality', () => {
-  it('PASSES when all required fields present, OCR confidence high, face detected', () => {
+  it('PASSES when all desired fields present, OCR confidence high, face detected', () => {
     const result = evaluateGate1(makeFrontResult());
     expect(result.passed).toBe(true);
     expect(result.rejection_reason).toBeNull();
   });
 
-  it('FAILS with FRONT_OCR_FAILED when full_name is missing', () => {
+  // ── Lenient OCR: single missing field should still pass ──────────────
+
+  it('PASSES (soft) when full_name is missing but other fields present', () => {
     const input = makeFrontResult();
     (input.ocr as any).full_name = '';
     const result = evaluateGate1(input);
-    expect(result.passed).toBe(false);
-    expect(result.rejection_reason).toBe('FRONT_OCR_FAILED');
+    expect(result.passed).toBe(true);
   });
 
-  it('FAILS with FRONT_OCR_FAILED when id_number is missing', () => {
-    const input = makeFrontResult();
-    (input.ocr as any).id_number = '';
-    const result = evaluateGate1(input);
-    expect(result.passed).toBe(false);
-    expect(result.rejection_reason).toBe('FRONT_OCR_FAILED');
-  });
-
-  it('FAILS with FRONT_OCR_FAILED when date_of_birth is missing', () => {
+  it('PASSES (soft) when date_of_birth is missing but other fields present', () => {
     const input = makeFrontResult();
     (input.ocr as any).date_of_birth = '';
     const result = evaluateGate1(input);
-    expect(result.passed).toBe(false);
-    expect(result.rejection_reason).toBe('FRONT_OCR_FAILED');
+    expect(result.passed).toBe(true);
   });
 
-  it('FAILS with FRONT_OCR_FAILED when expiry_date is missing', () => {
+  it('PASSES (soft) when expiry_date is missing but other fields present', () => {
     const input = makeFrontResult();
+    (input.ocr as any).expiry_date = '';
+    const result = evaluateGate1(input);
+    expect(result.passed).toBe(true);
+  });
+
+  // ── Hard reject when NO fields are readable ──────────────────────────
+
+  it('FAILS with FRONT_OCR_FAILED when ALL fields are empty', () => {
+    const input = makeFrontResult();
+    (input.ocr as any).full_name = '';
+    (input.ocr as any).date_of_birth = '';
+    (input.ocr as any).id_number = '';
     (input.ocr as any).expiry_date = '';
     const result = evaluateGate1(input);
     expect(result.passed).toBe(false);
     expect(result.rejection_reason).toBe('FRONT_OCR_FAILED');
   });
 
-  it('FAILS with FRONT_LOW_CONFIDENCE when OCR confidence < 0.60', () => {
-    const result = evaluateGate1(makeFrontResult({ ocr_confidence: 0.59 }));
+  // ── Noise detection: document headers should not count as valid names ─
+
+  it('treats "DRIVER LICENSE" as noise for full_name field', () => {
+    const input = makeFrontResult();
+    (input.ocr as any).full_name = 'DRIVER LICENSE';
+    (input.ocr as any).date_of_birth = '';
+    (input.ocr as any).expiry_date = '';
+    // Only id_number remains → should still pass (1 field present)
+    const result = evaluateGate1(input);
+    expect(result.passed).toBe(true);
+  });
+
+  it('FAILS when full_name is noise AND all other fields empty', () => {
+    const input = makeFrontResult();
+    (input.ocr as any).full_name = 'DRIVER LICENSE';
+    (input.ocr as any).date_of_birth = '';
+    (input.ocr as any).id_number = '';
+    (input.ocr as any).expiry_date = '';
+    const result = evaluateGate1(input);
     expect(result.passed).toBe(false);
-    expect(result.rejection_reason).toBe('FRONT_LOW_CONFIDENCE');
+    expect(result.rejection_reason).toBe('FRONT_OCR_FAILED');
+  });
+
+  // ── OCR confidence (soft check) ────────────────────────────────────
+
+  it('PASSES (soft) when OCR confidence < 0.60 — mobile photos often score lower', () => {
+    const result = evaluateGate1(makeFrontResult({ ocr_confidence: 0.59 }));
+    expect(result.passed).toBe(true);
+    expect(result.rejection_reason).toBeNull();
   });
 
   it('PASSES when OCR confidence is exactly 0.60', () => {
@@ -68,10 +97,12 @@ describe('Gate 1 — Front Document Quality', () => {
     expect(result.passed).toBe(true);
   });
 
-  it('FAILS with FRONT_OCR_FAILED when no face detected (face_confidence < 0.45)', () => {
+  // ── Face detection (soft check) ─────────────────────────────────────
+
+  it('PASSES (soft check) when no face detected — face match deferred to Gate 5', () => {
     const result = evaluateGate1(makeFrontResult({ face_confidence: 0.10, face_embedding: null }));
-    expect(result.passed).toBe(false);
-    expect(result.rejection_reason).toBe('FRONT_OCR_FAILED');
+    expect(result.passed).toBe(true);
+    expect(result.rejection_reason).toBeNull();
   });
 
   it('PASSES when face_confidence exactly at threshold (0.45)', () => {
@@ -79,15 +110,27 @@ describe('Gate 1 — Front Document Quality', () => {
     expect(result.passed).toBe(true);
   });
 
-  it('provides a user_message on failure', () => {
-    const result = evaluateGate1(makeFrontResult({ ocr_confidence: 0.30 }));
+  // ── User feedback ──────────────────────────────────────────────────
+
+  it('provides a user_message on failure (zero fields)', () => {
+    const input = makeFrontResult();
+    (input.ocr as any).full_name = '';
+    (input.ocr as any).date_of_birth = '';
+    (input.ocr as any).id_number = '';
+    (input.ocr as any).expiry_date = '';
+    const result = evaluateGate1(input);
     expect(result.passed).toBe(false);
     expect(result.user_message).toBeTruthy();
     expect(typeof result.user_message).toBe('string');
   });
 
   it('provides rejection_detail for audit on failure', () => {
-    const result = evaluateGate1(makeFrontResult({ ocr_confidence: 0.30 }));
+    const input = makeFrontResult();
+    (input.ocr as any).full_name = '';
+    (input.ocr as any).date_of_birth = '';
+    (input.ocr as any).id_number = '';
+    (input.ocr as any).expiry_date = '';
+    const result = evaluateGate1(input);
     expect(result.rejection_detail).toBeTruthy();
   });
 });
