@@ -6,7 +6,7 @@
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch --clear-screen=false src/server.ts",
-    "build": "tsc && tsc-alias",
+    "build": "node download-models.js && tsc && tsc-alias",
     "start": "node dist/server.js",
     "test": "vitest",
     "lint": "eslint src --ext .ts,.js",
