@@ -5,10 +5,10 @@ This directory contains the official SDKs for the [Idswyft](https://idswyft.com)
 ## Available SDKs
 
 ### JavaScript/Node.js SDK
-**Location**: `./javascript/`  
-**Package**: `@idswyft/sdk`  
-**Language**: TypeScript/JavaScript  
-**Node.js**: 16+  
+**Location**: `./javascript/`
+**Package**: `@idswyft/sdk`
+**Language**: TypeScript/JavaScript
+**Node.js**: 16+
 
 **Installation:**
 ```bash
@@ -24,23 +24,32 @@ const client = new IdswyftSDK({
   sandbox: true
 });
 
-const result = await client.verifyDocument({
-  document_type: 'passport',
-  document_file: fileBuffer,
-  user_id: 'user-123'
+// Step 1: Initialize session
+const session = await client.startVerification({
+  user_id: 'user-123',
+  document_type: 'drivers_license',
 });
 
-console.log('Verification result:', result);
-// Access AI analysis results
-console.log('OCR data:', result.ocr_data);
-console.log('Quality analysis:', result.quality_analysis);
+const vid = session.verification_id;
+
+// Step 2: Upload front of ID
+const front = await client.uploadFrontDocument(vid, frontImageBuffer);
+console.log('OCR data:', front.ocr_data);
+
+// Step 3: Upload back of ID
+const back = await client.uploadBackDocument(vid, backImageBuffer);
+console.log('Cross-validation:', back.cross_validation_results);
+
+// Step 4: Upload selfie (auto-finalizes)
+const result = await client.uploadSelfie(vid, selfieBuffer);
+console.log('Final result:', result.final_result); // 'verified', 'manual_review', or 'failed'
 ```
 
-### Python SDK  
-**Location**: `./python/`  
-**Package**: `idswyft`  
-**Language**: Python  
-**Version**: 3.8+  
+### Python SDK
+**Location**: `./python/`
+**Package**: `idswyft`
+**Language**: Python
+**Version**: 3.8+
 
 **Installation:**
 ```bash
@@ -56,91 +65,69 @@ client = idswyft.IdswyftClient(
     sandbox=True
 )
 
-result = client.verify_document(
-    document_type="passport",
-    document_file="passport.jpg",
-    user_id="user-123"
-)
+# Step 1: Initialize session
+session = client.start_verification(user_id="user-123", document_type="drivers_license")
+vid = session["verification_id"]
 
-print(f"Status: {result['status']}")
-# Access AI analysis results
-if result.get('ocr_data'):
-    print(f"Name: {result['ocr_data']['name']}")
-if result.get('quality_analysis'):
-    print(f"Quality: {result['quality_analysis']['overallQuality']}")
+# Step 2: Upload front of ID
+front = client.upload_front_document(vid, "front.jpg")
+print(f"OCR: {front.get('ocr_data')}")
+
+# Step 3: Upload back of ID
+back = client.upload_back_document(vid, "back.jpg")
+print(f"Cross-validation: {back.get('cross_validation_results')}")
+
+# Step 4: Upload selfie (auto-finalizes)
+result = client.upload_selfie(vid, "selfie.jpg")
+print(f"Result: {result['final_result']}")  # 'verified', 'manual_review', or 'failed'
 ```
+
+## Verification Flow (v2 API)
+
+Both SDKs follow the same step-based verification flow:
+
+```
+1. startVerification()       → Initialize session, get verification_id
+2. uploadFrontDocument()     → Upload front of ID → OCR + quality gate
+3. uploadBackDocument()      → Upload back of ID → barcode + cross-validation
+4. uploadSelfie()            → Upload selfie → liveness + face match → auto-finalize
+5. getVerificationStatus()   → Check status at any point
+```
+
+Each step auto-triggers quality gates:
+- **Gate 1**: Front document quality (blur, resolution, contrast)
+- **Gate 2**: Back document quality
+- **Gate 3**: Cross-validation (front OCR vs back barcode)
+- **Gate 4**: Liveness detection
+- **Gate 5**: Face matching (selfie vs document photo)
+
+If any gate fails, the session is hard-rejected and subsequent steps return 409.
 
 ## Features
 
-Both SDKs provide complete access to the Idswyft API:
-
-### ✅ **Document Verification**
+### Document Verification
 - Support for passports, driver's licenses, national IDs
-- Real-time OCR text extraction with confidence scores
-- Document quality analysis (blur, brightness, resolution)
-- Tamper detection and authenticity checks
+- Real-time OCR text extraction
+- Barcode/PDF417 scanning for ID back
+- Cross-validation between front and back data
 
-### ✅ **Selfie Verification** 
+### Selfie Verification
 - Liveness detection
 - Face matching against document photos
 - Anti-spoofing measures
 
-### ✅ **AI Analysis Results**
-- **OCR Data**: Extracted text fields with confidence scores
-- **Quality Analysis**: Image quality metrics and recommendations  
-- **Face Matching**: Similarity scores for selfie verification
-- **Liveness Scores**: Real person detection confidence
-
-### ✅ **Developer Tools**
+### Developer Tools
 - Usage statistics and quota monitoring
 - Webhook signature verification for security
 - Comprehensive error handling with specific error types
 - Full TypeScript definitions (JavaScript SDK)
 - Complete type hints (Python SDK)
 
-### ✅ **Enterprise Features**
-- API key management with expiration
+### Enterprise Features
+- API key management
 - Rate limiting and abuse protection
 - Sandbox environment for testing
 - GDPR/CCPA compliant data handling
-
-## API Response Structure
-
-Both SDKs return comprehensive verification results:
-
-```json
-{
-  "id": "verif_abc123",
-  "status": "verified",
-  "type": "document",
-  "confidence_score": 0.95,
-  "user_id": "user-123",
-  "ocr_data": {
-    "name": "John Doe",
-    "date_of_birth": "1990-01-01",
-    "document_number": "D1234567890",
-    "confidence_scores": {
-      "name": 0.98,
-      "date_of_birth": 0.95,
-      "document_number": 0.92
-    }
-  },
-  "quality_analysis": {
-    "overallQuality": "excellent", 
-    "isBlurry": false,
-    "brightness": 128,
-    "resolution": {
-      "width": 1920,
-      "height": 1080,
-      "isHighRes": true
-    },
-    "issues": [],
-    "recommendations": []
-  },
-  "face_match_score": 0.91,
-  "created_at": "2024-01-01T00:00:00Z"
-}
-```
 
 ## Authentication
 
@@ -156,8 +143,6 @@ export IDSWYFT_API_KEY="your-api-key"
 
 ## Testing
 
-Both SDKs include comprehensive test suites:
-
 **JavaScript:**
 ```bash
 cd javascript/
@@ -165,7 +150,7 @@ npm test
 ```
 
 **Python:**
-```bash  
+```bash
 cd python/
 python -m pytest
 ```
@@ -175,13 +160,6 @@ python -m pytest
 - **JavaScript SDK**: [`./javascript/README.md`](./javascript/README.md)
 - **Python SDK**: [`./python/README.md`](./python/README.md)
 - **API Documentation**: [https://docs.idswyft.com](https://docs.idswyft.com)
-
-## Support
-
-- 📖 [Full Documentation](https://docs.idswyft.com)
-- 🐛 [Issue Tracker](https://github.com/doobee46/idswyft/issues) 
-- 💬 [Support Email](mailto:support@idswyft.com)
-- 💼 [Enterprise Sales](mailto:sales@idswyft.com)
 
 ## License
 

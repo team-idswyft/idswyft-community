@@ -1,6 +1,8 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import FormData from 'form-data';
 
+// ─── Configuration ──────────────────────────────────────
+
 export interface IdswyftConfig {
   apiKey: string;
   baseURL?: string;
@@ -8,126 +10,103 @@ export interface IdswyftConfig {
   sandbox?: boolean;
 }
 
+// ─── Verification Types ─────────────────────────────────
+
+export type DocumentType = 'passport' | 'drivers_license' | 'national_id' | 'other';
+
+export type VerificationStatus =
+  | 'AWAITING_FRONT'
+  | 'FRONT_PROCESSING'
+  | 'AWAITING_BACK'
+  | 'BACK_PROCESSING'
+  | 'CROSS_VALIDATING'
+  | 'AWAITING_LIVE'
+  | 'LIVE_PROCESSING'
+  | 'FACE_MATCHING'
+  | 'COMPLETE'
+  | 'HARD_REJECTED';
+
 export interface OCRData {
+  full_name?: string;
   name?: string;
   date_of_birth?: string;
+  id_number?: string;
   document_number?: string;
+  expiry_date?: string;
   expiration_date?: string;
-  issuing_authority?: string;
   nationality?: string;
   address?: string;
+  issuing_authority?: string;
   raw_text?: string;
   confidence_scores?: Record<string, number>;
 }
 
-export interface QualityAnalysis {
-  isBlurry: boolean;
-  blurScore: number;
-  brightness: number;
-  contrast: number;
-  resolution: {
-    width: number;
-    height: number;
-    isHighRes: boolean;
-  };
-  fileSize: {
-    bytes: number;
-    isReasonableSize: boolean;
-  };
-  overallQuality: 'excellent' | 'good' | 'fair' | 'poor';
-  issues: string[];
-  recommendations: string[];
+export interface CrossValidationResults {
+  verdict: 'PASS' | 'REVIEW';
+  has_critical_failure: boolean;
+  score: number;
+  failures: string[];
+}
+
+export interface FaceMatchResults {
+  passed: boolean;
+  score: number;
+  distance: number;
+}
+
+export interface LivenessResults {
+  liveness_passed: boolean;
+  liveness_score: number;
+}
+
+export interface InitializeResponse {
+  success: boolean;
+  verification_id: string;
+  status: VerificationStatus;
+  current_step: number;
+  total_steps: number;
+  message: string;
 }
 
 export interface VerificationResult {
-  id: string;
-  verification_id?: string;
-  status: 'pending' | 'verified' | 'failed' | 'manual_review';
-  type: 'document' | 'selfie' | 'combined' | 'live_capture';
-  confidence_score?: number;
-  created_at: string;
-  updated_at: string;
-  developer_id: string;
-  user_id?: string;
-  metadata?: Record<string, any>;
-  webhook_url?: string;
-  // AI Analysis Results
-  ocr_data?: OCRData;
-  quality_analysis?: QualityAnalysis;
-  face_match_score?: number;
-  liveness_score?: number;
-  manual_review_reason?: string;
-  // Enhanced Verification Features
-  document_uploaded?: boolean;
-  document_type?: string;
-  back_of_id_uploaded?: boolean;
-  live_capture_completed?: boolean;
-  barcode_data?: BarcodeData;
-  cross_validation_results?: CrossValidationResults;
-  cross_validation_score?: number;
-  enhanced_verification_completed?: boolean;
-  liveness_details?: LivenessDetails;
-  next_steps?: string[];
-}
-
-export interface BarcodeData {
-  qr_code?: string;
-  parsed_data?: Record<string, any>;
-  verification_codes?: string[];
-  security_features?: string[];
-}
-
-export interface CrossValidationResults {
-  match_score: number;
-  validation_results: Record<string, boolean>;
-  discrepancies: string[];
-}
-
-export interface LivenessDetails {
-  blink_detection?: number;
-  head_movement?: number;
-  texture_analysis?: number;
-  challenge_passed?: boolean;
-}
-
-export interface StartVerificationRequest {
-  user_id: string;
-  sandbox?: boolean;
-}
-
-export interface StartVerificationResponse {
+  success: boolean;
   verification_id: string;
-  status: string;
-  user_id: string;
-  next_steps: string[];
-  created_at: string;
+  status: VerificationStatus;
+  current_step: number;
+  total_steps?: number;
+  message?: string;
+  // Front document fields
+  document_id?: string;
+  document_path?: string;
+  ocr_data?: OCRData | null;
+  // Back document fields
+  barcode_data?: Record<string, any> | null;
+  barcode_extraction_failed?: boolean;
+  documents_match?: boolean | null;
+  cross_validation_results?: CrossValidationResults | null;
+  // Live capture fields
+  selfie_id?: string;
+  selfie_path?: string;
+  face_match_results?: FaceMatchResults | null;
+  liveness_results?: LivenessResults | null;
+  // Final decision
+  final_result?: 'verified' | 'manual_review' | 'failed' | null;
+  // Rejection/failure info
+  rejection_reason?: string | null;
+  rejection_detail?: string | null;
+  failure_reason?: string | null;
+  manual_review_reason?: string | null;
+  // Status endpoint extras
+  front_document_uploaded?: boolean;
+  back_document_uploaded?: boolean;
+  live_capture_uploaded?: boolean;
+  face_match_passed?: boolean | null;
+  liveness_passed?: boolean | null;
+  created_at?: string;
+  updated_at?: string;
 }
 
-export interface BackOfIdRequest {
-  verification_id: string;
-  document_type: 'passport' | 'drivers_license' | 'national_id' | 'other';
-  back_of_id_file: File | Buffer;
-  metadata?: Record<string, any>;
-}
-
-export interface LiveCaptureRequest {
-  verification_id: string;
-  live_image_data: string; // base64 encoded
-  challenge_response?: string;
-  metadata?: Record<string, any>;
-}
-
-export interface LiveTokenRequest {
-  verification_id: string;
-  challenge_type?: 'blink' | 'smile' | 'turn_head' | 'random';
-}
-
-export interface LiveTokenResponse {
-  token: string;
-  challenge: string;
-  expires_at: string;
-  instructions: string;
-}
+// ─── Developer & Webhook Types ──────────────────────────
 
 export interface ApiKey {
   id: string;
@@ -161,23 +140,7 @@ export interface CreateWebhookRequest {
   secret?: string;
 }
 
-export interface DocumentVerificationRequest {
-  verification_id?: string; // For existing verification session
-  document_type: 'passport' | 'drivers_license' | 'national_id' | 'other';
-  document_file: File | Buffer;
-  user_id?: string;
-  webhook_url?: string;
-  metadata?: Record<string, any>;
-}
-
-export interface SelfieVerificationRequest {
-  verification_id?: string; // For existing verification session
-  selfie_file: File | Buffer;
-  reference_document_id?: string;
-  user_id?: string;
-  webhook_url?: string;
-  metadata?: Record<string, any>;
-}
+// ─── Error Handling ─────────────────────────────────────
 
 export interface ApiError {
   error: string;
@@ -200,6 +163,8 @@ export class IdswyftError extends Error {
   }
 }
 
+// ─── SDK Client ─────────────────────────────────────────
+
 export class IdswyftSDK {
   private client: AxiosInstance;
   private config: Required<IdswyftConfig>;
@@ -209,7 +174,7 @@ export class IdswyftSDK {
       apiKey: config.apiKey,
       baseURL: config.baseURL || 'https://api.idswyft.com',
       timeout: config.timeout || 30000,
-      sandbox: config.sandbox || false
+      sandbox: config.sandbox || false,
     };
 
     if (!this.config.apiKey) {
@@ -221,10 +186,10 @@ export class IdswyftSDK {
       timeout: this.config.timeout,
       headers: {
         'X-API-Key': this.config.apiKey,
-        'User-Agent': '@idswyft/sdk/2.0.0',
-        'X-SDK-Version': '2.0.0',
-        'X-SDK-Language': 'javascript'
-      }
+        'User-Agent': '@idswyft/sdk/3.0.0',
+        'X-SDK-Version': '3.0.0',
+        'X-SDK-Language': 'javascript',
+      },
     });
 
     // Response interceptor for error handling
@@ -248,200 +213,106 @@ export class IdswyftSDK {
     );
   }
 
+  // ─── Verification Flow (v2 API) ────────────────────────
+
   /**
-   * Start a new verification session
+   * Step 1: Initialize a new verification session.
+   * Returns a verification_id used in all subsequent steps.
    */
-  async startVerification(request: StartVerificationRequest): Promise<StartVerificationResponse> {
-    const response = await this.client.post('/api/verify/start', request);
+  async startVerification(request: {
+    user_id: string;
+    document_type?: DocumentType;
+    sandbox?: boolean;
+  }): Promise<InitializeResponse> {
+    const response = await this.client.post('/api/v2/verify/initialize', request);
     return response.data;
   }
 
   /**
-   * Verify a document (passport, driver's license, etc.)
+   * Step 2: Upload the front of the ID document.
+   * Triggers OCR extraction and Gate 1 (front quality check).
    */
-  async verifyDocument(request: DocumentVerificationRequest): Promise<VerificationResult> {
+  async uploadFrontDocument(
+    verificationId: string,
+    documentFile: File | Buffer,
+    documentType: DocumentType = 'drivers_license'
+  ): Promise<VerificationResult> {
     const formData = new FormData();
-    formData.append('document_type', request.document_type);
-    formData.append('document', request.document_file);
-    
-    if (request.verification_id) {
-      formData.append('verification_id', request.verification_id);
-    }
-    
-    if (request.user_id) {
-      formData.append('user_id', request.user_id);
-    }
-    
-    if (request.webhook_url) {
-      formData.append('webhook_url', request.webhook_url);
-    }
-    
-    if (request.metadata) {
-      formData.append('metadata', JSON.stringify(request.metadata));
-    }
+    formData.append('document', documentFile);
+    formData.append('document_type', documentType);
 
-    const response = await this.client.post('/api/verify/document', formData, {
-      headers: {
-        ...formData.getHeaders(),
-      },
-    });
-
-    return response.data.verification || response.data;
+    const response = await this.client.post(
+      `/api/v2/verify/${verificationId}/front-document`,
+      formData,
+      { headers: { ...formData.getHeaders() } }
+    );
+    return response.data;
   }
 
   /**
-   * Upload back-of-ID for enhanced verification with barcode scanning
+   * Step 3: Upload the back of the ID document.
+   * Triggers barcode extraction, Gate 2 (back quality), and Gate 3 (cross-validation).
    */
-  async verifyBackOfId(request: BackOfIdRequest): Promise<VerificationResult> {
+  async uploadBackDocument(
+    verificationId: string,
+    documentFile: File | Buffer,
+    documentType: DocumentType = 'drivers_license'
+  ): Promise<VerificationResult> {
     const formData = new FormData();
-    formData.append('verification_id', request.verification_id);
-    formData.append('document_type', request.document_type);
-    formData.append('back_of_id', request.back_of_id_file);
-    
-    if (request.metadata) {
-      formData.append('metadata', JSON.stringify(request.metadata));
-    }
+    formData.append('document', documentFile);
+    formData.append('document_type', documentType);
 
-    const response = await this.client.post('/api/verify/back-of-id', formData, {
-      headers: {
-        ...formData.getHeaders(),
-      },
-    });
-
+    const response = await this.client.post(
+      `/api/v2/verify/${verificationId}/back-document`,
+      formData,
+      { headers: { ...formData.getHeaders() } }
+    );
     return response.data;
   }
 
   /**
-   * Verify a selfie, optionally against a reference document
+   * Step 3.5 (optional): Retrieve cross-validation results.
+   * Cross-validation is auto-triggered after back document upload.
+   * Use this to query the cached result separately.
    */
-  async verifySelfie(request: SelfieVerificationRequest): Promise<VerificationResult> {
+  async getCrossValidation(verificationId: string): Promise<VerificationResult> {
+    const response = await this.client.post(
+      `/api/v2/verify/${verificationId}/cross-validation`
+    );
+    return response.data;
+  }
+
+  /**
+   * Step 4: Upload a selfie for liveness detection and face matching.
+   * Triggers Gate 4 (liveness) and Gate 5 (face match), then auto-finalizes.
+   */
+  async uploadSelfie(
+    verificationId: string,
+    selfieFile: File | Buffer
+  ): Promise<VerificationResult> {
     const formData = new FormData();
-    formData.append('selfie', request.selfie_file);
-    
-    if (request.verification_id) {
-      formData.append('verification_id', request.verification_id);
-    }
-    
-    if (request.reference_document_id) {
-      formData.append('reference_document_id', request.reference_document_id);
-    }
-    
-    if (request.user_id) {
-      formData.append('user_id', request.user_id);
-    }
-    
-    if (request.webhook_url) {
-      formData.append('webhook_url', request.webhook_url);
-    }
-    
-    if (request.metadata) {
-      formData.append('metadata', JSON.stringify(request.metadata));
-    }
+    formData.append('selfie', selfieFile);
 
-    const response = await this.client.post('/api/verify/selfie', formData, {
-      headers: {
-        ...formData.getHeaders(),
-      },
-    });
-
-    return response.data.verification || response.data;
-  }
-
-  /**
-   * Live capture with AI liveness detection
-   */
-  async liveCapture(request: LiveCaptureRequest): Promise<VerificationResult> {
-    const response = await this.client.post('/api/verify/live-capture', request);
+    const response = await this.client.post(
+      `/api/v2/verify/${verificationId}/live-capture`,
+      formData,
+      { headers: { ...formData.getHeaders() } }
+    );
     return response.data;
   }
 
   /**
-   * Generate a secure token for live capture sessions
-   */
-  async generateLiveToken(request: LiveTokenRequest): Promise<LiveTokenResponse> {
-    const response = await this.client.post('/api/verify/generate-live-token', request);
-    return response.data;
-  }
-
-  /**
-   * Get complete verification results including all enhancements
-   */
-  async getVerificationResults(verificationId: string): Promise<VerificationResult> {
-    const response = await this.client.get(`/api/verify/results/${verificationId}`);
-    return response.data;
-  }
-
-  /**
-   * Get verification history for a user
-   */
-  async getVerificationHistory(userId: string, options?: {
-    limit?: number;
-    offset?: number;
-  }): Promise<{
-    verifications: VerificationResult[];
-    total: number;
-    limit: number;
-    offset: number;
-  }> {
-    const params = new URLSearchParams();
-    if (options?.limit) params.append('limit', options.limit.toString());
-    if (options?.offset) params.append('offset', options.offset.toString());
-
-    const response = await this.client.get(`/api/verify/history/${userId}?${params.toString()}`);
-    return response.data;
-  }
-
-  /**
-   * Check the status of a verification request
+   * Get the full status and results of a verification session.
+   * Can be called at any point to check progress.
    */
   async getVerificationStatus(verificationId: string): Promise<VerificationResult> {
-    const response = await this.client.get(`/api/verify/status/${verificationId}`);
-    return response.data.verification;
-  }
-
-  /**
-   * List all verification requests for the developer
-   */
-  async listVerifications(options?: {
-    status?: string;
-    limit?: number;
-    offset?: number;
-    user_id?: string;
-  }): Promise<{
-    verifications: VerificationResult[];
-    total: number;
-    limit: number;
-    offset: number;
-  }> {
-    const params = new URLSearchParams();
-    
-    if (options?.status) params.append('status', options.status);
-    if (options?.limit) params.append('limit', options.limit.toString());
-    if (options?.offset) params.append('offset', options.offset.toString());
-    if (options?.user_id) params.append('user_id', options.user_id);
-
-    const response = await this.client.get(`/api/verify/list?${params.toString()}`);
+    const response = await this.client.get(
+      `/api/v2/verify/${verificationId}/status`
+    );
     return response.data;
   }
 
-
-  /**
-   * Verify webhook signature (for webhook endpoint security)
-   */
-  static verifyWebhookSignature(payload: string, signature: string, secret: string): boolean {
-    const crypto = require('crypto');
-    const expectedSignature = crypto
-      .createHmac('sha256', secret)
-      .update(payload)
-      .digest('hex');
-    
-    const providedSignature = signature.replace('sha256=', '');
-    
-    return crypto.timingSafeEqual(
-      Buffer.from(expectedSignature, 'hex'),
-      Buffer.from(providedSignature, 'hex')
-    );
-  }
+  // ─── Developer Management ──────────────────────────────
 
   /**
    * Register as a new developer
@@ -498,6 +369,28 @@ export class IdswyftSDK {
     const response = await this.client.get(`/api/developer/activity?${params.toString()}`);
     return response.data;
   }
+
+  /**
+   * Get developer usage statistics
+   */
+  async getUsageStats(): Promise<{
+    period: string;
+    total_requests: number;
+    successful_requests: number;
+    failed_requests: number;
+    pending_requests: number;
+    manual_review_requests: number;
+    success_rate: string;
+    monthly_limit: number;
+    monthly_usage: number;
+    remaining_quota: number;
+    quota_reset_date: string;
+  }> {
+    const response = await this.client.get('/api/developer/stats');
+    return response.data;
+  }
+
+  // ─── Webhook Management ────────────────────────────────
 
   /**
    * Register a webhook URL
@@ -559,24 +452,24 @@ export class IdswyftSDK {
     return response.data;
   }
 
+  // ─── Utilities ─────────────────────────────────────────
+
   /**
-   * Get developer usage statistics
+   * Verify webhook signature (for webhook endpoint security)
    */
-  async getUsageStats(): Promise<{
-    period: string;
-    total_requests: number;
-    successful_requests: number;
-    failed_requests: number;
-    pending_requests: number;
-    manual_review_requests: number;
-    success_rate: string;
-    monthly_limit: number;
-    monthly_usage: number;
-    remaining_quota: number;
-    quota_reset_date: string;
-  }> {
-    const response = await this.client.get('/api/developer/stats');
-    return response.data;
+  static verifyWebhookSignature(payload: string, signature: string, secret: string): boolean {
+    const crypto = require('crypto');
+    const expectedSignature = crypto
+      .createHmac('sha256', secret)
+      .update(payload)
+      .digest('hex');
+
+    const providedSignature = signature.replace('sha256=', '');
+
+    return crypto.timingSafeEqual(
+      Buffer.from(expectedSignature, 'hex'),
+      Buffer.from(providedSignature, 'hex')
+    );
   }
 
   /**
@@ -588,7 +481,6 @@ export class IdswyftSDK {
       return response.data;
     } catch (error) {
       if (error instanceof IdswyftError && error.statusCode === 404) {
-        // Fallback for basic connectivity test
         return { status: 'ok', timestamp: new Date().toISOString() };
       }
       throw error;

@@ -1,5 +1,5 @@
 /**
- * Integration tests for Idswyft JavaScript SDK
+ * Integration tests for Idswyft JavaScript SDK (v3 — v2 API)
  * Tests against actual running API server
  */
 
@@ -13,47 +13,36 @@ const { IdswyftSDK, IdswyftError } = require('../dist/index.js');
 // Test configuration
 const API_BASE_URL = 'http://localhost:3001';
 const TEST_API_KEY = 'test-api-key-12345';
-const TEST_DEVELOPER_EMAIL = 'test@example.com';
 
 // Create test client
 const client = new IdswyftSDK({
   apiKey: TEST_API_KEY,
   baseURL: API_BASE_URL,
-  sandbox: true
+  sandbox: true,
 });
 
 // Helper function to create a test image file
 function createTestImageBuffer() {
-  // Create a simple 100x100 pixel image buffer (PNG format)
-  const width = 100;
-  const height = 100;
-  
-  // Simple PNG header + minimal image data
-  const pngSignature = Buffer.from([0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A]);
+  const pngSignature = Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]);
   const ihdrChunk = Buffer.from([
-    0x00, 0x00, 0x00, 0x0D, // Chunk length
-    0x49, 0x48, 0x44, 0x52, // IHDR
-    0x00, 0x00, 0x00, 0x64, // Width (100)
-    0x00, 0x00, 0x00, 0x64, // Height (100) 
-    0x08, 0x02, 0x00, 0x00, 0x00, // Bit depth, color type, compression, filter, interlace
-    0x4C, 0x5C, 0x6D, 0x7E  // CRC
+    0x00, 0x00, 0x00, 0x0d,
+    0x49, 0x48, 0x44, 0x52,
+    0x00, 0x00, 0x00, 0x64,
+    0x00, 0x00, 0x00, 0x64,
+    0x08, 0x02, 0x00, 0x00, 0x00,
+    0x4c, 0x5c, 0x6d, 0x7e,
   ]);
-  
-  // Simple IDAT chunk with minimal compressed data
   const idatChunk = Buffer.from([
-    0x00, 0x00, 0x00, 0x0C, // Chunk length
-    0x49, 0x44, 0x41, 0x54, // IDAT
-    0x78, 0x9C, 0x62, 0x00, 0x02, 0x00, 0x00, 0x05, 0x00, 0x01, // Compressed data
-    0x0D, 0x0A, 0x2D, 0xB4  // CRC
+    0x00, 0x00, 0x00, 0x0c,
+    0x49, 0x44, 0x41, 0x54,
+    0x78, 0x9c, 0x62, 0x00, 0x02, 0x00, 0x00, 0x05, 0x00, 0x01,
+    0x0d, 0x0a, 0x2d, 0xb4,
   ]);
-  
-  // IEND chunk
   const iendChunk = Buffer.from([
-    0x00, 0x00, 0x00, 0x00, // Chunk length
-    0x49, 0x45, 0x4E, 0x44, // IEND
-    0xAE, 0x42, 0x60, 0x82  // CRC
+    0x00, 0x00, 0x00, 0x00,
+    0x49, 0x45, 0x4e, 0x44,
+    0xae, 0x42, 0x60, 0x82,
   ]);
-  
   return Buffer.concat([pngSignature, ihdrChunk, idatChunk, iendChunk]);
 }
 
@@ -61,212 +50,71 @@ async function testHealthCheck() {
   console.log('\n=== Testing Health Check ===');
   try {
     const result = await client.healthCheck();
-    console.log('✓ Health check passed:', result);
+    console.log('  Health check passed:', result);
     return true;
   } catch (error) {
-    console.error('✗ Health check failed:', error.message);
+    console.error('  Health check failed:', error.message);
     return false;
   }
 }
 
-async function testDeveloperRegistration() {
-  console.log('\n=== Testing Developer Registration ===');
+async function testVerificationFlow() {
+  console.log('\n=== Testing V2 Verification Flow ===');
   try {
-    // First register a developer using direct API call
-    const response = await axios.post(`${API_BASE_URL}/api/developer/register`, {
-      email: TEST_DEVELOPER_EMAIL,
-      name: 'Test Developer',
-      company: 'Test Company'
-    });
-    
-    console.log('✓ Developer registered:', response.data.developer.email);
-    
-    if (response.data.api_key) {
-      console.log('✓ API key received:', response.data.api_key.key.substring(0, 10) + '...');
-      return response.data.api_key.key;
-    }
-    
-    return null;
-  } catch (error) {
-    if (error.response && error.response.status === 400 && 
-        error.response.data.message.includes('already exists')) {
-      console.log('✓ Developer already exists (expected)');
-      // Try to get existing API key or use test key
-      return TEST_API_KEY;
-    }
-    console.error('✗ Developer registration failed:', error.message);
-    return null;
-  }
-}
+    const testImage = createTestImageBuffer();
 
-async function testEnhancedVerificationFlow(apiKey) {
-  console.log('\n=== Testing Enhanced Verification Flow ===');
-  try {
-    // Update client with real API key if available
-    if (apiKey && apiKey !== TEST_API_KEY) {
-      client.config.apiKey = apiKey;
-      client.client.defaults.headers['Authorization'] = `Bearer ${apiKey}`;
-    }
-    
-    // Step 1: Start verification session
-    console.log('Step 1: Starting verification session...');
+    // Step 1: Initialize
+    console.log('Step 1: Initializing verification session...');
     const session = await client.startVerification({
       user_id: 'test-user-123',
-      sandbox: true
+      document_type: 'drivers_license',
     });
-    
-    console.log('✓ Verification session started');
-    console.log('  Verification ID:', session.verification_id);
+
+    console.log('  Session created:', session.verification_id);
     console.log('  Status:', session.status);
-    console.log('  Next Steps:', session.next_steps);
-    
-    // Step 2: Upload front document
+    const vid = session.verification_id;
+
+    // Step 2: Upload front
     console.log('\nStep 2: Uploading front document...');
-    const testImageBuffer = createTestImageBuffer();
-    
-    const documentResult = await client.verifyDocument({
-      verification_id: session.verification_id,
-      document_type: 'drivers_license',
-      document_file: testImageBuffer,
-      metadata: {
-        test: true,
-        source: 'integration-test'
-      }
-    });
-    
-    console.log('✓ Front document uploaded');
-    console.log('  Status:', documentResult.status);
-    
-    // Check for AI analysis results
-    if (documentResult.ocr_data) {
-      console.log('✓ OCR data received');
-      if (documentResult.ocr_data.confidence_scores) {
-        console.log('  OCR confidence scores:', documentResult.ocr_data.confidence_scores);
-      }
+    const frontResult = await client.uploadFrontDocument(vid, testImage, 'drivers_license');
+    console.log('  Status:', frontResult.status);
+    if (frontResult.ocr_data) {
+      console.log('  OCR data received');
     }
-    
-    if (documentResult.quality_analysis) {
-      console.log('✓ Quality analysis received');
-      console.log('  Overall quality:', documentResult.quality_analysis.overallQuality);
+
+    // Step 3: Upload back
+    console.log('\nStep 3: Uploading back document...');
+    const backResult = await client.uploadBackDocument(vid, testImage, 'drivers_license');
+    console.log('  Status:', backResult.status);
+    if (backResult.documents_match != null) {
+      console.log('  Documents match:', backResult.documents_match);
     }
-    
-    // Step 3: Upload back of ID (enhanced verification)
-    console.log('\nStep 3: Uploading back of ID for enhanced verification...');
-    const backResult = await client.verifyBackOfId({
-      verification_id: session.verification_id,
-      document_type: 'drivers_license',
-      back_of_id_file: testImageBuffer // Using same buffer for test
-    });
-    
-    console.log('✓ Back of ID uploaded');
-    console.log('  Enhanced verification status:', backResult.status);
-    if (backResult.enhanced_verification) {
-      console.log('  Barcode scanning:', backResult.enhanced_verification.barcode_scanning_enabled);
-      console.log('  Cross validation:', backResult.enhanced_verification.cross_validation_enabled);
+
+    // Step 3.5: Cross-validation
+    console.log('\nStep 3.5: Checking cross-validation...');
+    const cvResult = await client.getCrossValidation(vid);
+    console.log('  Status:', cvResult.status);
+
+    // Step 4: Upload selfie
+    console.log('\nStep 4: Uploading selfie...');
+    const selfieResult = await client.uploadSelfie(vid, testImage);
+    console.log('  Status:', selfieResult.status);
+    if (selfieResult.final_result) {
+      console.log('  Final result:', selfieResult.final_result);
     }
-    
-    // Step 4: Generate live token and perform live capture
-    console.log('\nStep 4: Generating live capture token...');
-    const liveToken = await client.generateLiveToken({
-      verification_id: session.verification_id,
-      challenge_type: 'smile'
-    });
-    
-    console.log('✓ Live token generated');
-    console.log('  Token:', liveToken.token.substring(0, 10) + '...');
-    console.log('  Challenge:', liveToken.challenge);
-    console.log('  Instructions:', liveToken.instructions);
-    
-    // Step 5: Perform live capture
-    console.log('\nStep 5: Performing live capture...');
-    // Create a simple base64 test image
-    const base64Image = 'data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD//gA7Q1JFQVRP...'; // Truncated
-    
-    const liveResult = await client.liveCapture({
-      verification_id: session.verification_id,
-      live_image_data: base64Image,
-      challenge_response: 'smile'
-    });
-    
-    console.log('✓ Live capture completed');
-    console.log('  Liveness score:', liveResult.liveness_score);
-    console.log('  Face match score:', liveResult.face_match_score);
-    console.log('  Overall confidence:', liveResult.confidence_score);
-    
-    // Step 6: Get comprehensive results
-    console.log('\nStep 6: Getting comprehensive verification results...');
-    const finalResults = await client.getVerificationResults(session.verification_id);
-    
-    console.log('✓ Comprehensive results retrieved');
-    console.log('  Final status:', finalResults.status);
-    console.log('  Document uploaded:', finalResults.document_uploaded);
-    console.log('  Back of ID uploaded:', finalResults.back_of_id_uploaded);
-    console.log('  Live capture completed:', finalResults.live_capture_completed);
-    console.log('  Enhanced verification completed:', finalResults.enhanced_verification_completed);
-    
-    if (finalResults.cross_validation_results) {
-      console.log('  Cross validation score:', finalResults.cross_validation_results.match_score);
-    }
-    
-    return {
-      session,
-      documentResult,
-      backResult,
-      liveToken,
-      liveResult,
-      finalResults
-    };
-    
+
+    // Step 5: Get status
+    console.log('\nStep 5: Getting verification status...');
+    const status = await client.getVerificationStatus(vid);
+    console.log('  Status:', status.status);
+    console.log('  Step:', status.current_step, '/', status.total_steps);
+
+    return { session, frontResult, backResult, selfieResult, status };
   } catch (error) {
-    console.error('✗ Enhanced verification flow failed:', error.message);
+    console.error('  Verification flow failed:', error.message);
     if (error instanceof IdswyftError) {
       console.error('  Status Code:', error.statusCode);
-      console.error('  Error Code:', error.code);
     }
-    return null;
-  }
-}
-
-async function testVerificationStatus(verificationId) {
-  console.log('\n=== Testing Verification Status Check ===');
-  try {
-    const result = await client.getVerificationStatus(verificationId);
-    
-    console.log('✓ Status check successful');
-    console.log('  Verification ID:', result.id);
-    console.log('  Current Status:', result.status);
-    
-    if (result.confidence_score !== undefined) {
-      console.log('  Confidence Score:', result.confidence_score);
-    }
-    
-    return result;
-    
-  } catch (error) {
-    console.error('✗ Status check failed:', error.message);
-    return null;
-  }
-}
-
-async function testListVerifications() {
-  console.log('\n=== Testing List Verifications ===');
-  try {
-    const result = await client.listVerifications({
-      limit: 5
-    });
-    
-    console.log('✓ List verifications successful');
-    console.log('  Total verifications:', result.total);
-    console.log('  Returned:', result.verifications.length);
-    
-    result.verifications.forEach((verification, index) => {
-      console.log(`  ${index + 1}. ${verification.id} - ${verification.status}`);
-    });
-    
-    return result;
-    
-  } catch (error) {
-    console.error('✗ List verifications failed:', error.message);
     return null;
   }
 }
@@ -274,104 +122,47 @@ async function testListVerifications() {
 async function testDeveloperManagement() {
   console.log('\n=== Testing Developer Management ===');
   try {
-    // Test creating API key
     console.log('Creating new API key...');
     const apiKeyResult = await client.createApiKey({
       name: 'Test SDK Key',
-      environment: 'sandbox'
+      environment: 'sandbox',
     });
-    
-    console.log('✓ API key created');
-    console.log('  Key ID:', apiKeyResult.key_id);
-    console.log('  Key preview:', apiKeyResult.api_key.substring(0, 10) + '...');
-    
-    // Test listing API keys
-    console.log('\nListing API keys...');
+    console.log('  API key created:', apiKeyResult.key_id);
+
+    console.log('Listing API keys...');
     const apiKeysList = await client.listApiKeys();
-    
-    console.log('✓ API keys listed');
     console.log('  Total keys:', apiKeysList.api_keys.length);
-    apiKeysList.api_keys.forEach((key, index) => {
-      console.log(`  ${index + 1}. ${key.name} (${key.environment}) - ${key.is_active ? 'Active' : 'Inactive'}`);
-    });
-    
-    // Test getting API activity
-    console.log('\nGetting API activity...');
-    const activityResult = await client.getApiActivity({
-      limit: 5
-    });
-    
-    console.log('✓ API activity retrieved');
+
+    console.log('Getting API activity...');
+    const activityResult = await client.getApiActivity({ limit: 5 });
     console.log('  Total activities:', activityResult.total);
-    console.log('  Recent activities:', activityResult.activities.length);
-    
-    return {
-      apiKeyResult,
-      apiKeysList,
-      activityResult
-    };
-    
+
+    return true;
   } catch (error) {
-    console.error('✗ Developer management failed:', error.message);
-    return null;
+    console.error('  Developer management failed:', error.message);
+    return false;
   }
 }
 
 async function testWebhookManagement() {
   console.log('\n=== Testing Webhook Management ===');
   try {
-    // Test registering webhook
     console.log('Registering webhook...');
     const webhookResult = await client.registerWebhook({
       url: 'https://example.com/webhook',
       events: ['verification.completed', 'verification.failed'],
-      secret: 'test-webhook-secret'
+      secret: 'test-webhook-secret',
     });
-    
-    console.log('✓ Webhook registered');
-    console.log('  Webhook ID:', webhookResult.webhook.id);
-    console.log('  URL:', webhookResult.webhook.url);
-    console.log('  Events:', webhookResult.webhook.events);
-    
-    const webhookId = webhookResult.webhook.id;
-    
-    // Test listing webhooks
-    console.log('\nListing webhooks...');
+    console.log('  Webhook registered:', webhookResult.webhook.id);
+
+    console.log('Listing webhooks...');
     const webhooksList = await client.listWebhooks();
-    
-    console.log('✓ Webhooks listed');
     console.log('  Total webhooks:', webhooksList.webhooks.length);
-    webhooksList.webhooks.forEach((webhook, index) => {
-      console.log(`  ${index + 1}. ${webhook.url} - ${webhook.is_active ? 'Active' : 'Inactive'}`);
-    });
-    
-    // Test webhook delivery
-    console.log('\nTesting webhook delivery...');
-    const testResult = await client.testWebhook(webhookId);
-    
-    console.log('✓ Webhook test initiated');
-    console.log('  Delivery ID:', testResult.delivery_id);
-    console.log('  Success:', testResult.success);
-    
-    // Test updating webhook
-    console.log('\nUpdating webhook...');
-    const updateResult = await client.updateWebhook(webhookId, {
-      events: ['verification.completed'] // Reduce to one event
-    });
-    
-    console.log('✓ Webhook updated');
-    console.log('  Updated events:', updateResult.webhook.events);
-    
-    return {
-      webhookResult,
-      webhooksList,
-      testResult,
-      updateResult
-    };
-    
+
+    return true;
   } catch (error) {
-    console.error('✗ Webhook management failed:', error.message);
-    return null;
+    console.error('  Webhook management failed:', error.message);
+    return false;
   }
 }
 
@@ -379,184 +170,91 @@ async function testUsageStats() {
   console.log('\n=== Testing Usage Statistics ===');
   try {
     const result = await client.getUsageStats();
-    
-    console.log('✓ Usage stats retrieved');
     console.log('  Total requests:', result.total_requests);
     console.log('  Success rate:', result.success_rate);
-    console.log('  Remaining quota:', result.remaining_quota);
-    
-    return result;
-    
+    return true;
   } catch (error) {
-    console.error('✗ Usage stats failed:', error.message);
-    return null;
+    console.error('  Usage stats failed:', error.message);
+    return false;
   }
 }
 
 async function testWebhookSignatureVerification() {
   console.log('\n=== Testing Webhook Signature Verification ===');
-  
-  const payload = '{"verification_id":"test-123","status":"verified"}';
-  const secret = 'test-webhook-secret';
-  
-  // Test with valid signature (we'll create one)
   const crypto = require('crypto');
-  const validSignature = 'sha256=' + crypto
-    .createHmac('sha256', secret)
-    .update(payload)
-    .digest('hex');
-  
-  const isValid = client.constructor.verifyWebhookSignature(payload, validSignature, secret);
-  
-  if (isValid) {
-    console.log('✓ Webhook signature verification works correctly');
-  } else {
-    console.log('✗ Webhook signature verification failed');
-  }
-  
-  // Test with invalid signature
-  const isInvalid = client.constructor.verifyWebhookSignature(payload, 'invalid-signature', secret);
-  
-  if (!isInvalid) {
-    console.log('✓ Webhook signature correctly rejects invalid signatures');
-  } else {
-    console.log('✗ Webhook signature incorrectly accepts invalid signatures');
-  }
-  
+  const payload = '{"verification_id":"test-123","status":"COMPLETE"}';
+  const secret = 'test-webhook-secret';
+
+  const validSignature =
+    'sha256=' +
+    crypto.createHmac('sha256', secret).update(payload).digest('hex');
+
+  const isValid = IdswyftSDK.verifyWebhookSignature(payload, validSignature, secret);
+  console.log('  Valid signature:', isValid ? 'accepted' : 'rejected');
+
+  const isInvalid = IdswyftSDK.verifyWebhookSignature(payload, 'invalid', secret);
+  console.log('  Invalid signature:', !isInvalid ? 'rejected' : 'accepted');
+
   return isValid && !isInvalid;
 }
 
 async function runAllTests() {
-  console.log('🧪 Starting Idswyft JavaScript SDK Integration Tests (Enhanced)');
-  console.log('===============================================================');
-  
+  console.log('Idswyft JavaScript SDK v3 Integration Tests');
+  console.log('='.repeat(50));
+
   const results = {
     healthCheck: false,
-    developerRegistration: false,
-    enhancedVerificationFlow: false,
-    verificationHistory: false,
+    verificationFlow: false,
     developerManagement: false,
     webhookManagement: false,
     usageStats: false,
-    webhookVerification: false
+    webhookVerification: false,
   };
-  
-  let apiKey = TEST_API_KEY;
-  let verificationSession = null;
-  
+
   try {
-    // Test health check
     results.healthCheck = await testHealthCheck();
-    
-    // Test developer registration
-    const registeredApiKey = await testDeveloperRegistration();
-    if (registeredApiKey) {
-      results.developerRegistration = true;
-      apiKey = registeredApiKey;
-    }
-    
-    // Test enhanced verification flow (replaces old document verification)
-    const verificationFlow = await testEnhancedVerificationFlow(apiKey);
-    if (verificationFlow && verificationFlow.finalResults) {
-      results.enhancedVerificationFlow = true;
-      verificationSession = verificationFlow.session;
-    }
-    
-    // Test verification history
-    if (verificationSession) {
-      console.log('\n=== Testing Verification History ===');
-      try {
-        const historyResult = await client.getVerificationHistory(verificationSession.user_id, {
-          limit: 5
-        });
-        
-        console.log('✓ Verification history retrieved');
-        console.log('  Total verifications:', historyResult.total);
-        console.log('  Recent verifications:', historyResult.verifications.length);
-        
-        results.verificationHistory = true;
-      } catch (error) {
-        console.error('✗ Verification history failed:', error.message);
-      }
-    }
-    
-    // Test developer management features
-    const devManagementResult = await testDeveloperManagement();
-    if (devManagementResult) {
-      results.developerManagement = true;
-    }
-    
-    // Test webhook management features
-    const webhookResult = await testWebhookManagement();
-    if (webhookResult) {
-      results.webhookManagement = true;
-    }
-    
-    // Test usage stats
-    const statsResult = await testUsageStats();
-    if (statsResult) {
-      results.usageStats = true;
-    }
-    
-    // Test webhook signature verification
+    const flowResult = await testVerificationFlow();
+    results.verificationFlow = flowResult != null;
+    results.developerManagement = await testDeveloperManagement();
+    results.webhookManagement = await testWebhookManagement();
+    results.usageStats = await testUsageStats();
     results.webhookVerification = await testWebhookSignatureVerification();
-    
   } catch (error) {
-    console.error('💥 Unexpected error during testing:', error);
+    console.error('Unexpected error during testing:', error);
   }
-  
-  // Print summary
-  console.log('\n📊 Test Results Summary');
-  console.log('========================');
-  
+
+  // Summary
+  console.log('\nTest Results Summary');
+  console.log('='.repeat(30));
+
   const testNames = {
     healthCheck: 'Health Check',
-    developerRegistration: 'Developer Registration',
-    enhancedVerificationFlow: 'Enhanced Verification Flow (6 steps)',
-    verificationHistory: 'Verification History',
-    developerManagement: 'Developer Management (API Keys, Activity)',
-    webhookManagement: 'Webhook Management (CRUD, Testing)',
+    verificationFlow: 'V2 Verification Flow (5 steps)',
+    developerManagement: 'Developer Management',
+    webhookManagement: 'Webhook Management',
     usageStats: 'Usage Statistics',
-    webhookVerification: 'Webhook Signature Verification'
+    webhookVerification: 'Webhook Signature Verification',
   };
-  
+
   Object.entries(results).forEach(([test, passed]) => {
-    const status = passed ? '✅' : '❌';
-    console.log(`${status} ${testNames[test]}`);
+    const status = passed ? 'PASS' : 'FAIL';
+    console.log(`  [${status}] ${testNames[test]}`);
   });
-  
+
   const passedCount = Object.values(results).filter(Boolean).length;
   const totalCount = Object.keys(results).length;
-  
-  console.log(`\n🎯 Overall: ${passedCount}/${totalCount} tests passed`);
-  
-  if (passedCount === totalCount) {
-    console.log('🎉 All tests passed! Enhanced SDK is working correctly.');
-    console.log('✨ Ready for production deployment!');
-    return true;
-  } else {
-    console.log('⚠️  Some tests failed. Check the output above for details.');
-    return false;
-  }
+  console.log(`\nOverall: ${passedCount}/${totalCount} tests passed`);
+
+  return passedCount === totalCount;
 }
 
-// Run tests if this file is executed directly
 if (require.main === module) {
   runAllTests()
-    .then(success => {
-      process.exit(success ? 0 : 1);
-    })
-    .catch(error => {
+    .then((success) => process.exit(success ? 0 : 1))
+    .catch((error) => {
       console.error('Fatal error:', error);
       process.exit(1);
     });
 }
 
-module.exports = {
-  runAllTests,
-  testHealthCheck,
-  testDocumentVerification,
-  testVerificationStatus,
-  testListVerifications,
-  testUsageStats
-};
+module.exports = { runAllTests, testHealthCheck, testVerificationFlow, testUsageStats };

@@ -1,5 +1,5 @@
 """
-Type definitions for the Idswyft SDK
+Type definitions for the Idswyft SDK (v3 — matches backend v2 API)
 """
 
 from typing import Dict, Any, Optional, Literal, Union, BinaryIO
@@ -12,174 +12,106 @@ else:
     from typing_extensions import TypedDict
 
 # Type aliases
-VerificationStatus = Literal["pending", "verified", "failed", "manual_review"]
 DocumentType = Literal["passport", "drivers_license", "national_id", "other"]
-VerificationType = Literal["document", "selfie", "combined", "live_capture"]
+VerificationStatus = Literal[
+    "AWAITING_FRONT", "FRONT_PROCESSING",
+    "AWAITING_BACK", "BACK_PROCESSING",
+    "CROSS_VALIDATING",
+    "AWAITING_LIVE", "LIVE_PROCESSING",
+    "FACE_MATCHING", "COMPLETE", "HARD_REJECTED",
+]
+FinalResult = Literal["verified", "manual_review", "failed"]
 Environment = Literal["sandbox", "production"]
-ChallengeType = Literal["blink", "smile", "turn_head", "random"]
 FileData = Union[str, bytes, BinaryIO]
 
 
 class OCRData(TypedDict, total=False):
     """OCR extraction results from document analysis"""
+    full_name: Optional[str]
     name: Optional[str]
     date_of_birth: Optional[str]
+    id_number: Optional[str]
     document_number: Optional[str]
+    expiry_date: Optional[str]
     expiration_date: Optional[str]
-    issuing_authority: Optional[str]
     nationality: Optional[str]
     address: Optional[str]
+    issuing_authority: Optional[str]
     raw_text: Optional[str]
     confidence_scores: Optional[Dict[str, float]]
 
 
-class QualityAnalysisResolution(TypedDict):
-    """Resolution information from quality analysis"""
-    width: int
-    height: int
-    isHighRes: bool
-
-
-class QualityAnalysisFileSize(TypedDict):
-    """File size information from quality analysis"""
-    bytes: int
-    isReasonableSize: bool
-
-
-class QualityAnalysis(TypedDict, total=False):
-    """Document quality analysis results"""
-    isBlurry: bool
-    blurScore: float
-    brightness: float
-    contrast: float
-    resolution: QualityAnalysisResolution
-    fileSize: QualityAnalysisFileSize
-    overallQuality: Literal["excellent", "good", "fair", "poor"]
-    issues: list[str]
-    recommendations: list[str]
-
-
-class BarcodeData(TypedDict, total=False):
-    """Barcode/QR code scanning results"""
-    qr_code: Optional[str]
-    parsed_data: Optional[Dict[str, Any]]
-    verification_codes: Optional[list[str]]
-    security_features: Optional[list[str]]
-
-
-class CrossValidationResults(TypedDict):
+class CrossValidationResults(TypedDict, total=False):
     """Cross-validation results between front and back of ID"""
-    match_score: float
-    validation_results: Dict[str, bool]
-    discrepancies: list[str]
+    verdict: Literal["PASS", "REVIEW"]
+    has_critical_failure: bool
+    score: float
+    failures: list[str]
 
 
-class LivenessDetails(TypedDict, total=False):
-    """Detailed liveness detection analysis"""
-    blink_detection: Optional[float]
-    head_movement: Optional[float]
-    texture_analysis: Optional[float]
-    challenge_passed: Optional[bool]
+class FaceMatchResults(TypedDict, total=False):
+    """Face matching results"""
+    passed: bool
+    score: float
+    distance: float
+
+
+class LivenessResults(TypedDict, total=False):
+    """Liveness detection results"""
+    liveness_passed: bool
+    liveness_score: float
+
+
+class InitializeResponse(TypedDict, total=False):
+    """Response from the initialize endpoint"""
+    success: bool
+    verification_id: str
+    status: VerificationStatus
+    current_step: int
+    total_steps: int
+    message: str
 
 
 class VerificationResult(TypedDict, total=False):
-    """Result of a verification request"""
-    id: str
-    verification_id: Optional[str]
+    """Result from any verification step or status query"""
+    success: bool
+    verification_id: str
     status: VerificationStatus
-    type: VerificationType
-    confidence_score: Optional[float]
-    created_at: str
-    updated_at: str
-    developer_id: str
-    user_id: Optional[str]
-    metadata: Optional[Dict[str, Any]]
-    webhook_url: Optional[str]
-    error_message: Optional[str]
-    error_code: Optional[str]
-    # AI Analysis Results
+    current_step: int
+    total_steps: int
+    message: str
+    # Front document fields
+    document_id: Optional[str]
+    document_path: Optional[str]
     ocr_data: Optional[OCRData]
-    quality_analysis: Optional[QualityAnalysis]
-    face_match_score: Optional[float]
-    liveness_score: Optional[float]
-    manual_review_reason: Optional[str]
-    # Enhanced Verification Features
-    document_uploaded: Optional[bool]
-    document_type: Optional[str]
-    back_of_id_uploaded: Optional[bool]
-    live_capture_completed: Optional[bool]
-    barcode_data: Optional[BarcodeData]
+    # Back document fields
+    barcode_data: Optional[Dict[str, Any]]
+    barcode_extraction_failed: Optional[bool]
+    documents_match: Optional[bool]
     cross_validation_results: Optional[CrossValidationResults]
-    cross_validation_score: Optional[float]
-    enhanced_verification_completed: Optional[bool]
-    liveness_details: Optional[LivenessDetails]
-    next_steps: Optional[list[str]]
+    # Live capture fields
+    selfie_id: Optional[str]
+    selfie_path: Optional[str]
+    face_match_results: Optional[FaceMatchResults]
+    liveness_results: Optional[LivenessResults]
+    # Final decision
+    final_result: Optional[FinalResult]
+    # Rejection/failure info
+    rejection_reason: Optional[str]
+    rejection_detail: Optional[str]
+    failure_reason: Optional[str]
+    manual_review_reason: Optional[str]
+    # Status endpoint extras
+    front_document_uploaded: Optional[bool]
+    back_document_uploaded: Optional[bool]
+    live_capture_uploaded: Optional[bool]
+    face_match_passed: Optional[bool]
+    liveness_passed: Optional[bool]
+    created_at: Optional[str]
+    updated_at: Optional[str]
 
 
-class StartVerificationRequest(TypedDict):
-    """Request parameters for starting verification"""
-    user_id: str
-    sandbox: Optional[bool]
-
-
-class StartVerificationResponse(TypedDict):
-    """Response from start verification endpoint"""
-    verification_id: str
-    status: str
-    user_id: str
-    next_steps: list[str]
-    created_at: str
-
-
-class DocumentVerificationRequest(TypedDict, total=False):
-    """Request parameters for document verification"""
-    verification_id: Optional[str]  # For existing verification session
-    document_type: DocumentType
-    document_file: FileData
-    user_id: Optional[str]
-    webhook_url: Optional[str]
-    metadata: Optional[Dict[str, Any]]
-
-
-class BackOfIdRequest(TypedDict):
-    """Request parameters for back-of-ID verification"""
-    verification_id: str
-    document_type: DocumentType
-    back_of_id_file: FileData
-    metadata: Optional[Dict[str, Any]]
-
-
-class LiveCaptureRequest(TypedDict):
-    """Request parameters for live capture"""
-    verification_id: str
-    live_image_data: str  # base64 encoded
-    challenge_response: Optional[str]
-    metadata: Optional[Dict[str, Any]]
-
-
-class LiveTokenRequest(TypedDict):
-    """Request parameters for live token generation"""
-    verification_id: str
-    challenge_type: Optional[ChallengeType]
-
-
-class LiveTokenResponse(TypedDict):
-    """Response from live token generation"""
-    token: str
-    challenge: str
-    expires_at: str
-    instructions: str
-
-
-class SelfieVerificationRequest(TypedDict, total=False):
-    """Request parameters for selfie verification"""
-    verification_id: Optional[str]  # For existing verification session
-    selfie_file: FileData
-    reference_document_id: Optional[str]
-    user_id: Optional[str]
-    webhook_url: Optional[str]
-    metadata: Optional[Dict[str, Any]]
-
+# ─── Developer & Webhook Types ──────────────────────────
 
 class ApiKey(TypedDict):
     """API key information"""
@@ -238,19 +170,6 @@ class ListVerificationsResponse(TypedDict):
     total: int
     limit: int
     offset: int
-
-
-class ApiKeyInfo(TypedDict, total=False):
-    """API key information"""
-    id: str
-    name: str
-    key_preview: str
-    is_sandbox: bool
-    is_active: bool
-    last_used_at: Optional[str]
-    created_at: str
-    expires_at: Optional[str]
-    status: Literal["active", "expired", "revoked"]
 
 
 class WebhookEvent(TypedDict, total=False):
