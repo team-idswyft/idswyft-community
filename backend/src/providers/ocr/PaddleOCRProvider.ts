@@ -50,6 +50,64 @@ const DL_FIELD_TOKENS = new Set([
   'veteran','vet','dd','4d','4a','4b','4c','1','2','3','f','m','n',
 ]);
 
+// ── US State DL Number Formats (reference) ───────────────────
+// Comprehensive map of all 50 states + DC DL number formats.
+// Used for documentation and optional post-extraction validation.
+// Sources: NTSI, AAMVA, state DMV sites, usdl-regex (GitHub).
+export const STATE_DL_FORMATS: Record<string, { regex: RegExp; description: string }> = {
+  AL: { regex: /^[0-9]{1,8}$/,                                         description: '1-8 digits' },
+  AK: { regex: /^[0-9]{1,7}$/,                                         description: '1-7 digits' },
+  AZ: { regex: /^([A-Z][0-9]{8}|[0-9]{9})$/,                           description: '1L+8D or 9D' },
+  AR: { regex: /^[0-9]{4,9}$/,                                         description: '4-9 digits' },
+  CA: { regex: /^[A-Z][0-9]{7}$/,                                      description: '1L+7D' },
+  CO: { regex: /^([0-9]{9}|[A-Z][0-9]{3,6}|[A-Z]{2}[0-9]{2,5})$/,     description: '9D or 1L+3-6D or 2L+2-5D' },
+  CT: { regex: /^[0-9]{9}$/,                                           description: '9D' },
+  DE: { regex: /^[0-9]{1,7}$/,                                         description: '1-7D' },
+  FL: { regex: /^[A-Z][0-9]{12}$/,                                     description: '1L+12D' },
+  GA: { regex: /^[0-9]{7,9}$/,                                         description: '7-9D' },
+  HI: { regex: /^([A-Z][0-9]{8}|[0-9]{9})$/,                           description: '1L+8D or 9D' },
+  ID: { regex: /^([A-Z]{2}[0-9]{6}[A-Z]|[0-9]{9})$/,                   description: '2L+6D+1L or 9D' },
+  IL: { regex: /^[A-Z][0-9]{11,12}$/,                                  description: '1L+11-12D' },
+  IN: { regex: /^([A-Z][0-9]{9}|[0-9]{9,10})$/,                        description: '1L+9D or 9-10D' },
+  IA: { regex: /^([0-9]{9}|[0-9]{3}[A-Z]{2}[0-9]{4})$/,                description: '9D or 3D+2L+4D' },
+  KS: { regex: /^(K[0-9]{8}|[A-Z][0-9][A-Z][0-9][A-Z]|[0-9]{9})$/,    description: 'K+8D or L-D-L-D-L or 9D' },
+  KY: { regex: /^([A-Z][0-9]{8,9}|[0-9]{9})$/,                         description: '1L+8-9D or 9D' },
+  LA: { regex: /^[0-9]{1,9}$/,                                         description: '1-9D' },
+  ME: { regex: /^([0-9]{7}|[0-9]{7}[A-Z]|[0-9]{8})$/,                  description: '7D or 7D+1L or 8D' },
+  MD: { regex: /^[A-Z][0-9]{12}$/,                                     description: '1L+12D' },
+  MA: { regex: /^([A-Z][0-9]{8}|[0-9]{9})$/,                           description: '1L+8D or 9D' },
+  MI: { regex: /^[A-Z][0-9]{10,12}$/,                                  description: '1L+10-12D' },
+  MN: { regex: /^[A-Z][0-9]{12}$/,                                     description: '1L+12D' },
+  MS: { regex: /^[0-9]{9}$/,                                           description: '9D' },
+  MO: { regex: /^([A-Z][0-9]{5,9}|[A-Z][0-9]{6}R|[0-9]{8}[A-Z]{2}|[0-9]{9}[A-Z]?|[0-9]{3}[A-Z][0-9]{6})$/, description: 'complex — many legacy formats' },
+  MT: { regex: /^([A-Z][0-9]{8}|[0-9]{9}|[0-9]{13,14})$/,              description: '1L+8D or 9D or 13-14D' },
+  NE: { regex: /^[A-Z][0-9]{6,8}$/,                                    description: '1L+6-8D' },
+  NV: { regex: /^([0-9]{9,10}|[0-9]{12}|X[0-9]{8})$/,                  description: '9-10D or 12D or X+8D' },
+  NH: { regex: /^([0-9]{2}[A-Z]{3}[0-9]{5}|NH[LNV][0-9]{8})$/,         description: '2D+3L+5D (legacy) or NHL/NHN/NHV+8D' },
+  NJ: { regex: /^[A-Z][0-9]{14}$/,                                     description: '1L+14D' },
+  NM: { regex: /^[0-9]{8,9}$/,                                         description: '8-9D' },
+  NY: { regex: /^([0-9]{9}|[A-Z][0-9]{7}|[0-9]{16}|[0-9]{8})$/,        description: '9D or 1L+7D or 16D or 8D' },
+  NC: { regex: /^[0-9]{1,12}$/,                                        description: '1-12D' },
+  ND: { regex: /^([A-Z]{3}[0-9]{6}|[0-9]{9})$/,                        description: '3L+6D or 9D' },
+  OH: { regex: /^([A-Z][0-9]{4,8}|[A-Z]{2}[0-9]{3,7}|[0-9]{8})$/,     description: '1L+4-8D or 2L+3-7D or 8D' },
+  OK: { regex: /^([A-Z][0-9]{9}|[0-9]{9})$/,                           description: '1L+9D or 9D' },
+  OR: { regex: /^[0-9]{1,9}$/,                                         description: '1-9D (commonly 7)' },
+  PA: { regex: /^[0-9]{8}$/,                                           description: '8D' },
+  RI: { regex: /^([0-9]{7}|[A-Z][0-9]{6})$/,                           description: '7D or 1L+6D' },
+  SC: { regex: /^[0-9]{5,11}$/,                                        description: '5-11D' },
+  SD: { regex: /^([0-9]{6,10}|[0-9]{12})$/,                            description: '6-10D or 12D' },
+  TN: { regex: /^[0-9]{7,9}$/,                                         description: '7-9D' },
+  TX: { regex: /^[0-9]{7,8}$/,                                         description: '7-8D' },
+  UT: { regex: /^[0-9]{4,10}$/,                                        description: '4-10D' },
+  VT: { regex: /^([0-9]{8}|[0-9]{7}A)$/,                               description: '8D or 7D+A' },
+  VA: { regex: /^([A-Z][0-9]{8,11}|[0-9]{9})$/,                        description: '1L+8-11D or 9D' },
+  WA: { regex: /^(WDL[A-Z0-9]{9}|[A-Z*]{1,7}[A-Z0-9*]{5,11})$/,       description: 'WDL+9 (current) or 12-char name-encoded (legacy)' },
+  WV: { regex: /^([0-9]{7}|[A-Z]{1,2}[0-9]{5,6})$/,                    description: '7D or 1-2L+5-6D' },
+  WI: { regex: /^[A-Z][0-9]{13}$/,                                     description: '1L+13D' },
+  WY: { regex: /^[0-9]{9,10}$/,                                        description: '9-10D' },
+  DC: { regex: /^([0-9]{7}|[0-9]{9})$/,                                description: '7D or 9D' },
+};
+
 // AAMVA field codes found in OCR'd text from PDF417 zones or raw text
 const AAMVA_CODES: Record<string, keyof OCRData> = {
   DCS: 'name',
@@ -418,7 +476,7 @@ export class PaddleOCRProvider implements OCRProvider {
     const map = new Map<string, FlatLine & { lineIndex: number }>();
 
     const labelPatterns: Array<[string, RegExp]> = [
-      ['dl_number',   /(?:4d\b|DLn?\b|DL\s*#|LIC\s*#|LICENSE\s*(?:NO|NUMBER|#)|ID\s*NO|ID(?=\s*\d)|(?:^|\s)I(?=\d{3}\s*\d{3}))/i],
+      ['dl_number',   /(?:4d\b|DLn?\b|DL\s*#|LIC\s*#|LICENSE\s*(?:NO|NUMBER|#)|OPERATOR\s*(?:LICENSE|LIC)\s*(?:NO|#)?|PERMIT\s*NO|CUSTOMER\s*ID|CID\b|ID\s*NO|ID(?=\s*\d)|(?:^|\s)I(?=\d{3}\s*\d{3}))/i],
       ['last_name',   /\b(?:LN|LAST\s*NAME|FAMILY\s*NAME|SURNAME)\b/i],
       ['first_name',  /\b(?:FN|FIRST\s*NAME|GIVEN\s*NAME)\b/i],
       ['full_name',   /\b(?:FULL\s*)?NAME\b/i],
@@ -455,12 +513,25 @@ export class PaddleOCRProvider implements OCRProvider {
     // Strategy A: From labeled line
     const labelLine = labelMap.get('dl_number');
     if (labelLine) {
-      // Try the classic "DL label + optional class letter + numeric digits" pattern
-      // directly on the line text (preserves old behavior for "DL D5551234" → "5551234")
-      const directM = labelLine.text.match(
+      // Try full alphanumeric DL number after label (handles states with
+      // letter prefix/suffix: CA, NJ, WI, ID, VT, ME, MO, etc.)
+      const fullAlphaM = labelLine.text.match(
+        /(?:4d\s*)?(?:DLn?|DL\s*#?|LIC\s*#?)\s*([A-Z]{0,3}\d[\dA-Z]{4,14})\b/i,
+      );
+      if (fullAlphaM) {
+        const cleaned = fullAlphaM[1].replace(/[\s\-]/g, '');
+        if (/\d/.test(cleaned) && cleaned.length >= 5 && cleaned.length <= 15
+            && !this.looksLikeDate(cleaned)) {
+          return cleaned;
+        }
+      }
+
+      // Fallback: strip optional class letter + capture digits only.
+      // Handles NC-style "4d DLN C 000099112233 9Class C" where C is a vehicle class.
+      const digitsOnlyM = labelLine.text.match(
         /(?:4d\s*)?(?:DLn?|DL\s*#?|LIC\s*#?)\s*[A-Z]?\s*(\d{6,15})/i,
       );
-      if (directM) return directM[1].replace(/[\s\-]/g, '');
+      if (digitsOnlyM) return digitsOnlyM[1].replace(/[\s\-]/g, '');
 
       // Try "ID" prefix followed by spaced digits: "ID793 398 654" → "793398654"
       const idPrefixM = labelLine.text.match(
@@ -490,11 +561,33 @@ export class PaddleOCRProvider implements OCRProvider {
     }
 
     // Strategy B: Regex scan for DL number patterns across all lines
+    // Ordered from most specific to least to minimize false positives.
     const DL_PATTERNS = [
-      // Letter(s) + digits (CA, FL, IL, MI, MN, MD, WI, MA, VA, etc.)
-      /\b([A-Z]{1,2}\d{7,14})\b/,
-      // Pure digits 7-12 (NC, NY, PA, TX, CO, NJ numeric, OH, GA, etc.)
-      /\b(\d{7,12})\b/,
+      // Washington: WDL prefix (current post-2018 format)
+      /\b(WDL[A-Z0-9]{9,12})\b/i,
+      // New Hampshire current: NHL/NHN/NHV + 8 digits
+      /\b(NH[LNV]\d{8})\b/,
+      // Idaho: 2 letters + 6 digits + 1 letter (e.g., AB123456C)
+      /\b([A-Z]{2}\d{6}[A-Z])\b/,
+      // New Hampshire legacy: 2 digits + 3 letters + 5 digits (e.g., 12ABC45678)
+      /\b(\d{2}[A-Z]{3}\d{5})\b/,
+      // Iowa mixed: 3 digits + 2 letters + 4 digits (e.g., 123AB4567)
+      /\b(\d{3}[A-Z]{2}\d{4})\b/,
+      // Missouri mixed: 3 digits + 1 letter + 6 digits (e.g., 123A456789)
+      /\b(\d{3}[A-Z]\d{6})\b/,
+      // Kansas alternating: letter-digit-letter-digit-letter (e.g., K1A2B)
+      /\b([A-Z]\d[A-Z]\d[A-Z])\b/,
+      // Nevada X-prefix: X + 8 digits (non-citizen temporary)
+      /\b(X\d{8})\b/,
+      // Missouri R-suffix: letter + 6 digits + R (e.g., A123456R)
+      /\b([A-Z]\d{6}R)\b/,
+      // Letter(s) + digits: 1-3 letters + 6-14 digits (CA, FL, IL, MI, MN, MD, WI,
+      //   MA, VA, ND 3L+6D, NJ 1L+14D, etc.)
+      /\b([A-Z]{1,3}\d{6,14})\b/,
+      // Digits + trailing letter(s): ME 7D+1L, VT 7D+A, MO 8D+2L / 9D+1L
+      /\b(\d{7,9}[A-Z]{1,2})\b/,
+      // Pure digits 7-14 (expanded for MT 13-14 digit, NV 12 digit, plus NC, NY, PA, TX, etc.)
+      /\b(\d{7,14})\b/,
       // Spaced digit groups: "793 398 654" → "793398654" (NY and other states)
       /\b(\d{3}\s+\d{3}\s+\d{3})\b/,
       // Colorado: ##-###-####
@@ -503,8 +596,6 @@ export class PaddleOCRProvider implements OCRProvider {
       /\b(\d{3}-\d{3}-\d{3})\b/,
       // "ID" or "I" (OCR misread) prefix + spaced digits: "I793 398 654" or "ID793 398 654"
       /\bI[D]?\s*(\d[\d\s]{5,16}\d)\b/i,
-      // Washington: WDL prefix
-      /\b(WDL[A-Z0-9]{9,12})\b/i,
     ];
 
     // Scan with priority: lines containing "4d" or "DL" label get tried first
@@ -551,15 +642,16 @@ export class PaddleOCRProvider implements OCRProvider {
       }
     }
 
-    // Must be alphanumeric, 6–15 chars, no date-like pattern
-    const m = withoutLabel.match(/^([A-Z0-9\-]{6,15})/i);
+    // Must be alphanumeric, 5–15 chars, no date-like pattern
+    // (lowered from 6 to 5 to support Kansas alternating format: K1A2B)
+    const m = withoutLabel.match(/^([A-Z0-9\-]{5,15})/i);
     if (!m) return null;
     const candidate = m[1].replace(/\-/g, '');
     if (this.looksLikeDate(candidate)) return null;
     if (isHeaderNoise(candidate))      return null;
     // A DL number must contain at least one digit — reject pure-alpha like "Expires"
     if (!/\d/.test(candidate))         return null;
-    return candidate.length >= 6 ? candidate : null;
+    return candidate.length >= 5 ? candidate : null;
   }
 
   private looksLikeDate(s: string): boolean {
