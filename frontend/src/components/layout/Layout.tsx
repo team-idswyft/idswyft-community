@@ -1,4 +1,4 @@
-import { ReactNode } from 'react'
+import { ReactNode, useState } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import {
   ShieldCheckIcon,
@@ -31,6 +31,7 @@ const navigation = [
 
 export function Layout({ children }: LayoutProps) {
   const location = useLocation()
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
 
   const isAdminRoute = location.pathname.startsWith('/admin')
   const isStandaloneRoute =
@@ -139,14 +140,31 @@ export function Layout({ children }: LayoutProps) {
               </a>
 
               {/* Mobile menu button */}
-              <button className={clsx(
-                'lg:hidden w-8 h-8 rounded-full transition-colors flex items-center justify-center backdrop-blur-sm',
-                isDarkRoute ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-100/50 hover:bg-gray-200/50'
-              )}>
-                <div className="w-4 h-4 flex flex-col justify-between">
-                  <div className={clsx('w-4 h-0.5 rounded', isDarkRoute ? 'bg-slate-400' : 'bg-gray-600')}></div>
-                  <div className={clsx('w-4 h-0.5 rounded', isDarkRoute ? 'bg-slate-400' : 'bg-gray-600')}></div>
-                  <div className={clsx('w-4 h-0.5 rounded', isDarkRoute ? 'bg-slate-400' : 'bg-gray-600')}></div>
+              <button
+                onClick={() => setMobileMenuOpen(prev => !prev)}
+                className={clsx(
+                  'lg:hidden w-8 h-8 rounded-full transition-colors flex items-center justify-center backdrop-blur-sm',
+                  isDarkRoute ? 'bg-white/10 hover:bg-white/20' : 'bg-gray-100/50 hover:bg-gray-200/50'
+                )}
+                aria-label={mobileMenuOpen ? 'Close menu' : 'Open menu'}
+                aria-expanded={mobileMenuOpen}
+              >
+                <div className="w-4 h-4 flex flex-col justify-center items-center relative">
+                  <div className={clsx(
+                    'w-4 h-0.5 rounded transition-all duration-200 absolute',
+                    isDarkRoute ? 'bg-slate-400' : 'bg-gray-600',
+                    mobileMenuOpen ? 'rotate-45' : '-translate-y-1.5'
+                  )}></div>
+                  <div className={clsx(
+                    'w-4 h-0.5 rounded transition-all duration-200',
+                    isDarkRoute ? 'bg-slate-400' : 'bg-gray-600',
+                    mobileMenuOpen ? 'opacity-0' : 'opacity-100'
+                  )}></div>
+                  <div className={clsx(
+                    'w-4 h-0.5 rounded transition-all duration-200 absolute',
+                    isDarkRoute ? 'bg-slate-400' : 'bg-gray-600',
+                    mobileMenuOpen ? '-rotate-45' : 'translate-y-1.5'
+                  )}></div>
                 </div>
               </button>
             </div>
@@ -154,60 +172,64 @@ export function Layout({ children }: LayoutProps) {
         </div>
 
         {/* Mobile menu */}
-        <div className="lg:hidden mt-2">
-          <div className={clsx(
-            'backdrop-blur-xl rounded-2xl border shadow-xl p-4 space-y-2',
-            isDarkRoute
-              ? 'bg-[#0b0f19]/98 border-white/10 shadow-black/40'
-              : 'bg-white/95 border-white/30 shadow-black/5'
-          )}>
-            {navigation.map((item) => {
-              const Icon = item.icon
-              const isActive = !item.external && (location.pathname === item.href ||
-                (item.href !== '/' && location.pathname.startsWith(item.href)))
+        {mobileMenuOpen && (
+          <div className="lg:hidden mt-2">
+            <div className={clsx(
+              'backdrop-blur-xl rounded-2xl border shadow-xl p-4 space-y-2',
+              isDarkRoute
+                ? 'bg-[#0b0f19]/98 border-white/10 shadow-black/40'
+                : 'bg-white/95 border-white/30 shadow-black/5'
+            )}>
+              {navigation.map((item) => {
+                const Icon = item.icon
+                const isActive = !item.external && (location.pathname === item.href ||
+                  (item.href !== '/' && location.pathname.startsWith(item.href)))
 
-              if (item.external) {
+                if (item.external) {
+                  return (
+                    <a
+                      key={item.name}
+                      href={item.href}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      onClick={() => setMobileMenuOpen(false)}
+                      className={clsx(
+                        'flex items-center px-3 py-2.5 rounded-xl text-base font-medium space-x-3 transition-colors',
+                        isDarkRoute
+                          ? 'text-slate-400 hover:bg-white/10 hover:text-white'
+                          : 'text-gray-600 hover:bg-gray-50/80 hover:text-gray-900'
+                      )}
+                    >
+                      <Icon className="h-5 w-5 flex-shrink-0" />
+                      <span>{item.name}</span>
+                    </a>
+                  )
+                }
+
                 return (
-                  <a
+                  <Link
                     key={item.name}
-                    href={item.href}
-                    target="_blank"
-                    rel="noopener noreferrer"
+                    to={item.href}
+                    onClick={() => setMobileMenuOpen(false)}
                     className={clsx(
                       'flex items-center px-3 py-2.5 rounded-xl text-base font-medium space-x-3 transition-colors',
                       isDarkRoute
-                        ? 'text-slate-400 hover:bg-white/10 hover:text-white'
-                        : 'text-gray-600 hover:bg-gray-50/80 hover:text-gray-900'
+                        ? isActive
+                          ? 'bg-white/10 text-cyan-400'
+                          : 'text-slate-400 hover:bg-white/10 hover:text-white'
+                        : isActive
+                          ? 'bg-primary-50/80 text-primary-700'
+                          : 'text-gray-600 hover:bg-gray-50/80 hover:text-gray-900'
                     )}
                   >
                     <Icon className="h-5 w-5 flex-shrink-0" />
                     <span>{item.name}</span>
-                  </a>
+                  </Link>
                 )
-              }
-
-              return (
-                <Link
-                  key={item.name}
-                  to={item.href}
-                  className={clsx(
-                    'flex items-center px-3 py-2.5 rounded-xl text-base font-medium space-x-3 transition-colors',
-                    isDarkRoute
-                      ? isActive
-                        ? 'bg-white/10 text-cyan-400'
-                        : 'text-slate-400 hover:bg-white/10 hover:text-white'
-                      : isActive
-                        ? 'bg-primary-50/80 text-primary-700'
-                        : 'text-gray-600 hover:bg-gray-50/80 hover:text-gray-900'
-                  )}
-                >
-                  <Icon className="h-5 w-5 flex-shrink-0" />
-                  <span>{item.name}</span>
-                </Link>
-              )
-            })}
+              })}
+            </div>
           </div>
-        </div>
+        )}
       </nav>
 
       {/* Main content */}
