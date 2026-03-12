@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { API_BASE_URL } from '../config/api';
 import IDCameraCapture from '../components/IDCameraCapture';
+import SelfieCameraCapture from '../components/SelfieCameraCapture';
 
 // ─── Design system CSS ─────────────────────────────────────────────────────
 const css = `
@@ -397,6 +398,7 @@ const MobileVerificationPage: React.FC = () => {
   const [showCamera, setShowCamera] = useState(false);
   const [cameraVariant, setCameraVariant] = useState<'front' | 'back'>('front');
   const [cameraSupported, setCameraSupported] = useState(true);
+  const [showSelfieCamera, setShowSelfieCamera] = useState(false);
 
   // Checking screen messages
   const [checkingMsg, setCheckingMsg] = useState('Verifying your document…');
@@ -525,6 +527,25 @@ const MobileVerificationPage: React.FC = () => {
     const inputId = cameraVariant === 'front' ? 'mv-front-upload' : 'mv-back-upload';
     setTimeout(() => document.getElementById(inputId)?.click(), 100);
   }, [cameraVariant]);
+
+  // ── Guided selfie camera callbacks ────────────────────────────────────────
+  const handleSelfieCameraCapture = useCallback((file: File) => {
+    setShowSelfieCamera(false);
+    if (selfiePreviewUrl) URL.revokeObjectURL(selfiePreviewUrl);
+    setSelfieFile(file);
+    setSelfiePreviewUrl(URL.createObjectURL(file));
+    setStepError(null);
+  }, [selfiePreviewUrl]);
+
+  const handleSelfieCameraClose = useCallback(() => {
+    setShowSelfieCamera(false);
+  }, []);
+
+  const handleSelfieCameraFallback = useCallback(() => {
+    setShowSelfieCamera(false);
+    setCameraSupported(false);
+    setTimeout(() => document.getElementById('mv-selfie-upload')?.click(), 100);
+  }, []);
 
   const uploadFront = async () => {
     if (!frontFile || !verificationId || !apiKey) return;
@@ -1008,7 +1029,10 @@ const MobileVerificationPage: React.FC = () => {
               onChange={handleSelfieSelect} />
 
             {!selfieFile ? (
-              <PrimaryBtn onClick={() => document.getElementById('mv-selfie-upload')?.click()} disabled={isProcessing}>
+              <PrimaryBtn
+                onClick={() => cameraSupported ? setShowSelfieCamera(true) : document.getElementById('mv-selfie-upload')?.click()}
+                disabled={isProcessing}
+              >
                 Take Selfie
               </PrimaryBtn>
             ) : (
@@ -1032,6 +1056,15 @@ const MobileVerificationPage: React.FC = () => {
             onCapture={handleCameraCapture}
             onClose={handleCameraClose}
             onFallback={handleCameraFallback}
+          />
+        )}
+
+        {/* ── Guided Selfie Camera Overlay ──────────────────────────── */}
+        {showSelfieCamera && (
+          <SelfieCameraCapture
+            onCapture={handleSelfieCameraCapture}
+            onClose={handleSelfieCameraClose}
+            onFallback={handleSelfieCameraFallback}
           />
         )}
 
