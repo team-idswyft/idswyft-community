@@ -278,7 +278,7 @@ describe('PaddleOCRProvider', () => {
 
       const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
 
-      expect(data.document_number).toBe('5551234');
+      expect(data.document_number).toBe('D5551234');
       expect(data.name).toBe('MARIA ELENA GARCIA');
       expect(data.date_of_birth).toBe('1988-04-22');
       expect(data.expiration_date).toBe('2030-04-22');
@@ -505,6 +505,297 @@ describe('PaddleOCRProvider', () => {
       );
       const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
       expect(data.name).toBe('ELENA ROSA MARTINEZ');
+    });
+  });
+
+  describe('state-specific DL number formats', () => {
+    it('Idaho: 2 letters + 6 digits + 1 letter (e.g., AB123456C)', async () => {
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'IDAHO' }],
+          [{ text: 'DRIVER LICENSE' }],
+          [{ text: 'DL JK234567A' }],
+          [{ text: 'LN ANDERSON' }],
+          [{ text: 'FN SARAH' }],
+          [{ text: 'DOB: 03/15/1992' }],
+        ]),
+      );
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+      expect(data.document_number).toBe('JK234567A');
+    });
+
+    it('North Dakota: 3 letters + 6 digits (e.g., ABC123456)', async () => {
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'NORTH DAKOTA' }],
+          [{ text: 'DRIVER LICENSE' }],
+          [{ text: 'DL SMI123456' }],
+          [{ text: 'Name: SMITH, JOHN' }],
+          [{ text: 'DOB: 07/04/1985' }],
+        ]),
+      );
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+      expect(data.document_number).toBe('SMI123456');
+    });
+
+    it('New Hampshire current: NHL + 8 digits', async () => {
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'NEW HAMPSHIRE' }],
+          [{ text: 'DRIVER LICENSE' }],
+          [{ text: 'NHL12345678' }],
+          [{ text: 'LN BAKER' }],
+          [{ text: 'FN MICHAEL' }],
+          [{ text: 'DOB: 11/20/1980' }],
+        ]),
+      );
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+      expect(data.document_number).toBe('NHL12345678');
+    });
+
+    it('New Hampshire legacy: 2 digits + 3 letters + 5 digits', async () => {
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'NEW HAMPSHIRE' }],
+          [{ text: 'DRIVER LICENSE' }],
+          [{ text: '12BAK45678' }],
+          [{ text: 'LN BAKER' }],
+          [{ text: 'FN ANNA' }],
+          [{ text: 'DOB: 06/15/1975' }],
+        ]),
+      );
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+      expect(data.document_number).toBe('12BAK45678');
+    });
+
+    it('Iowa mixed: 3 digits + 2 letters + 4 digits (e.g., 123AB4567)', async () => {
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'IOWA' }],
+          [{ text: 'DRIVER LICENSE' }],
+          [{ text: 'DL 456CD7890' }],
+          [{ text: 'Name: LARSON, EMILY' }],
+          [{ text: 'DOB: 09/08/1999' }],
+        ]),
+      );
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+      expect(data.document_number).toBe('456CD7890');
+    });
+
+    it('Montana: 13-14 digit format', async () => {
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'MONTANA' }],
+          [{ text: 'DRIVER LICENSE' }],
+          [{ text: 'DL 1234567890123' }],
+          [{ text: 'Name: CARTER, WILLIAM' }],
+          [{ text: 'DOB: 04/22/1978' }],
+        ]),
+      );
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+      expect(data.document_number).toBe('1234567890123');
+    });
+
+    it('Missouri: 9 digits + trailing letter (e.g., 123456789A)', async () => {
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'MISSOURI' }],
+          [{ text: 'DRIVER LICENSE' }],
+          [{ text: 'DL 987654321B' }],
+          [{ text: 'Name: JOHNSON, ROBERT' }],
+          [{ text: 'DOB: 12/01/1990' }],
+        ]),
+      );
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+      expect(data.document_number).toBe('987654321B');
+    });
+
+    it('Missouri mixed: 3 digits + 1 letter + 6 digits', async () => {
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'MISSOURI' }],
+          [{ text: 'DRIVER LICENSE' }],
+          [{ text: '123A456789' }],
+          [{ text: 'LN DAVIS' }],
+          [{ text: 'FN MARK' }],
+          [{ text: 'DOB: 05/10/1988' }],
+        ]),
+      );
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+      expect(data.document_number).toBe('123A456789');
+    });
+
+    it('Vermont: 7 digits + A suffix (e.g., 1234567A)', async () => {
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'VERMONT' }],
+          [{ text: 'DRIVER LICENSE' }],
+          [{ text: 'DL 1234567A' }],
+          [{ text: 'Name: GREEN, LISA' }],
+          [{ text: 'DOB: 08/30/1993' }],
+        ]),
+      );
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+      expect(data.document_number).toBe('1234567A');
+    });
+
+    it('Maine: 7 digits + letter suffix (e.g., 1234567X)', async () => {
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'MAINE' }],
+          [{ text: 'DRIVER LICENSE' }],
+          [{ text: 'DL 7654321X' }],
+          [{ text: 'LN THOMPSON' }],
+          [{ text: 'FN DANIEL' }],
+          [{ text: 'DOB: 02/14/1986' }],
+        ]),
+      );
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+      expect(data.document_number).toBe('7654321X');
+    });
+
+    it('New Jersey: 1 letter + 14 digits', async () => {
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'NEW JERSEY' }],
+          [{ text: 'DRIVER LICENSE' }],
+          [{ text: 'DL S12345678901234' }],
+          [{ text: 'Name: PATEL, RAVI KUMAR' }],
+          [{ text: 'DOB: 01/25/1995' }],
+        ]),
+      );
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+      expect(data.document_number).toBe('S12345678901234');
+    });
+
+    it('Wisconsin: 1 letter + 13 digits', async () => {
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'WISCONSIN' }],
+          [{ text: 'DRIVER LICENSE' }],
+          [{ text: 'DL M1234567890123' }],
+          [{ text: 'Name: NGUYEN, TRAN' }],
+          [{ text: 'DOB: 10/12/1997' }],
+        ]),
+      );
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+      expect(data.document_number).toBe('M1234567890123');
+    });
+
+    it('Pennsylvania: 8 pure digits', async () => {
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'PENNSYLVANIA' }],
+          [{ text: 'DRIVER LICENSE' }],
+          [{ text: 'DL 12345678' }],
+          [{ text: 'Name: WILSON, JAMES' }],
+          [{ text: 'DOB: 06/20/1983' }],
+        ]),
+      );
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+      expect(data.document_number).toBe('12345678');
+    });
+
+    it('Nevada X-prefix: X + 8 digits', async () => {
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'NEVADA' }],
+          [{ text: 'DRIVER LICENSE' }],
+          [{ text: 'X12345678' }],
+          [{ text: 'LN RODRIGUEZ' }],
+          [{ text: 'FN CARLOS' }],
+          [{ text: 'DOB: 03/07/1991' }],
+        ]),
+      );
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+      expect(data.document_number).toBe('X12345678');
+    });
+
+    it('Washington WDL format', async () => {
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'WASHINGTON' }],
+          [{ text: 'DRIVER LICENSE' }],
+          [{ text: 'WDLBCDFGH1234' }],
+          [{ text: 'LN KIM' }],
+          [{ text: 'FN JENNY' }],
+          [{ text: 'DOB: 04/18/1994' }],
+        ]),
+      );
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+      expect(data.document_number).toBe('WDLBCDFGH1234');
+    });
+
+    it('Kansas alternating: letter-digit-letter-digit-letter (e.g., K1A2B)', async () => {
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'KANSAS' }],
+          [{ text: 'DRIVER LICENSE' }],
+          [{ text: 'DL K1A2B' }],
+          [{ text: 'Name: BROWN, TYLER' }],
+          [{ text: 'DOB: 11/30/2000' }],
+        ]),
+      );
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+      expect(data.document_number).toBe('K1A2B');
+    });
+
+    it('Kansas K-prefix: K + 8 digits', async () => {
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'KANSAS' }],
+          [{ text: 'DRIVER LICENSE' }],
+          [{ text: 'DL K12345678' }],
+          [{ text: 'Name: BROWN, TYLER' }],
+          [{ text: 'DOB: 11/30/2000' }],
+        ]),
+      );
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+      expect(data.document_number).toBe('K12345678');
+    });
+
+    it('Colorado: ##-###-#### format', async () => {
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'COLORADO' }],
+          [{ text: 'DRIVER LICENSE' }],
+          [{ text: 'DL 12-345-6789' }],
+          [{ text: 'Name: HARRIS, AMY' }],
+          [{ text: 'DOB: 07/22/1989' }],
+        ]),
+      );
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+      expect(data.document_number).toBe('123456789');
+    });
+
+    it('Missouri R-suffix: letter + 6 digits + R', async () => {
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'MISSOURI' }],
+          [{ text: 'DRIVER LICENSE' }],
+          [{ text: 'A123456R' }],
+          [{ text: 'LN MARTIN' }],
+          [{ text: 'FN SUSAN' }],
+          [{ text: 'DOB: 09/03/1982' }],
+        ]),
+      );
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+      expect(data.document_number).toBe('A123456R');
+    });
+
+    it('Operator License NO label variant', async () => {
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'WASHINGTON' }],
+          [{ text: 'DRIVER LICENSE' }],
+          [{ text: 'Operator License No WDLBCDFGH9999' }],
+          [{ text: 'LN LEE' }],
+          [{ text: 'FN CHRIS' }],
+          [{ text: 'DOB: 05/01/1996' }],
+        ]),
+      );
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+      expect(data.document_number).toBe('WDLBCDFGH9999');
     });
   });
 });
