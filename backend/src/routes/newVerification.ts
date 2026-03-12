@@ -20,6 +20,8 @@ import { VerificationStatus } from '@/verification/models/types.js';
 import type { FrontExtractionResult, BackExtractionResult, LiveCaptureResult, SessionState } from '@/verification/models/types.js';
 import { computeFaceMatch } from '@/verification/face/faceMatchService.js';
 import { SessionFlowError } from '@/verification/exceptions.js';
+import { WebhookService } from '@/services/webhook.js';
+import type { WebhookPayload } from '@/types/index.js';
 
 const router = express.Router();
 
@@ -28,6 +30,7 @@ const verificationService = new VerificationService();
 const ocrService = new OCRService();
 const barcodeService = new BarcodeService();
 const faceRecognitionService = new FaceRecognitionService();
+const webhookService = new WebhookService();
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -255,6 +258,56 @@ function mapStatusForResponse(state: Readonly<SessionState>): {
   };
 }
 
+// ─── Webhook trigger helper ──────────────────────────────
+
+/**
+ * Fire webhooks if the verification has reached a terminal state.
+ * Called AFTER res.json() so it never delays the HTTP response.
+ * Errors are caught and logged — never thrown.
+ */
+async function fireWebhooksIfTerminal(
+  verificationId: string,
+  developerId: string,
+  userId: string,
+  state: SessionState,
+  mapped: { final_result: string | null },
+  isSandbox: boolean
+): Promise<void> {
+  if (mapped.final_result === null) return; // not terminal yet
+
+  try {
+    const webhooks = await webhookService.getActiveWebhooksForDeveloper(developerId, isSandbox);
+    if (webhooks.length === 0) return;
+
+    const payload: WebhookPayload = {
+      user_id: userId,
+      verification_id: verificationId,
+      status: mapped.final_result as any,
+      timestamp: new Date().toISOString(),
+      data: {
+        ocr_data: state.front_extraction?.ocr ?? undefined,
+        face_match_score: state.face_match?.similarity_score ?? undefined,
+        failure_reason: state.rejection_detail ?? undefined,
+      },
+    };
+
+    for (const webhook of webhooks) {
+      webhookService.sendWebhook(webhook, verificationId, payload).catch(err => {
+        logger.error('Webhook delivery error (fire-and-forget):', {
+          webhookId: webhook.id,
+          verificationId,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+    }
+  } catch (err) {
+    logger.error('fireWebhooksIfTerminal failed:', {
+      verificationId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
 // ─── Auth helper ──────────────────────────────
 
 async function requireOwnedVerification(req: Request, verificationId: string) {
@@ -415,6 +468,12 @@ router.post('/:verification_id/front-document',
         ? stepResult.user_message || 'Front document processing failed'
         : 'Front document processed successfully - ready to upload back document',
     });
+
+    // Fire webhooks if Gate 1 hard-rejected (after response is sent)
+    fireWebhooksIfTerminal(
+      verification_id, (req as any).developer.id, verification.user_id,
+      state, mapped, isSandbox
+    );
   })
 );
 
@@ -522,6 +581,12 @@ router.post('/:verification_id/back-document',
         ? stepResult.user_message || 'Back document processing failed'
         : 'Back document processed and cross-validation passed - ready for live capture',
     });
+
+    // Fire webhooks if cross-validation hard-rejected (after response is sent)
+    fireWebhooksIfTerminal(
+      verification_id, (req as any).developer.id, verification.user_id,
+      state, mapped, isSandbox
+    );
   })
 );
 
@@ -685,6 +750,12 @@ router.post('/:verification_id/live-capture',
           ? stepResult.user_message || 'Verification failed'
           : 'Live capture processed',
     });
+
+    // Fire webhooks on COMPLETE or HARD_REJECTED (after response is sent)
+    fireWebhooksIfTerminal(
+      verification_id, (req as any).developer.id, verification.user_id,
+      state, mapped, isSandbox
+    );
   })
 );
 

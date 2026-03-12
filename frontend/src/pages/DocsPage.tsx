@@ -812,9 +812,9 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
               {
                 emoji: '🚀', title: 'Ready-Made Page',
                 tag: { label: 'Fastest', color: C.green, bg: C.greenDim },
-                desc: 'Redirect users to our hosted verification page. No UI to build — we handle all 6 steps, camera access, mobile handoff, and result display.',
-                features: ['Complete UI, zero frontend work', 'Camera + liveness built-in', 'Mobile QR code handoff', 'Light/dark theme support', 'Custom redirect on completion'],
-                href: '/user-verification?api_key=demo&user_id=demo-user',
+                desc: 'Redirect users to our hosted verification page. Users choose between mobile (recommended) or desktop — we handle all steps, camera access, and result display.',
+                features: ['Mobile-first with QR handoff (recommended)', 'Complete UI, zero frontend work', 'Camera + liveness built-in', 'Webhook notifications on completion', 'Custom redirect on completion'],
+                href: '/user-verification',
                 cta: 'Try demo →',
               },
               {
@@ -851,11 +851,11 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
               <FieldRow name="api_key" type="string" req={true} desc="Your Idswyft API key." />
               <FieldRow name="user_id" type="UUID string" req={true} desc="Unique identifier for the user being verified." />
               <FieldRow name="redirect_url" type="URL string" req={false} desc="Where to redirect after verification completes." />
-              <FieldRow name="theme" type="'light' | 'dark'" req={false} desc="UI color theme. Defaults to light." />
+              <FieldRow name="theme" type="'light' | 'dark'" req={false} desc="UI color theme. Defaults to dark." />
             </div>
           </div>
 
-          <Pre label="Example URL" code={`https://yourapp.com/user-verification?api_key=sk_live_xxx&user_id=user-123&redirect_url=https://yourapp.com/done&theme=light`} />
+          <Pre label="Example URL" code={`https://yourapp.com/user-verification?api_key=sk_live_xxx&user_id=user-123&redirect_url=https://yourapp.com/done&theme=dark`} />
 
           <Divider />
 

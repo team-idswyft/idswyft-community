@@ -337,6 +337,34 @@ export class WebhookService {
     }
   }
   
+  /**
+   * Fetch all active webhooks for a developer, filtered by sandbox mode.
+   * Returns [] on error — webhook failure must never block verification.
+   */
+  async getActiveWebhooksForDeveloper(
+    developerId: string,
+    isSandbox: boolean
+  ): Promise<Webhook[]> {
+    try {
+      const { data, error } = await supabase
+        .from('webhooks')
+        .select('*')
+        .eq('developer_id', developerId)
+        .eq('is_active', true)
+        .eq('is_sandbox', isSandbox);
+
+      if (error) {
+        logger.error('Failed to fetch active webhooks for developer:', error);
+        return [];
+      }
+
+      return (data ?? []) as Webhook[];
+    } catch (err) {
+      logger.error('Unexpected error fetching active webhooks:', err);
+      return [];
+    }
+  }
+
   // Get webhook statistics for a developer
   async getWebhookStats(developerId: string): Promise<{
     total_webhooks: number;
