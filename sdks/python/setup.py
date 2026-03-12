@@ -8,7 +8,7 @@ long_description = (here / "README.md").read_text(encoding="utf-8")
 
 setup(
     name="idswyft",
-    version="1.0.0",
+    version="3.0.0",
     author="Idswyft Team",
     author_email="support@idswyft.com",
     description="Official Python SDK for the Idswyft identity verification platform",

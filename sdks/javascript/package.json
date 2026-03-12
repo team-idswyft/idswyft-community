@@ -1,6 +1,6 @@
 {
   "name": "idswyft-sdk",
-  "version": "2.0.1",
+  "version": "3.0.0",
   "description": "Official JavaScript/Node.js SDK for the Idswyft identity verification platform",
   "main": "dist/index.cjs",
   "module": "dist/index.esm.js",

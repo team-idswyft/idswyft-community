@@ -15,21 +15,20 @@ from .exceptions import (
 )
 from .types import (
     VerificationResult,
-    DocumentVerificationRequest,
-    SelfieVerificationRequest,
+    InitializeResponse,
     UsageStats,
     VerificationStatus,
     DocumentType,
     OCRData,
-    QualityAnalysis,
-    QualityAnalysisResolution,
-    QualityAnalysisFileSize,
+    CrossValidationResults,
+    FaceMatchResults,
+    LivenessResults,
 )
 
 # Convenience imports
 Idswyft = IdswyftClient
 
-__version__ = "1.0.0"
+__version__ = "3.0.0"
 __author__ = "Idswyft Team"
 __email__ = "support@idswyft.com"
 
@@ -37,19 +36,18 @@ __all__ = [
     "IdswyftClient",
     "Idswyft",
     "IdswyftError",
-    "IdswyftAPIError", 
+    "IdswyftAPIError",
     "IdswyftAuthenticationError",
     "IdswyftValidationError",
     "IdswyftNetworkError",
     "IdswyftRateLimitError",
     "VerificationResult",
-    "DocumentVerificationRequest",
-    "SelfieVerificationRequest",
+    "InitializeResponse",
     "UsageStats",
     "VerificationStatus",
     "DocumentType",
     "OCRData",
-    "QualityAnalysis",
-    "QualityAnalysisResolution",
-    "QualityAnalysisFileSize",
+    "CrossValidationResults",
+    "FaceMatchResults",
+    "LivenessResults",
 ]
