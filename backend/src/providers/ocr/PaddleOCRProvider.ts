@@ -167,12 +167,19 @@ export class PaddleOCRProvider implements OCRProvider {
   private extractDriversLicenseData(lines: RecognitionResult[][], ocrData: OCRData): void {
     const flatLines = this.flattenLines(lines);
 
+    // Debug: log all flattened lines for diagnostics
+    logger.info('PaddleOCR DL extraction — raw lines', {
+      lineCount: flatLines.length,
+      lines: flatLines.map((l, i) => `[${i}] (${l.confidence.toFixed(2)}) "${l.text}"`),
+    });
+
     // ── DL number ──
     // US DLs use varied labels: "DLn", "DL", "License No", "LIC#", etc.
-    // First try direct regex for "DLn/DL# + digits" which is the most reliable pattern.
+    // PaddleOCR may merge adjacent fields: "4d DLN C 000048787175 9Class C"
+    // So we allow optional letters/spaces between the DL label and the digits.
     let dlNumberLineIndex = -1;
     for (let i = 0; i < flatLines.length; i++) {
-      const m = flatLines[i].text.match(/(?:DLn?|DL\s*#?|LIC\s*#?)\s*([0-9]{6,15})/i);
+      const m = flatLines[i].text.match(/(?:DLn?|DL\s*#?|LIC\s*#?)\s*[A-Z]?\s*([0-9]{6,15})/i);
       if (m) {
         ocrData.document_number = m[1];
         ocrData.confidence_scores!.document_number = flatLines[i].confidence;

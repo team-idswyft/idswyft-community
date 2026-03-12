@@ -162,24 +162,24 @@ describe('PaddleOCRProvider', () => {
       mockRecognize.mockResolvedValue(
         makeResult([
           [{ text: 'NORTHUSA', confidence: 0.97 }, { text: 'DRIVER LICENSE', confidence: 0.99 }, { text: 'CAROLINA', confidence: 0.98 }],
-          [{ text: '4d DLn', confidence: 0.82 }, { text: '000046688716', confidence: 0.99 }],
+          [{ text: '4d DLn', confidence: 0.82 }, { text: '000055667788', confidence: 0.99 }],
           [{ text: 'Class C', confidence: 0.97 }],
-          [{ text: 'LORISSON', confidence: 1.0 }],
-          [{ text: 'OBED', confidence: 0.91 }],
-          [{ text: '84020 TRYON PARK RD', confidence: 0.97 }],
+          [{ text: 'MARTINEZ', confidence: 1.0 }],
+          [{ text: 'ELENA', confidence: 0.91 }],
+          [{ text: '12300 OAK RIDGE BLVD', confidence: 0.97 }],
           [{ text: '3 Date of birth', confidence: 0.98 }, { text: 'N Sex Eyes', confidence: 0.85 }],
           [{ text: '09/29/1979', confidence: 1.0 }, { text: 'M', confidence: 1.0 }, { text: 'BLK', confidence: 1.0 }],
           [{ text: '16 Height', confidence: 0.98 }],
           [{ text: "5'-09\"", confidence: 0.98 }, { text: 'BLK', confidence: 0.97 }],
           [{ text: 'SEP', confidence: 0.99 }, { text: '4a Iss', confidence: 0.97 }, { text: '46 Exp', confidence: 0.94 }],
-          [{ text: '5 DD 0041761301', confidence: 0.98 }, { text: '08/14/2025', confidence: 1.0 }, { text: '09/29/2033', confidence: 1.0 }],
+          [{ text: '5 DD 0099887766', confidence: 0.98 }, { text: '08/14/2025', confidence: 1.0 }, { text: '09/29/2033', confidence: 1.0 }],
         ]),
       );
 
       const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
 
-      expect(data.document_number).toBe('000046688716');
-      expect(data.name).toBe('OBED LORISSON');
+      expect(data.document_number).toBe('000055667788');
+      expect(data.name).toBe('ELENA MARTINEZ');
       expect(data.date_of_birth).toBe('1979-09-29');
       expect(data.expiration_date).toBe('2033-09-29');
     });
@@ -191,11 +191,11 @@ describe('PaddleOCRProvider', () => {
         makeResult([
           [{ text: 'NORTH CAROLINA', confidence: 0.99 }],
           [{ text: 'DRIVER LICENSE', confidence: 0.99 }],
-          [{ text: '4d DLn', confidence: 0.82 }, { text: '000046688716', confidence: 0.99 }],
+          [{ text: '4d DLn', confidence: 0.82 }, { text: '000055667788', confidence: 0.99 }],
           [{ text: 'Class C', confidence: 0.97 }],
-          [{ text: 'LORISSON', confidence: 1.0 }],
-          [{ text: 'OBED', confidence: 0.91 }],
-          [{ text: '84020 TRYON PARK RD', confidence: 0.97 }],
+          [{ text: 'MARTINEZ', confidence: 1.0 }],
+          [{ text: 'ELENA', confidence: 0.91 }],
+          [{ text: '12300 OAK RIDGE BLVD', confidence: 0.97 }],
           [{ text: '3 Date of birth', confidence: 0.98 }],
           [{ text: '09/29/1979', confidence: 1.0 }],
           [{ text: 'Exp', confidence: 0.94 }],
@@ -210,9 +210,42 @@ describe('PaddleOCRProvider', () => {
       expect(data.name).not.toMatch(/driver/i);
       expect(data.document_number).not.toMatch(/carolina/i);
       // The actual data should still be extracted
-      expect(data.document_number).toBe('000046688716');
-      expect(data.name).toBe('OBED LORISSON');
+      expect(data.document_number).toBe('000055667788');
+      expect(data.name).toBe('ELENA MARTINEZ');
       expect(data.date_of_birth).toBe('1979-09-29');
+    });
+
+    it('extracts DL number when PaddleOCR merges class letter into DLN line', async () => {
+      // Simulates PaddleOCR merging adjacent text: "4d DLN C 000099112233 9Class C"
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'NORTHUSA DRIVER LICENSE *', confidence: 0.90 }],
+          [{ text: 'CAROLINA', confidence: 1.00 }],
+          [{ text: '4d DLN C 000099112233 9Class C', confidence: 0.86 }],
+          [{ text: 'TANAKA', confidence: 1.00 }],
+          [{ text: '2 KENJI HIRO', confidence: 0.98 }],
+          [{ text: '55000 MAPLE CREEK DR', confidence: 0.96 }],
+          [{ text: 'APT 204', confidence: 0.97 }],
+          [{ text: 'RALEIGH, NC 27601-1234', confidence: 0.98 }],
+          [{ text: '3 Date of birth 16 Sex 18 Eyes', confidence: 0.96 }],
+          [{ text: '10/11/1982 F BRO', confidence: 1.00 }],
+          [{ text: '16 Height 19 Hair', confidence: 0.98 }],
+          [{ text: "RR 2 5'-05\" BLK", confidence: 0.91 }],
+          [{ text: 'OCT 8 2 4a iss 4b Exp LImITed teRM', confidence: 0.87 }],
+          [{ text: 'S DD 0077665544 08/05/2025 10/11/2033 1', confidence: 0.83 }],
+        ]),
+      );
+
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+
+      expect(data.document_number).toBe('000099112233');
+      // Name: lines "TANAKA" (last) + "KENJI HIRO" (first) → "KENJI HIRO TANAKA"
+      expect(data.name).toContain('TANAKA');
+      expect(data.name).toContain('KENJI');
+      expect(data.name).not.toMatch(/carolina/i);
+      expect(data.name).not.toMatch(/driver/i);
+      expect(data.date_of_birth).toBe('1982-10-11');
+      expect(data.expiration_date).toBe('2033-10-11');
     });
 
     it('picks last date as expiry when multiple dates on same line', async () => {
