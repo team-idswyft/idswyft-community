@@ -452,11 +452,18 @@ const DemoPage: React.FC = () => {
         throw new Error(errorData.error || errorData.message || 'Failed to upload document');
       }
 
-      await response.json();
+      const data = await response.json();
+
+      // Gate 1 may hard-reject (e.g. image too blurry for OCR)
+      if (data.rejection_reason) {
+        toast.error(data.message || data.rejection_reason);
+        return;
+      }
+
       // Document upload successful, start polling for OCR results
       setCurrentStep(3);
       toast.success('Document uploaded successfully');
-      
+
       // Start polling for OCR results
       pollForOCRResults();
     } catch (error) {

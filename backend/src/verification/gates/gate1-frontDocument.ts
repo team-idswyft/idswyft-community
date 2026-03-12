@@ -1,17 +1,17 @@
 /**
- * Gate 1 — Front Document Quality (lenient initial gate)
+ * Gate 1 — Front Document Quality
  *
- * FAIL only if:
+ * HARD REJECT if:
  *   - ZERO OCR fields could be read (document is completely unreadable)
+ *   - OCR confidence below minimum threshold (image too blurry / low quality)
  *
  * SOFT CHECK (warn but pass):
  *   - Some OCR fields missing — cross-validation (Gate 3) handles thorough checks
- *   - OCR confidence below threshold — mobile phone photos often score lower
  *   - No face detected — face matching deferred to Gate 5 (selfie vs document)
  *
- * Gate 1 is intentionally lenient because mobile phone photos of ID cards
- * produce lower-quality OCR results (glare, angles, small text). The real
- * validation happens at Gate 3 (cross-validation) and Gate 5 (face match).
+ * OCR confidence is a hard gate because very low confidence produces garbage
+ * text that poisons downstream cross-validation. It is better to ask the user
+ * to retake the photo immediately than to let gibberish flow to Gate 3.
  */
 
 import type { FrontExtractionResult, GateResult } from '../models/types.js';
@@ -32,7 +32,10 @@ const HEADER_NOISE = [
 
 function isNoiseValue(field: string, value: string): boolean {
   if (field === 'full_name') {
-    return HEADER_NOISE.some(h => value.toLowerCase().trim() === h);
+    const lower = value.toLowerCase().trim();
+    // Match exact header strings OR values that contain a header phrase as a
+    // substring (e.g. "CAROLINA SA DRIVER LICENSE" contains "driver license")
+    return HEADER_NOISE.some(h => lower === h || lower.includes(h));
   }
   return false;
 }
@@ -82,12 +85,18 @@ export function evaluateGate1(front: FrontExtractionResult): GateResult {
     });
   }
 
-  // Soft check: OCR confidence — mobile phone photos often score below threshold
+  // Hard reject: OCR confidence too low — garbage text will poison downstream gates
   if (front.ocr_confidence < VERIFICATION_THRESHOLDS.OCR_CONFIDENCE.minimum_acceptable) {
-    logger.warn('Gate 1: low OCR confidence (soft check — passing)', {
+    logger.warn('Gate 1: REJECTING — OCR confidence too low', {
       ocr_confidence: front.ocr_confidence,
       threshold: VERIFICATION_THRESHOLDS.OCR_CONFIDENCE.minimum_acceptable,
     });
+    return {
+      passed: false,
+      rejection_reason: 'FRONT_LOW_CONFIDENCE',
+      rejection_detail: `OCR confidence ${front.ocr_confidence.toFixed(2)} is below minimum ${VERIFICATION_THRESHOLDS.OCR_CONFIDENCE.minimum_acceptable}`,
+      user_message: 'The photo of your ID is not clear enough. Please retake it in good lighting with the full document visible.',
+    };
   }
 
   // Soft check: face presence — warn but do not reject.

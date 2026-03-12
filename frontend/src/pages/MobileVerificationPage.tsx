@@ -498,6 +498,17 @@ const MobileVerificationPage: React.FC = () => {
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'Upload failed'); }
       if (!mountedRef.current) return;
+      const data = await res.json().catch(() => null);
+
+      // Gate 1 may hard-reject (e.g. image too blurry for OCR) — let user retake
+      if (data?.rejection_reason) {
+        setStepError(data.message || 'The photo of your ID is not clear enough. Please retake it in good lighting.');
+        setFrontFile(null);
+        if (frontPreviewUrl) URL.revokeObjectURL(frontPreviewUrl);
+        setFrontPreviewUrl(null);
+        return;
+      }
+
       // Move to back ID and poll OCR in background
       setScreenIdx(1);
       pollFrontOCR(0);

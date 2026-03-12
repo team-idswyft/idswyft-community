@@ -178,7 +178,7 @@ describe('VerificationSession — Flow Enforcement', () => {
 });
 
 describe('VerificationSession — Hard Rejection', () => {
-  it('PASSES Gate 1 with low OCR confidence (soft check — lenient gate)', async () => {
+  it('HARD REJECTS Gate 1 with low OCR confidence', async () => {
     mockExtractFront.mockResolvedValue({
       ...mockFrontResult,
       ocr_confidence: 0.20,
@@ -186,9 +186,9 @@ describe('VerificationSession — Hard Rejection', () => {
 
     const session = createSession();
     const result = await session.submitFront(Buffer.from('front'));
-    // Gate 1 is lenient — low OCR confidence is a soft warning, not a hard reject
-    expect(result.passed).toBe(true);
-    expect(session.getState().current_step).toBe(VerificationStatus.AWAITING_BACK);
+    // Low OCR confidence is now a hard reject — garbage text poisons downstream gates
+    expect(result.passed).toBe(false);
+    expect(result.rejection_reason).toBe('FRONT_LOW_CONFIDENCE');
   });
 
   it('transitions to HARD_REJECTED when Gate 1 fails (missing fields)', async () => {

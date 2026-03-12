@@ -84,16 +84,48 @@ describe('Gate 1 — Front Document Quality', () => {
     expect(result.rejection_reason).toBe('FRONT_OCR_FAILED');
   });
 
-  // ── OCR confidence (soft check) ────────────────────────────────────
-
-  it('PASSES (soft) when OCR confidence < 0.60 — mobile photos often score lower', () => {
-    const result = evaluateGate1(makeFrontResult({ ocr_confidence: 0.59 }));
+  it('treats partial header match "CAROLINA SA DRIVER LICENSE" as noise for full_name', () => {
+    const input = makeFrontResult();
+    (input.ocr as any).full_name = 'CAROLINA SA DRIVER LICENSE';
+    // Other fields still present → passes (noise name is just ignored)
+    const result = evaluateGate1(input);
     expect(result.passed).toBe(true);
-    expect(result.rejection_reason).toBeNull();
   });
 
-  it('PASSES when OCR confidence is exactly 0.60', () => {
+  it('FAILS when full_name is partial-noise AND all other fields empty', () => {
+    const input = makeFrontResult();
+    (input.ocr as any).full_name = 'CAROLINA SA DRIVER LICENSE';
+    (input.ocr as any).date_of_birth = '';
+    (input.ocr as any).id_number = '';
+    (input.ocr as any).expiry_date = '';
+    const result = evaluateGate1(input);
+    expect(result.passed).toBe(false);
+    expect(result.rejection_reason).toBe('FRONT_OCR_FAILED');
+  });
+
+  // ── OCR confidence (hard reject) ──────────────────────────────────
+
+  it('FAILS with FRONT_LOW_CONFIDENCE when OCR confidence < 0.60', () => {
+    const result = evaluateGate1(makeFrontResult({ ocr_confidence: 0.59 }));
+    expect(result.passed).toBe(false);
+    expect(result.rejection_reason).toBe('FRONT_LOW_CONFIDENCE');
+    expect(result.user_message).toBeTruthy();
+  });
+
+  it('FAILS with FRONT_LOW_CONFIDENCE when OCR confidence is very low (0.35)', () => {
+    const result = evaluateGate1(makeFrontResult({ ocr_confidence: 0.35 }));
+    expect(result.passed).toBe(false);
+    expect(result.rejection_reason).toBe('FRONT_LOW_CONFIDENCE');
+    expect(result.rejection_detail).toContain('0.35');
+  });
+
+  it('PASSES when OCR confidence is exactly 0.60 (boundary)', () => {
     const result = evaluateGate1(makeFrontResult({ ocr_confidence: 0.60 }));
+    expect(result.passed).toBe(true);
+  });
+
+  it('PASSES when OCR confidence is above threshold (0.75)', () => {
+    const result = evaluateGate1(makeFrontResult({ ocr_confidence: 0.75 }));
     expect(result.passed).toBe(true);
   });
 
