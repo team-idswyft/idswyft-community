@@ -271,7 +271,7 @@ const NAV = [
   { id: 'step-5', label: '5 · Get Results', depth: 1 },
   { id: 'selfie', label: 'Cross-Validation', depth: 1 },
   { id: 'integration', label: 'Integration', depth: 0 },
-  { id: 'analysis', label: 'AI Analysis', depth: 0 },
+  { id: 'analysis', label: 'Analysis Engine', depth: 0 },
   { id: 'statuses', label: 'Statuses', depth: 0 },
   { id: 'rate-limits', label: 'Rate Limits', depth: 0 },
   { id: 'support', label: 'Support', depth: 0 },
@@ -637,7 +637,7 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
           {/* Step 4 */}
           <SectionAnchor id="step-4" />
           <EndpointCard step={4} method="POST" path="/api/v2/verify/:id/live-capture" title="Submit Live Capture"
-            badge={{ label: 'AI-enhanced', color: C.purple, bg: C.purpleDim }}>
+            badge={{ label: 'final gate', color: C.green, bg: C.greenDim }}>
             <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
               Submit a <strong style={{ color: C.text }}>selfie image file</strong> for liveness detection (Gate 4) and
               face matching (Gate 5) against the front document photo. Only available after cross-validation passes.
@@ -647,11 +647,11 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
             </p>
 
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
-              <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>Liveness detection checks</div>
+              <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>Liveness & face match checks</div>
               <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px' }}>
-                {['Facial depth & 3D structure', 'Natural skin texture & lighting', 'Screen glare & digital artifact detection', 'Challenge-response (blink, smile, head turn)', 'Anti-spoofing: photo/video replay', 'Face matching against front document photo'].map(s => (
+                {['Image byte entropy analysis', 'Pixel variance & texture checks', 'File size heuristics (vs screenshots)', 'Digital artifact detection', 'Face detection (SSDMobileNet)', 'Face embedding cosine similarity'].map(s => (
                   <div key={s} style={{ fontFamily: C.sans, fontSize: '0.8rem', color: C.muted, display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <span style={{ color: C.purple, fontSize: '0.7rem' }}>✓</span> {s}
+                    <span style={{ color: C.green, fontSize: '0.7rem' }}>✓</span> {s}
                   </div>
                 ))}
               </div>
@@ -859,17 +859,17 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
 
           <Divider />
 
-          {/* ══ AI ANALYSIS ══════════════════════════════════════════════════ */}
+          {/* ══ ANALYSIS ENGINE ═══════════════════════════════════════════════ */}
           <SectionAnchor id="analysis" />
-          <H2>AI Analysis Features</H2>
-          <Lead>What the platform extracts and validates from each document and capture.</Lead>
+          <H2>Analysis Engine</H2>
+          <Lead>What the platform extracts and validates from each document and capture. Processing uses algorithmic rules, image forensics, and pre-trained OCR / face-detection models — no custom AI or LLMs.</Lead>
 
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12, marginBottom: 24 }}>
             {[
-              { title: 'OCR Extraction', color: C.cyan, items: ['Name, date of birth', 'Document number', 'Expiry & issue date', 'Issuing authority', 'Address (where applicable)', 'Per-field confidence scores'] },
-              { title: 'Document Quality', color: C.blue, items: ['Blur detection', 'Brightness & contrast', 'Resolution check', 'File size validation', 'Overall quality rating', 'Improvement recommendations'] },
-              { title: 'Barcode / QR', color: C.amber, items: ['PDF417 barcode decode', 'QR code scanning', 'Data field extraction', 'Front ↔ back cross-check', 'ID number consistency', 'Security feature flags'] },
-              { title: 'Liveness & Face', color: C.green, items: ['3D facial depth analysis', 'Skin texture & lighting', 'Anti-spoofing detection', 'Challenge-response', 'Face similarity 0–1', 'Multiple face detection'] },
+              { title: 'OCR Extraction', color: C.cyan, items: ['PaddleOCR / Tesseract engines', 'Name, DOB, ID number', 'Expiry & issue date', 'AAMVA field parsing (US DLs)', 'State DL format validation', 'Per-field confidence scores'] },
+              { title: 'Document Quality', color: C.blue, items: ['Sobel edge blur detection', 'Brightness & contrast stats', 'Resolution check (≥ 800×600)', 'File size validation', 'Overall quality score', 'Auto-reject below threshold'] },
+              { title: 'Cross-Validation', color: C.amber, items: ['PDF417 / QR barcode decode', 'Levenshtein distance matching', 'Token-set name similarity', 'Front OCR ↔ back barcode check', 'Date & ID number consistency', 'Weighted field scoring'] },
+              { title: 'Liveness & Face Match', color: C.green, items: ['Byte entropy analysis', 'Pixel variance checks', 'File-size heuristics', 'Face detection (SSDMobileNet)', '128-d face embeddings', 'Cosine similarity scoring'] },
             ].map(col => (
               <div key={col.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '18px 20px' }}>
                 <div style={{ fontFamily: C.mono, fontSize: '0.8rem', fontWeight: 600, color: col.color, marginBottom: 12 }}>{col.title}</div>
