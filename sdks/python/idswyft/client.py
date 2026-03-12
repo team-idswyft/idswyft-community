@@ -43,7 +43,7 @@ class IdswyftClient:
 
     Args:
         api_key: Your Idswyft API key
-        base_url: API base URL (default: https://api.idswyft.com)
+        base_url: API base URL (default: https://api.idswyft.app)
         timeout: Request timeout in seconds (default: 30)
         sandbox: Whether to use sandbox environment (default: False)
 
@@ -61,7 +61,7 @@ class IdswyftClient:
     def __init__(
         self,
         api_key: str,
-        base_url: str = "https://api.idswyft.com",
+        base_url: str = "https://api.idswyft.app",
         timeout: int = 30,
         sandbox: bool = False,
     ):

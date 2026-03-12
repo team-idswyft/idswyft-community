@@ -10,14 +10,14 @@ setup(
     name="idswyft",
     version="3.0.0",
     author="Idswyft Team",
-    author_email="support@idswyft.com",
+    author_email="support@idswyft.app",
     description="Official Python SDK for the Idswyft identity verification platform",
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/doobee46/idswyft",
     project_urls={
         "Bug Reports": "https://github.com/doobee46/idswyft/issues",
-        "Documentation": "https://docs.idswyft.com",
+        "Documentation": "https://idswyft.app/doc",
         "Source": "https://github.com/doobee46/idswyft/tree/main/sdks/python",
     },
     classifiers=[

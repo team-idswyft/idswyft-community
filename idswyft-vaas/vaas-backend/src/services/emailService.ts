@@ -258,7 +258,7 @@ Volume: ${data.estimatedVolume}/month
 Use Case: ${data.useCase}
 Signup ID: ${data.signupId}`;
 
-    const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL || 'admin@idswyft.com';
+    const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL || 'admin@idswyft.app';
     
     return this.sendEmail({
       to: adminEmail,

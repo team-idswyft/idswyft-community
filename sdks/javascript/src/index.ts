@@ -172,7 +172,7 @@ export class IdswyftSDK {
   constructor(config: IdswyftConfig) {
     this.config = {
       apiKey: config.apiKey,
-      baseURL: config.baseURL || 'https://api.idswyft.com',
+      baseURL: config.baseURL || 'https://api.idswyft.app',
       timeout: config.timeout || 30000,
       sandbox: config.sandbox || false,
     };

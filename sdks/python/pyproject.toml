@@ -4,9 +4,9 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "idswyft"
-version = "2.0.0"
+version = "3.0.0"
 authors = [
-    {name = "Idswyft Team", email = "support@idswyft.com"},
+    {name = "Idswyft Team", email = "support@idswyft.app"},
 ]
 description = "Official Python SDK for the Idswyft identity verification platform"
 readme = "README.md"
@@ -48,8 +48,8 @@ test = [
 ]
 
 [project.urls]
-Homepage = "https://idswyft.com"
-Documentation = "https://docs.idswyft.com"
+Homepage = "https://idswyft.app"
+Documentation = "https://idswyft.app/doc"
 Repository = "https://github.com/doobee46/idswyft.git"
 "Bug Reports" = "https://github.com/doobee46/idswyft/issues"
 

@@ -30,7 +30,7 @@ Idswyft = IdswyftClient
 
 __version__ = "3.0.0"
 __author__ = "Idswyft Team"
-__email__ = "support@idswyft.com"
+__email__ = "support@idswyft.app"
 
 __all__ = [
     "IdswyftClient",

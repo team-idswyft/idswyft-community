@@ -102,7 +102,7 @@ export const AdminLogin: React.FC = () => {
                 value={credentials.email}
                 onChange={(e) => setCredentials({...credentials, email: e.target.value})}
                 className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="admin@idswyft.com"
+                placeholder="admin@idswyft.app"
                 required
               />
             </div>
@@ -137,7 +137,7 @@ export const AdminLogin: React.FC = () => {
                 For testing purposes, you can use:
               </p>
               <div className="text-sm text-gray-700">
-                <p><strong>Email:</strong> admin@idswyft.com</p>
+                <p><strong>Email:</strong> admin@idswyft.app</p>
                 <p><strong>Password:</strong> admin123</p>
               </div>
             </div>

@@ -1,6 +1,6 @@
 # Idswyft Python SDK
 
-Official Python SDK for the [Idswyft](https://idswyft.com) identity verification platform.
+Official Python SDK for the [Idswyft](https://idswyft.app) identity verification platform.
 
 ## Installation
 
@@ -13,26 +13,31 @@ pip install idswyft
 ```python
 import idswyft
 
-# Initialize the client
 client = idswyft.IdswyftClient(
-    api_key="your-api-key-here",
-    sandbox=True  # Use sandbox for testing
+    api_key="your-api-key",
+    sandbox=True
 )
 
-# Verify a document
-with open("passport.jpg", "rb") as f:
-    result = client.verify_document(
-        document_type="passport",
-        document_file=f,
-        user_id="user-123"
-    )
+# Step 1: Initialize session
+session = client.start_verification(user_id="user-123", document_type="drivers_license")
+vid = session["verification_id"]
 
-print(f"Verification status: {result['status']}")
+# Step 2: Upload front of ID (triggers OCR + quality gate)
+front = client.upload_front_document(vid, "front.jpg")
+print(f"OCR: {front.get('ocr_data')}")
+
+# Step 3: Upload back of ID (triggers barcode + cross-validation)
+back = client.upload_back_document(vid, "back.jpg")
+print(f"Cross-validation: {back.get('cross_validation_results')}")
+
+# Step 4: Upload selfie (triggers liveness + face match, auto-finalizes)
+result = client.upload_selfie(vid, "selfie.jpg")
+print(f"Result: {result['final_result']}")  # 'verified', 'manual_review', or 'failed'
 ```
 
 ## Authentication
 
-Get your API key from the [Idswyft Developer Portal](https://idswyft.com/developer). Store it securely as an environment variable:
+Get your API key from the [Idswyft Developer Portal](https://idswyft.app/developer). Store it securely as an environment variable:
 
 ```bash
 export IDSWYFT_API_KEY="your-api-key"
@@ -45,98 +50,172 @@ import idswyft
 client = idswyft.IdswyftClient(api_key=os.getenv("IDSWYFT_API_KEY"))
 ```
 
-## API Reference
-
-### Client Configuration
+## Configuration
 
 ```python
 client = idswyft.IdswyftClient(
-    api_key="your-api-key",           # Required: Your Idswyft API key
-    base_url="https://api.idswyft.com",  # Optional: API base URL
-    timeout=30,                       # Optional: Request timeout in seconds
-    sandbox=False                     # Optional: Use sandbox environment
+    api_key="your-api-key",             # Required: Your Idswyft API key
+    base_url="https://api.idswyft.app", # Optional: API base URL
+    timeout=30,                         # Optional: Request timeout in seconds (default: 30)
+    sandbox=False                       # Optional: Use sandbox environment (default: False)
 )
 ```
 
-### Document Verification
+## Verification Flow (v2 API)
 
-Verify government-issued documents like passports, driver's licenses, and national IDs:
+The SDK follows a step-based verification flow. Each step auto-triggers quality gates that validate the submission before proceeding.
+
+```
+1. start_verification()        -> Initialize session, get verification_id
+2. upload_front_document()     -> Upload front of ID -> OCR + Gate 1 (quality)
+3. upload_back_document()      -> Upload back of ID -> barcode + Gate 2-3 (quality + cross-validation)
+4. upload_selfie()             -> Upload selfie -> Gate 4-5 (liveness + face match) -> auto-finalize
+5. get_verification_status()   -> Check status at any point
+```
+
+If any gate fails, the session is hard-rejected and subsequent steps return a `409 Conflict` error.
+
+### Step 1: Initialize Verification
+
+```python
+session = client.start_verification(
+    user_id="user-123",                 # Required: Your internal user ID
+    document_type="drivers_license",    # Optional: 'passport', 'drivers_license', 'national_id', 'other'
+    sandbox=True,                       # Optional: Use sandbox environment
+)
+
+vid = session["verification_id"]        # Use this ID for all subsequent steps
+print(session["status"])                # 'AWAITING_FRONT'
+```
+
+### Step 2: Upload Front Document
+
+The front document upload accepts file paths, bytes, or file-like objects:
 
 ```python
 # Using file path
-result = client.verify_document(
-    document_type="passport",  # 'passport' | 'drivers_license' | 'national_id' | 'other'
-    document_file="passport.jpg",
-    user_id="user-123",       # Optional: Your internal user ID
-    webhook_url="https://yourapp.com/webhook",  # Optional: Webhook URL
-    metadata={"session_id": "abc123"}  # Optional: Custom metadata
+front = client.upload_front_document(
+    verification_id=vid,
+    document_file="front.jpg",          # File path
+    document_type="drivers_license",    # Default: 'drivers_license'
 )
 
 # Using file object
-with open("drivers_license.jpg", "rb") as f:
-    result = client.verify_document(
-        document_type="drivers_license",
-        document_file=f,
-        user_id="user-456"
-    )
+with open("front.jpg", "rb") as f:
+    front = client.upload_front_document(vid, f)
 
 # Using bytes
-with open("national_id.jpg", "rb") as f:
-    file_data = f.read()
-    
-result = client.verify_document(
-    document_type="national_id",
-    document_file=file_data,
-    user_id="user-789"
-)
+with open("front.jpg", "rb") as f:
+    front = client.upload_front_document(vid, f.read())
+
+# Response includes OCR extraction results
+if front.get("ocr_data"):
+    ocr = front["ocr_data"]
+    print(f"Name: {ocr.get('full_name')}")
+    print(f"DOB: {ocr.get('date_of_birth')}")
+    print(f"ID Number: {ocr.get('id_number')}")
+
+# If Gate 1 fails (poor quality), check rejection info
+if front.get("rejection_reason"):
+    print(f"Rejected: {front['rejection_reason']}")
+    print(f"Detail: {front.get('rejection_detail')}")
 ```
 
-### Selfie Verification
-
-Verify selfies, optionally against a reference document:
+### Step 3: Upload Back Document
 
 ```python
-# Basic selfie verification
-result = client.verify_selfie(
-    selfie_file="selfie.jpg",
-    user_id="user-123"
-)
+back = client.upload_back_document(vid, "back.jpg")
 
-# Selfie verification with document matching
-result = client.verify_selfie(
-    selfie_file="selfie.jpg",
-    reference_document_id="doc-123",  # Document to match against
-    user_id="user-123",
-    webhook_url="https://yourapp.com/webhook",
-    metadata={"session_id": "abc123"}
-)
+# Barcode/PDF417 extraction results
+if back.get("barcode_data"):
+    print(f"Barcode data: {back['barcode_data']}")
+
+# Cross-validation results (front OCR vs back barcode)
+if back.get("cross_validation_results"):
+    cv = back["cross_validation_results"]
+    print(f"Verdict: {cv['verdict']}")      # 'PASS' or 'REVIEW'
+    print(f"Score: {cv['score']}")           # 0.0 - 1.0
+    print(f"Match: {back['documents_match']}")  # boolean
+```
+
+### Step 3.5: Get Cross-Validation (Optional)
+
+Cross-validation runs automatically after the back document upload. Use this to query the cached result separately:
+
+```python
+cv = client.get_cross_validation(vid)
+print(f"Cross-validation: {cv.get('cross_validation_results')}")
+```
+
+### Step 4: Upload Selfie
+
+This is the final step. It triggers liveness detection, face matching against the document photo, and auto-finalizes the verification.
+
+```python
+result = client.upload_selfie(vid, "selfie.jpg")
+
+# Face match results
+if result.get("face_match_results"):
+    fm = result["face_match_results"]
+    print(f"Face match passed: {fm['passed']}")
+    print(f"Similarity score: {fm['score']}")
+
+# Liveness results
+if result.get("liveness_results"):
+    lr = result["liveness_results"]
+    print(f"Liveness passed: {lr['liveness_passed']}")
+
+# Final verification outcome
+print(f"Final result: {result.get('final_result')}")  # 'verified' | 'manual_review' | 'failed'
 ```
 
 ### Check Verification Status
 
+Query the full status at any point during or after the flow:
+
 ```python
-verification = client.get_verification_status("verification-id")
-print(verification["status"])  # 'pending' | 'verified' | 'failed' | 'manual_review'
-print(verification["confidence_score"])  # Confidence score if available
+status = client.get_verification_status(vid)
+
+print(f"Status: {status['status']}")                           # e.g. 'COMPLETE', 'AWAITING_BACK'
+print(f"Step: {status.get('current_step')} / {status.get('total_steps')}")
+print(f"Front uploaded: {status.get('front_document_uploaded')}")
+print(f"Back uploaded: {status.get('back_document_uploaded')}")
+print(f"Selfie uploaded: {status.get('live_capture_uploaded')}")
+print(f"Final result: {status.get('final_result')}")
 ```
 
-### List Verifications
+## Verification Statuses
+
+| Status | Description |
+|--------|-------------|
+| `AWAITING_FRONT` | Waiting for front document upload |
+| `FRONT_PROCESSING` | Processing front document (OCR + quality) |
+| `AWAITING_BACK` | Waiting for back document upload |
+| `BACK_PROCESSING` | Processing back document (barcode + cross-validation) |
+| `CROSS_VALIDATING` | Running cross-validation between front and back |
+| `AWAITING_LIVE` | Waiting for selfie upload |
+| `LIVE_PROCESSING` | Processing selfie (liveness + face match) |
+| `FACE_MATCHING` | Running face match comparison |
+| `COMPLETE` | Verification complete |
+| `HARD_REJECTED` | Session rejected by a quality gate |
+
+## Developer Management
+
+### API Keys
 
 ```python
-# List all verifications
-response = client.list_verifications()
-print(f"Total verifications: {response['total']}")
+# Create a new API key
+key = client.create_api_key(name="Production Key", environment="production")
+print(f"API Key: {key['api_key']}")
+print(f"Key ID: {key['key_id']}")
 
-# List with filters
-response = client.list_verifications(
-    status="verified",     # Optional: Filter by status
-    limit=50,             # Optional: Limit results (default: 100)
-    offset=0,             # Optional: Pagination offset
-    user_id="user-123"    # Optional: Filter by user ID
-)
+# List all API keys
+keys = client.list_api_keys()
+for k in keys.get("api_keys", []):
+    print(f"  {k['name']} ({k['environment']}) - Active: {k['is_active']}")
 
-for verification in response["verifications"]:
-    print(f"ID: {verification['id']}, Status: {verification['status']}")
+# Revoke an API key
+client.revoke_api_key("key-id")
 ```
 
 ### Usage Statistics
@@ -148,7 +227,45 @@ print(f"Monthly usage: {stats['monthly_usage']}/{stats['monthly_limit']}")
 print(f"Remaining quota: {stats['remaining_quota']}")
 ```
 
-## Webhook Verification
+### API Activity
+
+```python
+activity = client.get_api_activity(
+    limit=50,
+    offset=0,
+    start_date="2024-01-01",
+    end_date="2024-12-31"
+)
+print(f"Total activities: {activity.get('total', 0)}")
+```
+
+## Webhook Management
+
+```python
+# Register a webhook
+webhook = client.register_webhook(
+    url="https://yourapp.com/webhook",
+    events=["verification.completed", "verification.failed"],
+    secret="your-webhook-secret"
+)
+
+# List all webhooks
+webhooks = client.list_webhooks()
+
+# Update a webhook
+client.update_webhook("webhook-id", events=["verification.completed"])
+
+# Test webhook delivery
+client.test_webhook("webhook-id")
+
+# Get delivery history
+deliveries = client.get_webhook_deliveries("webhook-id", limit=20)
+
+# Delete a webhook
+client.delete_webhook("webhook-id")
+```
+
+## Webhook Signature Verification
 
 Secure your webhook endpoints by verifying the signature:
 
@@ -162,15 +279,15 @@ app = Flask(__name__)
 def webhook():
     payload = request.get_data(as_text=True)
     signature = request.headers.get('X-Idswyft-Signature')
-    webhook_secret = 'your-webhook-secret'
+    secret = 'your-webhook-secret'
 
-    if idswyft.IdswyftClient.verify_webhook_signature(payload, signature, webhook_secret):
-        # Webhook is authentic
+    if idswyft.IdswyftClient.verify_webhook_signature(payload, signature, secret):
         data = request.get_json()
-        print(f"Verification update: {data['verification_id']} -> {data['status']}")
+        print(f"Event: {data['event_type']}")
+        print(f"Verification: {data['verification_id']}")
+        print(f"Status: {data['status']}")
         return 'OK', 200
     else:
-        # Invalid signature
         return 'Unauthorized', 401
 ```
 
@@ -179,36 +296,34 @@ def webhook():
 The SDK raises specific exceptions for different error types:
 
 ```python
-import idswyft
 from idswyft import (
     IdswyftError,
     IdswyftAPIError,
     IdswyftAuthenticationError,
     IdswyftValidationError,
     IdswyftNetworkError,
-    IdswyftRateLimitError
+    IdswyftRateLimitError,
 )
 
 try:
-    result = client.verify_document(
-        document_type="passport",
-        document_file="passport.jpg"
-    )
+    result = client.upload_front_document(vid, "front.jpg")
 except IdswyftAuthenticationError:
-    print("Authentication failed - check your API key")
+    print("Check your API key")
 except IdswyftValidationError as e:
     print(f"Validation error: {e.message}")
-    if hasattr(e, 'validation_errors'):
-        for error in e.validation_errors:
-            print(f"  - {error}")
+    if hasattr(e, 'validation_errors') and e.validation_errors:
+        for err in e.validation_errors:
+            print(f"  - {err}")
 except IdswyftRateLimitError as e:
-    print(f"Rate limit exceeded. Retry after: {e.retry_after} seconds")
+    print(f"Rate limit exceeded. Retry after: {e.retry_after}s")
 except IdswyftNetworkError:
     print("Network error - check your connection")
-except IdswyftError as e:
+except IdswyftAPIError as e:
     print(f"API Error {e.status_code}: {e.message}")
-except Exception as e:
-    print(f"Unexpected error: {e}")
+    if e.status_code == 409:
+        print("Session was hard-rejected by a quality gate")
+except IdswyftError as e:
+    print(f"Error: {e}")
 ```
 
 ## Examples
@@ -220,29 +335,36 @@ except Exception as e:
 from django.http import JsonResponse
 from django.views.decorators.csrf import csrf_exempt
 from django.views.decorators.http import require_http_methods
-import json
+from django.conf import settings
 import idswyft
 
 client = idswyft.IdswyftClient(api_key=settings.IDSWYFT_API_KEY)
 
 @csrf_exempt
 @require_http_methods(["POST"])
-def verify_document(request):
+def start_verification(request):
     try:
-        document_file = request.FILES['document']
-        document_type = request.POST.get('document_type', 'passport')
-        user_id = request.user.id if request.user.is_authenticated else None
-        
-        result = client.verify_document(
-            document_type=document_type,
-            document_file=document_file,
-            user_id=str(user_id) if user_id else None
+        session = client.start_verification(
+            user_id=str(request.user.id),
+            document_type=request.POST.get("document_type", "drivers_license")
         )
-        
-        return JsonResponse(result)
-        
+        return JsonResponse(session)
     except idswyft.IdswyftError as e:
-        return JsonResponse({'error': e.message}, status=400)
+        return JsonResponse({"error": str(e)}, status=400)
+
+@csrf_exempt
+@require_http_methods(["POST"])
+def upload_front(request, vid):
+    try:
+        doc = request.FILES["document"]
+        result = client.upload_front_document(
+            verification_id=vid,
+            document_file=doc.read(),
+            document_type=request.POST.get("document_type", "drivers_license")
+        )
+        return JsonResponse(result)
+    except idswyft.IdswyftError as e:
+        return JsonResponse({"error": str(e)}, status=400)
 ```
 
 ### FastAPI Integration
@@ -254,194 +376,96 @@ import idswyft
 app = FastAPI()
 client = idswyft.IdswyftClient(api_key="your-api-key")
 
-@app.post("/verify-document")
-async def verify_document(
-    document: UploadFile = File(...),
-    document_type: str = "passport",
-    user_id: str = None
-):
+@app.post("/verify/start")
+async def start_verification(user_id: str, document_type: str = "drivers_license"):
     try:
-        file_content = await document.read()
-        
-        result = client.verify_document(
-            document_type=document_type,
-            document_file=file_content,
-            user_id=user_id
-        )
-        
-        return result
-        
+        return client.start_verification(user_id=user_id, document_type=document_type)
     except idswyft.IdswyftError as e:
-        raise HTTPException(status_code=400, detail=e.message)
-```
+        raise HTTPException(status_code=400, detail=str(e))
 
-### Batch Processing
-
-```python
-import os
-import idswyft
-from concurrent.futures import ThreadPoolExecutor, as_completed
-import time
-
-client = idswyft.IdswyftClient(api_key=os.getenv("IDSWYFT_API_KEY"))
-
-def verify_single_document(file_path):
-    """Verify a single document"""
+@app.post("/verify/{vid}/front")
+async def upload_front(vid: str, document: UploadFile = File(...)):
     try:
-        filename = os.path.basename(file_path)
-        
-        # Determine document type from filename
-        if 'passport' in filename.lower():
-            doc_type = 'passport'
-        elif 'license' in filename.lower():
-            doc_type = 'drivers_license'
-        else:
-            doc_type = 'national_id'
-        
-        result = client.verify_document(
-            document_type=doc_type,
-            document_file=file_path,
-            user_id=f"batch-{int(time.time())}",
-            metadata={'filename': filename, 'batch': True}
-        )
-        
-        return {
-            'filename': filename,
-            'verification_id': result['id'],
-            'status': result['status'],
-            'confidence': result.get('confidence_score')
-        }
-        
-    except Exception as e:
-        return {
-            'filename': filename,
-            'error': str(e)
-        }
+        content = await document.read()
+        return client.upload_front_document(vid, content)
+    except idswyft.IdswyftError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
-def batch_verify_documents(directory_path, max_workers=5):
-    """Verify multiple documents concurrently"""
-    # Get all image files
-    image_extensions = ('.jpg', '.jpeg', '.png', '.pdf')
-    files = [
-        os.path.join(directory_path, f) 
-        for f in os.listdir(directory_path)
-        if f.lower().endswith(image_extensions)
-    ]
-    
-    results = []
-    
-    # Process files concurrently
-    with ThreadPoolExecutor(max_workers=max_workers) as executor:
-        # Submit all tasks
-        future_to_file = {
-            executor.submit(verify_single_document, file_path): file_path
-            for file_path in files
-        }
-        
-        # Collect results
-        for future in as_completed(future_to_file):
-            result = future.result()
-            results.append(result)
-            print(f"Processed: {result['filename']}")
-            
-            # Small delay to respect rate limits
-            time.sleep(0.2)
-    
-    return results
-
-# Usage
-if __name__ == "__main__":
-    results = batch_verify_documents("./documents")
-    
-    # Print summary
-    successful = len([r for r in results if 'verification_id' in r])
-    total = len(results)
-    print(f"\nBatch completed: {successful}/{total} documents processed successfully")
+@app.post("/verify/{vid}/selfie")
+async def upload_selfie(vid: str, selfie: UploadFile = File(...)):
+    try:
+        content = await selfie.read()
+        return client.upload_selfie(vid, content)
+    except idswyft.IdswyftError as e:
+        raise HTTPException(status_code=400, detail=str(e))
 ```
 
-### Context Manager Usage
+### Context Manager
 
 ```python
 import idswyft
 
-# Using context manager automatically closes the session
+# Automatically closes the HTTP session when done
 with idswyft.IdswyftClient(api_key="your-api-key") as client:
-    result = client.verify_document(
-        document_type="passport",
-        document_file="passport.jpg"
-    )
-    print(result["status"])
+    session = client.start_verification(user_id="user-123")
+    vid = session["verification_id"]
+
+    front = client.upload_front_document(vid, "front.jpg")
+    back = client.upload_back_document(vid, "back.jpg")
+    result = client.upload_selfie(vid, "selfie.jpg")
+    print(result["final_result"])
 # Session is automatically closed here
 ```
 
-### Monitoring Verification Status
+### Polling for Status
 
 ```python
 import time
 import idswyft
 
-def wait_for_verification(client, verification_id, max_attempts=30, poll_interval=2):
-    """Poll verification status until complete"""
-    
-    for attempt in range(1, max_attempts + 1):
-        try:
-            verification = client.get_verification_status(verification_id)
-            status = verification["status"]
-            
-            print(f"Attempt {attempt}: Status is {status}")
-            
-            # Check if verification is complete
-            if status in ["verified", "failed", "manual_review"]:
-                print("Verification completed!")
-                return verification
-            
-            # Wait before next poll
-            if attempt < max_attempts:
-                time.sleep(poll_interval)
-                
-        except Exception as e:
-            print(f"Status check failed on attempt {attempt}: {e}")
-            if attempt == max_attempts:
-                raise
-    
-    raise TimeoutError("Verification status monitoring timed out")
-
-# Usage
 client = idswyft.IdswyftClient(api_key="your-api-key")
 
-# Start verification
-result = client.verify_document(
-    document_type="passport",
-    document_file="passport.jpg"
-)
+def wait_for_completion(vid, max_attempts=30, interval=2):
+    """Poll verification status until complete."""
+    terminal_statuses = {"COMPLETE", "HARD_REJECTED"}
 
-# Wait for completion
-final_result = wait_for_verification(client, result["id"])
-print(f"Final status: {final_result['status']}")
+    for attempt in range(1, max_attempts + 1):
+        status = client.get_verification_status(vid)
+        current = status["status"]
+        print(f"Attempt {attempt}: {current}")
+
+        if current in terminal_statuses:
+            return status
+
+        time.sleep(interval)
+
+    raise TimeoutError("Verification did not complete in time")
 ```
 
-## TypeScript Support
+## Type Hints
 
-The Python SDK includes type hints for better IDE support:
+The SDK includes comprehensive type hints for IDE support:
 
 ```python
-from typing import Optional, Dict, Any
-import idswyft
-
-client: idswyft.IdswyftClient = idswyft.IdswyftClient(api_key="your-key")
-
-# Type hints provide better IDE completion and error checking
-result: idswyft.VerificationResult = client.verify_document(
-    document_type="passport",
-    document_file="passport.jpg"
+from idswyft import (
+    IdswyftClient,
+    VerificationResult,
+    InitializeResponse,
+    UsageStats,
+    VerificationStatus,
+    DocumentType,
+    OCRData,
+    CrossValidationResults,
+    FaceMatchResults,
+    LivenessResults,
 )
 ```
 
 ## Support
 
-- 📖 [Documentation](https://docs.idswyft.com)
-- 🐛 [Issue Tracker](https://github.com/doobee46/idswyft/issues)
-- 💬 [Support](mailto:support@idswyft.com)
+- [Documentation](https://idswyft.app/doc)
+- [Issue Tracker](https://github.com/doobee46/idswyft/issues)
+- [Support](mailto:support@idswyft.app)
 
 ## License
 

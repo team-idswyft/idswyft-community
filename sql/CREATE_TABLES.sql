@@ -121,11 +121,11 @@ CREATE TRIGGER update_verification_requests_updated_at
 
 -- Insert test data
 INSERT INTO developers (email, name, company, is_verified) 
-VALUES ('test@idswyft.com', 'Test Developer', 'Idswyft Testing', true)
+VALUES ('test@idswyft.app', 'Test Developer', 'Idswyft Testing', true)
 ON CONFLICT (email) DO NOTHING;
 
 INSERT INTO users (email, first_name, last_name) 
-VALUES ('testuser@idswyft.com', 'Test', 'User')
+VALUES ('testuser@idswyft.app', 'Test', 'User')
 ON CONFLICT DO NOTHING;
 
 -- Insert a test API key
@@ -138,5 +138,5 @@ SELECT
     true,
     true
 FROM developers d 
-WHERE d.email = 'test@idswyft.com'
+WHERE d.email = 'test@idswyft.app'
 ON CONFLICT DO NOTHING;

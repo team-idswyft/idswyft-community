@@ -91,7 +91,7 @@ function App() {
               <a href="#features" className="text-gray-600 hover:text-gray-900 transition-colors font-medium text-sm hover:scale-105 transform transition-transform">Features</a>
               <a href="#pricing" className="text-gray-600 hover:text-gray-900 transition-colors font-medium text-sm hover:scale-105 transform transition-transform">Pricing</a>
               <a href="#api" className="text-gray-600 hover:text-gray-900 transition-colors font-medium text-sm hover:scale-105 transform transition-transform">Solutions</a>
-              <a href="https://docs.idswyft.com" target="_blank" className="text-gray-600 hover:text-gray-900 transition-colors font-medium text-sm hover:scale-105 transform transition-transform">Docs</a>
+              <a href="https://idswyft.app/doc" target="_blank" className="text-gray-600 hover:text-gray-900 transition-colors font-medium text-sm hover:scale-105 transform transition-transform">Docs</a>
             </div>
             
             <div className="flex items-center space-x-3">
@@ -150,7 +150,7 @@ function App() {
                 </span>
               </button>
               <a 
-                href="https://docs.idswyft.com" 
+                href="https://idswyft.app/doc" 
                 target="_blank"
                 className="flex items-center justify-center px-10 py-4 rounded-2xl font-semibold text-lg text-gray-700 bg-white/80 backdrop-blur-sm border border-gray-200/50 hover:bg-white hover:shadow-lg transition-all duration-300"
               >
@@ -582,7 +582,7 @@ function App() {
               Start Free Trial
             </button>
             <a 
-              href="https://docs.idswyft.com" 
+              href="https://idswyft.app/doc" 
               target="_blank"
               className="bg-white/10 backdrop-blur-sm text-white px-10 py-4 rounded-2xl font-semibold text-lg border border-white/20 hover:bg-white/20 transition-all duration-300"
             >
