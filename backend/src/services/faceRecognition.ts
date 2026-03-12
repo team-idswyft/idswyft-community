@@ -9,7 +9,11 @@
  * returns no face so gate evaluation handles it.
  */
 
-import * as faceapi from '@vladmandic/face-api';
+// Use the WASM-backed bundle — the default entry (face-api.node.js) requires
+// @tensorflow/tfjs-node which needs native C++ compilation and fails on Railway.
+// The node-wasm bundle uses @tensorflow/tfjs + @tensorflow/tfjs-backend-wasm instead.
+// @ts-ignore — TypeScript can't resolve .js subpath types but runtime works fine
+import faceapi from '@vladmandic/face-api/dist/face-api.node-wasm.js';
 import { StorageService } from './storage.js';
 import { logger } from '@/utils/logger.js';
 import path from 'path';
