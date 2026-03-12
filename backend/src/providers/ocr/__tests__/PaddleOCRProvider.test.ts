@@ -184,6 +184,37 @@ describe('PaddleOCRProvider', () => {
       expect(data.expiration_date).toBe('2033-09-29');
     });
 
+    it('does NOT extract state names or document headers as name/id_number', async () => {
+      // Simulate OCR where lines come in a different order than expected,
+      // with state name and header text that could be mistaken for personal data.
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'NORTH CAROLINA', confidence: 0.99 }],
+          [{ text: 'DRIVER LICENSE', confidence: 0.99 }],
+          [{ text: '4d DLn', confidence: 0.82 }, { text: '000046688716', confidence: 0.99 }],
+          [{ text: 'Class C', confidence: 0.97 }],
+          [{ text: 'LORISSON', confidence: 1.0 }],
+          [{ text: 'OBED', confidence: 0.91 }],
+          [{ text: '84020 TRYON PARK RD', confidence: 0.97 }],
+          [{ text: '3 Date of birth', confidence: 0.98 }],
+          [{ text: '09/29/1979', confidence: 1.0 }],
+          [{ text: 'Exp', confidence: 0.94 }],
+          [{ text: '09/29/2033', confidence: 1.0 }],
+        ]),
+      );
+
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+
+      // State name and header should NOT be extracted as personal data
+      expect(data.name).not.toMatch(/carolina/i);
+      expect(data.name).not.toMatch(/driver/i);
+      expect(data.document_number).not.toMatch(/carolina/i);
+      // The actual data should still be extracted
+      expect(data.document_number).toBe('000046688716');
+      expect(data.name).toBe('OBED LORISSON');
+      expect(data.date_of_birth).toBe('1979-09-29');
+    });
+
     it('picks last date as expiry when multiple dates on same line', async () => {
       mockRecognize.mockResolvedValue(
         makeResult([

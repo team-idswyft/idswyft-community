@@ -82,9 +82,19 @@ export const BackOfIdUpload: React.FC<BackOfIdUploadProps> = ({
       }
 
       const result = await response.json();
-      console.log('✅ Back-of-ID upload successful:', result);
+      console.log('✅ Back-of-ID upload response:', result);
 
       setUploadResult(result);
+
+      // Check if cross-validation rejected the session
+      if (result.rejection_reason || result.status === 'failed') {
+        const reason = result.rejection_detail || result.rejection_reason || 'Cross-validation failed';
+        setError(reason);
+        setUploadState('error');
+        onUploadError?.(`Verification failed: ${reason}`);
+        return;
+      }
+
       setUploadState('processing');
       onUploadComplete?.(result);
 

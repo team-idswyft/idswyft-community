@@ -948,7 +948,7 @@ const DemoPage: React.FC = () => {
 
       if (!response.ok) {
         const errorData = await response.json();
-        throw new Error(errorData.error || 'Live capture failed');
+        throw new Error(errorData.message || errorData.error || 'Live capture failed');
       }
 
       const result = await response.json();

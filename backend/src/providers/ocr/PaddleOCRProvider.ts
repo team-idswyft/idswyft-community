@@ -116,6 +116,54 @@ export class PaddleOCRProvider implements OCRProvider {
     });
   }
 
+  // ── Noise filters ──────────────────────────────────
+  // Words/phrases that appear on DL headers but are NOT personal data.
+
+  /** Document header strings — never a person's name */
+  private static readonly HEADER_NOISE = new Set([
+    'driver license', 'drivers license', "driver's license",
+    'driver licence', 'drivers licence',
+    'identification card', 'id card', 'identity card',
+    'passport', 'national id', 'real id',
+    'department of motor vehicles', 'dmv',
+    'not for federal identification',
+    'federal limits apply',
+  ]);
+
+  /** US state names — they appear on DL headers, never as person names */
+  private static readonly US_STATES = new Set([
+    'alabama', 'alaska', 'arizona', 'arkansas', 'california',
+    'colorado', 'connecticut', 'delaware', 'florida', 'georgia',
+    'hawaii', 'idaho', 'illinois', 'indiana', 'iowa',
+    'kansas', 'kentucky', 'louisiana', 'maine', 'maryland',
+    'massachusetts', 'michigan', 'minnesota', 'mississippi', 'missouri',
+    'montana', 'nebraska', 'nevada', 'new hampshire', 'new jersey',
+    'new mexico', 'new york', 'north carolina', 'north dakota', 'ohio',
+    'oklahoma', 'oregon', 'pennsylvania', 'rhode island', 'south carolina',
+    'south dakota', 'tennessee', 'texas', 'utah', 'vermont',
+    'virginia', 'washington', 'west virginia', 'wisconsin', 'wyoming',
+    'district of columbia',
+  ]);
+
+  /** Check if text is a document header / state name — not personal data */
+  private isHeaderNoise(text: string): boolean {
+    const lower = text.toLowerCase().trim();
+    if (PaddleOCRProvider.HEADER_NOISE.has(lower)) return true;
+    if (PaddleOCRProvider.US_STATES.has(lower)) return true;
+    // Compound noise: "NORTH CAROLINA", "NORTHUSA DRIVER LICENSE CAROLINA"
+    // Check if the text is made up entirely of state fragments + header words
+    const words = lower.split(/\s+/);
+    const noiseWords = new Set([
+      'north', 'south', 'west', 'new', 'rhode', 'district', 'of',
+      'carolina', 'dakota', 'virginia', 'hampshire', 'jersey', 'mexico',
+      'york', 'island', 'columbia', 'usa', 'state',
+      'driver', 'drivers', 'license', 'licence', 'identification',
+      'card', 'id', 'real', 'department', 'motor', 'vehicles',
+    ]);
+    if (words.length > 0 && words.every(w => noiseWords.has(w))) return true;
+    return false;
+  }
+
   private extractDriversLicenseData(lines: RecognitionResult[][], ocrData: OCRData): void {
     const flatLines = this.flattenLines(lines);
 
@@ -134,10 +182,12 @@ export class PaddleOCRProvider implements OCRProvider {
     }
 
     // Fallback: try label-based extraction
+    // Note: avoid matching bare "driver license" header — it grabs the next line as value (e.g. "CAROLINA").
+    // Only match patterns that specifically indicate a number field.
     if (!ocrData.document_number) {
-      this.findField(flatLines, [/license\s*no/i, /driver\s*license/i, /number/i], (value, conf) => {
+      this.findField(flatLines, [/license\s*no/i, /license\s*#/i, /lic\s*no/i, /\bnumber\b/i], (value, conf) => {
         const cleaned = value.replace(/\s+/g, '');
-        if (/^[A-Z0-9\-]{6,15}$/i.test(cleaned) && !/\d{2}[\/\-\.]\d{2}/.test(cleaned)) {
+        if (/^[A-Z0-9\-]{6,15}$/i.test(cleaned) && !/\d{2}[\/\-\.]\d{2}/.test(cleaned) && !this.isHeaderNoise(cleaned)) {
           ocrData.document_number = cleaned;
           ocrData.confidence_scores!.document_number = conf;
         }
@@ -150,7 +200,7 @@ export class PaddleOCRProvider implements OCRProvider {
     // ── Name ──
     // First try labeled patterns
     this.findField(flatLines, [/full\s*name/i, /\bname\b/i, /\bfn\b/i, /\bln\b/i], (value, conf) => {
-      if (value.length > 3) {
+      if (value.length > 3 && !this.isHeaderNoise(value)) {
         ocrData.name = value.replace(/\s+/g, ' ');
         ocrData.confidence_scores!.name = conf;
       }
@@ -172,6 +222,8 @@ export class PaddleOCRProvider implements OCRProvider {
         if (/[:\-]/.test(text)) break; // label line — stop
         // Address lines: digits in the middle/end (e.g. "84020 TRYON PARK RD") — stop
         if (/\d{3,}/.test(text)) break;
+        // Skip document headers and state names
+        if (this.isHeaderNoise(text)) continue;
         // UPPERCASE text that looks like a name (letters, spaces, hyphens, apostrophes)
         if (/^[A-Z][A-Z\s\-']+$/.test(text) && text.length >= 2) {
           nameLines.push(text);
@@ -248,8 +300,10 @@ export class PaddleOCRProvider implements OCRProvider {
     }
 
     this.findField(flatLines, [/full\s*name/i, /\bname\b/i], (value, conf) => {
-      ocrData.name = value;
-      ocrData.confidence_scores!.name = conf;
+      if (!this.isHeaderNoise(value)) {
+        ocrData.name = value;
+        ocrData.confidence_scores!.name = conf;
+      }
     });
 
     this.findDateField(flatLines, [/dob/i, /date\s*of\s*birth/i, /born/i], (value, conf) => {
