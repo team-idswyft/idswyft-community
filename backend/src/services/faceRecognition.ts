@@ -18,6 +18,7 @@ import { StorageService } from './storage.js';
 import { logger } from '@/utils/logger.js';
 import path from 'path';
 import { fileURLToPath } from 'url';
+import { createRequire } from 'module';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -101,6 +102,9 @@ export class FaceRecognitionService {
 
     this.initPromise = (async () => {
       try {
+        // ── Step 1: Initialize TF.js backend (WASM preferred, CPU fallback) ──
+        await this.initTfBackend();
+
         // Monkey-patch canvas environment if available
         if (canvasModule) {
           const { Canvas, Image, ImageData } = canvasModule;
@@ -112,7 +116,8 @@ export class FaceRecognitionService {
         await faceapi.nets.faceRecognitionNet.loadFromDisk(MODELS_DIR);
 
         this.initialized = true;
-        logger.info('Face recognition models loaded (vladmandic/face-api)');
+        const backend = (faceapi.tf as any).getBackend?.() ?? 'unknown';
+        logger.info(`Face recognition models loaded (vladmandic/face-api, backend=${backend})`);
       } catch (error) {
         this.initPromise = null; // allow retry
         logger.error('Failed to load face recognition models', {
@@ -124,6 +129,59 @@ export class FaceRecognitionService {
     })();
 
     return this.initPromise;
+  }
+
+  /**
+   * Initialize TF.js backend: try WASM first (fast), fall back to CPU (universal).
+   *
+   * The WASM backend needs to know where the .wasm binary files live on disk.
+   * We resolve the path from @tensorflow/tfjs-backend-wasm's installed location
+   * so it works both in dev (hoisted node_modules) and in Docker builds.
+   */
+  private async initTfBackend(): Promise<void> {
+    // Cast to any — the face-api.node-wasm.js bundle exposes tf at runtime
+    // but its TypeScript types don't declare setBackend/ready/setWasmPaths.
+    const tf = faceapi.tf as any;
+
+    // Try WASM first — significantly faster than plain CPU
+    try {
+      // Locate the directory containing the .wasm files
+      const require = createRequire(import.meta.url);
+      const wasmBackendPath = require.resolve('@tensorflow/tfjs-backend-wasm/dist/tf-backend-wasm.node.js');
+      const wasmDir = path.dirname(wasmBackendPath) + '/';
+
+      // setWasmPaths is re-exported through the tfjs bundle
+      if (typeof tf.setWasmPaths === 'function') {
+        tf.setWasmPaths(wasmDir);
+      } else {
+        // Fallback: import the WASM backend directly for setWasmPaths
+        const wasmBackend = await import('@tensorflow/tfjs-backend-wasm');
+        if (typeof wasmBackend.setWasmPaths === 'function') {
+          wasmBackend.setWasmPaths(wasmDir);
+        }
+      }
+
+      await tf.setBackend('wasm');
+      await tf.ready();
+      logger.info('TF.js WASM backend initialized', { wasmDir });
+      return;
+    } catch (wasmError) {
+      logger.warn('WASM backend failed, falling back to CPU', {
+        error: wasmError instanceof Error ? wasmError.message : String(wasmError),
+      });
+    }
+
+    // Fallback to CPU — always available, ~3-5x slower but guaranteed to work
+    try {
+      await tf.setBackend('cpu');
+      await tf.ready();
+      logger.info('TF.js CPU backend initialized (fallback)');
+    } catch (cpuError) {
+      logger.error('Both WASM and CPU backends failed', {
+        error: cpuError instanceof Error ? cpuError.message : String(cpuError),
+      });
+      throw new Error('TF.js backend initialization failed — no usable backend');
+    }
   }
 
   /**
