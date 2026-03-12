@@ -201,6 +201,11 @@ export const errorHandler = (
   // JWT expired error
   if (err.name === 'TokenExpiredError') error = handleJWTExpiredError();
 
+  // Verification session flow errors (step called out of order or after rejection)
+  if (err.name === 'SessionFlowError' || err.code === 'VE_FLOW') {
+    error = new APIError(err.message, 409, 'SESSION_FLOW_ERROR');
+  }
+
   // Multer file upload errors
   if (err.code === 'LIMIT_FILE_SIZE') {
     error = new FileUploadError('File too large. Maximum size is 10MB.');

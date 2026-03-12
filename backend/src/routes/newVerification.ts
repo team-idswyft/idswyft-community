@@ -465,6 +465,23 @@ router.post('/:verification_id/back-document',
 
     // Hydrate session and run Gate 2 + auto cross-validation via session
     const session = await hydrateSession(verification_id, isSandbox);
+
+    // Guard: if session was already rejected in a previous step, return early
+    const preState = session.getState();
+    if (preState.current_step === VerificationStatus.HARD_REJECTED) {
+      const mapped = mapStatusForResponse(preState);
+      return res.status(409).json({
+        success: false,
+        verification_id,
+        status: mapped.status,
+        current_step: mapped.current_step,
+        final_result: mapped.final_result,
+        rejection_reason: preState.rejection_reason,
+        rejection_detail: preState.rejection_detail,
+        message: 'Verification was already rejected in a previous step. Please start a new verification.',
+      });
+    }
+
     (session as any).deps.extractBack = async () => backResult;
     const stepResult = await session.submitBack(req.file.buffer);
     await saveSessionState(verification_id, session.getState());
@@ -597,6 +614,24 @@ router.post('/:verification_id/live-capture',
 
     // Hydrate session and run Gate 4 + auto face match via session
     const session = await hydrateSession(verification_id, isSandbox);
+
+    // Guard: if the session was already rejected (e.g. Gate 3 cross-validation
+    // failed on the back document), return a clear error instead of crashing.
+    const preState = session.getState();
+    if (preState.current_step === VerificationStatus.HARD_REJECTED) {
+      const mapped = mapStatusForResponse(preState);
+      return res.status(409).json({
+        success: false,
+        verification_id,
+        status: mapped.status,
+        current_step: mapped.current_step,
+        final_result: mapped.final_result,
+        rejection_reason: preState.rejection_reason,
+        rejection_detail: preState.rejection_detail,
+        message: 'Verification was already rejected in a previous step. Please start a new verification.',
+      });
+    }
+
     (session as any).deps.processLiveCapture = async () => liveResult;
     const stepResult = await session.submitLiveCapture(req.file.buffer);
     await saveSessionState(verification_id, session.getState());
