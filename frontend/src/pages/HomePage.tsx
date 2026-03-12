@@ -7,29 +7,29 @@ const KEY  = 'your-api-key'
 const h    = { 'X-API-Key': KEY }
 
 // 1. Create verification session
-const { id } = await fetch(\`\${BASE}/api/verification/sessions\`, {
+const { verification_id } = await fetch(\`\${BASE}/api/v2/verify/initialize\`, {
   method: 'POST',
   headers: { ...h, 'Content-Type': 'application/json' },
-  body: JSON.stringify({ mode: 'sandbox' }),
+  body: JSON.stringify({ document_type: 'drivers_license' }),
 }).then(r => r.json())
 
 // 2. Upload front of ID
 const front = new FormData()
 front.append('document', frontFile)
-await fetch(\`\${BASE}/api/verification/\${id}/upload-front\`, { method: 'POST', headers: h, body: front })
+await fetch(\`\${BASE}/api/v2/verify/\${verification_id}/front-document\`, { method: 'POST', headers: h, body: front })
 
 // 3. Upload back of ID
 const back = new FormData()
 back.append('document', backFile)
-await fetch(\`\${BASE}/api/verification/\${id}/upload-back\`, { method: 'POST', headers: h, body: back })
+await fetch(\`\${BASE}/api/v2/verify/\${verification_id}/back-document\`, { method: 'POST', headers: h, body: back })
 
 // 4. Upload selfie for liveness + face match
 const selfie = new FormData()
 selfie.append('image', selfieFile)
-await fetch(\`\${BASE}/api/verification/\${id}/upload-selfie\`, { method: 'POST', headers: h, body: selfie })
+await fetch(\`\${BASE}/api/v2/verify/\${verification_id}/live-capture\`, { method: 'POST', headers: h, body: selfie })
 
 // 5. Get results
-const result = await fetch(\`\${BASE}/api/verification/\${id}/status\`, { headers: h }).then(r => r.json())
+const result = await fetch(\`\${BASE}/api/v2/verify/\${verification_id}/status\`, { headers: h }).then(r => r.json())
 console.log(result.status) // 'verified' | 'failed' | 'manual_review'`
 
 const PY_CODE = `import requests
@@ -39,27 +39,27 @@ KEY  = "your-api-key"
 H    = {"X-API-Key": KEY}
 
 # 1. Create verification session
-r = requests.post(f"{BASE}/api/verification/sessions",
-    json={"mode": "sandbox"}, headers={**H, "Content-Type": "application/json"})
-session_id = r.json()["id"]
+r = requests.post(f"{BASE}/api/v2/verify/initialize",
+    json={"document_type": "drivers_license"}, headers={**H, "Content-Type": "application/json"})
+verification_id = r.json()["verification_id"]
 
 # 2. Upload front of ID
 with open("front.jpg", "rb") as f:
-    requests.post(f"{BASE}/api/verification/{session_id}/upload-front",
+    requests.post(f"{BASE}/api/v2/verify/{verification_id}/front-document",
         files={"document": f}, headers=H)
 
 # 3. Upload back of ID
 with open("back.jpg", "rb") as f:
-    requests.post(f"{BASE}/api/verification/{session_id}/upload-back",
+    requests.post(f"{BASE}/api/v2/verify/{verification_id}/back-document",
         files={"document": f}, headers=H)
 
 # 4. Upload selfie for liveness + face match
 with open("selfie.jpg", "rb") as f:
-    requests.post(f"{BASE}/api/verification/{session_id}/upload-selfie",
+    requests.post(f"{BASE}/api/v2/verify/{verification_id}/live-capture",
         files={"image": f}, headers=H)
 
 # 5. Get results
-result = requests.get(f"{BASE}/api/verification/{session_id}/status", headers=H).json()
+result = requests.get(f"{BASE}/api/v2/verify/{verification_id}/status", headers=H).json()
 print(result["status"])  # 'verified' | 'failed' | 'manual_review'`
 
 function CodeStrip() {
