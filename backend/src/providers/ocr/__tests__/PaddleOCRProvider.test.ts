@@ -451,6 +451,62 @@ describe('PaddleOCRProvider', () => {
       ).rejects.toThrow('Invalid image format');
     });
   });
+
+  describe('name sanitization — strips DL field-label noise tokens', () => {
+    it('removes OCR noise word from name (e.g. HALT from misread HGT)', async () => {
+      // Simulates a DL where OCR reads "HALT" (misread of HGT/HAIR) as part of the name
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'CALIFORNIA' }],
+          [{ text: 'DRIVER LICENSE' }],
+          [{ text: 'DL D1234567' }],
+          [{ text: 'LORISSON' }],
+          [{ text: 'OBED HALT' }],
+        ]),
+      );
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+      expect(data.name).toBe('OBED LORISSON');
+    });
+
+    it('removes eye/hair color codes from name', async () => {
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'FLORIDA' }],
+          [{ text: 'DL F123456789' }],
+          [{ text: 'SMITH' }],
+          [{ text: 'JANE BLK' }],
+        ]),
+      );
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+      expect(data.name).toBe('JANE SMITH');
+    });
+
+    it('removes SEX field token from name', async () => {
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'NEW YORK' }],
+          [{ text: 'DL 123456789' }],
+          [{ text: 'DOE' }],
+          [{ text: 'JOHN SEX' }],
+        ]),
+      );
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+      expect(data.name).toBe('JOHN DOE');
+    });
+
+    it('keeps valid name unchanged when no noise present', async () => {
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'TEXAS' }],
+          [{ text: 'DL TX9876543' }],
+          [{ text: 'MARTINEZ' }],
+          [{ text: 'ELENA ROSA' }],
+        ]),
+      );
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+      expect(data.name).toBe('ELENA ROSA MARTINEZ');
+    });
+  });
 });
 
 describe('standardizeDateFormat', () => {

@@ -145,6 +145,29 @@ export class PaddleOCRProvider implements OCRProvider {
     'district of columbia',
   ]);
 
+  /**
+   * DL field-label tokens that OCR can inject into name extractions.
+   * These are short abbreviations printed on the card (HGT, SEX, etc.)
+   * plus common OCR misreads of them (HALT ← HGT, ISS ← ISS).
+   * Single tokens only — full-phrase noise is in HEADER_NOISE above.
+   */
+  private static readonly DL_FIELD_TOKENS = new Set([
+    // Physical descriptors
+    'hgt', 'ht', 'wt', 'sex', 'hair', 'eyes', 'eye',
+    // Dates / document fields
+    'dob', 'exp', 'iss', 'end', 'rstr', 'rest',
+    'class', 'endorsements', 'end', 'restr', 'restrictions',
+    // Common OCR misreads of the above
+    'halt', 'hait', 'hal', 'hai', 'hgi', 'hg',
+    'sek', 'sox', 'sex',
+    // Color codes (eye/hair) that might land in name
+    'blk', 'brn', 'blu', 'grn', 'hzl', 'gry',
+    // Descriptors
+    'none', 'organ', 'donor', 'veteran', 'vet',
+    // Single-letter DL field markers
+    'f', 'm', 'n',
+  ]);
+
   /** Check if text is a document header / state name — not personal data */
   private isHeaderNoise(text: string): boolean {
     const lower = text.toLowerCase().trim();
@@ -162,6 +185,34 @@ export class PaddleOCRProvider implements OCRProvider {
     ]);
     if (words.length > 0 && words.every(w => noiseWords.has(w))) return true;
     return false;
+  }
+
+  /**
+   * Post-process an extracted name to remove DL field-label tokens
+   * that OCR may have injected (e.g., "OBED HALT LORISSON" → "OBED LORISSON").
+   *
+   * Rules:
+   *  - Remove tokens that exactly match known DL field abbreviations
+   *  - Remove single-character tokens (except common name initials aren't
+   *    reliable enough from OCR to keep)
+   *  - Keep tokens ≥ 2 chars that aren't in the noise set
+   *  - If ALL tokens would be removed, return the original (safety net)
+   */
+  private sanitizeName(name: string): string {
+    const tokens = name.split(/\s+/).filter(Boolean);
+    const cleaned = tokens.filter(token => {
+      const lower = token.toLowerCase();
+      // Remove known DL field labels
+      if (PaddleOCRProvider.DL_FIELD_TOKENS.has(lower)) return false;
+      // Remove single-character tokens (likely field codes, not initials —
+      // real middle initials are rarely standalone on DLs)
+      if (token.length === 1) return false;
+      return true;
+    });
+
+    // Safety: if everything was filtered, keep original
+    if (cleaned.length === 0) return name;
+    return cleaned.join(' ');
   }
 
   private extractDriversLicenseData(lines: RecognitionResult[][], ocrData: OCRData): void {
@@ -312,6 +363,11 @@ export class PaddleOCRProvider implements OCRProvider {
           : nameLines[0];
         ocrData.confidence_scores!.name = nameConf / nameCount;
       }
+    }
+
+    // ── Post-process name: strip DL field-label noise tokens ──
+    if (ocrData.name) {
+      ocrData.name = this.sanitizeName(ocrData.name);
     }
 
     // ── Date of birth ──
