@@ -25,8 +25,20 @@ const UserVerificationPage: React.FC = () => {
   const viewOnly = !apiKey || !userId;
 
   const [phase, setPhase] = useState<Phase>('choice');
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth < 768
+  );
 
   useEffect(() => { injectFonts(); }, []);
+
+  // Track viewport width for responsive layout
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    setIsMobile(mq.matches);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   // ── Handlers ──────────────────────────────────────────────────────
   const handleVerificationComplete = (result: any) => {
@@ -184,7 +196,7 @@ const UserVerificationPage: React.FC = () => {
         </div>
 
         {/* Cards */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
           {/* ── Mobile card (recommended) ── */}
           <div style={{
             background: C.surface, border: `1.5px solid ${C.cyanBorder}`,
@@ -229,38 +241,40 @@ const UserVerificationPage: React.FC = () => {
             </button>
           </div>
 
-          {/* ── Desktop card (secondary) ── */}
-          <div style={{
-            background: C.surface, border: `1px solid ${C.border}`,
-            borderRadius: 14, padding: 24, display: 'flex', flexDirection: 'column', gap: 14,
-            opacity: viewOnly ? 0.6 : 1,
-          }}>
-            <div style={{ height: 20 }} /> {/* spacer to align with RECOMMENDED pill */}
-            <div style={{ fontSize: '2rem' }}>💻</div>
-            <div>
-              <h3 style={{ fontFamily: C.sans, fontSize: '1rem', fontWeight: 600, color: C.text, margin: '0 0 6px' }}>
-                Use This Device
-              </h3>
-              <p style={{ fontFamily: C.sans, fontSize: '0.78rem', color: C.muted, margin: 0, lineHeight: 1.55 }}>
-                Upload photos and use your webcam to complete verification on this computer.
-              </p>
+          {/* ── Desktop card (secondary) — hidden on mobile ── */}
+          {!isMobile && (
+            <div style={{
+              background: C.surface, border: `1px solid ${C.border}`,
+              borderRadius: 14, padding: 24, display: 'flex', flexDirection: 'column', gap: 14,
+              opacity: viewOnly ? 0.6 : 1,
+            }}>
+              <div style={{ height: 20 }} /> {/* spacer to align with RECOMMENDED pill */}
+              <div style={{ fontSize: '2rem' }}>💻</div>
+              <div>
+                <h3 style={{ fontFamily: C.sans, fontSize: '1rem', fontWeight: 600, color: C.text, margin: '0 0 6px' }}>
+                  Use This Device
+                </h3>
+                <p style={{ fontFamily: C.sans, fontSize: '0.78rem', color: C.muted, margin: 0, lineHeight: 1.55 }}>
+                  Upload photos and use your webcam to complete verification on this computer.
+                </p>
+              </div>
+              <button
+                onClick={() => !viewOnly && setPhase('desktop')}
+                disabled={viewOnly}
+                style={{
+                  marginTop: 'auto', width: '100%', padding: '12px 0',
+                  background: 'transparent',
+                  color: viewOnly ? C.dim : C.text,
+                  fontFamily: C.sans, fontSize: '0.88rem', fontWeight: 600,
+                  border: `1px solid ${viewOnly ? C.border : C.borderStrong}`,
+                  borderRadius: 10,
+                  cursor: viewOnly ? 'not-allowed' : 'pointer',
+                }}
+              >
+                Continue on Desktop
+              </button>
             </div>
-            <button
-              onClick={() => !viewOnly && setPhase('desktop')}
-              disabled={viewOnly}
-              style={{
-                marginTop: 'auto', width: '100%', padding: '12px 0',
-                background: 'transparent',
-                color: viewOnly ? C.dim : C.text,
-                fontFamily: C.sans, fontSize: '0.88rem', fontWeight: 600,
-                border: `1px solid ${viewOnly ? C.border : C.borderStrong}`,
-                borderRadius: 10,
-                cursor: viewOnly ? 'not-allowed' : 'pointer',
-              }}
-            >
-              Continue on Desktop
-            </button>
-          </div>
+          )}
         </div>
       </div>
     </div>
