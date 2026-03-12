@@ -116,7 +116,7 @@ export type CrossValidationResult = z.infer<typeof CrossValidationResultSchema>;
 
 // ─── Live Capture Result ───
 export const LiveCaptureResultSchema = z.object({
-  face_embedding: z.array(z.number()),
+  face_embedding: z.array(z.number()).nullable(),
   face_confidence: confidence,
   liveness_passed: z.boolean(),
   liveness_score: confidence,

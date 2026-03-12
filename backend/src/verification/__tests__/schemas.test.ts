@@ -194,15 +194,15 @@ describe('LiveCaptureResultSchema', () => {
     expect(result.success).toBe(true);
   });
 
-  it('requires face_embedding to be non-null', () => {
-    const invalid = {
+  it('accepts null face_embedding (face detection may not be available)', () => {
+    const valid = {
       face_embedding: null,
       face_confidence: 0.95,
       liveness_passed: true,
       liveness_score: 0.88,
     };
-    const result = LiveCaptureResultSchema.safeParse(invalid);
-    expect(result.success).toBe(false);
+    const result = LiveCaptureResultSchema.safeParse(valid);
+    expect(result.success).toBe(true);
   });
 
   it('rejects liveness_score outside 0-1 range', () => {

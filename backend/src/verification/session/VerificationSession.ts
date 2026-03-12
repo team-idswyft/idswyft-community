@@ -181,7 +181,7 @@ export class VerificationSession {
     } else {
       faceMatchResult = this.deps.computeFaceMatch(
         idEmbedding ?? [],
-        liveEmbedding,
+        liveEmbedding ?? [],
         threshold,
       );
     }

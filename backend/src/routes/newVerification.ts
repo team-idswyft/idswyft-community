@@ -118,12 +118,13 @@ async function extractFrontDocument(
   const values = Object.values(confidenceScores).filter((v): v is number => typeof v === 'number');
   const avgConfidence = values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0.5;
 
-  // Detect face presence
+  // Detect face and extract embedding from document photo
   let faceConfidence = 0;
   let faceEmbedding: number[] | null = null;
   try {
-    const faceResult = await faceRecognitionService.detectFacePresence(documentPath);
-    faceConfidence = typeof faceResult === 'number' ? faceResult : (faceResult as any)?.confidence ?? 0;
+    const faceResult = await faceRecognitionService.detectFace(documentPath);
+    faceConfidence = faceResult.confidence;
+    faceEmbedding = faceResult.embedding;
   } catch {
     faceConfidence = 0;
   }
@@ -191,12 +192,13 @@ async function extractLiveCapture(
   selfiePath: string,
   frontDocPath: string | null,
 ): Promise<LiveCaptureResult> {
-  // Detect face in selfie
+  // Detect face and extract embedding from selfie
   let faceConfidence = 0;
-  let faceEmbedding: number[] = [];
+  let faceEmbedding: number[] | null = null;
   try {
-    const faceResult = await faceRecognitionService.detectFacePresence(selfiePath);
-    faceConfidence = typeof faceResult === 'number' ? faceResult : (faceResult as any)?.confidence ?? 0;
+    const faceResult = await faceRecognitionService.detectFace(selfiePath);
+    faceConfidence = faceResult.confidence;
+    faceEmbedding = faceResult.embedding;
   } catch {
     faceConfidence = 0;
   }

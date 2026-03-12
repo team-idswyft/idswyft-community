@@ -1,4 +1,4 @@
-import fileType from 'file-type';
+import { fileTypeFromBuffer } from 'file-type';
 import { logger } from '@/utils/logger.js';
 
 const ALLOWED_MIME_TYPES = ['image/jpeg', 'image/png', 'application/pdf'];
@@ -13,7 +13,7 @@ export async function validateFileType(
   buffer: Buffer,
   allowedTypes: string[] = ALLOWED_MIME_TYPES
 ): Promise<FileValidationResult> {
-  const detected = await fileType.fromBuffer(buffer);
+  const detected = await fileTypeFromBuffer(buffer);
 
   if (!detected) {
     return {

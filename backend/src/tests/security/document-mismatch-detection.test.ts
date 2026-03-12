@@ -26,8 +26,20 @@ vi.mock('../../services/storage.js', () => ({
     getFile = vi.fn();
   },
 }));
-// Optional native modules: mock to prevent load errors
-vi.mock('./enhancedFaceRecognition.js', () => ({}));
+// Mock face-api and image decoders to avoid native dependency loads
+vi.mock('@vladmandic/face-api', () => ({
+  nets: {
+    ssdMobilenetv1: { loadFromDisk: vi.fn() },
+    faceLandmark68Net: { loadFromDisk: vi.fn() },
+    faceRecognitionNet: { loadFromDisk: vi.fn() },
+  },
+  env: { monkeyPatch: vi.fn() },
+  tf: { tensor3d: vi.fn(), dispose: vi.fn() },
+  SsdMobilenetv1Options: vi.fn(),
+  detectSingleFace: vi.fn(),
+}));
+vi.mock('canvas', () => ({}));
+vi.mock('sharp', () => ({ default: null }));
 
 import { FaceRecognitionService } from '../../services/faceRecognition.js';
 
@@ -41,26 +53,27 @@ describe('Document Mismatch Detection Security', () => {
     faceService = new FaceRecognitionService();
   });
 
-  it('returns low score for mismatched document photos (different people)', async () => {
-    vi.spyOn(faceService as any, 'compareDocumentPhotos').mockResolvedValue(0.35);
+  it('returns low confidence for images without clear faces', async () => {
+    vi.spyOn(faceService, 'detectFace').mockResolvedValue({
+      confidence: 0.2,
+      embedding: null,
+    });
 
-    const score = await (faceService as any).compareDocumentPhotos(
-      Buffer.from('person1-front'),
-      Buffer.from('person2-back')
-    );
-
-    expect(score).toBeLessThan(PHOTO_CONSISTENCY_THRESHOLD);
+    const result = await faceService.detectFace('no-face.jpg');
+    expect(result.confidence).toBeLessThan(PHOTO_CONSISTENCY_THRESHOLD);
+    expect(result.embedding).toBeNull();
   });
 
-  it('returns high score for matching document photos (same person)', async () => {
-    vi.spyOn(faceService as any, 'compareDocumentPhotos').mockResolvedValue(0.89);
+  it('returns high confidence and embedding for clear face images', async () => {
+    const mockEmbedding = Array.from({ length: 128 }, () => Math.random());
+    vi.spyOn(faceService, 'detectFace').mockResolvedValue({
+      confidence: 0.95,
+      embedding: mockEmbedding,
+    });
 
-    const score = await (faceService as any).compareDocumentPhotos(
-      Buffer.from('person1-front'),
-      Buffer.from('person1-back')
-    );
-
-    expect(score).toBeGreaterThanOrEqual(PHOTO_CONSISTENCY_THRESHOLD);
+    const result = await faceService.detectFace('clear-face.jpg');
+    expect(result.confidence).toBeGreaterThanOrEqual(PHOTO_CONSISTENCY_THRESHOLD);
+    expect(result.embedding).toHaveLength(128);
   });
 
   it('treats borderline scores below threshold as mismatched', () => {
