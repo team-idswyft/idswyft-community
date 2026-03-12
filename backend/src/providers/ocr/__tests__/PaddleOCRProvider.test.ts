@@ -261,6 +261,94 @@ describe('PaddleOCRProvider', () => {
       const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
       expect(data.expiration_date).toBe('2030-12-31');
     });
+
+    it('extracts California-style DL with LN/FN labels and letter-prefix number', async () => {
+      // California DLs use "LN" / "FN" labels and letter + 7 digits (e.g. D1234567)
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'CALIFORNIA', confidence: 0.99 }],
+          [{ text: 'DRIVER LICENSE', confidence: 0.99 }],
+          [{ text: 'DL D5551234', confidence: 0.95 }],
+          [{ text: 'LN GARCIA', confidence: 0.97 }],
+          [{ text: 'FN MARIA ELENA', confidence: 0.96 }],
+          [{ text: 'DOB: 04/22/1988', confidence: 0.98 }],
+          [{ text: 'Exp 04/22/2030', confidence: 0.95 }],
+        ]),
+      );
+
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+
+      expect(data.document_number).toBe('5551234');
+      expect(data.name).toBe('MARIA ELENA GARCIA');
+      expect(data.date_of_birth).toBe('1988-04-22');
+      expect(data.expiration_date).toBe('2030-04-22');
+    });
+
+    it('extracts comma-separated name format (LAST, FIRST MIDDLE)', async () => {
+      // Some states show name as "LASTNAME, FIRSTNAME MIDDLE" on one labeled line
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'TEXAS', confidence: 0.99 }],
+          [{ text: 'DRIVER LICENSE', confidence: 0.99 }],
+          [{ text: 'DL 12345678', confidence: 0.95 }],
+          [{ text: 'Name: PARK, JAMES HYUN', confidence: 0.96 }],
+          [{ text: 'DOB: 11/03/1995', confidence: 0.98 }],
+          [{ text: 'Exp 11/03/2031', confidence: 0.95 }],
+        ]),
+      );
+
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+
+      expect(data.document_number).toBe('12345678');
+      expect(data.name).toBe('JAMES HYUN PARK');
+      expect(data.date_of_birth).toBe('1995-11-03');
+    });
+
+    it('extracts letter-prefix DL number without explicit label (FL/IL/MI style)', async () => {
+      // Florida uses 1 letter + 12 digits with no "DL" label — just the raw number
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'FLORIDA', confidence: 0.99 }],
+          [{ text: 'DRIVER LICENSE', confidence: 0.99 }],
+          [{ text: 'W550123456789', confidence: 0.97 }],
+          [{ text: '1 WILLIAMS', confidence: 0.98 }],
+          [{ text: '2 TANYA NICOLE', confidence: 0.96 }],
+          [{ text: '3 Date of birth', confidence: 0.95 }],
+          [{ text: '07/19/1991', confidence: 0.99 }],
+          [{ text: '4b Exp 07/19/2029', confidence: 0.94 }],
+        ]),
+      );
+
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+
+      expect(data.document_number).toBe('W550123456789');
+      expect(data.name).toContain('WILLIAMS');
+      expect(data.name).toContain('TANYA');
+      expect(data.date_of_birth).toBe('1991-07-19');
+      expect(data.expiration_date).toBe('2029-07-19');
+    });
+
+    it('extracts pure numeric DL number with "ID NO" label (NY style)', async () => {
+      // New York uses 9 digits, sometimes labeled "ID NO" or "NO."
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'NEW YORK', confidence: 0.99 }],
+          [{ text: 'DRIVER LICENSE', confidence: 0.99 }],
+          [{ text: 'ID NO. 123456789', confidence: 0.96 }],
+          [{ text: 'Last Name: CHEN', confidence: 0.97 }],
+          [{ text: 'First Name: DAVID WEI', confidence: 0.96 }],
+          [{ text: 'DOB 08/30/1987', confidence: 0.98 }],
+          [{ text: 'Expires 08/30/2032', confidence: 0.95 }],
+        ]),
+      );
+
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+
+      expect(data.document_number).toBe('123456789');
+      expect(data.name).toBe('DAVID WEI CHEN');
+      expect(data.date_of_birth).toBe('1987-08-30');
+      expect(data.expiration_date).toBe('2032-08-30');
+    });
   });
 
   describe('national_id extraction', () => {

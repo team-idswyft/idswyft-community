@@ -174,27 +174,58 @@ export class PaddleOCRProvider implements OCRProvider {
     });
 
     // ── DL number ──
-    // US DLs use varied labels: "DLn", "DL", "License No", "LIC#", etc.
+    // US DL number formats vary wildly by state:
+    //   - Pure numeric: 7-12 digits (NC, NY, PA, TX, CO, etc.)
+    //   - Letter prefix: A1234567 (CA), H12345678 (HI), K12345678 (KS)
+    //   - Multi-letter: AA123456Z (ID), OH123456 (OH), WDL prefix (WA)
+    //   - Formatted: ##-###-#### (CO), ###-###-### (NY), L####-#####-##### (NJ)
+    //
+    // Labels also vary: "DL", "DLN", "DL#", "LIC#", "4d", "ID NO", "NO.", etc.
     // PaddleOCR may merge adjacent fields: "4d DLN C 000048787175 9Class C"
-    // So we allow optional letters/spaces between the DL label and the digits.
     let dlNumberLineIndex = -1;
+
+    // Pass 1: Direct regex for common DL label + number patterns
     for (let i = 0; i < flatLines.length; i++) {
-      const m = flatLines[i].text.match(/(?:DLn?|DL\s*#?|LIC\s*#?)\s*[A-Z]?\s*([0-9]{6,15})/i);
+      const text = flatLines[i].text;
+      // Match: DL/DLN/DL#/LIC#/4d + optional class letter + 6-15 digit number
+      const m = text.match(/(?:4d\s*)?(?:DLn?|DL\s*#?|LIC\s*#?)\s*[A-Z]?\s*([0-9]{6,15})/i)
+        // Also match: "ID NO" / "NO." + alphanumeric DL number
+        || text.match(/(?:ID\s*NO\.?|NO\.)\s*([A-Z0-9\-]{6,15})/i);
       if (m) {
-        ocrData.document_number = m[1];
+        ocrData.document_number = m[1].replace(/[\s\-]/g, '');
         ocrData.confidence_scores!.document_number = flatLines[i].confidence;
         dlNumberLineIndex = i;
         break;
       }
     }
 
-    // Fallback: try label-based extraction
-    // Note: avoid matching bare "driver license" header — it grabs the next line as value (e.g. "CAROLINA").
-    // Only match patterns that specifically indicate a number field.
+    // Pass 2: Look for letter-prefix DL numbers (e.g. "D1234567", "SA1234567")
+    // These are common in CA, FL, IL, MI, MN, MD, NJ, WI, MA, etc.
     if (!ocrData.document_number) {
-      this.findField(flatLines, [/license\s*no/i, /license\s*#/i, /lic\s*no/i, /\bnumber\b/i], (value, conf) => {
-        const cleaned = value.replace(/\s+/g, '');
-        if (/^[A-Z0-9\-]{6,15}$/i.test(cleaned) && !/\d{2}[\/\-\.]\d{2}/.test(cleaned) && !this.isHeaderNoise(cleaned)) {
+      for (let i = 0; i < flatLines.length; i++) {
+        const text = flatLines[i].text;
+        // 1-2 uppercase letters followed by 7-14 digits (not part of a word)
+        const m = text.match(/\b([A-Z]{1,2}\d{7,14})\b/);
+        if (m && !this.isHeaderNoise(m[1])) {
+          ocrData.document_number = m[1];
+          ocrData.confidence_scores!.document_number = flatLines[i].confidence;
+          dlNumberLineIndex = i;
+          break;
+        }
+      }
+    }
+
+    // Pass 3: Label-based extraction using findField
+    if (!ocrData.document_number) {
+      this.findField(flatLines, [
+        /license\s*(?:no|number|#)/i,
+        /lic\s*(?:no|#)/i,
+        /\b4d\b/i,
+        /\bID\s*NO\b/i,
+      ], (value, conf) => {
+        const cleaned = value.replace(/[\s\-]/g, '');
+        // Accept alphanumeric DL numbers (6-15 chars), reject dates and noise
+        if (/^[A-Z0-9]{6,15}$/i.test(cleaned) && !/\d{2}[\/\-\.]\d{2}/.test(value) && !this.isHeaderNoise(cleaned)) {
           ocrData.document_number = cleaned;
           ocrData.confidence_scores!.document_number = conf;
         }
@@ -205,16 +236,51 @@ export class PaddleOCRProvider implements OCRProvider {
     }
 
     // ── Name ──
-    // First try labeled patterns
-    this.findField(flatLines, [/full\s*name/i, /\bname\b/i, /\bfn\b/i, /\bln\b/i], (value, conf) => {
-      if (value.length > 3 && !this.isHeaderNoise(value)) {
-        ocrData.name = value.replace(/\s+/g, ' ');
-        ocrData.confidence_scores!.name = conf;
+    // US DLs use several name labeling styles:
+    //   1. "LN"/"FN" labels (California style)
+    //   2. AAMVA field numbers "1" (family name) / "2" (given name)
+    //   3. "LAST NAME"/"FIRST NAME" text labels
+    //   4. Comma-separated: "LASTNAME, FIRSTNAME MIDDLE"
+    //   5. Unlabeled UPPERCASE lines after the DL number
+
+    // Strategy A: Try labeled patterns (LN/FN, Last Name/First Name, etc.)
+    let lastName = '';
+    let firstName = '';
+
+    // Look for separate last name / first name fields
+    this.findField(flatLines, [/\bLN\b/i, /last\s*name/i, /family\s*name/i, /surname/i], (value, conf) => {
+      if (value.length >= 2 && !this.isHeaderNoise(value)) {
+        lastName = value.replace(/\s+/g, ' ').trim();
+      }
+    });
+    this.findField(flatLines, [/\bFN\b/i, /first\s*name/i, /given\s*name/i], (value, conf) => {
+      if (value.length >= 2 && !this.isHeaderNoise(value)) {
+        firstName = value.replace(/\s+/g, ' ').trim();
       }
     });
 
-    // Fallback for US DLs: name lines are UPPERCASE-only, appear after the DL number
-    // and before address/DOB lines. Typically 1-2 lines of just a name (last, then first).
+    if (lastName || firstName) {
+      ocrData.name = [firstName, lastName].filter(Boolean).join(' ');
+      ocrData.confidence_scores!.name = 0.9; // labeled fields are high confidence
+    }
+
+    // Strategy B: Full name / name label
+    if (!ocrData.name) {
+      this.findField(flatLines, [/full\s*name/i, /\bname\b/i], (value, conf) => {
+        if (value.length > 3 && !this.isHeaderNoise(value)) {
+          // Handle "LASTNAME, FIRSTNAME MIDDLE" comma format
+          const commaMatch = value.match(/^([A-Z][A-Z'\-]+),\s*(.+)$/i);
+          if (commaMatch) {
+            ocrData.name = `${commaMatch[2].trim()} ${commaMatch[1].trim()}`;
+          } else {
+            ocrData.name = value.replace(/\s+/g, ' ');
+          }
+          ocrData.confidence_scores!.name = conf;
+        }
+      });
+    }
+
+    // Strategy C: Positional fallback — UPPERCASE lines after the DL number
     if (!ocrData.name) {
       const nameLines: string[] = [];
       let nameConf = 0;
@@ -222,12 +288,12 @@ export class PaddleOCRProvider implements OCRProvider {
       const startIdx = dlNumberLineIndex >= 0 ? dlNumberLineIndex + 1 : 0;
 
       for (let i = startIdx; i < flatLines.length && i < startIdx + 4; i++) {
-        // Strip leading field numbers common on US DLs (e.g. "2OBED" → "OBED", "1LORISSON" → "LORISSON")
+        // Strip leading AAMVA field numbers (e.g. "2ELENA" → "ELENA", "1MARTINEZ" → "MARTINEZ")
         const text = flatLines[i].text.trim().replace(/^\d{1,2}\s*/, '');
         // Skip lines that look like class designations or labels
         if (/^class\b/i.test(text)) continue;
         if (/[:\-]/.test(text)) break; // label line — stop
-        // Address lines: digits in the middle/end (e.g. "84020 TRYON PARK RD") — stop
+        // Address lines: digits in the middle/end (e.g. "84020 OAK RIDGE BLVD") — stop
         if (/\d{3,}/.test(text)) break;
         // Skip document headers and state names
         if (this.isHeaderNoise(text)) continue;
@@ -249,15 +315,16 @@ export class PaddleOCRProvider implements OCRProvider {
     }
 
     // ── Date of birth ──
-    this.findDateField(flatLines, [/dob/i, /date\s*of\s*birth/i, /birth/i, /born/i], (value, conf) => {
+    // Labels: "DOB", "Date of birth", "3" (AAMVA field number)
+    this.findDateField(flatLines, [/dob/i, /date\s*of\s*birth/i, /birth/i, /born/i, /\b3\s+date\b/i], (value, conf) => {
       ocrData.date_of_birth = value;
       ocrData.confidence_scores!.date_of_birth = conf;
     });
 
     // ── Expiry date ──
-    // For US DLs, "Exp" often appears on a label line with the actual date on the next line.
-    // When multiple dates appear on the same line, the LAST one is typically the expiry.
-    this.findLastDateField(flatLines, [/expires/i, /expiry/i, /\bexp\b/i, /valid\s*until/i], (value, conf) => {
+    // Labels: "EXP", "Expires", "4b" (AAMVA field number), "Valid until"
+    // When multiple dates on one line, the LAST one is typically the expiry.
+    this.findLastDateField(flatLines, [/expires/i, /expiry/i, /\bexp\b/i, /valid\s*until/i, /\b4b\s*exp/i], (value, conf) => {
       ocrData.expiration_date = value;
       ocrData.confidence_scores!.expiration_date = conf;
     });
@@ -393,33 +460,51 @@ export class PaddleOCRProvider implements OCRProvider {
    * the value portion (text after the label on the same line, or the
    * entire next line if no value follows the label).
    */
+  /**
+   * Search lines for a label matching one of `patterns`, then extract the
+   * adjacent value using three strategies in order:
+   *   1. Colon/dash split: "Label: Value" or "Label - Value"
+   *   2. Space-separated:  "Label Value" (text after the matched portion)
+   *   3. Next-line:        "Label\nValue"
+   *
+   * The callback may return `false` to reject the candidate value (e.g. when
+   * it doesn't contain a date). findField will then try the next strategy
+   * or the next matching line.
+   */
   private findField(
     lines: Array<{ text: string; confidence: number }>,
     patterns: RegExp[],
-    onMatch: (value: string, confidence: number) => void,
+    onMatch: (value: string, confidence: number) => boolean | void,
   ): void {
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       for (const pattern of patterns) {
-        if (!pattern.test(line.text)) continue;
+        const match = line.text.match(pattern);
+        if (!match) continue;
 
-        // Try to split at the label to get the value portion
+        // Strategy 1: split at colon/dash to get the value portion
         const parts = line.text.split(/[:\-]\s*/);
         if (parts.length >= 2) {
-          // Value is everything after the first colon/dash
           const value = parts.slice(1).join(':').trim();
           if (value.length > 0) {
-            onMatch(value, line.confidence);
-            return;
+            const result = onMatch(value, line.confidence);
+            if (result !== false) return;
           }
         }
 
-        // Label was the whole line — try the next line as the value
+        // Strategy 2: space-separated — text after the matched label on the same line
+        const afterLabel = line.text.slice(match.index! + match[0].length).trim();
+        if (afterLabel.length > 0) {
+          const result = onMatch(afterLabel, line.confidence);
+          if (result !== false) return;
+        }
+
+        // Strategy 3: label was the whole line — try the next line as the value
         if (i + 1 < lines.length) {
           const nextLine = lines[i + 1];
           if (nextLine.text.trim().length > 0) {
-            onMatch(nextLine.text.trim(), nextLine.confidence);
-            return;
+            const result = onMatch(nextLine.text.trim(), nextLine.confidence);
+            if (result !== false) return;
           }
         }
       }
@@ -437,7 +522,8 @@ export class PaddleOCRProvider implements OCRProvider {
   ): void {
     this.findField(lines, patterns, (value, conf) => {
       const dateStr = this.extractDate(value);
-      if (dateStr) onMatch(dateStr, conf);
+      if (dateStr) { onMatch(dateStr, conf); return; }
+      return false; // no date found — let findField try the next candidate
     });
   }
 
@@ -453,7 +539,8 @@ export class PaddleOCRProvider implements OCRProvider {
   ): void {
     this.findField(lines, patterns, (value, conf) => {
       const dateStr = this.extractLastDate(value);
-      if (dateStr) onMatch(dateStr, conf);
+      if (dateStr) { onMatch(dateStr, conf); return; }
+      return false; // no date found — let findField try the next candidate
     });
   }
 
