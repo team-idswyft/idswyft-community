@@ -286,7 +286,7 @@ function App() {
               { label: 'Features', href: '#features' },
               { label: 'Solutions', href: '#solutions' },
               { label: 'Pricing', href: '#pricing' },
-              { label: 'Docs', href: 'https://docs.idswyft.com' },
+              { label: 'Docs', href: 'https://idswyft.app/doc' },
             ].map(({ label, href }) => (
               <a
                 key={label}
@@ -616,13 +616,13 @@ function App() {
               ))}
             </div>
             <a
-              href="https://idswyft.com"
+              href="https://idswyft.app"
               className="flex items-center gap-1 text-xs transition-colors"
               style={{ color: '#22d3ee' }}
               onMouseEnter={e => (e.currentTarget.style.color = '#67e8f9')}
               onMouseLeave={e => (e.currentTarget.style.color = '#22d3ee')}
             >
-              idswyft.com <ExternalLink className="w-3 h-3" />
+              idswyft.app <ExternalLink className="w-3 h-3" />
             </a>
           </div>
         </div>
@@ -916,7 +916,7 @@ function App() {
                 style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}
               >
                 <a
-                  href="https://docs.idswyft.com"
+                  href="https://idswyft.app/doc"
                   target="_blank"
                   className="flex items-center gap-1.5 text-xs transition-colors"
                   style={{ color: '#22d3ee' }}
@@ -1266,7 +1266,7 @@ function App() {
               <ArrowRight className="w-4 h-4" />
             </button>
             <a
-              href="https://docs.idswyft.com"
+              href="https://idswyft.app/doc"
               target="_blank"
               className="flex items-center justify-center gap-2 px-8 py-4 rounded-xl text-sm font-medium transition-all duration-200"
               style={{ color: '#64748b', border: '1px solid rgba(255,255,255,0.08)' }}
@@ -1306,8 +1306,8 @@ function App() {
             {/* Links */}
             <div className="flex flex-wrap justify-center gap-6" style={{ fontSize: '12px' }}>
               {[
-                { label: 'Platform', href: 'https://idswyft.com' },
-                { label: 'Documentation', href: 'https://docs.idswyft.com' },
+                { label: 'Platform', href: 'https://idswyft.app' },
+                { label: 'Documentation', href: 'https://idswyft.app/doc' },
                 { label: 'Open Source', href: 'https://github.com/doobee46/idswyft' },
                 { label: 'Admin Portal', href: 'https://admin.idswyft.app' },
                 { label: 'Privacy', href: '#' },

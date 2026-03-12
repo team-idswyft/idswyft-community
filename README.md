@@ -178,7 +178,7 @@ Webhooks
 Admin Dashboard
 - Typically located under `/admin` on the frontend.
 - Default local credentials (if seeded — change in production):
-  - Email: admin@idswyft.com
+  - Email: admin@idswyft.app
   - Password: admin123
 
 ---

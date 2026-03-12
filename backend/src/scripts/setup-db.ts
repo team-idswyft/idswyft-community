@@ -83,7 +83,7 @@ async function setupDatabase() {
       const { data: existingAdmin } = await supabase
         .from('admin_users')
         .select('id')
-        .eq('email', 'admin@idswyft.com')
+        .eq('email', 'admin@idswyft.app')
         .single();
       
       if (!existingAdmin) {
@@ -93,7 +93,7 @@ async function setupDatabase() {
         const { error: adminError } = await supabase
           .from('admin_users')
           .insert({
-            email: 'admin@idswyft.com',
+            email: 'admin@idswyft.app',
             password_hash: passwordHash,
             role: 'admin'
           });
@@ -101,7 +101,7 @@ async function setupDatabase() {
         if (adminError) {
           logger.error('Failed to create admin user:', adminError);
         } else {
-          logger.info('✓ Default admin user created (admin@idswyft.com / admin123)');
+          logger.info('✓ Default admin user created (admin@idswyft.app / admin123)');
         }
       } else {
         logger.info('✓ Admin user already exists');
@@ -115,7 +115,7 @@ async function setupDatabase() {
     logger.info('Next steps:');
     logger.info('1. Update your .env file with the correct database credentials');
     logger.info('2. Run `npm run dev` to start the development server');
-    logger.info('3. Access admin panel at http://localhost:3001/admin (admin@idswyft.com / admin123)');
+    logger.info('3. Access admin panel at http://localhost:3001/admin (admin@idswyft.app / admin123)');
     logger.info('4. Get your first API key at http://localhost:5173/developer');
     
   } catch (error) {

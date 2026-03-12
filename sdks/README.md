@@ -1,6 +1,6 @@
 # Idswyft SDKs
 
-This directory contains the official SDKs for the [Idswyft](https://idswyft.com) identity verification platform.
+This directory contains the official SDKs for the [Idswyft](https://idswyft.app) identity verification platform.
 
 ## Available SDKs
 
@@ -133,7 +133,7 @@ If any gate fails, the session is hard-rejected and subsequent steps return 409.
 
 Both SDKs use API keys for authentication:
 
-1. Register at [Idswyft Developer Portal](https://idswyft.com/developer)
+1. Register at [Idswyft Developer Portal](https://idswyft.app/developer)
 2. Get your API key
 3. Store securely as environment variable:
 
@@ -159,7 +159,7 @@ python -m pytest
 
 - **JavaScript SDK**: [`./javascript/README.md`](./javascript/README.md)
 - **Python SDK**: [`./python/README.md`](./python/README.md)
-- **API Documentation**: [https://docs.idswyft.com](https://docs.idswyft.com)
+- **API Documentation**: [https://idswyft.app/doc](https://idswyft.app/doc)
 
 ## License
 

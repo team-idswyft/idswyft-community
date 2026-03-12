@@ -280,5 +280,5 @@ GRANT ALL ON ALL SEQUENCES IN SCHEMA public TO authenticated;
 
 -- Create initial admin user (password: 'admin123' - change in production)
 INSERT INTO admin_users (email, password_hash, role) 
-VALUES ('admin@idswyft.com', crypt('admin123', gen_salt('bf')), 'admin')
+VALUES ('admin@idswyft.app', crypt('admin123', gen_salt('bf')), 'admin')
 ON CONFLICT (email) DO NOTHING;

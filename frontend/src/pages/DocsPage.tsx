@@ -269,8 +269,7 @@ const NAV = [
   { id: 'step-3', label: '3 · Upload Back', depth: 1 },
   { id: 'step-4', label: '4 · Live Capture', depth: 1 },
   { id: 'step-5', label: '5 · Get Results', depth: 1 },
-  { id: 'selfie', label: 'Selfie (Legacy)', depth: 1 },
-  { id: 'live-token', label: 'Live Token', depth: 1 },
+  { id: 'selfie', label: 'Cross-Validation', depth: 1 },
   { id: 'integration', label: 'Integration', depth: 0 },
   { id: 'analysis', label: 'AI Analysis', depth: 0 },
   { id: 'statuses', label: 'Statuses', depth: 0 },
@@ -515,16 +514,12 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
   -H "Content-Type: application/json" \\
   -d '{"user_id": "550e8400-e29b-41d4-a716-446655440000"}'`} />
             <Pre label="Response  —  HTTP 201" code={`{
+  "success": true,
   "verification_id": "550e8400-e29b-41d4-a716-446655440001",
-  "status": "started",
-  "user_id": "550e8400-e29b-41d4-a716-446655440000",
-  "next_steps": [
-    "Upload document with POST /api/v2/verify/:id/front-document",
-    "Upload back-of-ID with POST /api/v2/verify/:id/back-document",
-    "Complete live capture with POST /api/v2/verify/:id/live-capture",
-    "Check results with GET /api/v2/verify/:id/status"
-  ],
-  "created_at": "2026-03-06T12:00:00Z"
+  "status": "AWAITING_FRONT",
+  "current_step": 1,
+  "total_steps": 5,
+  "message": "Verification session initialized"
 }`} />
           </EndpointCard>
 
@@ -533,10 +528,9 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
           <EndpointCard step={2} method="POST" path="/api/v2/verify/:id/front-document" title="Upload Front Document">
             <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
               Upload the <strong style={{ color: C.text }}>front face</strong> of the identity document (passport, driver's license, national ID).
-              OCR extraction and image quality analysis run asynchronously after upload.
-              The response does <em>not</em> yet contain OCR data — poll
-              <code style={{ fontFamily: C.mono, color: C.cyan }}> GET /api/v2/verify/:id/status</code> until
-              <code style={{ fontFamily: C.mono, color: C.cyan }}> ocr_data</code> is present before moving to Step 3.
+              OCR extraction and image quality analysis (Gate 1) run during upload. The response includes
+              <code style={{ fontFamily: C.mono, color: C.cyan }}> ocr_data</code> with extracted fields and confidence scores.
+              If the image quality is too poor, the session is hard-rejected.
             </p>
             <div style={{ marginBottom: 12 }}>
               <FieldRow name="document_type" type="string" req={true} desc="'passport' | 'drivers_license' | 'national_id' | 'other'" />
@@ -547,28 +541,32 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
   -F "document_type=drivers_license" \\
   -F "document=@front.jpg"`} />
             <Pre label="Response  —  HTTP 201" code={`{
+  "success": true,
   "verification_id": "550e8400-e29b-41d4-a716-446655440001",
-  "status": "pending",                    // OCR not yet complete
-  "message": "Document uploaded successfully. Processing started.",
+  "status": "AWAITING_BACK",
+  "current_step": 2,
   "document_id": "doc_abc123",
+  "message": "Front document processed successfully",
 
-  // Included if quality analysis ran (images only):
-  "quality_analysis": {
-    "overall_quality": "excellent",       // poor | fair | good | excellent
-    "issues": [],                         // e.g. ["blurry", "low_contrast"]
-    "recommendations": [],
-    "quality_scores": {
-      "blur_score": 342.5,
-      "brightness": 128,
-      "contrast": 45,
-      "resolution": { "width": 1920, "height": 1080 }
-    }
+  // OCR extraction results (included in response):
+  "ocr_data": {
+    "full_name": "JANE SMITH",
+    "date_of_birth": "1990-06-15",
+    "id_number": "DL123456789",
+    "expiration_date": "2030-06-15",
+    "address": "123 Main St, Anytown, US",
+    "confidence_scores": { "full_name": 0.97, "date_of_birth": 0.96 }
   }
+
+  // If Gate 1 (quality) fails → status becomes "HARD_REJECTED":
+  // "rejection_reason": "POOR_QUALITY",
+  // "rejection_detail": "Image too blurry for OCR extraction"
 }`} />
             <Callout type="note">
-              OCR data is <strong>not in this response</strong>. Poll
-              <code style={{ fontFamily: C.mono }}> GET /api/v2/verify/:id/status</code> every 2 seconds
-              until the <code style={{ fontFamily: C.mono }}>ocr_data</code> field is populated, then proceed to Step 3.
+              If Gate 1 rejects the document (blur, low resolution), the session status becomes{' '}
+              <code style={{ fontFamily: C.mono }}>HARD_REJECTED</code> and subsequent steps will return 409.
+              Check <code style={{ fontFamily: C.mono }}>rejection_reason</code> and{' '}
+              <code style={{ fontFamily: C.mono }}>rejection_detail</code> for guidance to display to the user.
             </Callout>
           </EndpointCard>
 
@@ -603,20 +601,28 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
   -F "document_type=drivers_license" \\
   -F "document=@back.jpg"`} />
             <Pre label="Response  —  HTTP 201" code={`{
+  "success": true,
   "verification_id": "550e8400-e29b-41d4-a716-446655440001",
-  "back_of_id_document_id": "doc_back456",
-  "status": "processing",                  // cross-validation in progress
-  "message": "Back-of-ID uploaded successfully. Enhanced verification processing started.",
-  "enhanced_verification": {
-    "barcode_scanning_enabled": true,
-    "cross_validation_enabled": true,
-    "ai_powered": true
+  "status": "AWAITING_LIVE",
+  "current_step": 3,
+  "message": "Back document processed successfully",
+
+  // Barcode / PDF417 extraction:
+  "barcode_data": {
+    "first_name": "JANE",
+    "last_name": "SMITH",
+    "date_of_birth": "19900615",
+    "document_number": "DL123456789"
   },
-  "next_steps": [
-    "Processing barcode/QR code scanning",
-    "Cross-validating with front-of-ID data",
-    "Check results with GET /api/v2/verify/550e8400-.../status"
-  ]
+
+  // Cross-validation (front OCR vs back barcode):
+  "documents_match": true,
+  "cross_validation_results": {
+    "verdict": "PASS",            // "PASS" or "REVIEW"
+    "has_critical_failure": false,
+    "score": 0.95,                // 0.0 – 1.0
+    "failures": []                // e.g. ["DOB_MISMATCH", "NAME_MISMATCH"]
+  }
 }`} />
             <Callout type="warning">
               Cross-validation now auto-triggers during back-document upload. Poll{' '}
@@ -633,10 +639,11 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
           <EndpointCard step={4} method="POST" path="/api/v2/verify/:id/live-capture" title="Submit Live Capture"
             badge={{ label: 'AI-enhanced', color: C.purple, bg: C.purpleDim }}>
             <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
-              Submit a <strong style={{ color: C.text }}>selfie image file</strong> for liveness detection and
-              face matching against the front document photo. Only available after cross-validation passes.
+              Submit a <strong style={{ color: C.text }}>selfie image file</strong> for liveness detection (Gate 4) and
+              face matching (Gate 5) against the front document photo. Only available after cross-validation passes.
               Uses multipart file upload with field name <code style={{ fontFamily: C.mono, color: C.cyan }}>selfie</code>.
-              Final scores come from <code style={{ fontFamily: C.mono, color: C.cyan }}>GET /api/v2/verify/:id/status</code>.
+              This is the final step — the response includes face match scores, liveness results, and
+              the <code style={{ fontFamily: C.mono, color: C.cyan }}>final_result</code> auto-decision.
             </p>
 
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
@@ -657,13 +664,28 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
   -H "X-API-Key: your-key" \\
   -F "selfie=@selfie.jpg"`} />
             <Pre label="Response  —  HTTP 201" code={`{
+  "success": true,
   "verification_id": "550e8400-e29b-41d4-a716-446655440001",
-  "live_capture_id": "550e8400-e29b-41d4-a716-446655440099",
-  "status": "processing",        // liveness + face match running in background
-  "message": "Live capture uploaded successfully. Processing liveness detection and face matching.",
-  "liveness_check_enabled": true,
-  "face_matching_enabled": true,
-  "results_url": "/api/v2/verify/550e8400-e29b-41d4-a716-446655440001/status"
+  "status": "COMPLETE",
+  "current_step": 5,
+  "selfie_id": "selfie_abc789",
+  "message": "Verification complete",
+
+  // Face match (selfie vs document photo):
+  "face_match_results": {
+    "passed": true,
+    "score": 0.94,                // similarity 0.0 – 1.0
+    "distance": 0.32              // lower = more similar
+  },
+
+  // Liveness detection:
+  "liveness_results": {
+    "liveness_passed": true,
+    "liveness_score": 0.96
+  },
+
+  // Final auto-decision:
+  "final_result": "verified"      // "verified" | "manual_review" | "failed"
 }`} />
             <Callout type="note">
               Poll{' '}
@@ -701,103 +723,80 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
             <Pre label="Request" code={`curl -X GET ${apiUrl}/api/v2/verify/550e8400-e29b-41d4-a716-446655440001/status \\
   -H "X-API-Key: your-key"`} />
             <Pre label="Response  —  completed verification" code={`{
+  "success": true,
   "verification_id": "550e8400-e29b-41d4-a716-446655440001",
-  "user_id":         "550e8400-e29b-41d4-a716-446655440000",
-  "status":          "verified",
-  "created_at":      "2026-03-06T12:00:00Z",
-  "updated_at":      "2026-03-06T12:05:30Z",
+  "status": "COMPLETE",
+  "current_step": 5,
+  "total_steps": 5,
+  "created_at": "2026-03-06T12:00:00Z",
+  "updated_at": "2026-03-06T12:05:30Z",
+
+  // ── Upload progress ──────────────────────────────────────────
+  "front_document_uploaded": true,
+  "back_document_uploaded": true,
+  "live_capture_uploaded": true,
 
   // ── Front document (OCR) ─────────────────────────────────────
-  "document_uploaded": true,
-  "document_type":     "drivers_license",
   "ocr_data": {
-    "name":              "Jane Smith",
+    "full_name":         "JANE SMITH",
     "date_of_birth":     "1990-06-15",
-    "document_number":   "DL123456789",
+    "id_number":         "DL123456789",
     "expiration_date":   "2030-06-15",
     "address":           "123 Main St, Anytown, US",
-    "confidence_scores": { "name": 0.97, "date_of_birth": 0.96 }
+    "confidence_scores": { "full_name": 0.97, "date_of_birth": 0.96 }
   },
-  "quality_analysis": { "overallQuality": "excellent", "isBlurry": false },
 
   // ── Back-of-ID (barcode + cross-validation) ──────────────────
-  "back_of_id_uploaded":            true,
-  "enhanced_verification_completed": true,
-  "cross_validation_score":          0.98,
-  "cross_validation_results": {
-    "match_score": 0.98,
-    "validation_results": {
-      "id_number_match": true,
-      "expiry_date_match": true,
-      "overall_consistency": true
-    },
-    "discrepancies": []
-  },
   "barcode_data": {
-    "parsed_data": {
-      "id_number":          "DL123456789",
-      "expiry_date":        "2030-06-15",
-      "issuing_authority":  "Department of Motor Vehicles"
-    }
+    "first_name": "JANE", "last_name": "SMITH",
+    "document_number": "DL123456789"
+  },
+  "documents_match": true,
+  "cross_validation_results": {
+    "verdict": "PASS",
+    "has_critical_failure": false,
+    "score": 0.95,
+    "failures": []
   },
 
   // ── Live capture (liveness + face match) ─────────────────────
-  "live_capture_completed": true,
-  "liveness_score":          0.96,   // 0–1; threshold ~0.6
-  "face_match_score":        0.94,   // 0–1; threshold ~0.6
-
-  // ── Overall ──────────────────────────────────────────────────
-  "confidence_score":    0.95,
-  "failure_reason":      null,       // set if status is "failed"
-  "manual_review_reason": null       // set if status is "manual_review"
-}`} />
-          </EndpointCard>
-
-          {/* Selfie legacy */}
-          <SectionAnchor id="selfie" />
-          <EndpointCard method="POST" path="/api/verify/selfie" title="Selfie Upload"
-            badge={{ label: 'legacy', color: C.dim, bg: 'rgba(74,85,104,0.13)' }}>
-            <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
-              Upload a pre-captured selfie file for face matching. This is the legacy static-upload endpoint.
-              For new integrations, use <code style={{ fontFamily: C.mono, color: C.cyan }}>POST /api/v2/verify/:id/live-capture</code> which
-              includes real-time liveness detection via camera.
-            </p>
-            <div style={{ marginBottom: 12 }}>
-              <FieldRow name="verification_id" type="UUID string" req={true} desc="The session ID." />
-              <FieldRow name="selfie" type="File" req={true} desc="JPEG or PNG only. Max 10 MB." />
-            </div>
-            <Pre label="Response  —  HTTP 201" code={`{
-  "verification_id": "550e8400-e29b-41d4-a716-446655440001",
-  "status":  "processing",    // face matching runs async
-  "message": "Selfie uploaded successfully. Face recognition started.",
-  "selfie_id": "selfie_abc789",
-  "next_steps": "Check verification status with /api/v2/verify/:id/status"
-}`} />
-          </EndpointCard>
-
-          {/* Live token */}
-          <SectionAnchor id="live-token" />
-          <EndpointCard method="POST" path="/api/verify/generate-live-token" title="Generate Live Capture Token">
-            <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
-              Generate a secure short-lived token and liveness challenge for a live capture session.
-              Useful when you want to redirect users to a hosted capture page rather than embedding the camera yourself.
-              Token expires in 30 minutes.
-            </p>
-            <div style={{ marginBottom: 12 }}>
-              <FieldRow name="user_id" type="UUID string" req={true} desc="The user to generate the token for." />
-              <FieldRow name="verification_id" type="UUID string" req={false} desc="Link the token to an existing session." />
-            </div>
-            <Pre label="Response" code={`{
-  "live_capture_token":  "a3f8b2e1c9d7...",    // 64-char hex
-  "expires_at":          "2026-03-06T12:30:00Z",
-  "expires_in_seconds":  1800,
-  "live_capture_url":    "https://yourapp.com/live-capture?token=a3f8b2e1...",
-  "liveness_challenge": {
-    "type":        "smile",                     // blink_twice | turn_head_left | smile | look_up | ...
-    "instruction": "Please smile when prompted"
+  "face_match_results": {
+    "passed": true,
+    "score": 0.94,
+    "distance": 0.32
   },
-  "user_id":         "550e8400-e29b-41d4-a716-446655440000",
-  "verification_id": "550e8400-e29b-41d4-a716-446655440001"
+  "liveness_results": {
+    "liveness_passed": true,
+    "liveness_score": 0.96
+  },
+
+  // ── Final decision ───────────────────────────────────────────
+  "final_result": "verified",       // "verified" | "manual_review" | "failed"
+  "failure_reason": null,           // set if final_result is "failed"
+  "manual_review_reason": null      // set if final_result is "manual_review"
+}`} />
+          </EndpointCard>
+
+          {/* Cross-validation (optional) */}
+          <SectionAnchor id="selfie" />
+          <EndpointCard method="POST" path="/api/v2/verify/:id/cross-validation" title="Get Cross-Validation Results"
+            badge={{ label: 'optional', color: C.dim, bg: 'rgba(74,85,104,0.13)' }}>
+            <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
+              Retrieve the cached cross-validation results separately. Cross-validation runs automatically
+              during the back document upload (Step 3), so this endpoint is only needed if you want to
+              query the results independently.
+            </p>
+            <Pre label="Response  —  HTTP 200" code={`{
+  "success": true,
+  "verification_id": "550e8400-e29b-41d4-a716-446655440001",
+  "status": "AWAITING_LIVE",
+  "documents_match": true,
+  "cross_validation_results": {
+    "verdict": "PASS",
+    "has_critical_failure": false,
+    "score": 0.95,
+    "failures": []
+  }
 }`} />
           </EndpointCard>
 
@@ -888,15 +887,17 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
           {/* ══ STATUSES ═════════════════════════════════════════════════════ */}
           <SectionAnchor id="statuses" />
           <H2>Verification Statuses</H2>
-          <Lead>A verification moves through these statuses. Only <strong style={{ color: C.green }}>verified</strong>, <strong style={{ color: C.red }}>failed</strong>, and <strong style={{ color: C.orange }}>manual_review</strong> are terminal.</Lead>
+          <Lead>A verification moves through these statuses sequentially. <strong style={{ color: C.green }}>COMPLETE</strong> and <strong style={{ color: C.red }}>HARD_REJECTED</strong> are terminal states.</Lead>
 
           <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 24 }}>
             {[
-              { status: 'pending', color: C.amber, bg: C.amberDim, desc: 'Session created, or document uploaded. Waiting for OCR to complete.', terminal: false },
-              { status: 'processing', color: C.blue, bg: C.blueDim, desc: 'Cross-validation passed. Live capture is the next required step.', terminal: false },
-              { status: 'verified', color: C.green, bg: C.greenDim, desc: 'All checks passed — cross-validation, liveness, and face match.', terminal: true },
-              { status: 'failed', color: C.red, bg: C.redDim, desc: 'Verification failed. Check failure_reason for: cross-validation mismatch, liveness failure, or face match below threshold.', terminal: true },
-              { status: 'manual_review', color: C.orange, bg: C.orangeDim, desc: 'Requires human review. Edge case, low confidence score, or processing error.', terminal: true },
+              { status: 'AWAITING_FRONT', color: C.amber, bg: C.amberDim, desc: 'Session initialized. Waiting for front document upload.', terminal: false },
+              { status: 'AWAITING_BACK', color: C.amber, bg: C.amberDim, desc: 'Front document processed. Waiting for back document upload.', terminal: false },
+              { status: 'CROSS_VALIDATING', color: C.blue, bg: C.blueDim, desc: 'Running cross-validation between front OCR and back barcode data.', terminal: false },
+              { status: 'AWAITING_LIVE', color: C.amber, bg: C.amberDim, desc: 'Cross-validation passed. Waiting for selfie upload.', terminal: false },
+              { status: 'FACE_MATCHING', color: C.blue, bg: C.blueDim, desc: 'Running liveness detection and face matching against document photo.', terminal: false },
+              { status: 'COMPLETE', color: C.green, bg: C.greenDim, desc: 'All gates passed. Check final_result for: "verified", "manual_review", or "failed".', terminal: true },
+              { status: 'HARD_REJECTED', color: C.red, bg: C.redDim, desc: 'Session rejected by a quality gate. Check rejection_reason for details. Subsequent steps return 409.', terminal: true },
             ].map(s => (
               <div key={s.status} style={{ display: 'flex', gap: 16, padding: '14px 18px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, alignItems: 'flex-start', flexWrap: 'wrap' }}>
                 <div style={{ width: 130, flexShrink: 0, display: 'flex', gap: 8, alignItems: 'center' }}>
@@ -939,6 +940,7 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
                 { code: '400', color: C.amber, desc: 'Bad request — validation error' },
                 { code: '401', color: C.red, desc: 'Unauthorized — invalid or missing API key' },
                 { code: '404', color: C.red, desc: 'Verification not found' },
+                { code: '409', color: C.orange, desc: 'Conflict — session hard-rejected by a gate' },
                 { code: '429', color: C.orange, desc: 'Rate limit exceeded' },
                 { code: '500', color: C.red, desc: 'Internal server error' },
               ].map(s => (
@@ -961,7 +963,7 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
               { icon: '🔑', title: 'Developer Portal', desc: 'Get API keys, view usage stats and analytics', href: '/developer', cta: 'Open Portal →' },
               { icon: '🎮', title: 'Live Demo', desc: 'Try the full verification flow with a sandbox key', href: '/demo', cta: 'Open Demo →' },
               { icon: '📦', title: 'GitHub', desc: 'Source code, examples, and issue tracker', href: 'https://github.com/doobee46/idswyft', cta: 'View on GitHub →' },
-              { icon: '✉️', title: 'Email Support', desc: 'Technical support and integration help', href: 'mailto:support@idswyft.com', cta: 'support@idswyft.com' },
+              { icon: '✉️', title: 'Email Support', desc: 'Technical support and integration help', href: 'mailto:support@idswyft.app', cta: 'support@idswyft.app' },
             ].map(r => (
               <div key={r.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
                 <div style={{ fontSize: '1.4rem' }}>{r.icon}</div>

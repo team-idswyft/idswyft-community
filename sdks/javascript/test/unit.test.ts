@@ -15,7 +15,7 @@ describe('IdswyftSDK', () => {
   beforeEach(() => {
     sdk = new IdswyftSDK({
       apiKey: 'test-api-key',
-      baseURL: 'https://api.test.idswyft.com',
+      baseURL: 'https://api.test.idswyft.app',
       sandbox: true
     });
 
@@ -26,7 +26,7 @@ describe('IdswyftSDK', () => {
   describe('constructor', () => {
     it('should initialize with provided config', () => {
       expect(sdk['config'].apiKey).toBe('test-api-key');
-      expect(sdk['config'].baseURL).toBe('https://api.test.idswyft.com');
+      expect(sdk['config'].baseURL).toBe('https://api.test.idswyft.app');
       expect(sdk['config'].sandbox).toBe(true);
       expect(sdk['config'].timeout).toBe(30000);
     });
@@ -34,7 +34,7 @@ describe('IdswyftSDK', () => {
     it('should use default values when not provided', () => {
       const defaultSDK = new IdswyftSDK({ apiKey: 'test-key' });
 
-      expect(defaultSDK['config'].baseURL).toBe('https://api.idswyft.com');
+      expect(defaultSDK['config'].baseURL).toBe('https://api.idswyft.app');
       expect(defaultSDK['config'].timeout).toBe(30000);
       expect(defaultSDK['config'].sandbox).toBe(false);
     });
