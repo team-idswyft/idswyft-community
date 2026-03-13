@@ -53,21 +53,24 @@ What makes Idswyft unique:
 
 ## Architecture 🏗️
 
-- Backend: Node.js + TypeScript, Express.js
-  - Routes: auth, developer, admin, verification, health
-  - Middleware: authentication, rate limiting, error handling, logging
-  - Integrations: Supabase/Postgres, Tesseract OCR, face-api.js
-- Frontend: React + TypeScript (Vite) — Admin dashboard & Developer portal
-- Database: Supabase / PostgreSQL (schema/migrations may be present in repo)
-- File storage: Configurable (S3, Supabase Storage, or local)
-- Security: Encrypted storage for sensitive files, API-key hashing, JWT for admin/developer access
+The project consists of two platforms sharing a common backend stack:
 
-Key backend files (examples present in repo):
-- backend/src/config*.ts — configuration loaders (database, verification thresholds, dynamic thresholds)
-- backend/src/database.ts — DB connection utilities
-- backend/src/middleware/* — auth, rate limit, error handling, api logger
-- backend/src/models/ApiActivity.ts
-- backend/src/routes/admin-thresholds.ts
+**Main Platform** (developer-facing identity verification):
+- `backend/` — Node.js + TypeScript, Express.js, face-api.js, PaddleOCR
+- `frontend/` — React + Vite developer portal
+- Database: Supabase (`supabase/migrations/`)
+
+**VaaS Platform** (admin/enterprise verification-as-a-service):
+- `idswyft-vaas/vaas-backend/` — Express.js API with org-scoped + platform-scoped auth
+- `idswyft-vaas/vaas-admin/` — React + Tailwind org admin dashboard
+- `idswyft-vaas/platform-admin/` — React + Tailwind platform admin (branding, orgs, email config)
+- `idswyft-vaas/customer-portal/` — Customer-facing portal
+- Database: Separate Supabase project (`vaas-backend/src/config/migrations/`)
+
+**Shared infrastructure:**
+- Two Supabase projects (main + VaaS) with independent migration runners
+- File storage: Supabase Storage or S3-compatible
+- Security: JWT auth, bcrypt password hashing, encrypted file storage
 
 ---
 
@@ -104,18 +107,43 @@ cp .env.example .env
 Populate values described in the Configuration section below.
 
 4) Database
-- Create the required database and schema. If SQL schema/migrations are included in your clone (e.g., `sql/` or `supabase/migrations/`), apply them to your Postgres/Supabase instance.
-- Otherwise run the migrations or create tables according to your environment.
+
+Both backends use a lightweight migration runner that connects directly to Postgres and tracks applied migrations.
+
+**Main backend** — reads from `supabase/migrations/`:
+```bash
+# Add DATABASE_URL to backend/.env (from Supabase Dashboard > Settings > Database > Connection string URI)
+# DATABASE_URL=postgresql://postgres:PASSWORD@db.YOUR_PROJECT_REF.supabase.co:5432/postgres
+
+cd backend
+npm run migrate
+```
+
+**VaaS backend** — reads from `vaas-backend/src/config/migrations/`:
+```bash
+# Add VAAS_DATABASE_URL to vaas-backend/.env
+# VAAS_DATABASE_URL=postgresql://postgres:PASSWORD@db.YOUR_PROJECT_REF.supabase.co:5432/postgres
+
+cd idswyft-vaas/vaas-backend
+npm run migrate
+```
+
+The runner will:
+- Create a `_migrations` tracking table on first run
+- Apply pending `.sql` files in alphabetical order
+- Skip already-applied migrations
+- Wrap each migration in a transaction (rollback on failure)
 
 5) Start in development
 ```bash
-# backend (example)
-cd backend
-npm run dev
+# Main platform
+cd backend && npm run dev          # API on :3001
+cd frontend && npm run dev         # Developer portal on :5173
 
-# frontend (example)
-cd ../frontend
-npm run dev
+# VaaS platform
+cd idswyft-vaas/vaas-backend && npm run dev    # VaaS API on :3002
+cd idswyft-vaas/vaas-admin && npm run dev      # Org admin UI on :3000
+cd idswyft-vaas/platform-admin && npm run dev  # Platform admin UI on :3001
 ```
 
 6) Docker (optional)
@@ -126,9 +154,12 @@ docker-compose up -d
 Adjust volumes and .env files as necessary.
 
 Notes
-- Default local ports are typical but may vary:
-  - Backend API: http://localhost:3001
-  - Frontend / Dashboards: http://localhost:5173
+- Default local ports:
+  - Main backend API: http://localhost:3001
+  - Developer portal: http://localhost:5173
+  - VaaS backend API: http://localhost:3002
+  - VaaS org admin: http://localhost:3000
+  - Platform admin: http://localhost:3001 (needs backend on :3002)
 
 ---
 
