@@ -68,7 +68,7 @@ async function main() {
 
     // Get already-applied migrations
     const { rows: applied } = await client.query('SELECT name FROM _migrations ORDER BY name');
-    const appliedSet = new Set(applied.map(r => r.name));
+    const appliedSet = new Set(applied.map((r: { name: string }) => r.name));
 
     // Get all .sql files sorted
     const files = readdirSync(MIGRATIONS_DIR)
