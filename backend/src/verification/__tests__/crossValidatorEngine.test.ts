@@ -148,6 +148,32 @@ describe('Cross-Validator Engine', () => {
     expect(result.document_expired).toBe(false);
   });
 
+  it('returns REVIEW (not PASS) when barcode is completely unreadable', () => {
+    const emptyBack: BackExtractionResult = {
+      qr_payload: {},
+      mrz_result: null,
+      barcode_format: null,
+      raw_barcode_data: null,
+    };
+    const result = crossValidate(makeFront(), emptyBack);
+    expect(result.verdict).toBe('REVIEW');
+    expect(result.overall_score).toBeLessThan(0.92); // Below PASS threshold
+    expect(result.overall_score).toBeGreaterThanOrEqual(0.75); // Above REVIEW threshold
+    expect(result.has_critical_failure).toBe(false);
+  });
+
+  it('returns REJECT when barcode is unreadable AND document is expired', () => {
+    const emptyBack: BackExtractionResult = {
+      qr_payload: {},
+      mrz_result: null,
+      barcode_format: null,
+      raw_barcode_data: null,
+    };
+    const result = crossValidate(makeFront({ expiry_date: '2020-01-01' }), emptyBack);
+    expect(result.verdict).toBe('REJECT');
+    expect(result.document_expired).toBe(true);
+  });
+
   it('handles missing back fields gracefully (score 0 for missing fields)', () => {
     const back = makeBack();
     delete (back.qr_payload as any).nationality;

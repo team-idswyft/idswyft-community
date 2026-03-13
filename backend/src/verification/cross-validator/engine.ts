@@ -78,8 +78,9 @@ export function crossValidate(
   const backPayload = (back.qr_payload || {}) as Record<string, unknown>;
 
   // If barcode returned all-empty fields, we can't cross-validate.
-  // Auto-PASS with a low score — mobile phone photos often can't read barcodes.
-  // The front OCR + face match (Gates 1, 4, 5) still protect against fraud.
+  // Flag for REVIEW so a human inspects — unreadable barcode should NOT auto-pass.
+  // The session still proceeds to live capture (REVIEW unlocks it), but the
+  // verification will be flagged for manual review before final approval.
   const backHasData = Object.values(backPayload).some(
     v => typeof v === 'string' && v.trim().length > 0
   );
@@ -93,14 +94,14 @@ export function crossValidate(
     const frontExpiry = extractFrontField(frontOcr, 'expiry_date');
     const documentExpired = frontExpiry ? isExpired(frontExpiry, '') : false;
 
-    console.log('🔎 ── Cross-Validation: back data empty — auto-PASS (barcode unreadable) ──');
+    console.log('🔎 ── Cross-Validation: back data empty — REVIEW (barcode unreadable) ──');
 
     return {
-      overall_score: 0.93,  // Just above PASS threshold so it doesn't block the flow
+      overall_score: 0.80,  // Between REVIEW (0.75) and PASS (0.92) — flags for manual review
       field_scores: emptyFieldScores,
       has_critical_failure: false,
       document_expired: documentExpired,
-      verdict: documentExpired ? 'REJECT' : 'PASS',
+      verdict: documentExpired ? 'REJECT' : 'REVIEW',
     };
   }
 
