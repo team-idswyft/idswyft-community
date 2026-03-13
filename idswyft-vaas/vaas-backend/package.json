@@ -13,6 +13,7 @@
     "type-check": "tsc --noEmit",
     "railway:build": "npm run build",
     "railway:start": "npm run start",
+    "migrate": "tsx src/scripts/migrate.ts",
     "migrate:create-signups": "tsx src/scripts/create-enterprise-signups-table.ts",
     "migrate:run": "tsx src/scripts/run-migration.ts"
   },
