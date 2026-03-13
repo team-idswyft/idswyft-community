@@ -13,7 +13,7 @@ RUN apk add --no-cache \
     librsvg-dev
 
 COPY package*.json ./
-RUN npm ci --include=optional
+RUN npm install --include=optional
 
 # Download face-api.js model weights at build time (not committed to repo)
 COPY download-models.js ./
