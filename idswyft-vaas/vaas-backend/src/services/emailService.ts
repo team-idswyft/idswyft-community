@@ -1,5 +1,6 @@
 import config from '../config/index.js';
 import { VaasOrganization, VaasAdmin } from '../types/index.js';
+import { vaasSupabase } from '../config/database.js';
 
 interface WelcomeEmailData {
   organization: VaasOrganization;
@@ -49,10 +50,30 @@ interface SendEmailOptions {
   text: string;
 }
 
+interface EmailConfig {
+  logo_url: string | null;
+  primary_color: string;
+  footer_text: string;
+  company_name: string;
+}
+
+// ── Dark-theme constants ────────────────────────────────────────────────────
+const BG = '#080c14';
+const CARD = '#0f1420';
+const CARD_ALT = '#141c2e';
+const TEXT = '#dce4ef';
+const MUTED = '#8896aa';
+const BORDER = 'rgba(151,169,192,0.16)';
+
 export class EmailService {
   private resendApiKey: string;
   private fromAddress: string;
   private isConfigured: boolean = false;
+
+  // 5-minute cache for platform_email_config
+  private emailConfigCache: EmailConfig | null = null;
+  private emailConfigCacheTime: number = 0;
+  private static CONFIG_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
   constructor() {
     this.resendApiKey = process.env.RESEND_API_KEY || '';
@@ -67,6 +88,80 @@ export class EmailService {
       console.warn('Missing: RESEND_API_KEY');
     }
   }
+
+  /**
+   * Reads platform_email_config from DB with 5-minute cache.
+   * Falls back to defaults if table doesn't exist or query fails.
+   */
+  async getEmailConfig(): Promise<EmailConfig> {
+    const now = Date.now();
+    if (this.emailConfigCache && (now - this.emailConfigCacheTime) < EmailService.CONFIG_CACHE_TTL) {
+      return this.emailConfigCache;
+    }
+
+    const defaults: EmailConfig = {
+      logo_url: null,
+      primary_color: '#22d3ee',
+      footer_text: 'Powered by Idswyft VaaS',
+      company_name: 'Idswyft',
+    };
+
+    try {
+      const { data, error } = await vaasSupabase
+        .from('platform_email_config')
+        .select('logo_url, primary_color, footer_text, company_name')
+        .eq('id', 'default')
+        .single();
+
+      if (error || !data) {
+        this.emailConfigCache = defaults;
+      } else {
+        this.emailConfigCache = {
+          logo_url: data.logo_url || defaults.logo_url,
+          primary_color: data.primary_color || defaults.primary_color,
+          footer_text: data.footer_text || defaults.footer_text,
+          company_name: data.company_name || defaults.company_name,
+        };
+      }
+    } catch {
+      this.emailConfigCache = defaults;
+    }
+
+    this.emailConfigCacheTime = now;
+    return this.emailConfigCache;
+  }
+
+  // ── Dark-theme helpers ──────────────────────────────────────────────────
+
+  private darkHeader(accent: string, logo: string | null, title: string, subtitle: string): string {
+    const logoHtml = logo ? `<img src="${logo}" alt="${subtitle}" style="max-width:120px;height:auto;margin-bottom:14px;">` : '';
+    return `<div style="background:${accent};padding:32px 30px;text-align:center;border-radius:12px 12px 0 0;">
+      ${logoHtml}
+      <h1 style="margin:0;color:#04212a;font-size:22px;font-weight:700;">${title}</h1>
+      <p style="margin:8px 0 0;color:rgba(4,33,42,0.72);font-size:14px;">${subtitle}</p>
+    </div>`;
+  }
+
+  private darkFooter(footerText: string): string {
+    return `<div style="padding:22px;text-align:center;border-top:1px solid ${BORDER};color:${MUTED};font-size:13px;">
+      ${footerText}
+    </div>`;
+  }
+
+  private darkButton(accent: string, href: string, label: string): string {
+    return `<a href="${href}" style="display:inline-block;background:${accent};color:#04212a;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;box-shadow:0 4px 14px rgba(0,0,0,0.25);">${label}</a>`;
+  }
+
+  private darkWrap(inner: string): string {
+    return `<!DOCTYPE html>
+<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
+<body style="margin:0;padding:20px;background:${BG};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+<div style="max-width:600px;margin:0 auto;background:${CARD};border-radius:12px;overflow:hidden;border:1px solid ${BORDER};">
+${inner}
+</div></body></html>`;
+  }
+
+  // ── Send infrastructure (unchanged) ─────────────────────────────────────
 
   private async sendResendRequest(options: SendEmailOptions): Promise<boolean> {
     try {
@@ -137,53 +232,41 @@ export class EmailService {
     }
   }
 
-  async sendWelcomeEmail(data: WelcomeEmailData): Promise<boolean> {
-    const subject = `Welcome to Idswyft VaaS - Your ${data.organization.name} Account is Ready!`;
-    
-    const htmlContent = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background: #1e40af; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center; }
-    .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
-    .button { display: inline-block; background: #1e40af; color: white; padding: 12px 24px; text-decoration: none; border-radius: 6px; margin: 20px 0; }
-    .credentials { background: #fff; padding: 20px; border-radius: 8px; border-left: 4px solid #1e40af; margin: 20px 0; }
-    .warning { background: #fef3c7; padding: 15px; border-radius: 6px; border-left: 4px solid #f59e0b; margin: 20px 0; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1>🛡️ Welcome to Idswyft VaaS</h1>
-  </div>
-  
-  <div class="content">
-    <h2>Hello ${data.adminName}!</h2>
-    
-    <p>Your Idswyft VaaS account for <strong>${data.organization.name}</strong> has been successfully created.</p>
-    
-    <div class="credentials">
-      <h3>🔐 Your Login Credentials</h3>
-      <p><strong>Dashboard:</strong> <a href="${data.dashboardUrl}">${data.dashboardUrl}</a></p>
-      <p><strong>Email:</strong> ${data.adminEmail}</p>
-      <p><strong>Password:</strong> <code>${data.adminPassword}</code></p>
-      <p><strong>Organization:</strong> ${data.organization.name}</p>
-    </div>
-    
-    <div class="warning">
-      <strong>⚠️ Important:</strong> Please change your password after logging in.
-    </div>
-    
-    <a href="${data.dashboardUrl}" class="button">Access Dashboard</a>
-    
-    <p>Best regards,<br>The Idswyft Team</p>
-  </div>
-</body>
-</html>`;
+  // ── Templates (dark theme) ──────────────────────────────────────────────
 
-    const textContent = `Welcome to Idswyft VaaS!
+  async sendWelcomeEmail(data: WelcomeEmailData): Promise<boolean> {
+    const cfg = await this.getEmailConfig();
+    const accent = cfg.primary_color;
+    const subject = `Welcome to ${cfg.company_name} VaaS - Your ${data.organization.name} Account is Ready!`;
+
+    const htmlContent = this.darkWrap(`
+      ${this.darkHeader(accent, cfg.logo_url, `Welcome to ${cfg.company_name} VaaS`, data.organization.name)}
+      <div style="padding:30px;color:${TEXT};">
+        <p style="font-size:17px;margin:0 0 16px;">Hello <strong>${data.adminName}</strong>,</p>
+        <p style="color:${MUTED};line-height:1.7;">Your account for <strong style="color:${TEXT};">${data.organization.name}</strong> has been successfully created.</p>
+
+        <div style="background:${CARD_ALT};border-left:3px solid ${accent};border-radius:8px;padding:18px;margin:22px 0;">
+          <p style="margin:0 0 6px;font-size:13px;color:${MUTED};text-transform:uppercase;letter-spacing:0.06em;font-weight:600;">Login Credentials</p>
+          <p style="margin:4px 0;color:${TEXT};"><strong>Dashboard:</strong> <a href="${data.dashboardUrl}" style="color:${accent};">${data.dashboardUrl}</a></p>
+          <p style="margin:4px 0;color:${TEXT};"><strong>Email:</strong> ${data.adminEmail}</p>
+          <p style="margin:4px 0;color:${TEXT};"><strong>Password:</strong> <code style="background:rgba(151,169,192,0.12);padding:2px 6px;border-radius:4px;">${data.adminPassword}</code></p>
+          <p style="margin:4px 0;color:${TEXT};"><strong>Organization:</strong> ${data.organization.name}</p>
+        </div>
+
+        <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.28);border-radius:8px;padding:14px;margin:18px 0;">
+          <strong style="color:#fcd34d;">Important:</strong> <span style="color:${MUTED};">Please change your password after logging in.</span>
+        </div>
+
+        <div style="text-align:center;margin:24px 0;">
+          ${this.darkButton(accent, data.dashboardUrl, 'Access Dashboard')}
+        </div>
+
+        <p style="color:${MUTED};font-size:14px;">Best regards,<br>The ${cfg.company_name} Team</p>
+      </div>
+      ${this.darkFooter(cfg.footer_text)}
+    `);
+
+    const textContent = `Welcome to ${cfg.company_name} VaaS!
 
 Hello ${data.adminName},
 
@@ -191,55 +274,44 @@ Your account for ${data.organization.name} has been created.
 
 Login Details:
 - Dashboard: ${data.dashboardUrl}
-- Email: ${data.adminEmail}  
+- Email: ${data.adminEmail}
 - Password: ${data.adminPassword}
 - Organization: ${data.organization.name}
 
 Please change your password after logging in.
 
 Best regards,
-The Idswyft Team`;
+The ${cfg.company_name} Team`;
 
-    return this.sendEmail({
-      to: data.adminEmail,
-      subject,
-      html: htmlContent,
-      text: textContent
-    });
+    return this.sendEmail({ to: data.adminEmail, subject, html: htmlContent, text: textContent });
   }
 
   async sendNotificationToAdmin(data: NotificationEmailData): Promise<boolean> {
-    const subject = `🚀 New VaaS Signup: ${data.organizationName}`;
-    
-    const htmlContent = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { background: #059669; color: white; padding: 20px; border-radius: 8px 8px 0 0; text-align: center; }
-    .content { background: #f9fafb; padding: 30px; border-radius: 0 0 8px 8px; }
-    .info-box { background: #fff; padding: 20px; border-radius: 8px; margin: 20px 0; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1>New VaaS Enterprise Signup</h1>
-  </div>
-  
-  <div class="content">
-    <div class="info-box">
-      <p><strong>Company:</strong> ${data.organizationName}</p>
-      <p><strong>Contact:</strong> ${data.adminName} (${data.adminEmail})</p>
-      <p><strong>Job Title:</strong> ${data.jobTitle}</p>
-      <p><strong>Volume:</strong> ${data.estimatedVolume}/month</p>
-      <p><strong>Use Case:</strong> ${data.useCase}</p>
-      <p><strong>Signup ID:</strong> ${data.signupId}</p>
-    </div>
-  </div>
-</body>
-</html>`;
+    const cfg = await this.getEmailConfig();
+    const accent = cfg.primary_color;
+    const subject = `New VaaS Signup: ${data.organizationName}`;
+
+    const row = (label: string, value: string) =>
+      `<tr><td style="padding:8px 12px;color:${MUTED};font-size:13px;white-space:nowrap;vertical-align:top;">${label}</td><td style="padding:8px 12px;color:${TEXT};font-size:14px;">${value}</td></tr>`;
+
+    const htmlContent = this.darkWrap(`
+      ${this.darkHeader(accent, cfg.logo_url, 'New VaaS Enterprise Signup', cfg.company_name)}
+      <div style="padding:30px;color:${TEXT};">
+        <div style="background:${CARD_ALT};border-radius:8px;overflow:hidden;margin:0 0 20px;">
+          <table style="width:100%;border-collapse:collapse;">
+            <tbody>
+              ${row('Company', data.organizationName)}
+              ${row('Contact', `${data.adminName} (${data.adminEmail})`)}
+              ${row('Job Title', data.jobTitle)}
+              ${row('Volume', `${data.estimatedVolume}/month`)}
+              ${row('Use Case', data.useCase)}
+              ${row('Signup ID', `<code style="background:rgba(151,169,192,0.12);padding:2px 6px;border-radius:4px;font-size:12px;">${data.signupId}</code>`)}
+            </tbody>
+          </table>
+        </div>
+      </div>
+      ${this.darkFooter(cfg.footer_text)}
+    `);
 
     const textContent = `New VaaS Signup: ${data.organizationName}
 
@@ -251,197 +323,119 @@ Use Case: ${data.useCase}
 Signup ID: ${data.signupId}`;
 
     const adminEmail = process.env.ADMIN_NOTIFICATION_EMAIL || 'admin@idswyft.app';
-    
-    return this.sendEmail({
-      to: adminEmail,
-      subject,
-      html: htmlContent,
-      text: textContent
-    });
+    return this.sendEmail({ to: adminEmail, subject, html: htmlContent, text: textContent });
   }
 
   async sendVerificationEmail(data: VerificationEmailData): Promise<boolean> {
-    const subject = `Verify Your ${data.organizationName} Admin Account - Idswyft VaaS`;
-    
-    const htmlContent = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <style>
-    body { font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 20px; }
-    .header { text-align: center; padding: 30px 0; border-bottom: 1px solid #e5e7eb; }
-    .content { padding: 30px 20px; }
-    .button { display: inline-block; background: linear-gradient(135deg, #3b82f6, #8b5cf6); color: white; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: 600; margin: 20px 0; }
-    .verification-code { background: #f3f4f6; padding: 15px; border-radius: 8px; font-family: monospace; font-size: 16px; margin: 20px 0; text-align: center; }
-    .next-steps { background: #f0f9ff; padding: 20px; border-radius: 8px; margin: 30px 0; }
-  </style>
-</head>
-<body>
-  <div class="header">
-    <h1>🛡️ Idswyft VaaS</h1>
-    <p>Identity Verification as a Service</p>
-  </div>
-  
-  <div class="content">
-    <h2>Verify Your Admin Account</h2>
-    
-    <p>Hello ${data.adminName},</p>
-    
-    <p>Please verify your admin account for <strong>${data.organizationName}</strong> to complete your VaaS setup.</p>
-    
-    <p style="text-align: center;">
-      <a href="${data.dashboardUrl}/verify-email?token=${data.verificationToken}&email=${encodeURIComponent(data.adminEmail)}" class="button">
-        Verify Email Address
-      </a>
-    </p>
-    
-    <p>Or use this verification code:</p>
-    <div class="verification-code">
-      <strong>${data.verificationToken}</strong>
-    </div>
-    
-    <div class="next-steps">
-      <h4>🎯 Next Steps:</h4>
-      <ul>
-        <li>Click the verification link above</li>
-        <li>Access your dashboard at <a href="${data.dashboardUrl}">${data.dashboardUrl}</a></li>
-        <li>Set up your organization settings</li>
-        <li>Start integrating our verification API</li>
-      </ul>
-    </div>
-    
-    <p style="color: #6b7280; font-size: 14px;">
-      If you didn't create this account, please ignore this email.
-    </p>
-  </div>
-</body>
-</html>`;
+    const cfg = await this.getEmailConfig();
+    const accent = cfg.primary_color;
+    const subject = `Verify Your ${data.organizationName} Admin Account - ${cfg.company_name} VaaS`;
+    const verifyUrl = `${data.dashboardUrl}/verify-email?token=${data.verificationToken}&email=${encodeURIComponent(data.adminEmail)}`;
 
-    const textContent = `Verify Your ${data.organizationName} Admin Account - Idswyft VaaS
+    const htmlContent = this.darkWrap(`
+      ${this.darkHeader(accent, cfg.logo_url, 'Verify Your Admin Account', `${cfg.company_name} VaaS`)}
+      <div style="padding:30px;color:${TEXT};">
+        <p style="font-size:17px;margin:0 0 16px;">Hello <strong>${data.adminName}</strong>,</p>
+        <p style="color:${MUTED};line-height:1.7;">Please verify your admin account for <strong style="color:${TEXT};">${data.organizationName}</strong> to complete your VaaS setup.</p>
+
+        <div style="text-align:center;margin:24px 0;">
+          ${this.darkButton(accent, verifyUrl, 'Verify Email Address')}
+        </div>
+
+        <p style="color:${MUTED};font-size:14px;">Or use this verification code:</p>
+        <div style="background:${CARD_ALT};padding:16px;border-radius:8px;text-align:center;font-family:monospace;font-size:16px;color:${TEXT};letter-spacing:0.05em;margin:12px 0;">
+          <strong>${data.verificationToken}</strong>
+        </div>
+
+        <div style="background:rgba(34,211,238,0.06);border:1px solid rgba(34,211,238,0.18);border-radius:8px;padding:18px;margin:22px 0;">
+          <p style="margin:0 0 10px;font-weight:600;color:${TEXT};">Next Steps:</p>
+          <ul style="margin:0;padding-left:18px;color:${MUTED};line-height:1.8;">
+            <li>Click the verification link above</li>
+            <li>Access your dashboard at <a href="${data.dashboardUrl}" style="color:${accent};">${data.dashboardUrl}</a></li>
+            <li>Set up your organization settings</li>
+            <li>Start integrating our verification API</li>
+          </ul>
+        </div>
+
+        <p style="color:${MUTED};font-size:13px;">If you didn't create this account, please ignore this email.</p>
+      </div>
+      ${this.darkFooter(cfg.footer_text)}
+    `);
+
+    const textContent = `Verify Your ${data.organizationName} Admin Account - ${cfg.company_name} VaaS
 
 Hello ${data.adminName},
 
 Please verify your admin account for ${data.organizationName}.
 
-Verification Link: ${data.dashboardUrl}/verify-email?token=${data.verificationToken}&email=${encodeURIComponent(data.adminEmail)}
+Verification Link: ${verifyUrl}
 
 Verification Code: ${data.verificationToken}
 
 Next Steps:
-- Click the verification link above  
+- Click the verification link above
 - Access your dashboard at ${data.dashboardUrl}
 - Set up your organization settings
 - Start integrating our verification API
 
 If you didn't create this account, please ignore this email.`;
 
-    return this.sendEmail({
-      to: data.adminEmail,
-      subject,
-      html: htmlContent,
-      text: textContent
-    });
+    return this.sendEmail({ to: data.adminEmail, subject, html: htmlContent, text: textContent });
   }
 
   async sendVerificationInvitation(data: VerificationInvitationData): Promise<boolean> {
-    const subject = `${data.organizationBranding?.company_name || data.organizationName} - Verify Your Identity`;
-    const primaryColor = data.organizationBranding?.primary_color || '#1e40af';
-    const logoUrl = data.organizationBranding?.logo_url;
-    const welcomeMessage = data.organizationBranding?.welcome_message || 
+    const cfg = await this.getEmailConfig();
+    // Org branding overrides platform config when provided
+    const accent = data.organizationBranding?.primary_color || cfg.primary_color;
+    const logo = data.organizationBranding?.logo_url || cfg.logo_url;
+    const companyName = data.organizationBranding?.company_name || data.organizationName;
+    const welcomeMessage = data.organizationBranding?.welcome_message ||
       `Please complete your identity verification for ${data.organizationName}.`;
-    
-    const htmlContent = `
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <style>
-    body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #333; max-width: 600px; margin: 0 auto; padding: 0; background: #f8fafc; }
-    .container { background: white; border-radius: 12px; overflow: hidden; margin: 20px; box-shadow: 0 4px 6px rgba(0, 0, 0, 0.07); }
-    .header { background: ${primaryColor}; color: white; padding: 40px 30px; text-align: center; }
-    .header h1 { margin: 0; font-size: 28px; font-weight: 600; }
-    .header p { margin: 10px 0 0; opacity: 0.9; font-size: 16px; }
-    .content { padding: 40px 30px; }
-    .greeting { font-size: 18px; color: #1a202c; margin-bottom: 20px; }
-    .message { font-size: 16px; color: #4a5568; margin-bottom: 30px; line-height: 1.7; }
-    .button { display: inline-block; background: linear-gradient(135deg, ${primaryColor}, ${primaryColor}dd); color: white; padding: 16px 32px; text-decoration: none; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 20px 0 30px; box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15); transition: transform 0.2s; }
-    .button:hover { transform: translateY(-1px); }
-    .steps { background: #f7fafc; padding: 25px; border-radius: 8px; margin: 25px 0; }
-    .steps h3 { margin: 0 0 15px; color: #2d3748; font-size: 18px; }
-    .steps ul { margin: 0; padding-left: 20px; }
-    .steps li { margin: 8px 0; color: #4a5568; }
-    .expiry-notice { background: #fef5e7; border: 1px solid #f6d55c; padding: 15px; border-radius: 6px; margin: 25px 0; }
-    .expiry-notice strong { color: #92400e; }
-    .custom-message { background: #e6fffa; padding: 20px; border-radius: 8px; border-left: 4px solid #38b2ac; margin: 25px 0; }
-    .footer { text-align: center; padding: 25px; color: #718096; font-size: 14px; border-top: 1px solid #e2e8f0; }
-    .logo { max-width: 120px; height: auto; margin-bottom: 15px; }
-  </style>
-</head>
-<body>
-  <div class="container">
-    <div class="header">
-      ${logoUrl ? `<img src="${logoUrl}" alt="${data.organizationName}" class="logo">` : ''}
-      <h1>🛡️ Identity Verification</h1>
-      <p>${data.organizationBranding?.company_name || data.organizationName}</p>
-    </div>
-    
-    <div class="content">
-      <div class="greeting">Hello${data.userName ? ` ${data.userName}` : ''}!</div>
-      
-      <div class="message">
-        ${welcomeMessage}
+
+    const subject = `${companyName} - Verify Your Identity`;
+
+    const htmlContent = this.darkWrap(`
+      ${this.darkHeader(accent, logo, 'Identity Verification', companyName)}
+      <div style="padding:30px;color:${TEXT};">
+        <p style="font-size:17px;margin:0 0 16px;">Hello${data.userName ? ` <strong>${data.userName}</strong>` : ''}!</p>
+        <p style="color:${MUTED};line-height:1.7;">${welcomeMessage}</p>
+
+        ${data.customMessage ? `
+        <div style="background:${CARD_ALT};border-left:3px solid ${accent};border-radius:8px;padding:16px;margin:18px 0;">
+          <strong style="color:${TEXT};">Message from ${data.organizationName}:</strong><br>
+          <span style="color:${MUTED};">${data.customMessage}</span>
+        </div>
+        ` : ''}
+
+        <div style="text-align:center;margin:24px 0;">
+          ${this.darkButton(accent, data.verificationUrl, 'Start Verification')}
+        </div>
+
+        <div style="background:${CARD_ALT};border-radius:8px;padding:18px;margin:22px 0;">
+          <p style="margin:0 0 10px;font-weight:600;color:${TEXT};">What to expect:</p>
+          <ul style="margin:0;padding-left:18px;color:${MUTED};line-height:1.8;">
+            <li><strong style="color:${TEXT};">Document Upload:</strong> Take photos of your government-issued ID</li>
+            <li><strong style="color:${TEXT};">Live Capture:</strong> Quick photo for identity matching</li>
+            <li><strong style="color:${TEXT};">Liveness Check:</strong> Simple verification to confirm you're present</li>
+            <li><strong style="color:${TEXT};">Instant Results:</strong> Get verified in under 2 minutes</li>
+          </ul>
+        </div>
+
+        <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.24);border-radius:8px;padding:14px;margin:18px 0;">
+          <strong style="color:#fcd34d;">Important:</strong>
+          <span style="color:${MUTED};"> This verification link expires on ${new Date(data.expiresAt).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at ${new Date(data.expiresAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}.</span>
+        </div>
+
+        <p style="color:${MUTED};font-size:13px;margin-top:24px;">
+          If you're having trouble with the button, copy and paste this link:<br>
+          <a href="${data.verificationUrl}" style="color:${accent};word-break:break-all;">${data.verificationUrl}</a>
+        </p>
       </div>
-      
-      ${data.customMessage ? `
-      <div class="custom-message">
-        <strong>Message from ${data.organizationName}:</strong><br>
-        ${data.customMessage}
+      <div style="padding:22px;text-align:center;border-top:1px solid ${BORDER};color:${MUTED};font-size:13px;">
+        <p style="margin:0 0 4px;">This verification is requested by <strong style="color:${TEXT};">${data.organizationName}</strong></p>
+        <p style="margin:0;">${cfg.footer_text}</p>
       </div>
-      ` : ''}
-      
-      <div style="text-align: center;">
-        <a href="${data.verificationUrl}" class="button">
-          Start Verification
-        </a>
-      </div>
-      
-      <div class="steps">
-        <h3>🚀 What to expect:</h3>
-        <ul>
-          <li><strong>Document Upload:</strong> Take photos of your government-issued ID</li>
-          <li><strong>Selfie Verification:</strong> Quick photo for identity matching</li>
-          <li><strong>Liveness Check:</strong> Simple verification to confirm you're present</li>
-          <li><strong>Instant Results:</strong> Get verified in under 2 minutes</li>
-        </ul>
-      </div>
-      
-      <div class="expiry-notice">
-        <strong>⏰ Important:</strong> This verification link expires on ${new Date(data.expiresAt).toLocaleDateString('en-US', { 
-          weekday: 'long', 
-          year: 'numeric', 
-          month: 'long', 
-          day: 'numeric' 
-        })} at ${new Date(data.expiresAt).toLocaleTimeString('en-US', { 
-          hour: '2-digit', 
-          minute: '2-digit' 
-        })}.
-      </div>
-      
-      <p style="color: #718096; font-size: 14px; margin-top: 30px;">
-        If you're having trouble with the button above, you can copy and paste this link into your browser:<br>
-        <a href="${data.verificationUrl}" style="color: ${primaryColor}; word-break: break-all;">${data.verificationUrl}</a>
-      </p>
-    </div>
-    
-    <div class="footer">
-      <p>This verification is requested by <strong>${data.organizationName}</strong></p>
-      <p>Powered by <strong>Idswyft VaaS</strong> - Secure Identity Verification</p>
-    </div>
-  </div>
-</body>
-</html>`;
+    `);
 
     const textContent = `Identity Verification Required - ${data.organizationName}
 
@@ -449,27 +443,20 @@ Hello${data.userName ? ` ${data.userName}` : ''}!
 
 ${welcomeMessage}
 
-${data.customMessage ? `Message from ${data.organizationName}: ${data.customMessage}\n\n` : ''}
-
-Complete your verification: ${data.verificationUrl}
+${data.customMessage ? `Message from ${data.organizationName}: ${data.customMessage}\n\n` : ''}Complete your verification: ${data.verificationUrl}
 
 What to expect:
-• Document Upload: Take photos of your government-issued ID
-• Selfie Verification: Quick photo for identity matching  
-• Liveness Check: Simple verification to confirm you're present
-• Instant Results: Get verified in under 2 minutes
+- Document Upload: Take photos of your government-issued ID
+- Live Capture: Quick photo for identity matching
+- Liveness Check: Simple verification to confirm you're present
+- Instant Results: Get verified in under 2 minutes
 
-⏰ IMPORTANT: This verification link expires on ${new Date(data.expiresAt).toLocaleDateString()} at ${new Date(data.expiresAt).toLocaleTimeString()}.
+IMPORTANT: This verification link expires on ${new Date(data.expiresAt).toLocaleDateString()} at ${new Date(data.expiresAt).toLocaleTimeString()}.
 
 This verification is requested by ${data.organizationName}
-Powered by Idswyft VaaS - Secure Identity Verification`;
+${cfg.footer_text}`;
 
-    return this.sendEmail({
-      to: data.userEmail,
-      subject,
-      html: htmlContent,
-      text: textContent
-    });
+    return this.sendEmail({ to: data.userEmail, subject, html: htmlContent, text: textContent });
   }
 
   async testConnection(): Promise<{ connected: boolean; error?: string }> {

@@ -8,6 +8,7 @@ import rateLimit from 'express-rate-limit';
 import config from './config/index.js';
 import { connectVaasDB } from './config/database.js';
 import { sessionExpirationService } from './services/sessionExpirationService.js';
+import { seedPlatformAdmin } from './scripts/seedPlatformAdmin.js';
 
 // Import routes
 console.log('📦 Importing route modules...');
@@ -23,6 +24,10 @@ import adminSecretRoutes from './routes/admin-secrets.js';
 import adminThresholdsRoutes from './routes/admin-thresholds.js';
 import assetsRoutes from './routes/assets.js';
 import publicRoutes from './routes/public.js';
+import platformAuthRoutes from './routes/platformAuth.js';
+import platformOrgRoutes from './routes/platformOrganizations.js';
+import platformEmailRoutes from './routes/platformEmail.js';
+import platformBrandingRoutes from './routes/platformBranding.js';
 
 console.log('📧 Importing email routes...');
 import emailUtilRoutes from './routes/email-utils.js';
@@ -310,6 +315,14 @@ try {
   console.error('❌ Failed to mount email routes:', error);
 }
 
+// Mount platform admin routes (separate auth domain)
+console.log('🏗️ Mounting platform admin routes...');
+app.use('/api/platform/auth', platformAuthRoutes);
+app.use('/api/platform/organizations', platformOrgRoutes);
+app.use('/api/platform/email', platformEmailRoutes);
+app.use('/api/platform/branding', platformBrandingRoutes);
+console.log('✅ Platform admin routes mounted');
+
 // 404 handler
 app.use('*', (req, res) => {
   res.status(404).json({
@@ -376,7 +389,10 @@ const startVaasServer = async () => {
   try {
     // Test VaaS database connection
     await connectVaasDB();
-    
+
+    // Seed first platform admin if table is empty
+    await seedPlatformAdmin();
+
     // Start session expiration background jobs
     console.log('⏰ Starting session expiration service...');
     sessionExpirationService.startExpirationJob(5); // Check every 5 minutes

@@ -33,8 +33,10 @@ export const config = {
   // CORS Origins
   corsOrigins: process.env.VAAS_CORS_ORIGINS?.split(',') || [
     'http://localhost:3000',
+    'http://localhost:3001',
     'http://localhost:5173',
     'https://app.idswyft.app',
+    'https://platform.idswyft.app',
     'https://customer.idswyft.app',
     'https://enterprise.idswyft.app'
   ],
