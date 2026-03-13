@@ -119,22 +119,8 @@ sdks/*/*.egg-info/
 
 # Temporary processing files
 backend/temp/
-# Brand Strategy & Confidential Documents
-BRAND.md
-brand-strategy/
-brand-assets/
-*.brand
-brand-guidelines/
-
-# Audit & Internal Reports
-AUDIT_REPORT.md
-*_AUDIT_*.md
-
 # Git worktrees
 .worktrees/
 
-# Internal design docs & plans (never committed)
+# Internal docs — all markdown (except README.md / CLAUDE.md) lives in docs/
 docs/
-
-# Local test credentials
-TEST_ADMIN_CREDENTIALS.md
