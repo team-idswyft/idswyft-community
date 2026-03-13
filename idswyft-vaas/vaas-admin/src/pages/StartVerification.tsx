@@ -99,9 +99,17 @@ const StartVerification: React.FC = () => {
           });
           console.log('User created successfully:', newUser);
         } catch (createError: any) {
-          // If user already exists, look them up and reuse
-          if (createError.response?.data?.error?.code === 'DUPLICATE_EMAIL' ||
-              createError.response?.data?.error?.code === 'DUPLICATE_EXTERNAL_ID') {
+          // If user already exists, look them up and reuse.
+          // The API client interceptor transforms errors into ApiError objects
+          // with { message, status } — not raw Axios errors with .response.
+          const isDuplicate =
+            createError.status === 409 ||
+            createError.response?.status === 409 ||
+            createError.response?.data?.error?.code === 'DUPLICATE_EMAIL' ||
+            createError.response?.data?.error?.code === 'DUPLICATE_EXTERNAL_ID' ||
+            (typeof createError.message === 'string' && createError.message.includes('already exists'));
+
+          if (isDuplicate) {
             console.log('User already exists, looking up existing user...');
             const { users } = await apiClient.listEndUsers({ search: formData.email, page: 1, per_page: 1 });
             if (users.length > 0) {
@@ -135,32 +143,27 @@ const StartVerification: React.FC = () => {
       }
     } catch (error: any) {
       console.error('Failed to start verification:', error);
-      console.error('Error details:', {
-        status: error.response?.status,
-        statusText: error.response?.statusText,
-        data: error.response?.data,
-        url: error.config?.url,
-        method: error.config?.method,
-        baseURL: error.config?.baseURL
-      });
+
+      // The API client interceptor transforms errors into { message, status }
+      // (ApiError), not raw Axios errors with .response — check both shapes.
+      const status = error.status ?? error.response?.status;
+      const message = error.message ?? error.response?.data?.error?.message;
 
       let errorMessage = 'Failed to start verification. ';
-      if (error.response?.status === 404) {
-        errorMessage += `API endpoint not found: ${error.config?.method?.toUpperCase()} ${error.config?.baseURL}${error.config?.url}. The backend server may not have this endpoint implemented yet.`;
-      } else if (error.response?.data?.error?.message) {
-        errorMessage += error.response.data.error.message;
-      } else if (error.response?.status === 400) {
+      if (status === 404) {
+        errorMessage += 'API endpoint not found. The backend may not have this endpoint yet.';
+      } else if (status === 400) {
         errorMessage += 'Invalid user data provided. Please check the form fields.';
-      } else if (error.response?.status === 409) {
+      } else if (status === 409) {
         errorMessage += 'A user with this email already exists.';
-      } else if (error.response?.status === 401) {
+      } else if (status === 401) {
         errorMessage += 'Authentication failed. Please log in again.';
-      } else if (error.response?.status === 403) {
+      } else if (status === 403) {
         errorMessage += 'Permission denied. You may not have rights to create users.';
-      } else if (error.response?.status === 500) {
+      } else if (status === 500) {
         errorMessage += 'Server error occurred. Please contact support.';
-      } else if (error.message) {
-        errorMessage += error.message;
+      } else if (message) {
+        errorMessage += message;
       } else {
         errorMessage += 'Please check your network connection and try again.';
       }
