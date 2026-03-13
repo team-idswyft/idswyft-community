@@ -1,6 +1,8 @@
 import { Router } from 'express';
+import jwt from 'jsonwebtoken';
 import { organizationService } from '../services/organizationService.js';
 import { emailService } from '../services/emailService.js';
+import config from '../config/index.js';
 import { VaasApiResponse, VaasCreateOrganizationRequest, VaasEnterpriseSignupRequest } from '../types/index.js';
 import { validateCreateOrganization, validateEnterpriseSignup } from '../middleware/validation.js';
 import { requireAuth, requireSuperAdmin } from '../middleware/auth.js';
@@ -13,16 +15,25 @@ router.post('/signup', validateEnterpriseSignup, async (req, res) => {
     const signupData: VaasEnterpriseSignupRequest = req.body;
     const result = await organizationService.createEnterpriseSignup(signupData);
     
-    // Send welcome email with credentials
+    // Send welcome email with credentials + verification link
     try {
       const dashboardUrl = process.env.VAAS_ADMIN_URL || 'https://app.idswyft.app';
-      
+
+      // Generate verification token so the welcome email includes a verify link
+      const verificationToken = jwt.sign(
+        { email: signupData.email, type: 'email_verification' },
+        config.jwtSecret,
+        { expiresIn: '72h' }
+      );
+      const verifyUrl = `${dashboardUrl}/verify-email?token=${verificationToken}&email=${encodeURIComponent(signupData.email)}`;
+
       await emailService.sendWelcomeEmail({
         organization: result.organization,
         adminEmail: signupData.email,
         adminName: `${signupData.firstName} ${signupData.lastName}`,
         adminPassword: result.adminPassword,
-        dashboardUrl
+        dashboardUrl,
+        verifyUrl
       });
       
       // Send notification to admin team

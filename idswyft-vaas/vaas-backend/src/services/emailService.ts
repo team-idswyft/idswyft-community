@@ -8,6 +8,7 @@ interface WelcomeEmailData {
   adminName: string;
   adminPassword: string;
   dashboardUrl: string;
+  verifyUrl?: string;
 }
 
 interface NotificationEmailData {
@@ -263,12 +264,13 @@ ${inner}
         </div>
 
         <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.28);border-radius:8px;padding:14px;margin:18px 0;">
-          <strong style="color:#fcd34d;">Important:</strong> <span style="color:${MUTED};">Please change your password after logging in.</span>
+          <strong style="color:#fcd34d;">Important:</strong> <span style="color:${MUTED};">Please verify your email and change your password after logging in.</span>
         </div>
 
         <div style="text-align:center;margin:24px 0;">
-          ${this.darkButton(accent, data.dashboardUrl, 'Access Dashboard')}
+          ${data.verifyUrl ? this.darkButton(accent, data.verifyUrl, 'Verify Email & Get Started') : this.darkButton(accent, data.dashboardUrl, 'Access Dashboard')}
         </div>
+        ${data.verifyUrl ? `<p style="color:${MUTED};font-size:13px;text-align:center;">After verifying, you can log in at <a href="${data.dashboardUrl}" style="color:${accent};">${data.dashboardUrl}</a></p>` : ''}
 
         <p style="color:${MUTED};font-size:14px;">Best regards,<br>The ${cfg.company_name} Team</p>
       </div>
@@ -280,14 +282,14 @@ ${inner}
 Hello ${data.adminName},
 
 Your account for ${data.organization.name} has been created.
-
+${data.verifyUrl ? `\nPlease verify your email first: ${data.verifyUrl}\n` : ''}
 Login Details:
 - Dashboard: ${data.dashboardUrl}
 - Email: ${data.adminEmail}
 - Password: ${data.adminPassword}
 - Organization: ${data.organization.name}
 
-Please change your password after logging in.
+Please verify your email and change your password after logging in.
 
 Best regards,
 The ${cfg.company_name} Team`;

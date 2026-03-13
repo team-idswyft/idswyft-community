@@ -423,18 +423,24 @@ router.get('/verify-email', async (req, res) => {
     
     // Verify JWT token
     const decoded = jwt.verify(token, config.jwtSecret) as any;
-    
-    if (!decoded.admin_id || !decoded.email) {
+
+    if (!decoded.email || decoded.type !== 'email_verification') {
       throw new Error('Invalid token payload');
     }
-    
-    // Update admin email_verified status
-    const { error } = await vaasSupabase
+
+    // Update admin email_verified status — match by admin_id if present, otherwise by email
+    const query = vaasSupabase
       .from('vaas_admins')
-      .update({ email_verified: true })
-      .eq('id', decoded.admin_id)
-      .eq('email', decoded.email);
-      
+      .update({ email_verified: true, email_verified_at: new Date().toISOString() });
+
+    if (decoded.admin_id) {
+      query.eq('id', decoded.admin_id).eq('email', decoded.email);
+    } else {
+      query.eq('email', decoded.email);
+    }
+
+    const { error } = await query;
+
     if (error) {
       throw new Error('Failed to verify email');
     }

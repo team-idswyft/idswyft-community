@@ -21,6 +21,9 @@ export default function Login() {
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [emailNotVerified, setEmailNotVerified] = useState(false);
+  const [resending, setResending] = useState(false);
+  const [resendSuccess, setResendSuccess] = useState(false);
   const [logoUrl, setLogoUrl] = useState('/idswyft-logo.png');
 
   useEffect(() => {
@@ -84,9 +87,25 @@ export default function Login() {
       await refreshAuth();
     } catch (err: any) {
       console.error('Login failed:', err);
-      setSubmitError(err?.message ?? 'Login failed. Please try again.');
+      const msg = err?.message ?? 'Login failed. Please try again.';
+      setSubmitError(msg);
+      setEmailNotVerified(msg.toLowerCase().includes('verify your email'));
+      setResendSuccess(false);
     } finally {
       setSubmitting(false);
+    }
+  };
+
+  const handleResendVerification = async () => {
+    if (!formData.email.trim()) return;
+    setResending(true);
+    try {
+      await apiClient.post(`/email/send-verification/${encodeURIComponent(formData.email)}`);
+      setResendSuccess(true);
+    } catch {
+      setSubmitError('Failed to resend verification email. Please contact support.');
+    } finally {
+      setResending(false);
     }
   };
 
@@ -271,9 +290,24 @@ export default function Login() {
                 </div>
 
                 {submitError && (
-                  <div className="flex items-center gap-2 rounded-lg border border-rose-400/30 bg-rose-500/10 p-3 text-sm text-rose-200">
-                    <AlertCircle className="h-4 w-4 shrink-0" />
-                    <span>{submitError}</span>
+                  <div className="rounded-lg border border-rose-400/30 bg-rose-500/10 p-3 text-sm text-rose-200">
+                    <div className="flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4 shrink-0" />
+                      <span>{submitError}</span>
+                    </div>
+                    {emailNotVerified && !resendSuccess && (
+                      <button
+                        type="button"
+                        onClick={handleResendVerification}
+                        disabled={resending}
+                        className="mt-2 text-xs font-medium text-cyan-300 hover:text-cyan-200 transition disabled:opacity-50"
+                      >
+                        {resending ? 'Sending...' : 'Resend verification email'}
+                      </button>
+                    )}
+                    {resendSuccess && (
+                      <p className="mt-2 text-xs text-emerald-300">Verification email sent! Check your inbox.</p>
+                    )}
                   </div>
                 )}
 
