@@ -159,7 +159,7 @@ function App() {
   const vaasBackendUrl =
     import.meta.env.VITE_VAAS_BACKEND_URL || 'https://api-vaas.idswyft.app'
   const vaasAdminUrl =
-    import.meta.env.VITE_VAAS_ADMIN_URL || 'https://admin.idswyft.app'
+    import.meta.env.VITE_VAAS_ADMIN_URL || 'https://app.idswyft.app/login'
   const fallbackLogoUrl = '/idswyft-logo.png'
   const [showSignupForm, setShowSignupForm] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
