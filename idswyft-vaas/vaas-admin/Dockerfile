@@ -1,8 +1,14 @@
 # Use official Node.js LTS image
-FROM node:18-alpine
+FROM node:20-alpine
 
 # Set working directory
 WORKDIR /app
+
+# Vite embeds VITE_* vars at build time — must be declared as ARGs
+ARG VITE_API_URL
+ARG VITE_NODE_ENV
+ARG VITE_MOCK_AUTH_ENABLED
+ARG VITE_API_TIMEOUT
 
 # Copy package files
 COPY package*.json ./
@@ -13,7 +19,7 @@ RUN npm ci
 # Copy source code
 COPY . .
 
-# Build the application
+# Build the application (VITE_* ARGs become env vars during build)
 RUN npm run build
 
 # Install serve to serve the built files
