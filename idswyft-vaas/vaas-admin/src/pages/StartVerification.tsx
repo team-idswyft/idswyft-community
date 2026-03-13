@@ -85,18 +85,36 @@ const StartVerification: React.FC = () => {
         console.log('StartVerification API failed, trying manual approach:', startVerificationError);
 
         // Option 2: Manual approach - create user then send invitation
-        console.log('Creating user with createEndUser...');
-        const newUser = await apiClient.createEndUser({
-          email: formData.email,
-          phone: formData.phone || undefined,
-          first_name: formData.first_name || undefined,
-          last_name: formData.last_name || undefined,
-          external_id: formData.external_id || undefined,
-          tags: [],
-          metadata: {}
-        });
+        let newUser;
+        try {
+          console.log('Creating user with createEndUser...');
+          newUser = await apiClient.createEndUser({
+            email: formData.email,
+            phone: formData.phone || undefined,
+            first_name: formData.first_name || undefined,
+            last_name: formData.last_name || undefined,
+            external_id: formData.external_id || undefined,
+            tags: [],
+            metadata: {}
+          });
+          console.log('User created successfully:', newUser);
+        } catch (createError: any) {
+          // If user already exists, look them up and reuse
+          if (createError.response?.data?.error?.code === 'DUPLICATE_EMAIL' ||
+              createError.response?.data?.error?.code === 'DUPLICATE_EXTERNAL_ID') {
+            console.log('User already exists, looking up existing user...');
+            const { users } = await apiClient.listEndUsers({ search: formData.email, page: 1, per_page: 1 });
+            if (users.length > 0) {
+              newUser = users[0];
+              console.log('Found existing user:', newUser);
+            } else {
+              throw createError;
+            }
+          } else {
+            throw createError;
+          }
+        }
 
-        console.log('User created successfully:', newUser);
         setCreatedUser(newUser);
 
         // Step 2: Send verification invitation
