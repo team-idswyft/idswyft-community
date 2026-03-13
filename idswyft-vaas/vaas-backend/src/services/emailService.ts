@@ -50,70 +50,63 @@ interface SendEmailOptions {
 }
 
 export class EmailService {
-  private mailgunDomain: string;
-  private mailgunApiKey: string;
-  private mailgunApiUrl: string;
+  private resendApiKey: string;
   private fromAddress: string;
   private isConfigured: boolean = false;
 
   constructor() {
-    this.mailgunDomain = process.env.MAILGUN_DOMAIN || '';
-    this.mailgunApiKey = process.env.MAILGUN_API_KEY || '';
-    this.fromAddress = process.env.MAILGUN_FROM || `Idswyft VaaS <postmaster@${this.mailgunDomain}>`;
-    this.mailgunApiUrl = `https://api.mailgun.net/v3/${this.mailgunDomain}/messages`;
-    
-    this.isConfigured = !!(this.mailgunDomain && this.mailgunApiKey);
-    
+    this.resendApiKey = process.env.RESEND_API_KEY || '';
+    this.fromAddress = process.env.EMAIL_FROM || 'Idswyft VaaS <noreply@idswyft.app>';
+
+    this.isConfigured = !!this.resendApiKey;
+
     if (this.isConfigured) {
-      console.log(`✉️ Mailgun HTTP API configured for domain: ${this.mailgunDomain}`);
+      console.log(`✉️ Resend API configured (from: ${this.fromAddress})`);
     } else {
-      console.warn('❌ Mailgun not configured. Emails will be logged instead of sent.');
-      console.warn(`Missing: MAILGUN_DOMAIN=${!this.mailgunDomain ? 'MISSING' : 'OK'}, MAILGUN_API_KEY=${!this.mailgunApiKey ? 'MISSING' : 'OK'}`);
+      console.warn('❌ Resend not configured. Emails will be logged instead of sent.');
+      console.warn('Missing: RESEND_API_KEY');
     }
   }
 
-  private async sendMailgunRequest(options: SendEmailOptions): Promise<boolean> {
+  private async sendResendRequest(options: SendEmailOptions): Promise<boolean> {
     try {
-      const formData = new FormData();
-      formData.append('from', this.fromAddress);
-      formData.append('to', options.to);
-      formData.append('subject', options.subject);
-      formData.append('text', options.text);
-      formData.append('html', options.html);
-
       console.log(`📧 Sending email to: ${options.to}`);
       console.log(`📧 Subject: ${options.subject}`);
-      
-      // Create timeout promise
+
       const timeoutPromise = new Promise((_, reject) =>
-        setTimeout(() => reject(new Error('Mailgun request timeout after 8 seconds')), 8000)
+        setTimeout(() => reject(new Error('Resend request timeout after 8 seconds')), 8000)
       );
 
-      // Create fetch promise
-      const fetchPromise = fetch(this.mailgunApiUrl, {
+      const fetchPromise = fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
-          'Authorization': `Basic ${Buffer.from(`api:${this.mailgunApiKey}`).toString('base64')}`
+          'Authorization': `Bearer ${this.resendApiKey}`,
+          'Content-Type': 'application/json'
         },
-        body: formData
+        body: JSON.stringify({
+          from: this.fromAddress,
+          to: [options.to],
+          subject: options.subject,
+          html: options.html,
+          text: options.text
+        })
       });
 
-      // Race timeout vs fetch
       const response = await Promise.race([fetchPromise, timeoutPromise]) as Response;
-      
+
       if (!response.ok) {
         const errorText = await response.text().catch(() => 'Unable to read error response');
-        console.error(`❌ Mailgun API error: ${response.status} ${response.statusText}`);
+        console.error(`❌ Resend API error: ${response.status} ${response.statusText}`);
         console.error(`❌ Error details: ${errorText}`);
         return false;
       }
 
-      const result = await response.json().catch(() => ({ message: 'Email sent but unable to parse response' }));
-      console.log(`✅ Email sent via Mailgun: ${result.id || result.message || 'Success'}`);
+      const result = await response.json().catch(() => ({ id: 'unknown' }));
+      console.log(`✅ Email sent via Resend: ${result.id || 'Success'}`);
       return true;
 
     } catch (error) {
-      console.error('❌ Mailgun request failed:', error instanceof Error ? error.message : String(error));
+      console.error('❌ Resend request failed:', error instanceof Error ? error.message : String(error));
       return false;
     }
   }
@@ -121,7 +114,7 @@ export class EmailService {
   private async sendEmail(options: SendEmailOptions): Promise<boolean> {
     try {
       if (!this.isConfigured) {
-        console.log('\n📧 EMAIL (not sent - Mailgun not configured):');
+        console.log('\n📧 EMAIL (not sent - Resend not configured):');
         console.log(`To: ${options.to}`);
         console.log(`Subject: ${options.subject}`);
         console.log(`From: ${this.fromAddress}`);
@@ -129,18 +122,17 @@ export class EmailService {
         return true; // Return true for development mode
       }
 
-      return await this.sendMailgunRequest(options);
+      return await this.sendResendRequest(options);
 
     } catch (error) {
       console.error('❌ Email service error:', error instanceof Error ? error.message : String(error));
-      
-      // Log email for debugging
+
       console.log('\n📧 EMAIL (failed to send):');
       console.log(`To: ${options.to}`);
       console.log(`Subject: ${options.subject}`);
       console.log(`Error: ${error instanceof Error ? error.message : String(error)}`);
       console.log('─'.repeat(50));
-      
+
       return false;
     }
   }
@@ -482,22 +474,22 @@ Powered by Idswyft VaaS - Secure Identity Verification`;
 
   async testConnection(): Promise<{ connected: boolean; error?: string }> {
     if (!this.isConfigured) {
-      return { 
-        connected: false, 
-        error: 'Mailgun not configured - missing MAILGUN_DOMAIN or MAILGUN_API_KEY' 
+      return {
+        connected: false,
+        error: 'Resend not configured - missing RESEND_API_KEY'
       };
     }
 
     try {
-      console.log('🔍 Testing Mailgun configuration...');
-      return { 
-        connected: true, 
-        error: `Domain: ${this.mailgunDomain}, From: ${this.fromAddress}` 
+      console.log('🔍 Testing Resend configuration...');
+      return {
+        connected: true,
+        error: `From: ${this.fromAddress}`
       };
     } catch (error) {
-      return { 
-        connected: false, 
-        error: error instanceof Error ? error.message : 'Unknown error' 
+      return {
+        connected: false,
+        error: error instanceof Error ? error.message : 'Unknown error'
       };
     }
   }
