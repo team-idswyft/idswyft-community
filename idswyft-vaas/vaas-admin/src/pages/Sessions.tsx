@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { Monitor, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import apiClient from '../services/api';
 import type { ActiveSession } from '../types.js';
+import { sectionLabel, monoXs, monoSm, cardSurface, statusPill, tableHeaderClass } from '../styles/tokens';
 
 export default function Sessions() {
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
@@ -46,82 +47,90 @@ export default function Sessions() {
   };
 
   return (
-    <div className="p-6 max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center">
-          <Monitor className="h-8 w-8 text-blue-600 mr-3" />
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Active Sessions</h1>
-            <p className="text-sm text-gray-500">
-              These are all devices currently logged into your account.
-            </p>
-          </div>
+    <div className="p-6 max-w-4xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <p className={sectionLabel}>Active Sessions</p>
+          <p className="text-sm text-slate-500 mt-1">
+            Devices currently logged into your account.
+          </p>
         </div>
         <button
           onClick={load}
           disabled={loading}
-          className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 flex items-center"
+          className="p-2 border border-white/10 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 disabled:opacity-50 transition-colors"
+          title="Refresh"
         >
-          <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-          Refresh
+          <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
         </button>
       </div>
 
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <div className="p-4 bg-rose-500/12 border border-rose-500/25 rounded-lg text-rose-300 text-sm">
           {error}
         </div>
       )}
 
       {loading ? (
-        <div className="text-center py-12 text-gray-400">Loading sessions...</div>
+        <div className="animate-pulse space-y-4">
+          <div className={`${cardSurface} p-5`}>
+            <div className="h-3 bg-slate-700/50 rounded w-40 mb-3" />
+            <div className="h-3 bg-slate-700/50 rounded w-60" />
+          </div>
+        </div>
       ) : sessions.length === 0 ? (
-        <div className="text-center py-12 text-gray-400">No active sessions found.</div>
+        <div className="text-center py-12">
+          <p className={`${sectionLabel} mb-2`}>No Sessions</p>
+          <p className="text-sm text-slate-500">No active sessions found.</p>
+        </div>
       ) : (
-        <div className="content-card-glass overflow-hidden">
-          <table className="w-full text-sm">
-            <thead className="bg-gray-50 text-gray-600 text-left">
-              <tr>
-                <th className="px-4 py-3 font-medium">Device / Browser</th>
-                <th className="px-4 py-3 font-medium">IP Address</th>
-                <th className="px-4 py-3 font-medium">Last Active</th>
-                <th className="px-4 py-3 font-medium"></th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-100">
-              {sessions.map((session) => (
-                <tr key={session.id} className="hover:bg-gray-50">
-                  <td className="px-4 py-3">
-                    <span className="font-medium text-gray-900">
-                      {session.userAgent || 'Unknown device'}
-                    </span>
-                    {session.isCurrent && (
-                      <span className="ml-2 text-xs text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded-full">
-                        Current
-                      </span>
-                    )}
-                  </td>
-                  <td className="px-4 py-3 text-gray-500 font-mono text-xs">
-                    {session.ip}
-                  </td>
-                  <td className="px-4 py-3 text-gray-500">
-                    {formatDate(session.lastActiveAt)}
-                  </td>
-                  <td className="px-4 py-3 text-right">
-                    {!session.isCurrent && (
-                      <button
-                        onClick={() => revoke(session.id)}
-                        disabled={revoking === session.id}
-                        className="text-xs text-red-600 hover:text-red-800 disabled:opacity-50"
-                      >
-                        {revoking === session.id ? 'Revoking...' : 'Revoke'}
-                      </button>
-                    )}
-                  </td>
+        <div className={`${cardSurface} overflow-hidden`}>
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-slate-900/80">
+                <tr>
+                  <th className={tableHeaderClass}>Device / Browser</th>
+                  <th className={tableHeaderClass}>IP Address</th>
+                  <th className={tableHeaderClass}>Last Active</th>
+                  <th className={tableHeaderClass}></th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-white/10">
+                {sessions.map((session) => (
+                  <tr key={session.id} className="hover:bg-slate-800/40 transition-colors">
+                    <td className="px-5 py-3.5">
+                      <span className={`${monoSm} text-slate-100`}>
+                        {session.userAgent || 'Unknown device'}
+                      </span>
+                      {session.isCurrent && (
+                        <span className={`ml-2 ${statusPill} bg-cyan-500/15 text-cyan-300 border-cyan-500/30`}>
+                          Current
+                        </span>
+                      )}
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <span className={`${monoXs} text-slate-500`}>{session.ip}</span>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <span className={`${monoXs} text-slate-400`}>{formatDate(session.lastActiveAt)}</span>
+                    </td>
+                    <td className="px-5 py-3.5 text-right">
+                      {!session.isCurrent && (
+                        <button
+                          onClick={() => revoke(session.id)}
+                          disabled={revoking === session.id}
+                          className={`${monoXs} text-rose-400 hover:text-rose-300 disabled:opacity-50 transition-colors`}
+                        >
+                          {revoking === session.id ? 'Revoking...' : 'Revoke'}
+                        </button>
+                      )}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
     </div>

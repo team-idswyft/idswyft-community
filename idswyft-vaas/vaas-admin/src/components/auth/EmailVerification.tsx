@@ -61,16 +61,16 @@ const EmailVerification: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gray-50">
+      <div className="min-h-screen flex items-center justify-center bg-[#080c14]">
         <div className="max-w-md w-full space-y-8">
           <div className="text-center">
             <div className="mx-auto h-16 w-16 flex items-center justify-center">
               <Loader2 className="h-8 w-8 text-primary-600 animate-spin" />
             </div>
-            <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
+            <h2 className="mt-6 text-3xl font-extrabold text-slate-100">
               Verifying Email
             </h2>
-            <p className="mt-2 text-sm text-gray-600">
+            <p className="mt-2 text-sm text-slate-400">
               Please wait while we verify your email address...
             </p>
           </div>
@@ -80,7 +80,7 @@ const EmailVerification: React.FC = () => {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
+    <div className="min-h-screen flex items-center justify-center bg-[#080c14]">
       <div className="max-w-md w-full space-y-8">
         <div className="text-center">
           <div className="mx-auto h-16 w-16 flex items-center justify-center">
@@ -91,16 +91,16 @@ const EmailVerification: React.FC = () => {
             )}
           </div>
           
-          <h2 className="mt-6 text-3xl font-extrabold text-gray-900">
+          <h2 className="mt-6 text-3xl font-extrabold text-slate-100">
             {result?.success ? 'Email Verified!' : 'Verification Failed'}
           </h2>
           
-          <p className="mt-2 text-sm text-gray-600">
+          <p className="mt-2 text-sm text-slate-400">
             {result?.message}
           </p>
           
           {result?.email && (
-            <p className="mt-1 text-xs text-gray-500">
+            <p className="mt-1 text-xs text-slate-400">
               Email: {result.email}
             </p>
           )}
@@ -109,7 +109,7 @@ const EmailVerification: React.FC = () => {
         <div className="text-center">
           {result?.success ? (
             <div className="space-y-4">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-slate-400">
                 Your email has been successfully verified. You can now log in to your account.
               </p>
               <Link
@@ -121,7 +121,7 @@ const EmailVerification: React.FC = () => {
             </div>
           ) : (
             <div className="space-y-4">
-              <p className="text-sm text-gray-600">
+              <p className="text-sm text-slate-400">
                 If you continue to have problems, please contact support.
               </p>
               <div className="space-y-2">
@@ -133,7 +133,7 @@ const EmailVerification: React.FC = () => {
                 </Link>
                 <a
                   href="mailto:support@idswyft.app"
-                  className="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
+                  className="w-full flex justify-center py-2 px-4 border border-white/15 rounded-md shadow-sm text-sm font-medium text-slate-300 bg-slate-900/70 hover:bg-slate-800/50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500"
                 >
                   Contact Support
                 </a>

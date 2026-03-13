@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { apiClient } from '../../services/api';
 import { UsageStats } from '../../types.js';
-import { BarChart3, TrendingUp, Calendar, AlertTriangle, CheckCircle } from 'lucide-react';
+import { sectionLabel, statNumber, monoXs, monoSm, cardSurface, infoPanel, getStatusAccent } from '../../styles/tokens';
 
 interface UsageDashboardProps {
   organizationId: string;
@@ -43,12 +43,16 @@ export default function UsageDashboard({ organizationId }: UsageDashboardProps) 
 
   if (isLoading) {
     return (
-      <div className="bg-white shadow rounded-lg p-6">
+      <div className={`${cardSurface} p-6`}>
         <div className="animate-pulse">
-          <div className="h-4 bg-gray-300 rounded w-1/3 mb-4"></div>
+          <div className="h-4 bg-slate-700/50 rounded w-1/3 mb-4"></div>
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {[1, 2, 3].map((i) => (
-              <div key={i} className="h-24 bg-gray-300 rounded"></div>
+              <div key={i} className={`${cardSurface} p-5 animate-pulse`}>
+                <div className="h-3 bg-slate-700/50 rounded w-1/2 mb-3"></div>
+                <div className="h-6 bg-slate-700/50 rounded w-2/3 mb-2"></div>
+                <div className="h-3 bg-slate-700/50 rounded w-3/4"></div>
+              </div>
             ))}
           </div>
         </div>
@@ -58,14 +62,14 @@ export default function UsageDashboard({ organizationId }: UsageDashboardProps) 
 
   if (error || !usageStats) {
     return (
-      <div className="bg-white shadow rounded-lg p-6">
+      <div className={`${cardSurface} p-6`}>
         <div className="text-center">
-          <AlertTriangle className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">Unable to load usage stats</h3>
-          <p className="mt-1 text-sm text-gray-500">{error}</p>
+          <p className={`${sectionLabel} text-slate-400 mb-2`}>Error</p>
+          <h3 className="mt-2 text-sm font-medium text-slate-100">Unable to load usage stats</h3>
+          <p className={`${monoXs} text-slate-500 mt-1`}>{error}</p>
           <button
             onClick={loadUsageStats}
-            className="mt-3 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700"
+            className="mt-3 inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-cyan-600 hover:bg-cyan-700 transition-colors"
           >
             Retry
           </button>
@@ -81,14 +85,11 @@ export default function UsageDashboard({ organizationId }: UsageDashboardProps) 
 
   return (
     <div className="space-y-6">
-      <div className="bg-white shadow rounded-lg">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <div className="flex items-center">
-            <BarChart3 className="h-5 w-5 text-gray-400 mr-2" />
-            <h3 className="text-lg font-medium text-gray-900">Current Usage</h3>
-          </div>
+      <div className={cardSurface}>
+        <div className="px-6 py-4 border-b border-white/10">
+          <p className={sectionLabel}>Current Usage</p>
         </div>
-        
+
         <div className="p-6">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
             <UsageCard
@@ -99,29 +100,27 @@ export default function UsageDashboard({ organizationId }: UsageDashboardProps) 
               isWarning={usagePercentage > 80}
               isError={isOverLimit}
             />
-            
+
             <UsageCard
               title="API Calls"
               value={usageStats.current_period.api_calls.toLocaleString()}
               subtitle="This month"
-              icon={<TrendingUp className="h-5 w-5" />}
             />
-            
+
             <UsageCard
               title="Storage Used"
               value={`${usageStats.current_period.storage_used_mb.toFixed(1)} MB`}
               subtitle="Document storage"
-              icon={<Calendar className="h-5 w-5" />}
             />
           </div>
 
           {/* Usage Progress Bar */}
           <div className="mb-6">
-            <div className="flex justify-between text-sm text-gray-600 mb-2">
-              <span>Monthly Verification Usage</span>
-              <span>{usageStats.current_period.verification_count} / {usageStats.monthly_limit}</span>
+            <div className="flex justify-between mb-2">
+              <span className={`${monoXs} text-slate-500`}>Monthly Verification Usage</span>
+              <span className={`${monoSm} text-slate-300`}>{usageStats.current_period.verification_count} / {usageStats.monthly_limit}</span>
             </div>
-            <div className="w-full bg-gray-200 rounded-full h-2">
+            <div className="w-full bg-slate-700/50 rounded-full h-2">
               <div
                 className={`h-2 rounded-full ${
                   isOverLimit
@@ -134,7 +133,7 @@ export default function UsageDashboard({ organizationId }: UsageDashboardProps) 
               />
             </div>
             {isOverLimit && (
-              <p className="text-sm text-red-600 mt-2">
+              <p className={`${monoXs} text-rose-400 mt-2`}>
                 You have exceeded your monthly limit by {overageCount.toLocaleString()} verifications.
               </p>
             )}
@@ -142,40 +141,36 @@ export default function UsageDashboard({ organizationId }: UsageDashboardProps) 
 
           {/* Overage Information */}
           {isOverLimit && (
-            <div className="bg-red-50 border border-red-200 rounded-md p-4">
-              <div className="flex">
-                <div className="flex-shrink-0">
-                  <AlertTriangle className="h-5 w-5 text-red-400" />
-                </div>
-                <div className="ml-3">
-                  <h3 className="text-sm font-medium text-red-800">
-                    Overage Charges Apply
-                  </h3>
-                  <div className="mt-2 text-sm text-red-700">
-                    <p>
-                      Additional {overageCount.toLocaleString()} verifications at ${usageStats.overage_cost_per_verification} each.
-                    </p>
-                    <p className="font-medium mt-1">
-                      Estimated overage cost: ${overageCost.toFixed(2)}
-                    </p>
-                  </div>
+            <div className={`${cardSurface} border-l-[3px] ${getStatusAccent('error').border} p-4`}>
+              <div>
+                <p className={sectionLabel}>
+                  Overage Charges Apply
+                </p>
+                <div className="mt-2">
+                  <p className={`${monoXs} text-slate-500`}>
+                    Additional {overageCount.toLocaleString()} verifications at ${usageStats.overage_cost_per_verification} each.
+                  </p>
+                  <p className={`${monoSm} text-rose-300 font-semibold mt-1`}>
+                    Estimated overage cost: ${overageCost.toFixed(2)}
+                  </p>
                 </div>
               </div>
             </div>
           )}
 
           {/* Plan Information */}
-          <div className="bg-gray-50 rounded-md p-4 mt-4">
+          <div className={`${infoPanel} mt-4`}>
             <div className="flex items-center justify-between">
               <div>
-                <h4 className="text-sm font-medium text-gray-900 capitalize">
+                <p className={sectionLabel}>Plan</p>
+                <p className="text-sm font-medium text-slate-100 capitalize mt-1">
                   {organization?.subscription_tier} Plan
-                </h4>
-                <p className="text-sm text-gray-600">
+                </p>
+                <p className={`${monoXs} text-slate-500 mt-0.5`}>
                   {usageStats.monthly_limit.toLocaleString()} verifications per month
                 </p>
               </div>
-              <button className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-blue-700 bg-blue-100 hover:bg-blue-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500">
+              <button className="inline-flex items-center px-3 py-2 border border-white/10 text-sm leading-4 font-medium rounded-md text-cyan-300 bg-cyan-500/10 hover:bg-cyan-500/20 transition-colors">
                 Upgrade Plan
               </button>
             </div>
@@ -184,18 +179,17 @@ export default function UsageDashboard({ organizationId }: UsageDashboardProps) 
       </div>
 
       {/* Historical Usage Chart Placeholder */}
-      <div className="bg-white shadow rounded-lg">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900">Usage Trends</h3>
+      <div className={cardSurface}>
+        <div className="px-6 py-4 border-b border-white/10">
+          <p className={sectionLabel}>Usage Trends</p>
         </div>
         <div className="p-6">
-          <div className="h-64 flex items-center justify-center border-2 border-gray-200 border-dashed rounded-lg">
+          <div className="h-64 flex items-center justify-center border-2 border-white/10 border-dashed rounded-lg">
             <div className="text-center">
-              <BarChart3 className="mx-auto h-12 w-12 text-gray-400" />
-              <span className="mt-2 block text-sm font-medium text-gray-900">
+              <span className={`${sectionLabel} block`}>
                 Usage charts coming soon
               </span>
-              <span className="block text-sm text-gray-500">
+              <span className={`${monoXs} text-slate-500 block mt-1`}>
                 Historical usage data and trends will be displayed here
               </span>
             </div>
@@ -213,40 +207,35 @@ interface UsageCardProps {
   percentage?: number;
   isWarning?: boolean;
   isError?: boolean;
-  icon?: React.ReactNode;
 }
 
-function UsageCard({ title, value, subtitle, percentage, isWarning, isError, icon }: UsageCardProps) {
-  const getStatusColor = () => {
-    if (isError) return 'text-red-600';
-    if (isWarning) return 'text-yellow-600';
-    return 'text-green-600';
+function UsageCard({ title, value, subtitle, percentage, isWarning, isError }: UsageCardProps) {
+  const getBorderColor = () => {
+    if (isError) return 'border-l-rose-400';
+    if (isWarning) return 'border-l-amber-400';
+    return 'border-l-emerald-400';
   };
 
-  const getStatusIcon = () => {
-    if (isError || isWarning) {
-      return <AlertTriangle className="h-5 w-5" />;
-    }
-    return <CheckCircle className="h-5 w-5" />;
+  const getAccentColor = () => {
+    if (isError) return 'text-rose-300';
+    if (isWarning) return 'text-amber-300';
+    return 'text-emerald-300';
   };
+
+  const borderColor = percentage !== undefined ? getBorderColor() : 'border-l-sky-400';
 
   return (
-    <div className="bg-white border border-gray-200 rounded-lg p-6">
-      <div className="flex items-center justify-between">
-        <div className="flex-1">
-          <h3 className="text-sm font-medium text-gray-500">{title}</h3>
-          <p className="mt-1 text-2xl font-semibold text-gray-900">{value}</p>
-          <p className="mt-1 text-sm text-gray-600">{subtitle}</p>
-        </div>
-        <div className={`flex-shrink-0 ${getStatusColor()}`}>
-          {percentage !== undefined ? getStatusIcon() : icon}
-        </div>
+    <div className={`${cardSurface} border-l-[3px] ${borderColor} p-5`}>
+      <div>
+        <p className={sectionLabel}>{title}</p>
+        <p className={`${statNumber} mt-1`}>{value}</p>
+        <p className={`${monoXs} text-slate-500 mt-1`}>{subtitle}</p>
       </div>
       {percentage !== undefined && (
         <div className="mt-3">
-          <div className={`text-xs font-medium ${getStatusColor()}`}>
+          <span className={`${monoXs} ${getAccentColor()}`}>
             {percentage.toFixed(1)}% of limit used
-          </div>
+          </span>
         </div>
       )}
     </div>

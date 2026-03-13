@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import {
   Shield, Zap, Users, ArrowRight, CheckCircle, X,
   Code2, Building2, Activity, ChevronRight, ExternalLink,
   GitBranch, Fingerprint, FileCheck, Layers, Globe,
-  BarChart2, Terminal
+  BarChart2, Terminal, User, Mail, Briefcase, ArrowLeft,
+  Sparkles, Rocket, Crown
 } from 'lucide-react'
 
 // ── Code preview content (3 language tabs) ────────────────────────────────
@@ -157,12 +158,18 @@ const accentClasses: Record<string, { bg: string; border: string; icon: string }
 function App() {
   const vaasBackendUrl =
     import.meta.env.VITE_VAAS_BACKEND_URL || 'https://api-vaas.idswyft.app'
+  const vaasAdminUrl =
+    import.meta.env.VITE_VAAS_ADMIN_URL || 'https://admin.idswyft.app'
   const fallbackLogoUrl = '/idswyft-logo.png'
   const [showSignupForm, setShowSignupForm] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [signupStep, setSignupStep] = useState(1)
+  const [signupResult, setSignupResult] = useState<{ name: string; tier: string } | null>(null)
+  const [signupError, setSignupError] = useState('')
   const [activeTab, setActiveTab] = useState<CodeTab>('curl')
   const [scrolled, setScrolled] = useState(false)
   const [logoUrl, setLogoUrl] = useState(fallbackLogoUrl)
+  const modalRef = useRef<HTMLDivElement>(null)
   const [formData, setFormData] = useState({
     firstName: '',
     lastName: '',
@@ -203,9 +210,41 @@ function App() {
     setFormData(prev => ({ ...prev, [e.target.name]: e.target.value }))
   }
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
+  const openSignup = () => {
+    setShowSignupForm(true)
+    setSignupStep(1)
+    setSignupResult(null)
+    setSignupError('')
+  }
+
+  const closeSignup = () => {
+    setShowSignupForm(false)
+    setSignupStep(1)
+    setSignupResult(null)
+    setSignupError('')
+    setFormData({
+      firstName: '', lastName: '', email: '', phone: '',
+      company: '', jobTitle: '', estimatedVolume: '', useCase: '',
+    })
+  }
+
+  const nextStep = () => {
+    setSignupError('')
+    if (modalRef.current) modalRef.current.scrollTop = 0
+    setSignupStep(s => Math.min(s + 1, 3))
+  }
+  const prevStep = () => {
+    setSignupError('')
+    if (modalRef.current) modalRef.current.scrollTop = 0
+    setSignupStep(s => Math.max(s - 1, 1))
+  }
+
+  const canAdvanceStep1 = formData.firstName.trim() && formData.lastName.trim() && formData.email.trim()
+  const canAdvanceStep2 = formData.company.trim() && formData.estimatedVolume
+
+  const handleSubmit = async () => {
     setIsSubmitting(true)
+    setSignupError('')
     try {
       const response = await fetch(`${vaasBackendUrl}/api/organizations/signup`, {
         method: 'POST',
@@ -214,28 +253,23 @@ function App() {
       })
       const result = await response.json()
       if (result.success) {
-        alert(
-          `Success! Account created for ${result.data.organization.name}.\n\n` +
-          `You'll receive login credentials via email within 24 hours.\n` +
-          `Tier: ${result.data.organization.subscription_tier.toUpperCase()}`
-        )
-        setShowSignupForm(false)
-        setFormData({
-          firstName: '', lastName: '', email: '', phone: '',
-          company: '', jobTitle: '', estimatedVolume: '', useCase: '',
+        setSignupResult({
+          name: result.data.organization.name,
+          tier: result.data.organization.subscription_tier,
         })
+        setSignupStep(4) // success screen
       } else {
         if (result.error?.details && Array.isArray(result.error.details)) {
           const msgs = result.error.details
             .map((d: { field: string; message: string }) => `${d.field}: ${d.message}`)
-            .join('\n')
-          alert(`Please fix the following:\n\n${msgs}`)
+            .join('. ')
+          setSignupError(msgs)
         } else {
-          alert(`Signup failed: ${result.error?.message || 'Unknown error'}`)
+          setSignupError(result.error?.message || 'Something went wrong. Please try again.')
         }
       }
     } catch {
-      alert('Network error. Please check your connection and try again.')
+      setSignupError('Network error. Please check your connection and try again.')
     } finally {
       setIsSubmitting(false)
     }
@@ -303,14 +337,14 @@ function App() {
           {/* CTAs */}
           <div className="flex items-center gap-3">
             <a
-              href="https://admin.idswyft.app"
+              href={vaasAdminUrl}
               className="hidden sm:block text-sm font-medium transition-colors"
               style={{ color: '#64748b' }}
             >
               Sign in
             </a>
             <button
-              onClick={() => setShowSignupForm(true)}
+              onClick={openSignup}
               className="text-sm font-bold px-4 py-2 rounded-lg transition-colors duration-200"
               style={{ background: '#22d3ee', color: '#05080f' }}
               onMouseEnter={e => (e.currentTarget.style.background = '#67e8f9')}
@@ -398,7 +432,7 @@ function App() {
               {/* CTA buttons */}
               <div className="flex flex-wrap gap-4 mb-14">
                 <button
-                  onClick={() => setShowSignupForm(true)}
+                  onClick={openSignup}
                   className="flex items-center gap-2 px-6 py-3 rounded-xl text-sm font-bold transition-all duration-200"
                   style={{ background: '#22d3ee', color: '#05080f' }}
                   onMouseEnter={e => (e.currentTarget.style.background = '#67e8f9')}
@@ -1096,7 +1130,7 @@ function App() {
                 ))}
               </ul>
               <button
-                onClick={() => setShowSignupForm(true)}
+                onClick={openSignup}
                 className="w-full py-3 rounded-xl text-sm font-semibold transition-all duration-200"
                 style={{ border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', background: 'transparent' }}
                 onMouseEnter={e => {
@@ -1158,7 +1192,7 @@ function App() {
                 ))}
               </ul>
               <button
-                onClick={() => setShowSignupForm(true)}
+                onClick={openSignup}
                 className="w-full py-3 rounded-xl text-sm font-bold transition-colors duration-200"
                 style={{ background: '#22d3ee', color: '#05080f' }}
                 onMouseEnter={e => (e.currentTarget.style.background = '#67e8f9')}
@@ -1194,7 +1228,7 @@ function App() {
                 ))}
               </ul>
               <button
-                onClick={() => setShowSignupForm(true)}
+                onClick={openSignup}
                 className="w-full py-3 rounded-xl text-sm font-semibold transition-all duration-200"
                 style={{ border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', background: 'transparent' }}
                 onMouseEnter={e => {
@@ -1256,7 +1290,7 @@ function App() {
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <button
-              onClick={() => setShowSignupForm(true)}
+              onClick={openSignup}
               className="flex items-center justify-center gap-2 px-8 py-4 rounded-xl text-sm font-bold transition-colors duration-200"
               style={{ background: '#22d3ee', color: '#05080f' }}
               onMouseEnter={e => (e.currentTarget.style.background = '#67e8f9')}
@@ -1309,7 +1343,7 @@ function App() {
                 { label: 'Platform', href: 'https://idswyft.app' },
                 { label: 'Documentation', href: 'https://idswyft.app/doc' },
                 { label: 'Open Source', href: 'https://github.com/doobee46/idswyft' },
-                { label: 'Admin Portal', href: 'https://admin.idswyft.app' },
+                { label: 'Admin Portal', href: vaasAdminUrl },
                 { label: 'Privacy', href: '#' },
                 { label: 'Terms', href: '#' },
               ].map(({ label, href }) => (
@@ -1336,259 +1370,539 @@ function App() {
       </footer>
 
       {/* ════════════════════════════════════════
-          SIGNUP MODAL
+          MULTI-STEP SIGNUP MODAL
           ════════════════════════════════════════ */}
       {showSignupForm && (
         <div
           className="fixed inset-0 flex items-center justify-center z-50 p-4"
-          style={{ background: 'rgba(0,0,0,0.8)', backdropFilter: 'blur(12px)' }}
-          onClick={e => { if (e.target === e.currentTarget) setShowSignupForm(false) }}
+          style={{ background: 'rgba(0,0,0,0.85)', backdropFilter: 'blur(16px)' }}
+          onClick={e => { if (e.target === e.currentTarget) closeSignup() }}
         >
           <div
-            className="max-w-xl w-full max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl"
+            ref={modalRef}
+            className="w-full max-h-[90vh] overflow-y-auto rounded-2xl shadow-2xl"
             style={{
+              maxWidth: signupStep === 4 ? '480px' : '560px',
               background: '#080c18',
-              border: '1px solid rgba(255,255,255,0.1)',
+              border: '1px solid rgba(255,255,255,0.08)',
+              transition: 'max-width 0.3s ease',
             }}
           >
-            <div className="p-7">
-              {/* Modal header */}
-              <div className="flex justify-between items-start mb-7">
-                <div>
-                  <h2
-                    className="font-display font-bold mb-1.5"
-                    style={{ fontSize: '22px', fontFamily: 'Syne, sans-serif' }}
-                  >
-                    Start Free Trial
-                  </h2>
-                  <p style={{ color: '#475569', fontSize: '14px' }}>
-                    1,000 free verifications. No credit card required.
-                  </p>
-                </div>
-                <button
-                  onClick={() => setShowSignupForm(false)}
-                  className="transition-colors p-1.5 rounded-lg"
-                  style={{ color: '#334155', background: 'transparent' }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.background = 'rgba(255,255,255,0.05)'
-                    e.currentTarget.style.color = '#94a3b8'
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.background = 'transparent'
-                    e.currentTarget.style.color = '#334155'
-                  }}
-                >
-                  <X className="w-5 h-5" />
-                </button>
-              </div>
+            {/* ── Modal header with progress ── */}
+            {signupStep < 4 && (
+              <div style={{ borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+                <div className="px-7 pt-6 pb-4">
+                  <div className="flex justify-between items-start mb-5">
+                    <div className="flex items-center gap-3">
+                      {signupStep > 1 && (
+                        <button
+                          onClick={prevStep}
+                          className="p-1.5 rounded-lg transition-colors"
+                          style={{ color: '#475569', background: 'rgba(255,255,255,0.04)' }}
+                          onMouseEnter={e => (e.currentTarget.style.color = '#94a3b8')}
+                          onMouseLeave={e => (e.currentTarget.style.color = '#475569')}
+                        >
+                          <ArrowLeft className="w-4 h-4" />
+                        </button>
+                      )}
+                      <div>
+                        <h2
+                          className="font-display font-bold"
+                          style={{ fontSize: '20px', fontFamily: 'Syne, sans-serif' }}
+                        >
+                          {signupStep === 1 && 'Get started'}
+                          {signupStep === 2 && 'Your company'}
+                          {signupStep === 3 && 'Almost there'}
+                        </h2>
+                        <p style={{ color: '#475569', fontSize: '13px', marginTop: '2px' }}>
+                          {signupStep === 1 && 'Create your VaaS account'}
+                          {signupStep === 2 && 'Tell us about your organization'}
+                          {signupStep === 3 && 'Describe your verification needs'}
+                        </p>
+                      </div>
+                    </div>
+                    <button
+                      onClick={closeSignup}
+                      className="p-1.5 rounded-lg transition-colors"
+                      style={{ color: '#334155', background: 'transparent' }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.background = 'rgba(255,255,255,0.05)'
+                        e.currentTarget.style.color = '#94a3b8'
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.background = 'transparent'
+                        e.currentTarget.style.color = '#334155'
+                      }}
+                    >
+                      <X className="w-5 h-5" />
+                    </button>
+                  </div>
 
-              {/* Form */}
-              <form onSubmit={handleSubmit} className="space-y-4">
-                {/* First + Last name row */}
-                <div className="grid grid-cols-2 gap-4">
-                  {[
-                    { id: 'firstName', label: 'First Name', placeholder: 'John', type: 'text' },
-                    { id: 'lastName', label: 'Last Name', placeholder: 'Doe', type: 'text' },
-                  ].map(({ id, label, placeholder, type }) => (
-                    <div key={id}>
-                      <label
-                        className="block uppercase tracking-wider font-semibold mb-2"
-                        style={{ color: '#334155', fontSize: '11px', letterSpacing: '0.12em' }}
+                  {/* Step progress bar */}
+                  <div className="flex gap-2">
+                    {[1, 2, 3].map(step => (
+                      <div
+                        key={step}
+                        className="flex-1 rounded-full overflow-hidden"
+                        style={{ height: '3px', background: 'rgba(255,255,255,0.06)' }}
                       >
-                        {label} *
-                      </label>
+                        <div
+                          className="h-full rounded-full transition-all duration-500 ease-out"
+                          style={{
+                            width: signupStep >= step ? '100%' : '0%',
+                            background: signupStep >= step
+                              ? 'linear-gradient(90deg, #22d3ee, #67e8f9)'
+                              : 'transparent',
+                          }}
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="p-7">
+              {/* Error message */}
+              {signupError && (
+                <div
+                  className="mb-5 p-3.5 rounded-xl flex items-start gap-3"
+                  style={{ background: 'rgba(239,68,68,0.08)', border: '1px solid rgba(239,68,68,0.15)' }}
+                >
+                  <X className="w-4 h-4 flex-shrink-0 mt-0.5" style={{ color: '#ef4444' }} />
+                  <p style={{ color: '#fca5a5', fontSize: '13px', lineHeight: 1.5 }}>{signupError}</p>
+                </div>
+              )}
+
+              {/* ── STEP 1: Personal Info ── */}
+              {signupStep === 1 && (
+                <div className="space-y-4">
+                  <div className="grid grid-cols-2 gap-4">
+                    {[
+                      { id: 'firstName', label: 'First Name', placeholder: 'John', type: 'text', icon: User },
+                      { id: 'lastName', label: 'Last Name', placeholder: 'Doe', type: 'text', icon: User },
+                    ].map(({ id, label, placeholder, type }) => (
+                      <div key={id}>
+                        <label
+                          className="block uppercase tracking-wider font-semibold mb-2"
+                          style={{ color: '#475569', fontSize: '10px', letterSpacing: '0.14em' }}
+                        >
+                          {label}
+                        </label>
+                        <input
+                          type={type}
+                          name={id}
+                          required
+                          value={formData[id as keyof typeof formData]}
+                          onChange={handleInputChange}
+                          placeholder={placeholder}
+                          className="w-full rounded-xl text-sm transition-all duration-200"
+                          style={{
+                            padding: '11px 14px',
+                            background: 'rgba(255,255,255,0.03)',
+                            border: '1px solid rgba(255,255,255,0.07)',
+                            color: '#f1f5f9',
+                            outline: 'none',
+                          }}
+                          onFocus={e => (e.currentTarget.style.borderColor = 'rgba(34,211,238,0.4)')}
+                          onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)')}
+                        />
+                      </div>
+                    ))}
+                  </div>
+
+                  <div>
+                    <label
+                      className="block uppercase tracking-wider font-semibold mb-2"
+                      style={{ color: '#475569', fontSize: '10px', letterSpacing: '0.14em' }}
+                    >
+                      Business Email
+                    </label>
+                    <div className="relative">
+                      <Mail className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#334155' }} />
                       <input
-                        type={type}
-                        id={id}
-                        name={id}
+                        type="email"
+                        name="email"
                         required
-                        value={formData[id as keyof typeof formData]}
+                        value={formData.email}
                         onChange={handleInputChange}
-                        placeholder={placeholder}
+                        placeholder="john@company.com"
                         className="w-full rounded-xl text-sm transition-all duration-200"
                         style={{
-                          padding: '10px 14px',
-                          background: 'rgba(255,255,255,0.04)',
-                          border: '1px solid rgba(255,255,255,0.08)',
+                          padding: '11px 14px 11px 40px',
+                          background: 'rgba(255,255,255,0.03)',
+                          border: '1px solid rgba(255,255,255,0.07)',
                           color: '#f1f5f9',
                           outline: 'none',
                         }}
                         onFocus={e => (e.currentTarget.style.borderColor = 'rgba(34,211,238,0.4)')}
-                        onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
+                        onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)')}
                       />
                     </div>
-                  ))}
-                </div>
+                  </div>
 
-                {/* Other fields */}
-                {[
-                  { id: 'email', label: 'Business Email', placeholder: 'john@company.com', type: 'email' },
-                  { id: 'phone', label: 'Phone', placeholder: '+1 (555) 123-4567', type: 'tel' },
-                  { id: 'company', label: 'Company', placeholder: 'Acme Corporation', type: 'text' },
-                  { id: 'jobTitle', label: 'Job Title', placeholder: 'CTO, Head of Engineering, Compliance Officer…', type: 'text' },
-                ].map(({ id, label, placeholder, type }) => (
-                  <div key={id}>
+                  <div>
                     <label
                       className="block uppercase tracking-wider font-semibold mb-2"
-                      style={{ color: '#334155', fontSize: '11px', letterSpacing: '0.12em' }}
+                      style={{ color: '#475569', fontSize: '10px', letterSpacing: '0.14em' }}
                     >
-                      {label} *
+                      Phone <span style={{ color: '#334155', fontWeight: 400, textTransform: 'none', letterSpacing: 'normal', fontSize: '11px' }}>(optional)</span>
                     </label>
                     <input
-                      type={type}
-                      id={id}
-                      name={id}
-                      required
-                      value={formData[id as keyof typeof formData]}
+                      type="tel"
+                      name="phone"
+                      value={formData.phone}
                       onChange={handleInputChange}
-                      placeholder={placeholder}
+                      placeholder="+1 (555) 123-4567"
                       className="w-full rounded-xl text-sm transition-all duration-200"
                       style={{
-                        padding: '10px 14px',
-                        background: 'rgba(255,255,255,0.04)',
-                        border: '1px solid rgba(255,255,255,0.08)',
+                        padding: '11px 14px',
+                        background: 'rgba(255,255,255,0.03)',
+                        border: '1px solid rgba(255,255,255,0.07)',
                         color: '#f1f5f9',
                         outline: 'none',
                       }}
                       onFocus={e => (e.currentTarget.style.borderColor = 'rgba(34,211,238,0.4)')}
-                      onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
+                      onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)')}
                     />
                   </div>
-                ))}
 
-                {/* Volume select */}
-                <div>
-                  <label
-                    className="block uppercase tracking-wider font-semibold mb-2"
-                    style={{ color: '#334155', fontSize: '11px', letterSpacing: '0.12em' }}
-                  >
-                    Monthly Volume *
-                  </label>
-                  <select
-                    id="estimatedVolume"
-                    name="estimatedVolume"
-                    required
-                    value={formData.estimatedVolume}
-                    onChange={handleInputChange}
-                    className="w-full rounded-xl text-sm transition-all duration-200"
-                    style={{
-                      padding: '10px 14px',
-                      background: '#0a0e1a',
-                      border: '1px solid rgba(255,255,255,0.08)',
-                      color: formData.estimatedVolume ? '#f1f5f9' : '#334155',
-                      outline: 'none',
-                    }}
-                    onFocus={e => (e.currentTarget.style.borderColor = 'rgba(34,211,238,0.4)')}
-                    onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
-                  >
-                    <option value="" style={{ background: '#0a0e1a', color: '#475569' }}>Select volume range</option>
-                    <option value="1-1000" style={{ background: '#0a0e1a' }}>1 – 1,000 verifications</option>
-                    <option value="1000-10000" style={{ background: '#0a0e1a' }}>1,000 – 10,000 verifications</option>
-                    <option value="10000-50000" style={{ background: '#0a0e1a' }}>10,000 – 50,000 verifications</option>
-                    <option value="50000+" style={{ background: '#0a0e1a' }}>50,000+ verifications</option>
-                  </select>
-                </div>
+                  {/* Trust signals */}
+                  <div className="flex items-center gap-4 pt-1" style={{ color: '#334155', fontSize: '11px' }}>
+                    <span className="flex items-center gap-1.5">
+                      <Shield className="w-3.5 h-3.5" style={{ color: '#22d3ee' }} />
+                      SOC 2 Compliant
+                    </span>
+                    <span className="flex items-center gap-1.5">
+                      <CheckCircle className="w-3.5 h-3.5" style={{ color: '#10b981' }} />
+                      No credit card
+                    </span>
+                  </div>
 
-                {/* Use case textarea */}
-                <div>
-                  <label
-                    className="block uppercase tracking-wider font-semibold mb-2"
-                    style={{ color: '#334155', fontSize: '11px', letterSpacing: '0.12em' }}
-                  >
-                    Primary Use Case *
-                  </label>
-                  <textarea
-                    id="useCase"
-                    name="useCase"
-                    required
-                    rows={3}
-                    value={formData.useCase}
-                    onChange={handleInputChange}
-                    placeholder="KYC onboarding, marketplace trust & safety, patient verification…"
-                    className="w-full rounded-xl text-sm resize-none transition-all duration-200"
-                    style={{
-                      padding: '10px 14px',
-                      background: 'rgba(255,255,255,0.04)',
-                      border: '1px solid rgba(255,255,255,0.08)',
-                      color: '#f1f5f9',
-                      outline: 'none',
-                    }}
-                    onFocus={e => (e.currentTarget.style.borderColor = 'rgba(34,211,238,0.4)')}
-                    onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)')}
-                  />
-                </div>
-
-                {/* What happens next */}
-                <div
-                  className="rounded-xl p-4"
-                  style={{ background: 'rgba(34,211,238,0.04)', border: '1px solid rgba(34,211,238,0.1)' }}
-                >
-                  <p className="font-semibold mb-3" style={{ color: '#94a3b8', fontSize: '12px' }}>
-                    What happens next
-                  </p>
-                  <ul className="space-y-2">
-                    {[
-                      'Account created within 24 hours',
-                      'API keys and documentation sent via email',
-                      '1,000 free verifications to test the platform',
-                      'Optional onboarding call with our team',
-                    ].map(item => (
-                      <li key={item} className="flex items-center gap-2.5" style={{ color: '#64748b', fontSize: '12px' }}>
-                        <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#10b981' }} />
-                        {item}
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-
-                {/* Submit row */}
-                <div className="flex gap-3 pt-1">
                   <button
-                    type="button"
-                    onClick={() => setShowSignupForm(false)}
-                    className="flex-1 py-3 rounded-xl text-sm font-medium transition-all duration-200"
-                    style={{ border: '1px solid rgba(255,255,255,0.08)', color: '#475569', background: 'transparent' }}
-                    onMouseEnter={e => {
-                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.18)'
-                      e.currentTarget.style.color = '#94a3b8'
+                    onClick={nextStep}
+                    disabled={!canAdvanceStep1}
+                    className="w-full py-3 rounded-xl text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2"
+                    style={{
+                      background: canAdvanceStep1 ? '#22d3ee' : 'rgba(34,211,238,0.15)',
+                      color: canAdvanceStep1 ? '#05080f' : 'rgba(34,211,238,0.4)',
+                      cursor: canAdvanceStep1 ? 'pointer' : 'not-allowed',
                     }}
-                    onMouseLeave={e => {
-                      e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'
-                      e.currentTarget.style.color = '#475569'
-                    }}
+                    onMouseEnter={e => { if (canAdvanceStep1) e.currentTarget.style.background = '#67e8f9' }}
+                    onMouseLeave={e => { if (canAdvanceStep1) e.currentTarget.style.background = '#22d3ee' }}
                   >
-                    Cancel
+                    Continue
+                    <ArrowRight className="w-4 h-4" />
                   </button>
+                </div>
+              )}
+
+              {/* ── STEP 2: Company Info ── */}
+              {signupStep === 2 && (
+                <div className="space-y-4">
+                  <div>
+                    <label
+                      className="block uppercase tracking-wider font-semibold mb-2"
+                      style={{ color: '#475569', fontSize: '10px', letterSpacing: '0.14em' }}
+                    >
+                      Company Name
+                    </label>
+                    <div className="relative">
+                      <Building2 className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#334155' }} />
+                      <input
+                        type="text"
+                        name="company"
+                        required
+                        value={formData.company}
+                        onChange={handleInputChange}
+                        placeholder="Acme Corporation"
+                        className="w-full rounded-xl text-sm transition-all duration-200"
+                        style={{
+                          padding: '11px 14px 11px 40px',
+                          background: 'rgba(255,255,255,0.03)',
+                          border: '1px solid rgba(255,255,255,0.07)',
+                          color: '#f1f5f9',
+                          outline: 'none',
+                        }}
+                        onFocus={e => (e.currentTarget.style.borderColor = 'rgba(34,211,238,0.4)')}
+                        onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)')}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label
+                      className="block uppercase tracking-wider font-semibold mb-2"
+                      style={{ color: '#475569', fontSize: '10px', letterSpacing: '0.14em' }}
+                    >
+                      Your Role
+                    </label>
+                    <div className="relative">
+                      <Briefcase className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4" style={{ color: '#334155' }} />
+                      <input
+                        type="text"
+                        name="jobTitle"
+                        value={formData.jobTitle}
+                        onChange={handleInputChange}
+                        placeholder="CTO, Head of Engineering, Compliance Officer..."
+                        className="w-full rounded-xl text-sm transition-all duration-200"
+                        style={{
+                          padding: '11px 14px 11px 40px',
+                          background: 'rgba(255,255,255,0.03)',
+                          border: '1px solid rgba(255,255,255,0.07)',
+                          color: '#f1f5f9',
+                          outline: 'none',
+                        }}
+                        onFocus={e => (e.currentTarget.style.borderColor = 'rgba(34,211,238,0.4)')}
+                        onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)')}
+                      />
+                    </div>
+                  </div>
+
+                  <div>
+                    <label
+                      className="block uppercase tracking-wider font-semibold mb-2"
+                      style={{ color: '#475569', fontSize: '10px', letterSpacing: '0.14em' }}
+                    >
+                      Expected Monthly Volume
+                    </label>
+                    <div className="grid grid-cols-2 gap-2.5">
+                      {[
+                        { value: '1-1000', label: '1 – 1K', sub: 'Getting started', icon: Sparkles },
+                        { value: '1000-10000', label: '1K – 10K', sub: 'Growing fast', icon: Rocket },
+                        { value: '10000-50000', label: '10K – 50K', sub: 'Scale-up', icon: Zap },
+                        { value: '50000+', label: '50K+', sub: 'Enterprise', icon: Crown },
+                      ].map(({ value, label, sub, icon: Icon }) => (
+                        <button
+                          key={value}
+                          type="button"
+                          onClick={() => setFormData(prev => ({ ...prev, estimatedVolume: value }))}
+                          className="text-left rounded-xl p-3.5 transition-all duration-200"
+                          style={{
+                            background: formData.estimatedVolume === value
+                              ? 'rgba(34,211,238,0.08)'
+                              : 'rgba(255,255,255,0.02)',
+                            border: `1px solid ${formData.estimatedVolume === value
+                              ? 'rgba(34,211,238,0.3)'
+                              : 'rgba(255,255,255,0.06)'}`,
+                          }}
+                          onMouseEnter={e => {
+                            if (formData.estimatedVolume !== value)
+                              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.12)'
+                          }}
+                          onMouseLeave={e => {
+                            if (formData.estimatedVolume !== value)
+                              e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'
+                          }}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <Icon
+                              className="w-4 h-4"
+                              style={{
+                                color: formData.estimatedVolume === value ? '#22d3ee' : '#475569',
+                              }}
+                            />
+                            <div>
+                              <p
+                                className="font-semibold text-sm"
+                                style={{
+                                  color: formData.estimatedVolume === value ? '#f1f5f9' : '#94a3b8',
+                                }}
+                              >
+                                {label}
+                              </p>
+                              <p style={{ color: '#475569', fontSize: '11px' }}>{sub}</p>
+                            </div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+
                   <button
-                    type="submit"
+                    onClick={nextStep}
+                    disabled={!canAdvanceStep2}
+                    className="w-full py-3 rounded-xl text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2"
+                    style={{
+                      background: canAdvanceStep2 ? '#22d3ee' : 'rgba(34,211,238,0.15)',
+                      color: canAdvanceStep2 ? '#05080f' : 'rgba(34,211,238,0.4)',
+                      cursor: canAdvanceStep2 ? 'pointer' : 'not-allowed',
+                    }}
+                    onMouseEnter={e => { if (canAdvanceStep2) e.currentTarget.style.background = '#67e8f9' }}
+                    onMouseLeave={e => { if (canAdvanceStep2) e.currentTarget.style.background = '#22d3ee' }}
+                  >
+                    Continue
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
+              {/* ── STEP 3: Use Case + Submit ── */}
+              {signupStep === 3 && (
+                <div className="space-y-4">
+                  <div>
+                    <label
+                      className="block uppercase tracking-wider font-semibold mb-2"
+                      style={{ color: '#475569', fontSize: '10px', letterSpacing: '0.14em' }}
+                    >
+                      Primary Use Case
+                    </label>
+                    <textarea
+                      name="useCase"
+                      rows={3}
+                      value={formData.useCase}
+                      onChange={handleInputChange}
+                      placeholder="KYC onboarding, marketplace trust & safety, patient verification, employee screening..."
+                      className="w-full rounded-xl text-sm resize-none transition-all duration-200"
+                      style={{
+                        padding: '11px 14px',
+                        background: 'rgba(255,255,255,0.03)',
+                        border: '1px solid rgba(255,255,255,0.07)',
+                        color: '#f1f5f9',
+                        outline: 'none',
+                      }}
+                      onFocus={e => (e.currentTarget.style.borderColor = 'rgba(34,211,238,0.4)')}
+                      onBlur={e => (e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)')}
+                    />
+                  </div>
+
+                  {/* Summary card */}
+                  <div
+                    className="rounded-xl p-4"
+                    style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
+                  >
+                    <p className="font-semibold mb-3" style={{ color: '#64748b', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
+                      Your trial includes
+                    </p>
+                    <ul className="space-y-2.5">
+                      {[
+                        '1,000 free verifications',
+                        'Full API access with sandbox mode',
+                        'Admin dashboard & analytics',
+                        'Webhook integrations',
+                        'Dedicated onboarding support',
+                      ].map(item => (
+                        <li key={item} className="flex items-center gap-2.5" style={{ color: '#94a3b8', fontSize: '13px' }}>
+                          <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#10b981' }} />
+                          {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <button
+                    onClick={handleSubmit}
                     disabled={isSubmitting}
-                    className="flex-1 py-3 rounded-xl text-sm font-bold transition-all duration-200"
+                    className="w-full py-3.5 rounded-xl text-sm font-bold transition-all duration-200"
                     style={{
                       background: isSubmitting ? 'rgba(34,211,238,0.4)' : '#22d3ee',
                       color: '#05080f',
                       cursor: isSubmitting ? 'not-allowed' : 'pointer',
                     }}
-                    onMouseEnter={e => {
-                      if (!isSubmitting) e.currentTarget.style.background = '#67e8f9'
-                    }}
-                    onMouseLeave={e => {
-                      if (!isSubmitting) e.currentTarget.style.background = '#22d3ee'
-                    }}
+                    onMouseEnter={e => { if (!isSubmitting) e.currentTarget.style.background = '#67e8f9' }}
+                    onMouseLeave={e => { if (!isSubmitting) e.currentTarget.style.background = '#22d3ee' }}
                   >
                     {isSubmitting ? (
-                      <div className="flex items-center justify-center gap-2">
+                      <span className="flex items-center justify-center gap-2">
                         <div
                           className="w-4 h-4 rounded-full border-2 animate-spin"
                           style={{ borderColor: 'rgba(5,8,15,0.3)', borderTopColor: '#05080f' }}
                         />
-                        Creating Account…
-                      </div>
+                        Creating your account...
+                      </span>
                     ) : (
-                      'Start Free Trial'
+                      <span className="flex items-center justify-center gap-2">
+                        Start Free Trial
+                        <ArrowRight className="w-4 h-4" />
+                      </span>
                     )}
                   </button>
+
+                  <p className="text-center" style={{ color: '#334155', fontSize: '11px' }}>
+                    No credit card required. Cancel anytime.
+                  </p>
                 </div>
-              </form>
+              )}
+
+              {/* ── STEP 4: Success ── */}
+              {signupStep === 4 && signupResult && (
+                <div className="text-center py-4">
+                  {/* Animated checkmark */}
+                  <div
+                    className="mx-auto mb-5 flex items-center justify-center rounded-full"
+                    style={{
+                      width: '64px',
+                      height: '64px',
+                      background: 'rgba(16,185,129,0.1)',
+                      border: '2px solid rgba(16,185,129,0.25)',
+                    }}
+                  >
+                    <CheckCircle className="w-8 h-8" style={{ color: '#10b981' }} />
+                  </div>
+
+                  <h2
+                    className="font-display font-bold mb-2"
+                    style={{ fontSize: '22px', fontFamily: 'Syne, sans-serif' }}
+                  >
+                    Welcome to Idswyft VaaS
+                  </h2>
+                  <p style={{ color: '#64748b', fontSize: '14px', lineHeight: 1.6, maxWidth: '340px', margin: '0 auto' }}>
+                    Your account for <strong style={{ color: '#f1f5f9' }}>{signupResult.name}</strong> has been created.
+                  </p>
+
+                  <div
+                    className="rounded-xl p-4 mt-6 text-left"
+                    style={{ background: 'rgba(34,211,238,0.04)', border: '1px solid rgba(34,211,238,0.1)' }}
+                  >
+                    <p className="font-semibold mb-3" style={{ color: '#94a3b8', fontSize: '12px' }}>
+                      What happens next
+                    </p>
+                    <ul className="space-y-2.5">
+                      {[
+                        { text: 'Check your email for login credentials', highlight: true },
+                        { text: 'Access the admin dashboard to configure settings', highlight: false },
+                        { text: 'Generate API keys and start integrating', highlight: false },
+                        { text: '1,000 free verifications ready to use', highlight: false },
+                      ].map(({ text, highlight }) => (
+                        <li key={text} className="flex items-start gap-2.5" style={{ color: highlight ? '#f1f5f9' : '#64748b', fontSize: '13px' }}>
+                          <CheckCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: '#10b981' }} />
+                          {text}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+
+                  <div className="flex gap-3 mt-6">
+                    <a
+                      href={vaasAdminUrl}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 py-3 rounded-xl text-sm font-bold transition-all duration-200 flex items-center justify-center gap-2"
+                      style={{ background: '#22d3ee', color: '#05080f' }}
+                      onMouseEnter={e => (e.currentTarget.style.background = '#67e8f9')}
+                      onMouseLeave={e => (e.currentTarget.style.background = '#22d3ee')}
+                    >
+                      Open Dashboard
+                      <ExternalLink className="w-4 h-4" />
+                    </a>
+                    <button
+                      onClick={closeSignup}
+                      className="flex-1 py-3 rounded-xl text-sm font-medium transition-all duration-200"
+                      style={{ border: '1px solid rgba(255,255,255,0.08)', color: '#64748b', background: 'transparent' }}
+                      onMouseEnter={e => {
+                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.18)'
+                        e.currentTarget.style.color = '#94a3b8'
+                      }}
+                      onMouseLeave={e => {
+                        e.currentTarget.style.borderColor = 'rgba(255,255,255,0.08)'
+                        e.currentTarget.style.color = '#64748b'
+                      }}
+                    >
+                      Close
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>

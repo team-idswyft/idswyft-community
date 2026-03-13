@@ -1,52 +1,35 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import apiClient from '../services/api';
-import type { 
-  AuditLogEntry, 
-  AuditLogFilters, 
-  AuditLogResponse, 
+import type {
+  AuditLogEntry,
+  AuditLogFilters,
+  AuditLogResponse,
   AuditLogStats,
   AuditAction,
   AuditResourceType
 } from '../types';
-import { 
-  Shield, 
-  Search, 
-  Filter, 
-  Download, 
-  Eye, 
-  AlertTriangle, 
-  User, 
-  Key, 
+import {
+  Search,
+  Filter,
+  Download,
+  Eye,
+  AlertTriangle,
+  User,
+  Key,
   Server,
   Activity,
   Calendar,
   Clock,
-  CheckCircle,
-  XCircle,
-  AlertCircle,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
   RefreshCw
 } from 'lucide-react';
+import Modal from '../components/ui/Modal';
+import { sectionLabel, statNumber, monoXs, monoSm, cardSurface, statusPill, tableHeaderClass, infoPanel, getStatusAccent } from '../styles/tokens';
 
 const ITEMS_PER_PAGE = 20;
-
-// Severity badge colors
-const severityColors = {
-  low: 'bg-gray-100 text-gray-800',
-  medium: 'bg-blue-100 text-blue-800',
-  high: 'bg-yellow-100 text-yellow-800',
-  critical: 'bg-red-100 text-red-800'
-};
-
-// Status colors
-const statusColors = {
-  success: 'bg-green-100 text-green-800',
-  failure: 'bg-red-100 text-red-800',
-  warning: 'bg-yellow-100 text-yellow-800'
-};
 
 // Actor type icons
 const actorIcons = {
@@ -98,17 +81,17 @@ export default function AuditLogs() {
   const [statsLoading, setStatsLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  
+
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [total, setTotal] = useState(0);
-  
+
   // Filters
   const [filters, setFilters] = useState<AuditLogFilters>({});
   const [showFilters, setShowFilters] = useState(false);
   const [search, setSearch] = useState('');
-  
+
   // Selected log for details modal
   const [selectedLog, setSelectedLog] = useState<AuditLogEntry | null>(null);
   const [showLogModal, setShowLogModal] = useState(false);
@@ -116,7 +99,7 @@ export default function AuditLogs() {
   // Load audit logs
   const loadAuditLogs = useCallback(async (page = 1, newFilters = filters) => {
     if (!organization?.id) return;
-    
+
     setLoading(true);
     try {
       const params = {
@@ -141,7 +124,7 @@ export default function AuditLogs() {
   // Load audit log statistics
   const loadStats = useCallback(async () => {
     if (!organization?.id) return;
-    
+
     setStatsLoading(true);
     try {
       const statsData = await apiClient.getAuditLogStats(organization.id);
@@ -202,7 +185,7 @@ export default function AuditLogs() {
   // Handle export
   const handleExport = async (format: 'csv' | 'json' = 'csv') => {
     if (!organization?.id) return;
-    
+
     setExporting(true);
     try {
       const blob = await apiClient.exportAuditLogs(organization.id, {
@@ -210,7 +193,7 @@ export default function AuditLogs() {
         search: search.trim() || undefined,
         format
       });
-      
+
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -228,7 +211,7 @@ export default function AuditLogs() {
 
   // Format action name for display
   const formatAction = (action: AuditAction) => {
-    return action.split('_').map(word => 
+    return action.split('_').map(word =>
       word.charAt(0).toUpperCase() + word.slice(1)
     ).join(' ');
   };
@@ -243,7 +226,7 @@ export default function AuditLogs() {
     const now = new Date();
     const then = new Date(timestamp);
     const diffInSeconds = Math.floor((now.getTime() - then.getTime()) / 1000);
-    
+
     if (diffInSeconds < 60) return 'Just now';
     if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)}m ago`;
     if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)}h ago`;
@@ -260,22 +243,22 @@ export default function AuditLogs() {
     return (
       <div className="p-6">
         <div className="animate-pulse">
-          <div className="h-8 bg-gray-200 rounded w-64 mb-6"></div>
+          <div className="h-8 bg-slate-700/50 rounded w-64 mb-6"></div>
           <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
             {[1, 2, 3, 4].map(i => (
-              <div key={i} className="stat-card-glass p-6">
-                <div className="h-4 bg-gray-200 rounded w-24 mb-2"></div>
-                <div className="h-8 bg-gray-200 rounded w-16"></div>
+              <div key={i} className={`${cardSurface} border-l-[3px] border-l-slate-700/50 p-5`}>
+                <div className="h-4 bg-slate-700/50 rounded w-24 mb-2"></div>
+                <div className="h-8 bg-slate-700/50 rounded w-16"></div>
               </div>
             ))}
           </div>
-          <div className="content-card-glass">
-            <div className="p-6 border-b">
-              <div className="h-6 bg-gray-200 rounded w-32"></div>
+          <div className={cardSurface}>
+            <div className="p-6 border-b border-white/10">
+              <div className="h-6 bg-slate-700/50 rounded w-32"></div>
             </div>
             <div className="p-6">
               {[1, 2, 3, 4, 5].map(i => (
-                <div key={i} className="h-16 bg-gray-100 rounded mb-4"></div>
+                <div key={i} className="h-16 bg-slate-800/50 rounded mb-4"></div>
               ))}
             </div>
           </div>
@@ -288,32 +271,28 @@ export default function AuditLogs() {
     <div className="p-6 space-y-8 max-w-7xl mx-auto">
       {/* Header */}
       <div className="flex justify-between items-center mb-6">
-        <div className="flex items-center">
-          <Shield className="h-8 w-8 text-blue-600 mr-3" />
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Audit Logs</h1>
-            <p className="text-gray-600 mt-1">Organization-wide security and compliance monitoring</p>
-          </div>
+        <div>
+          <p className={sectionLabel}>Audit Logs</p>
+          <p className="text-slate-400 mt-1 text-sm">Organization-wide security and compliance monitoring</p>
         </div>
-        
+
         <div className="flex space-x-3">
           <button
             onClick={handleRefresh}
             disabled={refreshing}
-            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 flex items-center"
+            className="p-2 border border-white/10 rounded-lg text-slate-300 bg-slate-900/70 hover:bg-slate-800/40 transition-colors disabled:opacity-50 flex items-center"
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-            Refresh
+            <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
           </button>
-          
+
           <div className="relative">
             <button
               onClick={() => handleExport('csv')}
               disabled={exporting}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 flex items-center"
+              className="p-2 border border-white/10 rounded-lg text-slate-300 bg-slate-900/70 hover:bg-slate-800/40 transition-colors disabled:opacity-50 flex items-center"
             >
               <Download className="h-4 w-4 mr-2" />
-              {exporting ? 'Exporting...' : 'Export'}
+              <span className="font-mono text-sm">{exporting ? 'Exporting...' : 'Export'}</span>
             </button>
           </div>
         </div>
@@ -322,79 +301,59 @@ export default function AuditLogs() {
       {/* Stats Cards */}
       {stats && !statsLoading && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          <div className="stat-card-glass p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Today</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.total_events_today.toLocaleString()}</p>
-              </div>
-              <Activity className="h-8 w-8 text-blue-600" />
-            </div>
+          <div className={`${cardSurface} border-l-[3px] border-l-cyan-400 p-5`}>
+            <p className={sectionLabel}>Today</p>
+            <p className={`${statNumber} text-slate-100`}>{stats.total_events_today.toLocaleString()}</p>
           </div>
-          
-          <div className="stat-card-glass p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">This Week</p>
-                <p className="text-2xl font-bold text-gray-900">{stats.total_events_week.toLocaleString()}</p>
-              </div>
-              <Calendar className="h-8 w-8 text-green-600" />
-            </div>
+
+          <div className={`${cardSurface} border-l-[3px] border-l-emerald-400 p-5`}>
+            <p className={sectionLabel}>This Week</p>
+            <p className={`${statNumber} text-emerald-400`}>{stats.total_events_week.toLocaleString()}</p>
           </div>
-          
-          <div className="stat-card-glass p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Security Alerts</p>
-                <p className="text-2xl font-bold text-red-600">{stats.security_alerts_count.toLocaleString()}</p>
-              </div>
-              <AlertTriangle className="h-8 w-8 text-red-600" />
-            </div>
+
+          <div className={`${cardSurface} border-l-[3px] border-l-rose-400 p-5`}>
+            <p className={sectionLabel}>Security Alerts</p>
+            <p className={`${statNumber} text-rose-400`}>{stats.security_alerts_count.toLocaleString()}</p>
           </div>
-          
-          <div className="stat-card-glass p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-gray-600 text-sm">Failed Logins</p>
-                <p className="text-2xl font-bold text-yellow-600">{stats.failed_login_attempts.toLocaleString()}</p>
-              </div>
-              <XCircle className="h-8 w-8 text-yellow-600" />
-            </div>
+
+          <div className={`${cardSurface} border-l-[3px] border-l-amber-400 p-5`}>
+            <p className={sectionLabel}>Failed Logins</p>
+            <p className={`${statNumber} text-amber-400`}>{stats.failed_login_attempts.toLocaleString()}</p>
           </div>
         </div>
       )}
 
       {/* Search and Filters */}
-      <div className="content-card-glass mb-6">
-        <div className="p-6 border-b">
+      <div className={`${cardSurface} mb-6`}>
+        <div className="p-6 border-b border-white/10">
           <div className="flex flex-col sm:flex-row gap-4">
             <div className="flex-1">
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-slate-500" />
                 <input
                   type="text"
                   placeholder="Search logs by actor, action, resource, IP address..."
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && handleSearch()}
-                  className="pl-10 pr-4 py-2 w-full border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="pl-10 pr-4 py-2 w-full border border-white/10 rounded-lg bg-slate-900/70 text-slate-100 placeholder-slate-500 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 font-mono text-sm"
                 />
               </div>
             </div>
-            
+
             <div className="flex gap-2">
               <button
                 onClick={handleSearch}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700"
+                className="px-4 py-2 bg-cyan-600 text-white rounded-lg hover:bg-cyan-700 font-mono text-sm"
               >
                 Search
               </button>
               <button
                 onClick={() => setShowFilters(!showFilters)}
-                className={`px-4 py-2 border rounded-md flex items-center ${
-                  showFilters 
-                    ? 'bg-blue-50 border-blue-300 text-blue-700' 
-                    : 'border-gray-300 text-gray-700 bg-white hover:bg-gray-50'
+                className={`px-4 py-2 border rounded-lg flex items-center font-mono text-sm ${
+                  showFilters
+                    ? 'bg-cyan-500/12 border-cyan-500/30 text-cyan-300'
+                    : 'border-white/10 text-slate-300 bg-slate-900/70 hover:bg-slate-800/40 transition-colors'
                 }`}
               >
                 <Filter className="h-4 w-4 mr-2" />
@@ -407,15 +366,15 @@ export default function AuditLogs() {
 
         {/* Advanced Filters */}
         {showFilters && (
-          <div className="p-6 bg-gray-50 border-t">
+          <div className="p-6 bg-slate-900/40 border-t border-white/10">
             <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
               {/* Actor Type Filter */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Actor Type</label>
+                <label className="form-label">Actor Type</label>
                 <select
                   value={filters.actor_type || ''}
                   onChange={(e) => handleFilterChange('actor_type', e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="form-input"
                 >
                   <option value="">All Types</option>
                   <option value="admin">Admin</option>
@@ -426,11 +385,11 @@ export default function AuditLogs() {
 
               {/* Resource Type Filter */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Resource Type</label>
+                <label className="form-label">Resource Type</label>
                 <select
                   value={filters.resource_type || ''}
                   onChange={(e) => handleFilterChange('resource_type', e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="form-input"
                 >
                   <option value="">All Resources</option>
                   <option value="user">User</option>
@@ -446,11 +405,11 @@ export default function AuditLogs() {
 
               {/* Severity Filter */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Severity</label>
+                <label className="form-label">Severity</label>
                 <select
                   value={filters.severity || ''}
                   onChange={(e) => handleFilterChange('severity', e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="form-input"
                 >
                   <option value="">All Severities</option>
                   <option value="low">Low</option>
@@ -462,11 +421,11 @@ export default function AuditLogs() {
 
               {/* Status Filter */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">Status</label>
+                <label className="form-label">Status</label>
                 <select
                   value={filters.status || ''}
                   onChange={(e) => handleFilterChange('status', e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="form-input"
                 >
                   <option value="">All Statuses</option>
                   <option value="success">Success</option>
@@ -477,23 +436,23 @@ export default function AuditLogs() {
 
               {/* Date From */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">From Date</label>
+                <label className="form-label">From Date</label>
                 <input
                   type="datetime-local"
                   value={filters.date_from || ''}
                   onChange={(e) => handleFilterChange('date_from', e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="form-input"
                 />
               </div>
 
               {/* Date To */}
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-1">To Date</label>
+                <label className="form-label">To Date</label>
                 <input
                   type="datetime-local"
                   value={filters.date_to || ''}
                   onChange={(e) => handleFilterChange('date_to', e.target.value)}
-                  className="w-full border border-gray-300 rounded-md px-3 py-2 text-sm focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  className="form-input"
                 />
               </div>
 
@@ -505,7 +464,7 @@ export default function AuditLogs() {
                     setSearch('');
                     loadAuditLogs(1, {});
                   }}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50"
+                  className="w-full px-4 py-2 border border-white/10 rounded-lg text-slate-300 bg-slate-900/70 hover:bg-slate-800/40 transition-colors font-mono text-sm"
                 >
                   Clear All
                 </button>
@@ -516,14 +475,14 @@ export default function AuditLogs() {
       </div>
 
       {/* Audit Logs Table */}
-      <div className="content-card-glass">
-        <div className="px-6 py-4 border-b">
+      <div className={cardSurface}>
+        <div className="px-6 py-4 border-b border-white/10">
           <div className="flex justify-between items-center">
-            <h2 className="text-lg font-semibold text-gray-900">
-              Audit Logs ({total.toLocaleString()} total)
+            <h2 className="text-lg font-semibold text-slate-100">
+              Audit Logs <span className={`${monoXs} text-slate-500`}>({total.toLocaleString()} total)</span>
             </h2>
             {loading && (
-              <div className="flex items-center text-gray-500">
+              <div className={`flex items-center text-slate-500 ${monoXs}`}>
                 <RefreshCw className="h-4 w-4 animate-spin mr-2" />
                 Loading...
               </div>
@@ -533,82 +492,65 @@ export default function AuditLogs() {
 
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50">
+            <thead className="bg-slate-900/40">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Timestamp
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actor
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Action
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Resource
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Severity
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
+                <th className={tableHeaderClass}>Timestamp</th>
+                <th className={tableHeaderClass}>Actor</th>
+                <th className={tableHeaderClass}>Action</th>
+                <th className={tableHeaderClass}>Resource</th>
+                <th className={tableHeaderClass}>Status</th>
+                <th className={tableHeaderClass}>Severity</th>
+                <th className={tableHeaderClass}>Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-white/30 backdrop-blur-sm divide-y divide-white/20">
+            <tbody className="bg-slate-900/40 backdrop-blur-sm divide-y divide-white/10">
               {logs.map((log) => {
                 const ActorIcon = actorIcons[log.actor_type];
                 return (
-                  <tr key={log.id} className="hover:bg-gray-50">
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <tr key={log.id} className="hover:bg-slate-800/40 transition-colors">
+                    <td className="px-5 py-4 whitespace-nowrap text-sm text-slate-100">
                       <div>
                         <div className="font-medium">{getRelativeTime(log.timestamp)}</div>
-                        <div className="text-gray-500 text-xs">{formatTimestamp(log.timestamp)}</div>
+                        <div className={`${monoXs} text-slate-500`}>{formatTimestamp(log.timestamp)}</div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <td className="px-5 py-4 whitespace-nowrap text-sm">
                       <div className="flex items-center">
-                        <ActorIcon className="h-4 w-4 text-gray-400 mr-2" />
+                        <ActorIcon className="h-4 w-4 text-slate-500 mr-2" />
                         <div>
-                          <div className="font-medium text-gray-900">{log.actor_name}</div>
+                          <div className="font-medium text-slate-100">{log.actor_name}</div>
                           {log.actor_email && (
-                            <div className="text-gray-500 text-xs">{log.actor_email}</div>
+                            <div className={`${monoXs} text-slate-500`}>{log.actor_email}</div>
                           )}
-                          <div className="text-gray-400 text-xs capitalize">{log.actor_type}</div>
+                          <div className={`${monoXs} text-slate-500 capitalize`}>{log.actor_type}</div>
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
-                      <div className="font-medium text-gray-900">{formatAction(log.action)}</div>
+                    <td className="px-5 py-4 whitespace-nowrap text-sm">
+                      <div className="font-medium text-slate-100">{formatAction(log.action)}</div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm">
+                    <td className="px-5 py-4 whitespace-nowrap text-sm">
                       <div>
-                        <div className="font-medium text-gray-900 capitalize">{log.resource_type}</div>
+                        <div className="font-medium text-slate-100 capitalize">{log.resource_type}</div>
                         {log.resource_name && (
-                          <div className="text-gray-500 text-xs truncate max-w-32">{log.resource_name}</div>
+                          <div className={`${monoXs} text-slate-500 truncate max-w-32`}>{log.resource_name}</div>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${statusColors[log.status]}`}>
-                        {log.status === 'success' && <CheckCircle className="h-3 w-3 mr-1" />}
-                        {log.status === 'failure' && <XCircle className="h-3 w-3 mr-1" />}
-                        {log.status === 'warning' && <AlertCircle className="h-3 w-3 mr-1" />}
+                    <td className="px-5 py-4 whitespace-nowrap">
+                      <span className={`${statusPill} ${getStatusAccent(log.status).pill}`}>
                         {log.status.charAt(0).toUpperCase() + log.status.slice(1)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex px-2.5 py-0.5 rounded-full text-xs font-medium ${severityColors[log.severity]}`}>
+                    <td className="px-5 py-4 whitespace-nowrap">
+                      <span className={`${statusPill} ${getStatusAccent(log.severity).pill}`}>
                         {log.severity.charAt(0).toUpperCase() + log.severity.slice(1)}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-5 py-4 whitespace-nowrap text-sm text-slate-500">
                       <button
                         onClick={() => showLogDetails(log)}
-                        className="text-blue-600 hover:text-blue-900 flex items-center"
+                        className="text-cyan-400 hover:text-cyan-300 flex items-center"
                       >
                         <Eye className="h-4 w-4 mr-1" />
                         View
@@ -623,9 +565,9 @@ export default function AuditLogs() {
 
         {logs.length === 0 && !loading && (
           <div className="text-center py-12">
-            <Shield className="mx-auto h-12 w-12 text-gray-400" />
-            <h3 className="mt-2 text-sm font-medium text-gray-900">No audit logs found</h3>
-            <p className="mt-1 text-sm text-gray-500">
+            <Activity className="mx-auto h-12 w-12 text-slate-500" />
+            <h3 className="mt-2 text-sm font-medium text-slate-100">No audit logs found</h3>
+            <p className="mt-1 text-sm text-slate-500">
               {Object.keys(filters).length > 0 || search
                 ? 'Try adjusting your search criteria or filters.'
                 : 'Audit logs will appear here as activities occur in your organization.'}
@@ -635,24 +577,24 @@ export default function AuditLogs() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="px-6 py-4 border-t bg-gray-50">
+          <div className="px-6 py-4 border-t border-white/10 bg-slate-900/40">
             <div className="flex items-center justify-between">
-              <div className="text-sm text-gray-700">
+              <div className={`${monoXs} text-slate-500`}>
                 Showing {((currentPage - 1) * ITEMS_PER_PAGE) + 1} to{' '}
                 {Math.min(currentPage * ITEMS_PER_PAGE, total)} of{' '}
                 {total.toLocaleString()} results
               </div>
-              
+
               <div className="flex items-center space-x-2">
                 <button
                   onClick={() => loadAuditLogs(currentPage - 1)}
                   disabled={currentPage === 1 || loading}
-                  className="px-3 py-1 border border-gray-300 rounded text-sm text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                  className="px-3 py-1 border border-white/10 rounded-lg font-mono text-sm text-slate-300 bg-slate-900/70 hover:bg-slate-800/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                 >
                   <ChevronLeft className="h-4 w-4" />
                   Previous
                 </button>
-                
+
                 <div className="flex items-center space-x-1">
                   {[...Array(Math.min(5, totalPages))].map((_, i) => {
                     const page = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
@@ -661,10 +603,10 @@ export default function AuditLogs() {
                         key={page}
                         onClick={() => loadAuditLogs(page)}
                         disabled={loading}
-                        className={`px-3 py-1 text-sm rounded ${
+                        className={`px-3 py-1 font-mono text-sm rounded-lg ${
                           page === currentPage
-                            ? 'bg-blue-600 text-white'
-                            : 'text-gray-700 bg-white border border-gray-300 hover:bg-gray-50'
+                            ? 'bg-cyan-500/20 border border-cyan-400/40 text-cyan-200'
+                            : 'text-slate-300 bg-slate-900/70 border border-white/10 hover:bg-slate-800/40 transition-colors'
                         } disabled:opacity-50`}
                       >
                         {page}
@@ -672,11 +614,11 @@ export default function AuditLogs() {
                     );
                   })}
                 </div>
-                
+
                 <button
                   onClick={() => loadAuditLogs(currentPage + 1)}
                   disabled={currentPage === totalPages || loading}
-                  className="px-3 py-1 border border-gray-300 rounded text-sm text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                  className="px-3 py-1 border border-white/10 rounded-lg font-mono text-sm text-slate-300 bg-slate-900/70 hover:bg-slate-800/40 transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
                 >
                   Next
                   <ChevronRight className="h-4 w-4" />
@@ -688,149 +630,123 @@ export default function AuditLogs() {
       </div>
 
       {/* Log Details Modal */}
-      {showLogModal && selectedLog && (
-        <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm">
-          <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-            <div className="px-6 py-4 border-b">
-              <div className="flex justify-between items-center">
-                <h3 className="text-lg font-semibold text-gray-900">Audit Log Details</h3>
-                <button
-                  onClick={() => setShowLogModal(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <XCircle className="h-6 w-6" />
-                </button>
+      <Modal isOpen={showLogModal} onClose={() => setShowLogModal(false)} title="Audit Log Details" size="lg">
+        {selectedLog && (
+          <div className="space-y-5">
+            {/* Header Info */}
+            <div className="grid grid-cols-2 gap-4">
+              <div>
+                <p className={sectionLabel}>Event ID</p>
+                <div className={infoPanel}>
+                  <p className={`${monoXs} text-slate-100`}>{selectedLog.id}</p>
+                </div>
+              </div>
+              <div>
+                <p className={sectionLabel}>Timestamp</p>
+                <div className={infoPanel}>
+                  <p className={`${monoSm} text-slate-100`}>{formatTimestamp(selectedLog.timestamp)}</p>
+                </div>
               </div>
             </div>
-            
-            <div className="px-6 py-4 space-y-6">
-              {/* Header Info */}
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Event ID</label>
-                  <p className="text-sm font-mono bg-gray-100 p-2 rounded">{selectedLog.id}</p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-1">Timestamp</label>
-                  <p className="text-sm text-gray-900">{formatTimestamp(selectedLog.timestamp)}</p>
-                </div>
-              </div>
 
-              {/* Actor Details */}
+            {/* Actor Details */}
+            <div>
+              <p className={`${sectionLabel} mb-2`}>Actor</p>
+              <div className={infoPanel}>
+                <div className="flex items-center mb-2">
+                  {React.createElement(actorIcons[selectedLog.actor_type], { className: "h-5 w-5 text-slate-400 mr-2" })}
+                  <span className="font-medium text-slate-100">{selectedLog.actor_name}</span>
+                  <span className={`ml-2 ${statusPill} ${getStatusAccent(selectedLog.actor_type).pill}`}>
+                    {selectedLog.actor_type.replace('_', ' ').toUpperCase()}
+                  </span>
+                </div>
+                {selectedLog.actor_email && (
+                  <p className={`${monoSm} text-slate-400`}>{selectedLog.actor_email}</p>
+                )}
+              </div>
+            </div>
+
+            {/* Action & Resource */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Actor</label>
-                <div className="bg-gray-50 p-4 rounded-lg">
-                  <div className="flex items-center mb-2">
-                    {React.createElement(actorIcons[selectedLog.actor_type], { className: "h-5 w-5 text-gray-600 mr-2" })}
-                    <span className="font-medium">{selectedLog.actor_name}</span>
-                    <span className={`ml-2 inline-flex px-2 py-1 rounded-full text-xs font-medium ${
-                      selectedLog.actor_type === 'admin' ? 'bg-blue-100 text-blue-800' :
-                      selectedLog.actor_type === 'api_key' ? 'bg-green-100 text-green-800' :
-                      'bg-gray-100 text-gray-800'
-                    }`}>
-                      {selectedLog.actor_type.replace('_', ' ').toUpperCase()}
-                    </span>
-                  </div>
-                  {selectedLog.actor_email && (
-                    <p className="text-sm text-gray-600">{selectedLog.actor_email}</p>
+                <p className={`${sectionLabel} mb-2`}>Action</p>
+                <p className="text-sm bg-cyan-500/12 text-cyan-200 p-3 rounded-lg font-medium">
+                  {formatAction(selectedLog.action)}
+                </p>
+              </div>
+              <div>
+                <p className={`${sectionLabel} mb-2`}>Resource</p>
+                <div className={infoPanel}>
+                  <p className="text-sm font-medium capitalize text-slate-100">{selectedLog.resource_type}</p>
+                  {selectedLog.resource_name && (
+                    <p className="text-sm text-slate-400 mt-1">{selectedLog.resource_name}</p>
+                  )}
+                  {selectedLog.resource_id && (
+                    <p className={`${monoXs} text-slate-500 mt-1`}>{selectedLog.resource_id}</p>
                   )}
                 </div>
               </div>
+            </div>
 
-              {/* Action & Resource */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Action</label>
-                  <p className="text-sm bg-blue-50 text-blue-800 p-3 rounded-lg font-medium">
-                    {formatAction(selectedLog.action)}
-                  </p>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Resource</label>
-                  <div className="bg-gray-50 p-3 rounded-lg">
-                    <p className="text-sm font-medium capitalize">{selectedLog.resource_type}</p>
-                    {selectedLog.resource_name && (
-                      <p className="text-sm text-gray-600 mt-1">{selectedLog.resource_name}</p>
-                    )}
-                    {selectedLog.resource_id && (
-                      <p className="text-xs text-gray-500 font-mono mt-1">{selectedLog.resource_id}</p>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Status & Severity */}
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                  <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${statusColors[selectedLog.status]}`}>
-                    {selectedLog.status === 'success' && <CheckCircle className="h-4 w-4 mr-1" />}
-                    {selectedLog.status === 'failure' && <XCircle className="h-4 w-4 mr-1" />}
-                    {selectedLog.status === 'warning' && <AlertCircle className="h-4 w-4 mr-1" />}
-                    {selectedLog.status.charAt(0).toUpperCase() + selectedLog.status.slice(1)}
-                  </span>
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Severity</label>
-                  <span className={`inline-flex px-3 py-1 rounded-full text-sm font-medium ${severityColors[selectedLog.severity]}`}>
-                    {selectedLog.severity.charAt(0).toUpperCase() + selectedLog.severity.slice(1)}
-                  </span>
-                </div>
-              </div>
-
-              {/* Metadata */}
-              {selectedLog.metadata && Object.keys(selectedLog.metadata).length > 0 && (
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">Metadata</label>
-                  <div className="bg-gray-50 p-4 rounded-lg">
-                    {selectedLog.metadata.ip_address && (
-                      <div className="mb-2">
-                        <span className="text-sm font-medium text-gray-700">IP Address:</span>
-                        <span className="text-sm text-gray-900 ml-2">{selectedLog.metadata.ip_address}</span>
-                      </div>
-                    )}
-                    {selectedLog.metadata.user_agent && (
-                      <div className="mb-2">
-                        <span className="text-sm font-medium text-gray-700">User Agent:</span>
-                        <p className="text-sm text-gray-900 mt-1 font-mono text-xs">{selectedLog.metadata.user_agent}</p>
-                      </div>
-                    )}
-                    {selectedLog.metadata.location && (
-                      <div className="mb-2">
-                        <span className="text-sm font-medium text-gray-700">Location:</span>
-                        <span className="text-sm text-gray-900 ml-2">{selectedLog.metadata.location}</span>
-                      </div>
-                    )}
-                    {selectedLog.metadata.api_key_name && (
-                      <div className="mb-2">
-                        <span className="text-sm font-medium text-gray-700">API Key:</span>
-                        <span className="text-sm text-gray-900 ml-2">{selectedLog.metadata.api_key_name}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Details */}
+            {/* Status & Severity */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">Details</label>
-                <pre className="text-sm bg-gray-900 text-gray-100 p-4 rounded-lg overflow-auto">
-                  {JSON.stringify(selectedLog.details, null, 2)}
-                </pre>
+                <p className={`${sectionLabel} mb-2`}>Status</p>
+                <span className={`${statusPill} ${getStatusAccent(selectedLog.status).pill}`}>
+                  {selectedLog.status.charAt(0).toUpperCase() + selectedLog.status.slice(1)}
+                </span>
+              </div>
+              <div>
+                <p className={`${sectionLabel} mb-2`}>Severity</p>
+                <span className={`${statusPill} ${getStatusAccent(selectedLog.severity).pill}`}>
+                  {selectedLog.severity.charAt(0).toUpperCase() + selectedLog.severity.slice(1)}
+                </span>
               </div>
             </div>
-            
-            <div className="px-6 py-4 border-t bg-gray-50">
-              <button
-                onClick={() => setShowLogModal(false)}
-                className="px-4 py-2 bg-gray-600 text-white rounded-md hover:bg-gray-700"
-              >
-                Close
-              </button>
+
+            {/* Metadata */}
+            {selectedLog.metadata && Object.keys(selectedLog.metadata).length > 0 && (
+              <div>
+                <p className={`${sectionLabel} mb-2`}>Metadata</p>
+                <div className={infoPanel}>
+                  {selectedLog.metadata.ip_address && (
+                    <div className="mb-2">
+                      <span className="text-sm font-medium text-slate-300">IP Address:</span>
+                      <span className={`${monoSm} text-slate-100 ml-2`}>{selectedLog.metadata.ip_address}</span>
+                    </div>
+                  )}
+                  {selectedLog.metadata.user_agent && (
+                    <div className="mb-2">
+                      <span className="text-sm font-medium text-slate-300">User Agent:</span>
+                      <p className={`${monoXs} text-slate-100 mt-1`}>{selectedLog.metadata.user_agent}</p>
+                    </div>
+                  )}
+                  {selectedLog.metadata.location && (
+                    <div className="mb-2">
+                      <span className="text-sm font-medium text-slate-300">Location:</span>
+                      <span className="text-sm text-slate-100 ml-2">{selectedLog.metadata.location}</span>
+                    </div>
+                  )}
+                  {selectedLog.metadata.api_key_name && (
+                    <div className="mb-2">
+                      <span className="text-sm font-medium text-slate-300">API Key:</span>
+                      <span className={`${monoSm} text-slate-100 ml-2`}>{selectedLog.metadata.api_key_name}</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* Details */}
+            <div>
+              <p className={`${sectionLabel} mb-2`}>Details</p>
+              <pre className="text-sm bg-slate-900/60 text-slate-100 p-4 rounded-lg overflow-auto border border-white/10">
+                {JSON.stringify(selectedLog.details, null, 2)}
+              </pre>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
     </div>
   );
 }

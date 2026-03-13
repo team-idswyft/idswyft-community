@@ -1,32 +1,26 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Plus, 
-  Edit, 
-  Trash2, 
-  Globe, 
-  Key, 
-  CheckCircle, 
-  XCircle, 
+import {
+  Plus,
+  Edit,
+  Trash2,
+  Globe,
+  Key,
+  CheckCircle,
+  XCircle,
   AlertTriangle,
   RefreshCw,
   Eye,
   EyeOff,
   Copy,
-  ExternalLink,
   Download,
-  Settings,
-  Activity,
-  Clock,
-  Filter,
   Search,
-  MoreHorizontal,
   Zap,
-  Shield,
-  Code,
-  History
+  Clock
 } from 'lucide-react';
 import { apiClient } from '../services/api';
 import type { Webhook, WebhookDelivery, WebhookFormData } from '../types.js';
+import Modal from '../components/ui/Modal';
+import { sectionLabel, statNumber, monoXs, monoSm, cardSurface, statusPill, tableHeaderClass, infoPanel, getStatusAccent } from '../styles/tokens';
 
 const WEBHOOK_EVENTS = [
   { value: 'verification.started', label: 'Verification Started', description: 'When a new verification session begins' },
@@ -117,12 +111,12 @@ export default function Webhooks() {
 
   const bulkToggleWebhooks = async (enabled: boolean) => {
     if (selectedWebhooks.length === 0) return;
-    
+
     try {
       const promises = selectedWebhooks.map(webhookId =>
         apiClient.updateWebhook(webhookId, { enabled })
       );
-      
+
       await Promise.all(promises);
       setWebhooks(prev =>
         prev.map(w =>
@@ -137,7 +131,7 @@ export default function Webhooks() {
 
   const bulkDeleteWebhooks = async () => {
     if (selectedWebhooks.length === 0) return;
-    
+
     if (!confirm(`Are you sure you want to delete ${selectedWebhooks.length} webhook(s)?`)) {
       return;
     }
@@ -146,7 +140,7 @@ export default function Webhooks() {
       const promises = selectedWebhooks.map(webhookId =>
         apiClient.deleteWebhook(webhookId)
       );
-      
+
       await Promise.all(promises);
       setWebhooks(prev => prev.filter(w => !selectedWebhooks.includes(w.id)));
       setSelectedWebhooks([]);
@@ -157,12 +151,12 @@ export default function Webhooks() {
 
   const testAllWebhooks = async () => {
     if (filteredWebhooks.length === 0) return;
-    
+
     try {
       const promises = filteredWebhooks
         .filter(w => w.enabled)
         .map(w => apiClient.testWebhook(w.id));
-      
+
       await Promise.all(promises);
       alert(`Test requests sent to ${promises.length} active webhook(s)!`);
     } catch (error) {
@@ -180,7 +174,7 @@ export default function Webhooks() {
       last_success_at: webhook.last_success_at,
       failure_count: webhook.failure_count
     }));
-    
+
     const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
@@ -211,8 +205,8 @@ export default function Webhooks() {
   const toggleWebhook = async (webhookId: string, enabled: boolean) => {
     try {
       await apiClient.updateWebhook(webhookId, { enabled });
-      setWebhooks(prev => 
-        prev.map(w => 
+      setWebhooks(prev =>
+        prev.map(w =>
           w.id === webhookId ? { ...w, enabled } : w
         )
       );
@@ -252,16 +246,16 @@ export default function Webhooks() {
     });
   };
 
-  const getStatusIcon = (webhook: Webhook) => {
-    if (!webhook.enabled) {
-      return <XCircle className="w-4 h-4 text-slate-500" />;
-    }
-    
-    if (webhook.failure_count > 0) {
-      return <AlertTriangle className="w-4 h-4 text-yellow-500" />;
-    }
-    
-    return <CheckCircle className="w-4 h-4 text-green-500" />;
+  const getWebhookHealthKey = (webhook: Webhook): string => {
+    if (!webhook.enabled) return 'disabled';
+    if (webhook.failure_count > 0) return 'degraded';
+    return 'healthy';
+  };
+
+  const getWebhookHealthLabel = (webhook: Webhook): string => {
+    if (!webhook.enabled) return 'Disabled';
+    if (webhook.failure_count > 0) return `${webhook.failure_count} failures`;
+    return 'Healthy';
   };
 
   const webhookStats = {
@@ -273,64 +267,43 @@ export default function Webhooks() {
 
   return (
     <div className="p-6 space-y-8">
-      {/* Enhanced Header */}
+      {/* Header */}
       <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start space-y-4 lg:space-y-0">
         <div>
-          <h1 className="text-3xl font-bold text-slate-100">Webhook Management</h1>
-          <p className="text-slate-400 mt-1">Monitor and manage webhook endpoints for real-time event notifications</p>
-          
-          {/* Stats Bar */}
-          <div className="flex items-center space-x-6 mt-4">
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-              <span className="text-sm text-slate-400">Total: {webhookStats.total}</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-              <span className="text-sm text-slate-400">Active: {webhookStats.active}</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-yellow-500 rounded-full"></div>
-              <span className="text-sm text-slate-400">Failing: {webhookStats.failing}</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-slate-500 rounded-full"></div>
-              <span className="text-sm text-slate-400">Disabled: {webhookStats.disabled}</span>
-            </div>
-          </div>
+          <p className={sectionLabel}>Webhook Management</p>
+          <p className="text-slate-400 text-sm mt-1">Monitor and manage webhook endpoints for real-time event notifications</p>
         </div>
-        
+
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
           <button
             onClick={exportWebhookConfig}
-            className="btn btn-secondary"
+            className="border border-white/10 rounded-lg font-mono text-sm px-3 py-2 text-slate-300 hover:bg-slate-800/40 transition-colors inline-flex items-center"
             disabled={webhooks.length === 0}
           >
             <Download className="w-4 h-4 mr-2" />
             Export Config
           </button>
-          
+
           <button
             onClick={() => setShowHealthModal(true)}
-            className="btn btn-secondary"
+            className="border border-white/10 rounded-lg font-mono text-sm px-3 py-2 text-slate-300 hover:bg-slate-800/40 transition-colors inline-flex items-center"
             disabled={webhooks.length === 0}
           >
-            <Activity className="w-4 h-4 mr-2" />
             Health Check
           </button>
-          
+
           <button
             onClick={testAllWebhooks}
-            className="btn btn-secondary"
+            className="border border-white/10 rounded-lg font-mono text-sm px-3 py-2 text-slate-300 hover:bg-slate-800/40 transition-colors inline-flex items-center"
             disabled={filteredWebhooks.filter(w => w.enabled).length === 0}
           >
             <Zap className="w-4 h-4 mr-2" />
             Test All
           </button>
-          
+
           <button
             onClick={() => setShowCreateModal(true)}
-            className="btn btn-primary"
+            className="bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 hover:bg-cyan-500/30 rounded-lg font-mono text-sm px-3 py-2 inline-flex items-center transition-colors"
           >
             <Plus className="w-4 h-4 mr-2" />
             Add Webhook
@@ -338,8 +311,28 @@ export default function Webhooks() {
         </div>
       </div>
 
-      {/* Enhanced Filters and Search */}
-      <div className="content-card-glass">
+      {/* Stat Cards */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className={`${cardSurface} border-l-[3px] border-l-cyan-400 p-5`}>
+          <p className={sectionLabel}>Total Webhooks</p>
+          <p className={statNumber}>{webhookStats.total}</p>
+        </div>
+        <div className={`${cardSurface} border-l-[3px] border-l-emerald-400 p-5`}>
+          <p className={sectionLabel}>Active</p>
+          <p className={statNumber}>{webhookStats.active}</p>
+        </div>
+        <div className={`${cardSurface} border-l-[3px] border-l-amber-400 p-5`}>
+          <p className={sectionLabel}>Failing</p>
+          <p className={statNumber}>{webhookStats.failing}</p>
+        </div>
+        <div className={`${cardSurface} border-l-[3px] border-l-slate-400 p-5`}>
+          <p className={sectionLabel}>Disabled</p>
+          <p className={statNumber}>{webhookStats.disabled}</p>
+        </div>
+      </div>
+
+      {/* Filters and Search */}
+      <div className={cardSurface}>
         <div className="p-4 border-b border-white/10">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
             <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-4">
@@ -351,7 +344,7 @@ export default function Webhooks() {
                   placeholder="Search webhooks..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-white/15 rounded-md focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 w-full sm:w-64"
+                  className="pl-10 pr-4 py-2 border border-white/10 rounded-md focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 w-full sm:w-64 bg-slate-800/50 text-slate-100 placeholder-slate-500"
                 />
               </div>
 
@@ -359,7 +352,7 @@ export default function Webhooks() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="px-3 py-2 border border-white/15 rounded-md focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
+                className="px-3 py-2 border border-white/10 rounded-md focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 bg-slate-800/50 text-slate-100"
               >
                 <option value="all">All Status</option>
                 <option value="active">Active</option>
@@ -367,7 +360,7 @@ export default function Webhooks() {
                 <option value="disabled">Disabled</option>
               </select>
 
-              <div className="text-sm text-slate-500">
+              <div className={`${monoXs} text-slate-500`}>
                 Showing {filteredWebhooks.length} of {webhooks.length} webhooks
               </div>
             </div>
@@ -375,27 +368,27 @@ export default function Webhooks() {
             {/* Bulk Actions */}
             {selectedWebhooks.length > 0 && (
               <div className="flex items-center space-x-2">
-                <span className="text-sm text-slate-400">
+                <span className={`${monoXs} text-slate-400`}>
                   {selectedWebhooks.length} selected
                 </span>
-                
+
                 <button
                   onClick={() => bulkToggleWebhooks(true)}
-                  className="px-3 py-1 text-xs bg-green-100 text-green-700 rounded-md hover:bg-green-200"
+                  className="border border-white/10 rounded-lg font-mono text-sm px-3 py-1 text-emerald-300 hover:bg-slate-800/40 transition-colors"
                 >
                   Enable
                 </button>
-                
+
                 <button
                   onClick={() => bulkToggleWebhooks(false)}
-                  className="px-3 py-1 text-xs bg-yellow-100 text-yellow-700 rounded-md hover:bg-yellow-200"
+                  className="border border-white/10 rounded-lg font-mono text-sm px-3 py-1 text-amber-300 hover:bg-slate-800/40 transition-colors"
                 >
                   Disable
                 </button>
-                
+
                 <button
                   onClick={bulkDeleteWebhooks}
-                  className="px-3 py-1 text-xs bg-red-100 text-red-700 rounded-md hover:bg-red-200"
+                  className="border border-white/10 rounded-lg font-mono text-sm px-3 py-1 text-rose-300 hover:bg-slate-800/40 transition-colors"
                 >
                   Delete
                 </button>
@@ -406,11 +399,19 @@ export default function Webhooks() {
       </div>
 
       {/* Webhook List */}
-      <div className="content-card-glass">
+      <div className={cardSurface}>
         {loading ? (
-          <div className="flex items-center justify-center py-12">
-            <div className="w-6 h-6 border-2 border-primary-600 border-t-transparent rounded-full animate-spin mr-3"></div>
-            Loading webhooks...
+          <div className="p-6 space-y-4">
+            {[...Array(3)].map((_, i) => (
+              <div key={i} className={`${cardSurface} animate-pulse p-5`}>
+                <div className="flex items-center space-x-4">
+                  <div className="h-4 w-48 bg-slate-700/50 rounded"></div>
+                  <div className="h-4 w-24 bg-slate-700/50 rounded"></div>
+                  <div className="h-4 w-16 bg-slate-700/50 rounded"></div>
+                </div>
+                <div className="mt-3 h-3 w-32 bg-slate-700/50 rounded"></div>
+              </div>
+            ))}
           </div>
         ) : filteredWebhooks.length === 0 ? (
           <div className="text-center py-12">
@@ -421,7 +422,7 @@ export default function Webhooks() {
             </p>
             <button
               onClick={() => setShowCreateModal(true)}
-              className="btn btn-primary"
+              className="bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 hover:bg-cyan-500/30 rounded-lg font-mono text-sm px-4 py-2 inline-flex items-center transition-colors"
             >
               <Plus className="w-4 h-4 mr-2" />
               Add Your First Webhook
@@ -429,92 +430,65 @@ export default function Webhooks() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-slate-900/60">
+            <table className="min-w-full divide-y divide-white/10">
+              <thead>
                 <tr>
-                  <th className="px-6 py-3">
+                  <th className={tableHeaderClass}>
                     <input
                       type="checkbox"
                       checked={selectedWebhooks.length === filteredWebhooks.length && filteredWebhooks.length > 0}
                       onChange={(e) => selectAllWebhooks(e.target.checked)}
-                      className="h-4 w-4 text-cyan-300 focus:ring-cyan-500 border-white/15 rounded"
+                      className="h-4 w-4 text-cyan-300 focus:ring-cyan-500 border-white/10 rounded"
                     />
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Webhook URL
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Events
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Status & Health
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Last Activity
-                  </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                    Actions
-                  </th>
+                  <th className={tableHeaderClass}>Webhook URL</th>
+                  <th className={tableHeaderClass}>Events</th>
+                  <th className={tableHeaderClass}>Status & Health</th>
+                  <th className={tableHeaderClass}>Last Activity</th>
+                  <th className={tableHeaderClass}>Actions</th>
                 </tr>
               </thead>
-              <tbody className="bg-slate-900/55 backdrop-blur-sm divide-y divide-white/20">
+              <tbody className="divide-y divide-white/10">
                 {filteredWebhooks.map((webhook) => (
-                  <tr key={webhook.id} className="hover:bg-slate-900/60">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                  <tr key={webhook.id} className="hover:bg-slate-800/40 transition-colors">
+                    <td className="px-5 py-4 whitespace-nowrap">
                       <input
                         type="checkbox"
                         checked={selectedWebhooks.includes(webhook.id)}
                         onChange={() => toggleWebhookSelection(webhook.id)}
-                        className="h-4 w-4 text-cyan-300 focus:ring-cyan-500 border-white/15 rounded"
+                        className="h-4 w-4 text-cyan-300 focus:ring-cyan-500 border-white/10 rounded"
                       />
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <Globe className="w-5 h-5 text-slate-500 mr-3" />
-                        <div>
-                          <div className="text-sm font-medium text-slate-100">
-                            {webhook.url}
-                          </div>
-                          <div className="text-xs text-slate-500">
-                            ID: {webhook.id.substring(0, 8)}...
-                          </div>
-                          <span className="text-xs text-slate-500">
-                            {webhook.max_retries ?? 3} retries · {webhook.retry_backoff_minutes ?? 5} min backoff
-                          </span>
+                    <td className="px-5 py-4 whitespace-nowrap">
+                      <div>
+                        <div className={`${monoSm} text-slate-100`}>
+                          {webhook.url}
                         </div>
+                        <div className={`${monoXs} text-slate-500 mt-0.5`}>
+                          ID: {webhook.id.substring(0, 8)}...
+                        </div>
+                        <span className={`${monoXs} text-slate-500`}>
+                          {webhook.max_retries ?? 3} retries · {webhook.retry_backoff_minutes ?? 5} min backoff
+                        </span>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-slate-100">
+                    <td className="px-5 py-4 whitespace-nowrap">
+                      <div className={`${monoSm} text-slate-100`}>
                         {webhook.events.length} event{webhook.events.length !== 1 ? 's' : ''}
                       </div>
-                      <div className="text-xs text-slate-500">
+                      <div className={`${monoXs} text-slate-500 mt-0.5`}>
                         {webhook.events.slice(0, 2).join(', ')}
                         {webhook.events.length > 2 && ` +${webhook.events.length - 2} more`}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-5 py-4 whitespace-nowrap">
                       <div className="flex flex-col space-y-1">
-                        <div className="flex items-center">
-                          {getStatusIcon(webhook)}
-                          <span className={`ml-2 text-sm font-medium ${
-                            !webhook.enabled 
-                              ? 'text-slate-500' 
-                              : webhook.failure_count > 0 
-                                ? 'text-yellow-600' 
-                                : 'text-green-600'
-                          }`}>
-                            {!webhook.enabled 
-                              ? 'Disabled' 
-                              : webhook.failure_count > 0 
-                                ? `${webhook.failure_count} failures` 
-                                : 'Healthy'
-                            }
-                          </span>
-                        </div>
+                        <span className={`${statusPill} ${getStatusAccent(getWebhookHealthKey(webhook)).pill}`}>
+                          {getWebhookHealthLabel(webhook)}
+                        </span>
                         {webhook.enabled && (
-                          <div className="text-xs text-slate-500">
-                            {webhook.last_success_at 
+                          <div className={`${monoXs} text-slate-500`}>
+                            {webhook.last_success_at
                               ? `Last success: ${formatDate(webhook.last_success_at).split(',')[0]}`
                               : 'Never delivered'
                             }
@@ -522,64 +496,64 @@ export default function Webhooks() {
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
+                    <td className="px-5 py-4 whitespace-nowrap">
                       {webhook.last_success_at ? (
                         <div>
-                          <div>Success: {formatDate(webhook.last_success_at)}</div>
+                          <div className={`${monoXs} text-slate-400`}>Success: {formatDate(webhook.last_success_at)}</div>
                           {webhook.last_failure_at && (
-                            <div className="text-red-500">
+                            <div className={`${monoXs} text-rose-400`}>
                               Failure: {formatDate(webhook.last_failure_at)}
                             </div>
                           )}
                         </div>
                       ) : webhook.last_failure_at ? (
-                        <div className="text-red-500">
+                        <div className={`${monoXs} text-rose-400`}>
                           Failure: {formatDate(webhook.last_failure_at)}
                         </div>
                       ) : (
-                        'No deliveries'
+                        <span className={`${monoXs} text-slate-500`}>No deliveries</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <td className="px-5 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
                         <button
                           onClick={() => viewDeliveries(webhook)}
-                          className="text-primary-600 hover:text-primary-900"
+                          className="text-slate-400 hover:text-cyan-300 transition-colors"
                           title="View deliveries"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
-                        
+
                         <button
                           onClick={() => testWebhook(webhook.id)}
-                          className="text-cyan-300 hover:text-cyan-200"
+                          className="text-slate-400 hover:text-cyan-300 transition-colors"
                           title="Send test"
                         >
                           <RefreshCw className="w-4 h-4" />
                         </button>
-                        
+
                         <button
                           onClick={() => toggleWebhook(webhook.id, !webhook.enabled)}
-                          className={webhook.enabled ? "text-amber-300 hover:text-amber-200" : "text-emerald-300 hover:text-emerald-200"}
+                          className={webhook.enabled ? "text-slate-400 hover:text-amber-300 transition-colors" : "text-slate-400 hover:text-emerald-300 transition-colors"}
                           title={webhook.enabled ? "Disable" : "Enable"}
                         >
                           {webhook.enabled ? <XCircle className="w-4 h-4" /> : <CheckCircle className="w-4 h-4" />}
                         </button>
-                        
+
                         <button
                           onClick={() => {
                             setSelectedWebhook(webhook);
                             setShowCreateModal(true);
                           }}
-                          className="text-slate-400 hover:text-slate-100"
+                          className="text-slate-400 hover:text-slate-100 transition-colors"
                           title="Edit"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
-                        
+
                         <button
                           onClick={() => deleteWebhook(webhook.id)}
-                          className="text-red-600 hover:text-red-900"
+                          className="text-slate-400 hover:text-rose-300 transition-colors"
                           title="Delete"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -709,7 +683,7 @@ function WebhookFormModal({ webhook, onClose, onSuccess }: WebhookFormModalProps
 
     try {
       setLoading(true);
-      
+
       const payload = {
         ...formData,
         secret_key: formData.secret_key || undefined
@@ -743,205 +717,186 @@ function WebhookFormModal({ webhook, onClose, onSuccess }: WebhookFormModalProps
   };
 
   return (
-    <div className="fixed inset-0 z-[120] overflow-y-auto h-full w-full bg-slate-950/70 backdrop-blur-sm">
-      <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-slate-900">
-        <div className="flex justify-between items-start mb-6">
-          <div>
-            <h3 className="text-lg font-semibold text-slate-100">
-              {webhook ? 'Edit Webhook' : 'Add New Webhook'}
-            </h3>
-            <p className="text-sm text-slate-500 mt-1">
-              Configure webhook endpoint to receive real-time notifications
-            </p>
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title={webhook ? 'Edit Webhook' : 'Add New Webhook'}
+      size="lg"
+      closeOnOverlayClick={false}
+    >
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div>
+          <p className={sectionLabel}>Webhook URL *</p>
+          <div className="relative mt-2">
+            <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 w-4 h-4" />
+            <input
+              type="url"
+              className={`form-input pl-10 ${errors.url ? '!border-rose-500 focus:!ring-rose-500/20' : ''}`}
+              placeholder="https://your-domain.com/webhooks"
+              value={formData.url}
+              onChange={(e) => {
+                setFormData(prev => ({ ...prev, url: e.target.value }));
+                if (errors.url) setErrors(prev => ({ ...prev, url: '' }));
+              }}
+            />
           </div>
-          <button
-            onClick={onClose}
-            className="text-slate-500 hover:text-slate-400"
-          >
-            <XCircle className="w-6 h-6" />
-          </button>
+          {errors.url && <p className="mt-1 text-sm text-rose-400">{errors.url}</p>}
+          <p className={`mt-1 ${monoXs} text-slate-500`}>
+            HTTPS URLs are recommended for security
+          </p>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div>
-            <label className="form-label">Webhook URL *</label>
-            <div className="relative">
-              <Globe className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 w-4 h-4" />
-              <input
-                type="url"
-                className={`form-input pl-10 ${errors.url ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : ''}`}
-                placeholder="https://your-domain.com/webhooks"
-                value={formData.url}
-                onChange={(e) => {
-                  setFormData(prev => ({ ...prev, url: e.target.value }));
-                  if (errors.url) setErrors(prev => ({ ...prev, url: '' }));
-                }}
-              />
-            </div>
-            {errors.url && <p className="mt-1 text-sm text-red-600">{errors.url}</p>}
-            <p className="mt-1 text-sm text-slate-500">
-              HTTPS URLs are recommended for security
-            </p>
-          </div>
-
-          <div>
-            <label className="form-label">Secret Key (Optional)</label>
-            <div className="relative">
-              <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 w-4 h-4" />
-              <input
-                type={showSecretKey ? 'text' : 'password'}
-                className="form-input pl-10 pr-20"
-                placeholder="Optional secret key for signing webhooks"
-                value={formData.secret_key}
-                onChange={(e) => setFormData(prev => ({ ...prev, secret_key: e.target.value }))}
-              />
-              <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
-                <button
-                  type="button"
-                  onClick={() => setShowSecretKey(!showSecretKey)}
-                  className="text-slate-500 hover:text-slate-400"
-                >
-                  {showSecretKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-                {formData.secret_key && (
-                  <button
-                    type="button"
-                    onClick={copySecretKey}
-                    className="text-slate-500 hover:text-slate-400"
-                    title="Copy secret key"
-                  >
-                    <Copy className="w-4 h-4" />
-                  </button>
-                )}
-              </div>
-            </div>
-            <div className="flex justify-between items-center mt-1">
-              <p className="text-sm text-slate-500">
-                {webhook?.id
-                  ? 'Leave blank to keep the existing secret. Enter a new value to rotate it.'
-                  : 'Used to verify webhook authenticity (HMAC-SHA256)'}
-              </p>
+        <div>
+          <p className={sectionLabel}>Secret Key (Optional)</p>
+          <div className="relative mt-2">
+            <Key className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 w-4 h-4" />
+            <input
+              type={showSecretKey ? 'text' : 'password'}
+              className="form-input pl-10 pr-20"
+              placeholder="Optional secret key for signing webhooks"
+              value={formData.secret_key}
+              onChange={(e) => setFormData(prev => ({ ...prev, secret_key: e.target.value }))}
+            />
+            <div className="absolute right-3 top-1/2 transform -translate-y-1/2 flex items-center space-x-1">
               <button
                 type="button"
-                onClick={generateSecretKey}
-                className="text-sm text-primary-600 hover:text-primary-700"
+                onClick={() => setShowSecretKey(!showSecretKey)}
+                className="text-slate-500 hover:text-slate-400 transition-colors"
               >
-                Generate Random Key
+                {showSecretKey ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
               </button>
-            </div>
-          </div>
-
-          <div>
-            <label className="form-label">Events to Listen For *</label>
-            {errors.events && <p className="mb-2 text-sm text-red-600">{errors.events}</p>}
-            <div className="space-y-2 max-h-48 overflow-y-auto border border-white/10 rounded-lg p-3">
-              {WEBHOOK_EVENTS.map((event) => (
-                <div key={event.value} className="flex items-start">
-                  <input
-                    type="checkbox"
-                    id={event.value}
-                    checked={formData.events.includes(event.value)}
-                    onChange={() => toggleEvent(event.value)}
-                    className="mt-1 h-4 w-4 text-primary-600 focus:ring-primary-500 border-white/15 rounded"
-                  />
-                  <label htmlFor={event.value} className="ml-3 text-sm cursor-pointer">
-                    <div className="font-medium text-slate-100">{event.label}</div>
-                    <div className="text-slate-500">{event.description}</div>
-                  </label>
-                </div>
-              ))}
-            </div>
-          </div>
-
-          {webhookSecret && formData.url.startsWith('https://') && (
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">
-                Signing Secret
-              </label>
-              <div className="flex items-center gap-2">
-                <input
-                  type="text"
-                  readOnly
-                  value={webhookSecret}
-                  className="flex-1 font-mono text-xs border rounded-lg px-3 py-2 bg-slate-900/60"
-                />
+              {formData.secret_key && (
                 <button
                   type="button"
-                  onClick={() => navigator.clipboard.writeText(webhookSecret)}
-                  className="px-3 py-2 text-sm border rounded-lg hover:bg-slate-900/60"
+                  onClick={copySecretKey}
+                  className="text-slate-500 hover:text-slate-400 transition-colors"
+                  title="Copy secret key"
                 >
-                  Copy
+                  <Copy className="w-4 h-4" />
                 </button>
-              </div>
-              <p className="text-xs text-slate-500 mt-1">
-                Compute <code>HMAC-SHA256(secret, rawBody)</code> and compare to the{' '}
-                <code>X-Webhook-Signature</code> header to verify payloads.
-              </p>
-            </div>
-          )}
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">
-                Max Retries
-              </label>
-              <input
-                type="number"
-                min={0}
-                max={10}
-                value={formData.max_retries ?? 3}
-                onChange={(e) => {
-                  const v = parseInt(e.target.value, 10);
-                  if (!isNaN(v)) setFormData((f) => ({ ...f, max_retries: v }));
-                }}
-                className="w-full border rounded-lg px-3 py-2"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">
-                Retry Backoff (minutes)
-              </label>
-              <input
-                type="number"
-                min={1}
-                max={60}
-                value={formData.retry_backoff_minutes ?? 5}
-                onChange={(e) => {
-                  const v = parseInt(e.target.value, 10);
-                  if (!isNaN(v)) setFormData((f) => ({ ...f, retry_backoff_minutes: v }));
-                }}
-                className="w-full border rounded-lg px-3 py-2"
-              />
+              )}
             </div>
           </div>
-
-          <div className="flex justify-end space-x-4 pt-4 border-t border-white/10">
+          <div className="flex justify-between items-center mt-1">
+            <p className={`${monoXs} text-slate-500`}>
+              {webhook?.id
+                ? 'Leave blank to keep the existing secret. Enter a new value to rotate it.'
+                : 'Used to verify webhook authenticity (HMAC-SHA256)'}
+            </p>
             <button
               type="button"
-              onClick={onClose}
-              className="btn btn-secondary"
-              disabled={loading}
+              onClick={generateSecretKey}
+              className="text-sm text-cyan-300 hover:text-cyan-200 transition-colors"
             >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={loading}
-            >
-              {loading ? (
-                <div className="flex items-center">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                  Saving...
-                </div>
-              ) : (
-                webhook ? 'Update Webhook' : 'Create Webhook'
-              )}
+              Generate Random Key
             </button>
           </div>
-        </form>
-      </div>
-    </div>
+        </div>
+
+        <div>
+          <p className={sectionLabel}>Events to Listen For *</p>
+          {errors.events && <p className="mb-2 text-sm text-rose-400">{errors.events}</p>}
+          <div className="space-y-2 max-h-48 overflow-y-auto border border-white/10 rounded-lg p-3 mt-2">
+            {WEBHOOK_EVENTS.map((event) => (
+              <div key={event.value} className="flex items-start">
+                <input
+                  type="checkbox"
+                  id={event.value}
+                  checked={formData.events.includes(event.value)}
+                  onChange={() => toggleEvent(event.value)}
+                  className="mt-1 h-4 w-4 text-cyan-300 focus:ring-cyan-500 border-white/10 rounded"
+                />
+                <label htmlFor={event.value} className="ml-3 text-sm cursor-pointer">
+                  <div className="font-medium text-slate-100">{event.label}</div>
+                  <div className={`${monoXs} text-slate-500`}>{event.description}</div>
+                </label>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {webhookSecret && formData.url.startsWith('https://') && (
+          <div>
+            <p className={sectionLabel}>Signing Secret</p>
+            <div className="flex items-center gap-2 mt-2">
+              <input
+                type="text"
+                readOnly
+                value={webhookSecret}
+                className={`flex-1 ${monoXs} border border-white/10 rounded-lg px-3 py-2 bg-slate-800/50 text-slate-100`}
+              />
+              <button
+                type="button"
+                onClick={() => navigator.clipboard.writeText(webhookSecret)}
+                className="border border-white/10 rounded-lg font-mono text-sm px-3 py-2 text-slate-300 hover:bg-slate-800/40 transition-colors"
+              >
+                Copy
+              </button>
+            </div>
+            <p className={`${monoXs} text-slate-500 mt-1`}>
+              Compute <code>HMAC-SHA256(secret, rawBody)</code> and compare to the{' '}
+              <code>X-Webhook-Signature</code> header to verify payloads.
+            </p>
+          </div>
+        )}
+
+        <div className="grid grid-cols-2 gap-4">
+          <div>
+            <p className={sectionLabel}>Max Retries</p>
+            <input
+              type="number"
+              min={0}
+              max={10}
+              value={formData.max_retries ?? 3}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                if (!isNaN(v)) setFormData((f) => ({ ...f, max_retries: v }));
+              }}
+              className="form-input mt-2"
+            />
+          </div>
+          <div>
+            <p className={sectionLabel}>Retry Backoff (minutes)</p>
+            <input
+              type="number"
+              min={1}
+              max={60}
+              value={formData.retry_backoff_minutes ?? 5}
+              onChange={(e) => {
+                const v = parseInt(e.target.value, 10);
+                if (!isNaN(v)) setFormData((f) => ({ ...f, retry_backoff_minutes: v }));
+              }}
+              className="form-input mt-2"
+            />
+          </div>
+        </div>
+
+        <div className="flex justify-end space-x-4 pt-4 border-t border-white/10">
+          <button
+            type="button"
+            onClick={onClose}
+            className="border border-white/10 rounded-lg font-mono text-sm px-4 py-2 text-slate-300 hover:bg-slate-800/40 transition-colors"
+            disabled={loading}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 hover:bg-cyan-500/30 rounded-lg font-mono text-sm px-4 py-2 transition-colors"
+            disabled={loading}
+          >
+            {loading ? (
+              <div className="flex items-center">
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                Saving...
+              </div>
+            ) : (
+              webhook ? 'Update Webhook' : 'Create Webhook'
+            )}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
@@ -952,18 +907,12 @@ interface WebhookDeliveriesModalProps {
 }
 
 function WebhookDeliveriesModal({ webhook, deliveries, onClose }: WebhookDeliveriesModalProps) {
-  const getStatusBadge = (status: string) => {
-    const baseClass = "inline-flex items-center px-2 py-1 rounded-full text-xs font-medium";
-    
+  const getDeliveryStatusKey = (status: string): string => {
     switch (status) {
-      case 'delivered':
-        return `${baseClass} bg-green-100 text-green-800`;
-      case 'failed':
-        return `${baseClass} bg-red-100 text-red-800`;
-      case 'retrying':
-        return `${baseClass} bg-yellow-100 text-yellow-800`;
-      default:
-        return `${baseClass} bg-slate-800/70 text-slate-200`;
+      case 'delivered': return 'success';
+      case 'failed': return 'failed';
+      case 'retrying': return 'pending';
+      default: return 'default';
     }
   };
 
@@ -979,99 +928,86 @@ function WebhookDeliveriesModal({ webhook, deliveries, onClose }: WebhookDeliver
   };
 
   return (
-    <div className="fixed inset-0 z-[120] overflow-y-auto h-full w-full bg-slate-950/70 backdrop-blur-sm">
-      <div className="relative top-10 mx-auto p-5 border w-11/12 max-w-5xl shadow-lg rounded-md bg-slate-900">
-        <div className="flex justify-between items-start mb-6">
-          <div>
-            <h3 className="text-lg font-semibold text-slate-100">Webhook Deliveries</h3>
-            <p className="text-sm text-slate-500 mt-1">
-              Recent delivery attempts for {webhook.url}
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-slate-500 hover:text-slate-400"
-          >
-            <XCircle className="w-6 h-6" />
-          </button>
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title="Webhook Deliveries"
+      size="2xl"
+    >
+      <div className="space-y-4">
+        <div className={infoPanel}>
+          <p className={sectionLabel}>Endpoint</p>
+          <p className={`${monoSm} text-slate-100`}>{webhook.url}</p>
         </div>
 
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-slate-900/60">
+          <table className="min-w-full divide-y divide-white/10">
+            <thead>
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Event
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Response
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Attempts
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Timestamp
-                </th>
+                <th className={tableHeaderClass}>Event</th>
+                <th className={tableHeaderClass}>Status</th>
+                <th className={tableHeaderClass}>Response</th>
+                <th className={tableHeaderClass}>Attempts</th>
+                <th className={tableHeaderClass}>Timestamp</th>
               </tr>
             </thead>
-            <tbody className="bg-slate-900 divide-y divide-gray-200">
+            <tbody className="divide-y divide-white/10">
               {deliveries.length === 0 ? (
                 <tr>
-                  <td colSpan={5} className="px-6 py-4 text-center text-slate-500">
+                  <td colSpan={5} className="px-5 py-8 text-center text-slate-500">
                     No deliveries found for this webhook
                   </td>
                 </tr>
               ) : (
                 deliveries.map((delivery) => (
-                  <tr key={delivery.id} className="hover:bg-slate-900/60">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm font-medium text-slate-100">
+                  <tr key={delivery.id} className="hover:bg-slate-800/40 transition-colors">
+                    <td className="px-5 py-4 whitespace-nowrap">
+                      <div className={`${monoSm} text-slate-100`}>
                         {delivery.event_type}
                       </div>
-                      <div className="text-xs text-slate-500">
+                      <div className={`${monoXs} text-slate-500 mt-0.5`}>
                         ID: {delivery.id.substring(0, 8)}...
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={getStatusBadge(delivery.status)}>
+                    <td className="px-5 py-4 whitespace-nowrap">
+                      <span className={`${statusPill} ${getStatusAccent(getDeliveryStatusKey(delivery.status)).pill}`}>
                         {delivery.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-slate-100">
+                    <td className="px-5 py-4 whitespace-nowrap">
+                      <div className={monoSm}>
                         {delivery.http_status_code ? (
                           <span className={
-                            delivery.http_status_code < 300 
-                              ? 'text-green-600' 
-                              : 'text-red-600'
+                            delivery.http_status_code < 300
+                              ? 'text-emerald-300'
+                              : 'text-rose-300'
                           }>
                             {delivery.http_status_code}
                           </span>
                         ) : (
-                          'N/A'
+                          <span className="text-slate-500">N/A</span>
                         )}
                       </div>
                       {delivery.error_message && (
-                        <div className="text-xs text-red-500 truncate max-w-xs">
+                        <div className={`${monoXs} text-rose-400 truncate max-w-xs mt-0.5`}>
                           {delivery.error_message}
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-100">
-                      {delivery.attempts}/{delivery.max_retries}
+                    <td className="px-5 py-4 whitespace-nowrap">
+                      <span className={`${monoSm} text-slate-100`}>
+                        {delivery.attempts}/{delivery.max_retries}
+                      </span>
                       {delivery.next_retry_at && (
-                        <div className="text-xs text-slate-500">
+                        <div className={`${monoXs} text-slate-500 mt-0.5`}>
                           Next: {formatDate(delivery.next_retry_at)}
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                      <div>{formatDate(delivery.created_at)}</div>
+                    <td className="px-5 py-4 whitespace-nowrap">
+                      <div className={`${monoXs} text-slate-400`}>{formatDate(delivery.created_at)}</div>
                       {delivery.delivered_at && (
-                        <div className="text-xs text-green-600">
+                        <div className={`${monoXs} text-emerald-400 mt-0.5`}>
                           Delivered: {formatDate(delivery.delivered_at)}
                         </div>
                       )}
@@ -1083,16 +1019,16 @@ function WebhookDeliveriesModal({ webhook, deliveries, onClose }: WebhookDeliver
           </table>
         </div>
 
-        <div className="flex justify-end mt-6">
+        <div className="flex justify-end pt-4 border-t border-white/10">
           <button
             onClick={onClose}
-            className="btn btn-secondary"
+            className="border border-white/10 rounded-lg font-mono text-sm px-4 py-2 text-slate-300 hover:bg-slate-800/40 transition-colors"
           >
             Close
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -1123,93 +1059,59 @@ function WebhookHealthModal({ webhooks, onClose }: WebhookHealthModalProps) {
   });
 
   return (
-    <div className="fixed inset-0 z-[120] overflow-y-auto h-full w-full bg-slate-950/70 backdrop-blur-sm">
-      <div className="relative top-10 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-slate-900">
-        <div className="flex justify-between items-start mb-6">
-          <div>
-            <h3 className="text-lg font-semibold text-slate-100 flex items-center">
-              <Activity className="h-5 w-5 mr-2 text-green-600" />
-              Webhook Health Dashboard
-            </h3>
-            <p className="text-sm text-slate-500 mt-1">
-              Overview of webhook performance and health status
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-slate-500 hover:text-slate-400"
-          >
-            <XCircle className="w-6 h-6" />
-          </button>
-        </div>
-
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title="Webhook Health Dashboard"
+      size="xl"
+    >
+      <div className="space-y-6">
         {/* Health Overview Cards */}
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-          <div className="bg-cyan-500/10 border border-cyan-500/30 rounded-lg p-4">
-            <div className="flex items-center">
-              <Globe className="h-8 w-8 text-cyan-300" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-cyan-300">Total Webhooks</p>
-                <p className="text-2xl font-bold text-slate-100">{healthStats.total}</p>
-              </div>
-            </div>
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+          <div className={`${cardSurface} border-l-[3px] border-l-cyan-400 p-5`}>
+            <p className={sectionLabel}>Total Webhooks</p>
+            <p className={statNumber}>{healthStats.total}</p>
           </div>
 
-          <div className="bg-emerald-500/10 border border-emerald-500/30 rounded-lg p-4">
-            <div className="flex items-center">
-              <CheckCircle className="h-8 w-8 text-green-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-emerald-300">Healthy</p>
-                <p className="text-2xl font-bold text-slate-100">{healthStats.healthy}</p>
-              </div>
-            </div>
+          <div className={`${cardSurface} border-l-[3px] border-l-emerald-400 p-5`}>
+            <p className={sectionLabel}>Healthy</p>
+            <p className={statNumber}>{healthStats.healthy}</p>
           </div>
 
-          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
-            <div className="flex items-center">
-              <AlertTriangle className="h-8 w-8 text-yellow-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-amber-300">Failing</p>
-                <p className="text-2xl font-bold text-slate-100">{healthStats.failing}</p>
-              </div>
-            </div>
+          <div className={`${cardSurface} border-l-[3px] border-l-amber-400 p-5`}>
+            <p className={sectionLabel}>Failing</p>
+            <p className={statNumber}>{healthStats.failing}</p>
           </div>
 
-          <div className="bg-slate-900/60 border border-white/10 rounded-lg p-4">
-            <div className="flex items-center">
-              <XCircle className="h-8 w-8 text-slate-400" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-slate-400">Disabled</p>
-                <p className="text-2xl font-bold text-slate-100">{healthStats.disabled}</p>
-              </div>
-            </div>
+          <div className={`${cardSurface} border-l-[3px] border-l-slate-400 p-5`}>
+            <p className={sectionLabel}>Disabled</p>
+            <p className={statNumber}>{healthStats.disabled}</p>
           </div>
         </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Critical Issues */}
-          <div className="bg-slate-900 border border-white/10 rounded-lg">
+          <div className={cardSurface}>
             <div className="p-4 border-b border-white/10">
-              <h4 className="text-lg font-semibold text-slate-100 flex items-center">
-                <AlertTriangle className="h-4 w-4 mr-2 text-red-500" />
-                Critical Issues
-              </h4>
+              <p className={sectionLabel}>Critical Issues</p>
             </div>
             <div className="p-4">
               {criticalWebhooks.length === 0 ? (
                 <div className="text-center py-4">
-                  <CheckCircle className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                  <CheckCircle className="h-8 w-8 text-emerald-400 mx-auto mb-2" />
                   <p className="text-sm text-slate-400">No critical issues found</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {criticalWebhooks.map(webhook => (
-                    <div key={webhook.id} className="flex items-center justify-between p-3 bg-rose-500/10 rounded-lg border border-rose-500/20">
-                      <div>
-                        <p className="text-sm font-medium text-slate-100">{webhook.url}</p>
-                        <p className="text-xs text-red-600">{webhook.failure_count} consecutive failures</p>
+                    <div key={webhook.id} className={`${infoPanel} !p-3 border border-rose-500/20`}>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className={`${monoSm} text-slate-100`}>{webhook.url}</p>
+                          <p className={`${monoXs} text-rose-400`}>{webhook.failure_count} consecutive failures</p>
+                        </div>
+                        <AlertTriangle className="h-4 w-4 text-rose-400 flex-shrink-0" />
                       </div>
-                      <AlertTriangle className="h-4 w-4 text-red-500" />
                     </div>
                   ))}
                 </div>
@@ -1218,37 +1120,36 @@ function WebhookHealthModal({ webhooks, onClose }: WebhookHealthModalProps) {
           </div>
 
           {/* Stale Webhooks */}
-          <div className="bg-slate-900 border border-white/10 rounded-lg">
+          <div className={cardSurface}>
             <div className="p-4 border-b border-white/10">
-              <h4 className="text-lg font-semibold text-slate-100 flex items-center">
-                <Clock className="h-4 w-4 mr-2 text-yellow-500" />
-                Stale Webhooks
-              </h4>
+              <p className={sectionLabel}>Stale Webhooks</p>
             </div>
             <div className="p-4">
               {staleWebhooks.length === 0 ? (
                 <div className="text-center py-4">
-                  <Activity className="h-8 w-8 text-green-500 mx-auto mb-2" />
+                  <CheckCircle className="h-8 w-8 text-emerald-400 mx-auto mb-2" />
                   <p className="text-sm text-slate-400">All webhooks have recent activity</p>
                 </div>
               ) : (
                 <div className="space-y-3">
                   {staleWebhooks.slice(0, 5).map(webhook => (
-                    <div key={webhook.id} className="flex items-center justify-between p-3 bg-amber-500/10 rounded-lg border border-amber-500/20">
-                      <div>
-                        <p className="text-sm font-medium text-slate-100">{webhook.url}</p>
-                        <p className="text-xs text-yellow-600">
-                          {!webhook.last_success_at && !webhook.last_failure_at 
-                            ? 'Never received events' 
-                            : 'No activity in 7+ days'
-                          }
-                        </p>
+                    <div key={webhook.id} className={`${infoPanel} !p-3 border border-amber-500/20`}>
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className={`${monoSm} text-slate-100`}>{webhook.url}</p>
+                          <p className={`${monoXs} text-amber-400`}>
+                            {!webhook.last_success_at && !webhook.last_failure_at
+                              ? 'Never received events'
+                              : 'No activity in 7+ days'
+                            }
+                          </p>
+                        </div>
+                        <Clock className="h-4 w-4 text-amber-400 flex-shrink-0" />
                       </div>
-                      <Clock className="h-4 w-4 text-yellow-500" />
                     </div>
                   ))}
                   {staleWebhooks.length > 5 && (
-                    <p className="text-xs text-slate-500 text-center">
+                    <p className={`${monoXs} text-slate-500 text-center`}>
                       +{staleWebhooks.length - 5} more stale webhooks
                     </p>
                   )}
@@ -1259,36 +1160,33 @@ function WebhookHealthModal({ webhooks, onClose }: WebhookHealthModalProps) {
         </div>
 
         {/* Health Recommendations */}
-        <div className="mt-6 bg-cyan-500/10 border border-cyan-500/25 rounded-lg p-4">
-          <h4 className="text-sm font-semibold text-cyan-200 mb-2 flex items-center">
-            <Shield className="h-4 w-4 mr-2" />
-            Health Recommendations
-          </h4>
-          <ul className="text-sm text-cyan-200 space-y-1">
+        <div className={infoPanel}>
+          <p className={sectionLabel}>Health Recommendations</p>
+          <ul className={`${monoXs} text-slate-300 space-y-1`}>
             {criticalWebhooks.length > 0 && (
-              <li>• Review and fix {criticalWebhooks.length} webhook(s) with high failure rates</li>
+              <li>Review and fix {criticalWebhooks.length} webhook(s) with high failure rates</li>
             )}
             {staleWebhooks.length > 0 && (
-              <li>• Consider removing or updating {staleWebhooks.length} inactive webhook(s)</li>
+              <li>Consider removing or updating {staleWebhooks.length} inactive webhook(s)</li>
             )}
             {healthStats.disabled > 0 && (
-              <li>• Review {healthStats.disabled} disabled webhook(s) - enable if still needed</li>
+              <li>Review {healthStats.disabled} disabled webhook(s) - enable if still needed</li>
             )}
             {criticalWebhooks.length === 0 && staleWebhooks.length === 0 && healthStats.disabled === 0 && (
-              <li>• All webhooks are healthy and active! 🎉</li>
+              <li>All webhooks are healthy and active</li>
             )}
           </ul>
         </div>
 
-        <div className="flex justify-end mt-6">
+        <div className="flex justify-end pt-4 border-t border-white/10">
           <button
             onClick={onClose}
-            className="btn btn-primary"
+            className="bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 hover:bg-cyan-500/30 rounded-lg font-mono text-sm px-4 py-2 transition-colors"
           >
             Close
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

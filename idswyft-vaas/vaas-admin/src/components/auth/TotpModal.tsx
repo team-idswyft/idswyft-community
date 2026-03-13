@@ -59,7 +59,7 @@ export function TotpModal({ tempToken, onSuccess, onCancel }: Props) {
     <div className="fixed inset-0 z-[120] flex items-center justify-center bg-slate-950/70 backdrop-blur-sm">
       <div className="bg-[#0f1420] border border-white/10 rounded-xl p-8 w-full max-w-sm shadow-2xl">
         <h2 className="text-xl font-semibold mb-2">Two-Factor Authentication</h2>
-        <p className="text-sm text-gray-500 mb-6">
+        <p className="text-sm text-slate-500 mb-6">
           Enter the 6-digit code from your authenticator app.
         </p>
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -74,20 +74,20 @@ export function TotpModal({ tempToken, onSuccess, onCancel }: Props) {
             autoFocus
           />
           {error && (
-            <p className="text-sm text-red-600">{error}</p>
+            <p className="text-sm text-rose-400">{error}</p>
           )}
           <div className="flex gap-3">
             <button
               type="button"
               onClick={onCancel}
-              className="flex-1 py-2 border rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+              className="flex-1 py-2 border border-white/15 rounded-lg text-slate-400 hover:bg-slate-800/50 transition-colors"
             >
               Cancel
             </button>
             <button
               type="submit"
               disabled={code.length !== 6 || loading || Date.now() < (retryUntil ?? 0)}
-              className="flex-1 py-2 bg-blue-600 text-white rounded-lg disabled:opacity-50 hover:bg-blue-700 transition-colors"
+              className="flex-1 py-2 bg-cyan-600 text-white rounded-lg disabled:opacity-50 hover:bg-cyan-700 transition-colors"
             >
               {loading ? 'Verifying...' : countdown > 0 ? `Wait ${countdown}s` : 'Verify'}
             </button>

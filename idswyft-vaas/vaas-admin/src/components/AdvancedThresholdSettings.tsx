@@ -1,13 +1,14 @@
 /**
  * Advanced Threshold Settings Component
- * 
+ *
  * Enhanced UI for visual threshold management in VaaS admin
  * Connects to the centralized threshold configuration system
  */
 
 import React, { useState, useEffect } from 'react';
-import { Settings, Sliders, Eye, Shield, BarChart3, Info, RefreshCw, AlertTriangle, CheckCircle } from 'lucide-react';
+import { Settings, Eye, Shield, Info, RefreshCw, AlertTriangle, CheckCircle } from 'lucide-react';
 import { apiClient } from '../services/api';
+import { sectionLabel, monoXs, monoSm, cardSurface, infoPanel, getStatusAccent } from '../styles/tokens';
 
 interface ThresholdData {
   production: {
@@ -67,7 +68,7 @@ export default function AdvancedThresholdSettings({ organizationId, canEdit, onT
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
-  
+
   // Form state
   const [autoApproveThreshold, setAutoApproveThreshold] = useState(85);
   const [manualReviewThreshold, setManualReviewThreshold] = useState(60);
@@ -91,10 +92,10 @@ export default function AdvancedThresholdSettings({ organizationId, canEdit, onT
     try {
       setIsLoading(true);
       setError(null);
-      
+
       const response = await apiClient.get('/admin/thresholds');
       setThresholds(response.data.data);
-      
+
       // Initialize form with current values (would come from organization settings)
       // For now, using example values
       setAutoApproveThreshold(85);
@@ -102,7 +103,7 @@ export default function AdvancedThresholdSettings({ organizationId, canEdit, onT
       setRequireLiveness(true);
       setRequireBackOfId(false);
       setMaxAttempts(3);
-      
+
     } catch (err: any) {
       setError(err.message || 'Failed to load threshold settings');
     } finally {
@@ -142,10 +143,10 @@ export default function AdvancedThresholdSettings({ organizationId, canEdit, onT
       setSuccess('Threshold settings updated successfully');
       await loadThresholds();
       onThresholdsUpdated?.();
-      
+
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000);
-      
+
     } catch (err: any) {
       setError(err.message || 'Failed to update threshold settings');
     } finally {
@@ -156,12 +157,12 @@ export default function AdvancedThresholdSettings({ organizationId, canEdit, onT
   const handleReset = async () => {
     try {
       setIsSaving(true);
-      
+
       await apiClient.post('/admin/thresholds/reset');
-      
+
       setSuccess('Thresholds reset to defaults');
       await loadThresholds();
-      
+
     } catch (err: any) {
       setError(err.message || 'Failed to reset thresholds');
     } finally {
@@ -171,12 +172,12 @@ export default function AdvancedThresholdSettings({ organizationId, canEdit, onT
 
   if (isLoading) {
     return (
-      <div className="bg-white shadow rounded-lg p-6">
+      <div className={`${cardSurface} p-6`}>
         <div className="animate-pulse">
-          <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
+          <div className="h-4 bg-slate-700/50 rounded w-3/4 mb-4"></div>
           <div className="space-y-3">
-            <div className="h-4 bg-gray-200 rounded"></div>
-            <div className="h-4 bg-gray-200 rounded w-5/6"></div>
+            <div className="h-4 bg-slate-700/50 rounded"></div>
+            <div className="h-4 bg-slate-700/50 rounded w-5/6"></div>
           </div>
         </div>
       </div>
@@ -186,27 +187,24 @@ export default function AdvancedThresholdSettings({ organizationId, canEdit, onT
   return (
     <div className="space-y-6">
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-4 flex items-center space-x-2">
-          <AlertTriangle className="h-5 w-5 text-red-400 flex-shrink-0" />
-          <span className="text-red-700">{error}</span>
+        <div className="bg-rose-500/10 border border-rose-400/30 rounded-lg p-4 flex items-center space-x-2">
+          <AlertTriangle className="h-5 w-5 text-rose-400 flex-shrink-0" />
+          <span className={`${monoSm} text-rose-300`}>{error}</span>
         </div>
       )}
 
       {success && (
-        <div className="bg-green-50 border border-green-200 rounded-md p-4 flex items-center space-x-2">
-          <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
-          <span className="text-green-700">{success}</span>
+        <div className="bg-emerald-500/10 border border-emerald-400/30 rounded-lg p-4 flex items-center space-x-2">
+          <CheckCircle className="h-5 w-5 text-emerald-400 flex-shrink-0" />
+          <span className={`${monoSm} text-emerald-300`}>{success}</span>
         </div>
       )}
 
       {/* High-Level Threshold Controls */}
-      <div className="bg-white shadow rounded-lg">
-        <div className="px-6 py-4 border-b border-gray-200">
-          <h3 className="text-lg font-medium text-gray-900 flex items-center">
-            <Sliders className="h-5 w-5 mr-2 text-blue-600" />
-            Verification Confidence Thresholds
-          </h3>
-          <p className="text-sm text-gray-500 mt-1">
+      <div className={cardSurface}>
+        <div className="px-6 py-4 border-b border-white/10">
+          <p className={sectionLabel}>Verification Confidence Thresholds</p>
+          <p className={`${monoXs} text-slate-500 mt-1`}>
             Configure the overall confidence levels for automatic decisions
           </p>
         </div>
@@ -215,10 +213,10 @@ export default function AdvancedThresholdSettings({ organizationId, canEdit, onT
           {/* Auto-Approve Threshold */}
           <div>
             <div className="flex justify-between items-center mb-2">
-              <label className="text-sm font-medium text-gray-700">
+              <label className={`${sectionLabel} block`}>
                 Auto-Approve Threshold
               </label>
-              <span className="text-lg font-semibold text-green-600">
+              <span className={`${monoSm} text-emerald-300`}>
                 {autoApproveThreshold}%
               </span>
             </div>
@@ -230,13 +228,13 @@ export default function AdvancedThresholdSettings({ organizationId, canEdit, onT
               value={autoApproveThreshold}
               onChange={(e) => setAutoApproveThreshold(Number(e.target.value))}
               disabled={!canEdit}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider-green"
+              className="w-full h-2 bg-slate-700/50 rounded-lg appearance-none cursor-pointer border border-white/10 slider-green"
             />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
-              <span>70% (Lenient)</span>
-              <span>95% (Strict)</span>
+            <div className="flex justify-between mt-1">
+              <span className={`${monoXs} text-slate-500`}>70% (Lenient)</span>
+              <span className={`${monoXs} text-slate-500`}>95% (Strict)</span>
             </div>
-            <p className="text-xs text-gray-600 mt-1">
+            <p className={`${monoXs} text-slate-500 mt-1`}>
               Verifications above this confidence are automatically approved
             </p>
           </div>
@@ -244,10 +242,10 @@ export default function AdvancedThresholdSettings({ organizationId, canEdit, onT
           {/* Manual Review Threshold */}
           <div>
             <div className="flex justify-between items-center mb-2">
-              <label className="text-sm font-medium text-gray-700">
+              <label className={`${sectionLabel} block`}>
                 Manual Review Threshold
               </label>
-              <span className="text-lg font-semibold text-yellow-600">
+              <span className={`${monoSm} text-amber-300`}>
                 {manualReviewThreshold}%
               </span>
             </div>
@@ -259,23 +257,23 @@ export default function AdvancedThresholdSettings({ organizationId, canEdit, onT
               value={manualReviewThreshold}
               onChange={(e) => setManualReviewThreshold(Number(e.target.value))}
               disabled={!canEdit}
-              className="w-full h-2 bg-gray-200 rounded-lg appearance-none cursor-pointer slider-yellow"
+              className="w-full h-2 bg-slate-700/50 rounded-lg appearance-none cursor-pointer border border-white/10 slider-yellow"
             />
-            <div className="flex justify-between text-xs text-gray-500 mt-1">
-              <span>30% (Fewer Reviews)</span>
-              <span>80% (More Reviews)</span>
+            <div className="flex justify-between mt-1">
+              <span className={`${monoXs} text-slate-500`}>30% (Fewer Reviews)</span>
+              <span className={`${monoXs} text-slate-500`}>80% (More Reviews)</span>
             </div>
-            <p className="text-xs text-gray-600 mt-1">
+            <p className={`${monoXs} text-slate-500 mt-1`}>
               Verifications above this confidence require manual admin review
             </p>
           </div>
 
           {/* Settings Toggles */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-gray-200">
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-4 border-t border-white/10">
             <div className="flex items-center justify-between">
               <div>
-                <label className="text-sm font-medium text-gray-900">Liveness Detection</label>
-                <p className="text-xs text-gray-500">Require real-time selfie verification</p>
+                <label className={`${sectionLabel} block`}>Liveness Detection</label>
+                <p className={`${monoXs} text-slate-500`}>Require real-time selfie verification</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input
@@ -285,14 +283,14 @@ export default function AdvancedThresholdSettings({ organizationId, canEdit, onT
                   disabled={!canEdit}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                <div className="w-11 h-6 bg-slate-700/50 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-cyan-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-500 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500"></div>
               </label>
             </div>
 
             <div className="flex items-center justify-between">
               <div>
-                <label className="text-sm font-medium text-gray-900">Back of ID Required</label>
-                <p className="text-xs text-gray-500">Require both sides of documents</p>
+                <label className={`${sectionLabel} block`}>Back of ID Required</label>
+                <p className={`${monoXs} text-slate-500`}>Require both sides of documents</p>
               </div>
               <label className="relative inline-flex items-center cursor-pointer">
                 <input
@@ -302,14 +300,14 @@ export default function AdvancedThresholdSettings({ organizationId, canEdit, onT
                   disabled={!canEdit}
                   className="sr-only peer"
                 />
-                <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+                <div className="w-11 h-6 bg-slate-700/50 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-cyan-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-500 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500"></div>
               </label>
             </div>
           </div>
 
           {/* Max Attempts */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className={`${sectionLabel} block mb-2`}>
               Maximum Verification Attempts
             </label>
             <input
@@ -319,9 +317,9 @@ export default function AdvancedThresholdSettings({ organizationId, canEdit, onT
               value={maxAttempts}
               onChange={(e) => setMaxAttempts(Number(e.target.value))}
               disabled={!canEdit}
-              className="w-32 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50"
+              className="w-32 px-3 py-2 bg-slate-900/60 border border-white/10 rounded-lg font-mono text-sm text-slate-100 focus:outline-none focus:ring-cyan-500 focus:border-cyan-500 disabled:bg-slate-900/40"
             />
-            <p className="text-xs text-gray-500 mt-1">
+            <p className={`${monoXs} text-slate-500 mt-1`}>
               How many times users can retry failed verifications
             </p>
           </div>
@@ -330,36 +328,36 @@ export default function AdvancedThresholdSettings({ organizationId, canEdit, onT
 
       {/* Preview Section */}
       {preview && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6">
-          <h4 className="text-md font-medium text-blue-900 flex items-center mb-4">
-            <Eye className="h-5 w-5 mr-2" />
-            Impact Preview
-          </h4>
-          
-          <div className="space-y-3 text-sm">
+        <div className={`${cardSurface} p-6`}>
+          <div className="flex items-center mb-4">
+            <Eye className="h-4 w-4 mr-2 text-cyan-400" />
+            <p className={sectionLabel}>Impact Preview</p>
+          </div>
+
+          <div className="space-y-3">
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <h5 className="font-medium text-blue-800 mb-2">Production Environment</h5>
-                <ul className="space-y-1 text-blue-700">
-                  <li>• Face matching: {(preview.preview.production.face_matching * 100).toFixed(0)}% required</li>
-                  <li>• Liveness detection: {(preview.preview.production.liveness * 100).toFixed(0)}% required</li>
+              <div className={infoPanel}>
+                <p className={`${sectionLabel} mb-2`}>Production Environment</p>
+                <ul className="space-y-1">
+                  <li className={`${monoXs} text-slate-400`}>Face matching: <span className={`${monoSm} text-slate-200`}>{(preview.preview.production.face_matching * 100).toFixed(0)}%</span> required</li>
+                  <li className={`${monoXs} text-slate-400`}>Liveness detection: <span className={`${monoSm} text-slate-200`}>{(preview.preview.production.liveness * 100).toFixed(0)}%</span> required</li>
                 </ul>
               </div>
-              <div>
-                <h5 className="font-medium text-blue-800 mb-2">Sandbox Environment</h5>
-                <ul className="space-y-1 text-blue-700">
-                  <li>• Face matching: {(preview.preview.sandbox.face_matching * 100).toFixed(0)}% required</li>
-                  <li>• Liveness detection: {(preview.preview.sandbox.liveness * 100).toFixed(0)}% required</li>
+              <div className={infoPanel}>
+                <p className={`${sectionLabel} mb-2`}>Sandbox Environment</p>
+                <ul className="space-y-1">
+                  <li className={`${monoXs} text-slate-400`}>Face matching: <span className={`${monoSm} text-slate-200`}>{(preview.preview.sandbox.face_matching * 100).toFixed(0)}%</span> required</li>
+                  <li className={`${monoXs} text-slate-400`}>Liveness detection: <span className={`${monoSm} text-slate-200`}>{(preview.preview.sandbox.liveness * 100).toFixed(0)}%</span> required</li>
                 </ul>
               </div>
             </div>
-            
-            <div className="border-t border-blue-300 pt-3 mt-4">
-              <h5 className="font-medium text-blue-800 mb-2">Verification Behavior</h5>
-              <ul className="space-y-1 text-blue-700">
-                <li>• {preview.explanation.auto_approve_threshold}</li>
-                <li>• {preview.explanation.manual_review_threshold}</li>
-                <li>• {preview.explanation.liveness_detection}</li>
+
+            <div className="border-t border-white/10 pt-3 mt-4">
+              <p className={`${sectionLabel} mb-2`}>Verification Behavior</p>
+              <ul className="space-y-1">
+                <li className={`${monoXs} text-slate-400`}>{preview.explanation.auto_approve_threshold}</li>
+                <li className={`${monoXs} text-slate-400`}>{preview.explanation.manual_review_threshold}</li>
+                <li className={`${monoXs} text-slate-400`}>{preview.explanation.liveness_detection}</li>
               </ul>
             </div>
           </div>
@@ -368,68 +366,65 @@ export default function AdvancedThresholdSettings({ organizationId, canEdit, onT
 
       {/* Current Technical Thresholds Display */}
       {thresholds && showAdvanced && (
-        <div className="bg-gray-50 border border-gray-200 rounded-lg">
-          <div className="px-6 py-4 border-b border-gray-200">
-            <h4 className="text-md font-medium text-gray-900 flex items-center">
-              <BarChart3 className="h-5 w-5 mr-2 text-gray-600" />
-              Technical Threshold Details
-            </h4>
+        <div className={cardSurface}>
+          <div className="px-6 py-4 border-b border-white/10">
+            <p className={sectionLabel}>Technical Threshold Details</p>
           </div>
-          
+
           <div className="p-6">
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div>
-                <h5 className="font-medium text-gray-800 mb-3">Production Environment</h5>
-                <div className="space-y-2 text-sm">
+              <div className={infoPanel}>
+                <p className={`${sectionLabel} mb-3`}>Production Environment</p>
+                <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Photo Consistency:</span>
-                    <span className="font-mono">{(thresholds.production.photo_consistency * 100).toFixed(0)}%</span>
+                    <span className={`${monoXs} text-slate-500`}>Photo Consistency:</span>
+                    <span className={`${monoSm} text-slate-200`}>{(thresholds.production.photo_consistency * 100).toFixed(0)}%</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Face Matching:</span>
-                    <span className="font-mono">{(thresholds.production.face_matching * 100).toFixed(0)}%</span>
+                    <span className={`${monoXs} text-slate-500`}>Face Matching:</span>
+                    <span className={`${monoSm} text-slate-200`}>{(thresholds.production.face_matching * 100).toFixed(0)}%</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Liveness Detection:</span>
-                    <span className="font-mono">{(thresholds.production.liveness * 100).toFixed(0)}%</span>
+                    <span className={`${monoXs} text-slate-500`}>Liveness Detection:</span>
+                    <span className={`${monoSm} text-slate-200`}>{(thresholds.production.liveness * 100).toFixed(0)}%</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Cross Validation:</span>
-                    <span className="font-mono">{(thresholds.production.cross_validation * 100).toFixed(0)}%</span>
+                    <span className={`${monoXs} text-slate-500`}>Cross Validation:</span>
+                    <span className={`${monoSm} text-slate-200`}>{(thresholds.production.cross_validation * 100).toFixed(0)}%</span>
                   </div>
                 </div>
               </div>
-              
-              <div>
-                <h5 className="font-medium text-gray-800 mb-3">Sandbox Environment</h5>
-                <div className="space-y-2 text-sm">
+
+              <div className={infoPanel}>
+                <p className={`${sectionLabel} mb-3`}>Sandbox Environment</p>
+                <div className="space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Photo Consistency:</span>
-                    <span className="font-mono">{(thresholds.sandbox.photo_consistency * 100).toFixed(0)}%</span>
+                    <span className={`${monoXs} text-slate-500`}>Photo Consistency:</span>
+                    <span className={`${monoSm} text-slate-200`}>{(thresholds.sandbox.photo_consistency * 100).toFixed(0)}%</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Face Matching:</span>
-                    <span className="font-mono">{(thresholds.sandbox.face_matching * 100).toFixed(0)}%</span>
+                    <span className={`${monoXs} text-slate-500`}>Face Matching:</span>
+                    <span className={`${monoSm} text-slate-200`}>{(thresholds.sandbox.face_matching * 100).toFixed(0)}%</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Liveness Detection:</span>
-                    <span className="font-mono">{(thresholds.sandbox.liveness * 100).toFixed(0)}%</span>
+                    <span className={`${monoXs} text-slate-500`}>Liveness Detection:</span>
+                    <span className={`${monoSm} text-slate-200`}>{(thresholds.sandbox.liveness * 100).toFixed(0)}%</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-600">Cross Validation:</span>
-                    <span className="font-mono">{(thresholds.sandbox.cross_validation * 100).toFixed(0)}%</span>
+                    <span className={`${monoXs} text-slate-500`}>Cross Validation:</span>
+                    <span className={`${monoSm} text-slate-200`}>{(thresholds.sandbox.cross_validation * 100).toFixed(0)}%</span>
                   </div>
                 </div>
               </div>
             </div>
-            
-            <div className="mt-4 p-3 bg-yellow-50 border border-yellow-200 rounded-md">
+
+            <div className={`${infoPanel} mt-4`}>
               <div className="flex">
-                <Info className="h-5 w-5 text-yellow-400 flex-shrink-0" />
+                <Info className="h-4 w-4 text-amber-400 flex-shrink-0 mt-0.5" />
                 <div className="ml-3">
-                  <h6 className="text-sm font-medium text-yellow-800">About Technical Thresholds</h6>
-                  <p className="text-sm text-yellow-700 mt-1">
-                    These technical thresholds are automatically calculated based on your high-level settings above. 
+                  <p className={`${sectionLabel} text-amber-400`}>About Technical Thresholds</p>
+                  <p className={`${monoXs} text-slate-500 mt-1`}>
+                    These technical thresholds are automatically calculated based on your high-level settings above.
                     They control the specific AI model confidence levels for each verification step.
                   </p>
                 </div>
@@ -443,26 +438,26 @@ export default function AdvancedThresholdSettings({ organizationId, canEdit, onT
       <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center space-y-3 sm:space-y-0">
         <button
           onClick={() => setShowAdvanced(!showAdvanced)}
-          className="inline-flex items-center text-sm text-gray-600 hover:text-gray-800"
+          className={`inline-flex items-center ${monoXs} text-slate-500 hover:text-slate-300 transition-colors`}
         >
           <Settings className="h-4 w-4 mr-1" />
           {showAdvanced ? 'Hide' : 'Show'} Technical Details
         </button>
-        
+
         <div className="flex space-x-3">
           <button
             onClick={handleReset}
             disabled={!canEdit || isSaving}
-            className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+            className="inline-flex items-center px-4 py-2 border border-white/10 rounded-lg font-mono text-sm text-slate-300 hover:bg-slate-800/40 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500 disabled:opacity-50"
           >
             <RefreshCw className="h-4 w-4 mr-2" />
             Reset to Defaults
           </button>
-          
+
           <button
             onClick={handleSave}
             disabled={!canEdit || isSaving}
-            className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+            className="inline-flex items-center px-4 py-2 bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 hover:bg-cyan-500/30 font-mono text-sm rounded-lg transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-500 disabled:opacity-50"
           >
             <Shield className="h-4 w-4 mr-2" />
             {isSaving ? 'Saving...' : 'Save Threshold Settings'}

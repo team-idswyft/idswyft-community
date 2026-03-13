@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { sectionLabel, monoXs, cardSurface } from '../styles/tokens';
 
 interface AssetUploadProps {
   label: string;
@@ -39,9 +40,9 @@ export function AssetUpload({ label, currentUrl, onUpload, disabled }: AssetUplo
   };
 
   return (
-    <div className="border border-gray-200 rounded-lg p-4 flex flex-col gap-3">
+    <div className={`${cardSurface} p-4 flex flex-col gap-3`}>
       {/* Preview */}
-      <div className="w-full h-24 bg-gray-50 rounded flex items-center justify-center overflow-hidden">
+      <div className="w-full h-24 bg-slate-900/40 border border-white/10 rounded-lg flex items-center justify-center overflow-hidden">
         {currentUrl ? (
           <img
             src={currentUrl}
@@ -49,28 +50,28 @@ export function AssetUpload({ label, currentUrl, onUpload, disabled }: AssetUplo
             className="max-h-full max-w-full object-contain"
           />
         ) : (
-          <span className="text-gray-400 text-sm">No image set</span>
+          <span className={`${monoXs} text-slate-500`}>No image set</span>
         )}
       </div>
 
       {/* Label + upload button */}
       <div className="flex items-center justify-between">
-        <span className="text-sm font-medium text-gray-700">{label}</span>
+        <span className={sectionLabel}>{label}</span>
         <button
           type="button"
           onClick={() => inputRef.current?.click()}
           disabled={disabled || uploading}
-          className="text-sm px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
+          className="bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 hover:bg-cyan-500/30 font-mono text-sm rounded-lg transition-colors px-3 py-1.5 disabled:opacity-50 disabled:cursor-not-allowed"
         >
-          {uploading ? 'Uploading…' : 'Upload'}
+          {uploading ? 'Uploading\u2026' : 'Upload'}
         </button>
       </div>
 
       {/* Format hint */}
-      <p className="text-xs text-gray-400">PNG, JPG, WebP · Max 2MB</p>
+      <p className={`${monoXs} text-slate-500`}>PNG, JPG, WebP &middot; Max 2MB</p>
 
       {/* Error */}
-      {error && <p className="text-xs text-red-600">{error}</p>}
+      {error && <p className={`${monoXs} text-red-400`}>{error}</p>}
 
       <input
         ref={inputRef}

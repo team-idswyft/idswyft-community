@@ -1,7 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Admin, AdminPermissions } from '../../types.js';
-import { Users, UserPlus, MoreVertical, Edit, Trash2, Shield, Eye, EyeOff } from 'lucide-react';
+import { sectionLabel, monoXs, monoSm, cardSurface, statusPill, tableHeaderClass, infoPanel, getStatusAccent } from '../../styles/tokens';
+import Modal from '../ui/Modal';
+import { UserPlus, MoreVertical, Edit, Trash2, Shield, Eye, EyeOff } from 'lucide-react';
+
+/** Role → accent mapping (matches statusAccent convention) */
+const roleAccent: Record<string, { pill: string }> = {
+  owner:    { pill: 'bg-purple-500/15 text-purple-300 border-purple-500/30' },
+  admin:    { pill: 'bg-cyan-500/15 text-cyan-300 border-cyan-500/30' },
+  operator: { pill: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
+  viewer:   { pill: 'bg-slate-500/15 text-slate-300 border-slate-500/30' },
+};
+
+function getRoleAccent(role: string) {
+  return roleAccent[role?.toLowerCase()] || roleAccent.viewer;
+}
 
 interface AdminManagementProps {
   organizationId: string;
@@ -24,7 +38,7 @@ export default function AdminManagement({ organizationId, canManageAdmins }: Adm
       // TODO: Implement API call to fetch organization admins
       // const response = await apiClient.getOrganizationAdmins(organizationId);
       // setAdmins(response);
-      
+
       // Mock data for now
       const mockAdmins: Admin[] = [
         {
@@ -67,34 +81,15 @@ export default function AdminManagement({ organizationId, canManageAdmins }: Adm
     }
   };
 
-  const getRoleBadgeColor = (role: Admin['role']) => {
-    switch (role) {
-      case 'owner': return 'bg-purple-100 text-purple-800';
-      case 'admin': return 'bg-blue-100 text-blue-800';
-      case 'operator': return 'bg-green-100 text-green-800';
-      case 'viewer': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusBadgeColor = (status: Admin['status']) => {
-    switch (status) {
-      case 'active': return 'bg-green-100 text-green-800';
-      case 'inactive': return 'bg-gray-100 text-gray-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   if (isLoading) {
     return (
-      <div className="bg-white shadow rounded-lg p-6">
+      <div className={`${cardSurface} p-6`}>
         <div className="animate-pulse">
-          <div className="h-4 bg-gray-300 rounded w-1/4 mb-4"></div>
+          <div className="h-4 bg-slate-700/50 rounded w-1/4 mb-4"></div>
           <div className="space-y-3">
-            <div className="h-4 bg-gray-300 rounded"></div>
-            <div className="h-4 bg-gray-300 rounded w-5/6"></div>
-            <div className="h-4 bg-gray-300 rounded w-4/6"></div>
+            <div className="h-4 bg-slate-700/50 rounded"></div>
+            <div className="h-4 bg-slate-700/50 rounded w-5/6"></div>
+            <div className="h-4 bg-slate-700/50 rounded w-4/6"></div>
           </div>
         </div>
       </div>
@@ -102,50 +97,35 @@ export default function AdminManagement({ organizationId, canManageAdmins }: Adm
   }
 
   return (
-    <div className="bg-white shadow rounded-lg">
-      <div className="px-6 py-4 border-b border-gray-200 flex items-center justify-between">
-        <div className="flex items-center">
-          <Users className="h-5 w-5 text-gray-400 mr-2" />
-          <h3 className="text-lg font-medium text-gray-900">Admin Users</h3>
-        </div>
+    <div className={cardSurface}>
+      <div className="px-6 py-4 border-b border-white/10 flex items-center justify-between">
+        <p className={sectionLabel}>Admin Users</p>
         {canManageAdmins && (
           <button
             onClick={() => setShowInviteForm(true)}
-            className="inline-flex items-center px-3 py-2 border border-transparent text-sm leading-4 font-medium rounded-md text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
+            className="inline-flex items-center px-3 py-2 bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 hover:bg-cyan-500/30 font-mono text-sm rounded-lg transition-colors"
           >
             <UserPlus className="h-4 w-4 mr-1" />
             Invite Admin
           </button>
         )}
       </div>
-      
+
       <div className="overflow-hidden">
-        <table className="min-w-full divide-y divide-gray-200">
-          <thead className="bg-gray-50">
+        <table className="min-w-full divide-y divide-white/10">
+          <thead className="bg-slate-900/40">
             <tr>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Admin
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Role
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Status
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Last Login
-              </th>
-              <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
-                Permissions
-              </th>
+              <th className={tableHeaderClass}>Admin</th>
+              <th className={tableHeaderClass}>Role</th>
+              <th className={tableHeaderClass}>Status</th>
+              <th className={tableHeaderClass}>Last Login</th>
+              <th className={tableHeaderClass}>Permissions</th>
               {canManageAdmins && (
-                <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">
-                  Actions
-                </th>
+                <th className={`${tableHeaderClass} text-right`}>Actions</th>
               )}
             </tr>
           </thead>
-          <tbody className="bg-white divide-y divide-gray-200">
+          <tbody className="bg-slate-900/40 divide-y divide-white/10">
             {admins.map((admin) => (
               <AdminRow
                 key={admin.id}
@@ -160,16 +140,15 @@ export default function AdminManagement({ organizationId, canManageAdmins }: Adm
         </table>
       </div>
 
-      {showInviteForm && (
-        <InviteAdminModal
-          onClose={() => setShowInviteForm(false)}
-          onInvite={(inviteData) => {
-            // TODO: Implement invite functionality
-            console.log('Inviting admin:', inviteData);
-            setShowInviteForm(false);
-          }}
-        />
-      )}
+      <InviteAdminModal
+        isOpen={showInviteForm}
+        onClose={() => setShowInviteForm(false)}
+        onInvite={(inviteData) => {
+          // TODO: Implement invite functionality
+          console.log('Inviting admin:', inviteData);
+          setShowInviteForm(false);
+        }}
+      />
     </div>
   );
 }
@@ -186,80 +165,63 @@ function AdminRow({ admin, currentAdminId, canManage, onEdit, onDelete }: AdminR
   const [showDropdown, setShowDropdown] = useState(false);
   const [showPermissions, setShowPermissions] = useState(false);
 
-  const getRoleBadgeColor = (role: Admin['role']) => {
-    switch (role) {
-      case 'owner': return 'bg-purple-100 text-purple-800';
-      case 'admin': return 'bg-blue-100 text-blue-800';
-      case 'operator': return 'bg-green-100 text-green-800';
-      case 'viewer': return 'bg-gray-100 text-gray-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
-  const getStatusBadgeColor = (status: Admin['status']) => {
-    switch (status) {
-      case 'active': return 'bg-green-100 text-green-800';
-      case 'inactive': return 'bg-gray-100 text-gray-800';
-      case 'pending': return 'bg-yellow-100 text-yellow-800';
-      default: return 'bg-gray-100 text-gray-800';
-    }
-  };
-
   const countPermissions = (permissions: AdminPermissions) => {
     return Object.values(permissions).filter(Boolean).length;
   };
 
   return (
-    <tr>
-      <td className="px-6 py-4 whitespace-nowrap">
+    <tr className="hover:bg-slate-800/40 transition-colors">
+      <td className="px-5 py-4 whitespace-nowrap">
         <div className="flex items-center">
           <div className="flex-shrink-0 h-10 w-10">
-            <div className="h-10 w-10 rounded-full bg-gray-300 flex items-center justify-center">
-              <span className="text-sm font-medium text-gray-700">
+            <div className="h-10 w-10 rounded-full bg-slate-700/50 flex items-center justify-center">
+              <span className={`${monoXs} font-medium text-slate-300`}>
                 {admin.first_name?.[0]}{admin.last_name?.[0]}
               </span>
             </div>
           </div>
           <div className="ml-4">
-            <div className="text-sm font-medium text-gray-900">
+            <div className="text-sm font-medium text-slate-100">
               {admin.first_name} {admin.last_name}
               {admin.id === currentAdminId && (
-                <span className="ml-2 text-xs text-gray-500">(You)</span>
+                <span className={`ml-2 ${monoXs} text-slate-500`}>(You)</span>
               )}
             </div>
-            <div className="text-sm text-gray-500">{admin.email}</div>
+            <div className={`${monoSm} text-slate-500`}>{admin.email}</div>
             {!admin.email_verified && (
-              <div className="text-xs text-red-500">Email not verified</div>
+              <div className={`${monoXs} text-rose-400`}>Email not verified</div>
             )}
           </div>
         </div>
       </td>
-      <td className="px-6 py-4 whitespace-nowrap">
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${getRoleBadgeColor(admin.role)}`}>
+      <td className="px-5 py-4 whitespace-nowrap">
+        <span className={`${statusPill} ${getRoleAccent(admin.role).pill} capitalize`}>
           {admin.role}
         </span>
       </td>
-      <td className="px-6 py-4 whitespace-nowrap">
-        <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium capitalize ${getStatusBadgeColor(admin.status)}`}>
+      <td className="px-5 py-4 whitespace-nowrap">
+        <span className={`${statusPill} ${getStatusAccent(admin.status).pill} capitalize`}>
           {admin.status}
         </span>
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+      <td className="px-5 py-4 whitespace-nowrap">
         {admin.last_login_at ? (
           <div>
-            <div>{new Date(admin.last_login_at).toLocaleDateString()}</div>
-            <div className="text-xs text-gray-500">
+            <div className={`${monoXs} text-slate-100`}>
+              {new Date(admin.last_login_at).toLocaleDateString()}
+            </div>
+            <div className={`${monoXs} text-slate-500`}>
               {admin.login_count} login{admin.login_count !== 1 ? 's' : ''}
             </div>
           </div>
         ) : (
-          <span className="text-gray-500">Never</span>
+          <span className={`${monoXs} text-slate-500`}>Never</span>
         )}
       </td>
-      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+      <td className="px-5 py-4 whitespace-nowrap">
         <button
           onClick={() => setShowPermissions(!showPermissions)}
-          className="inline-flex items-center text-blue-600 hover:text-blue-800"
+          className={`inline-flex items-center ${monoXs} text-cyan-400 hover:text-cyan-300 transition-colors`}
         >
           {showPermissions ? (
             <EyeOff className="h-4 w-4 mr-1" />
@@ -270,24 +232,24 @@ function AdminRow({ admin, currentAdminId, canManage, onEdit, onDelete }: AdminR
         </button>
       </td>
       {canManage && (
-        <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
+        <td className="px-5 py-4 whitespace-nowrap text-right text-sm font-medium">
           <div className="relative">
             <button
               onClick={() => setShowDropdown(!showDropdown)}
-              className="text-gray-400 hover:text-gray-600"
+              className="text-slate-500 hover:text-slate-400 transition-colors"
               disabled={admin.role === 'owner' && admin.id === currentAdminId}
             >
               <MoreVertical className="h-4 w-4" />
             </button>
             {showDropdown && (
-              <div className="origin-top-right absolute right-0 mt-2 w-48 rounded-md shadow-lg bg-white ring-1 ring-black ring-opacity-5 z-10">
+              <div className={`origin-top-right absolute right-0 mt-2 w-48 rounded-lg ${cardSurface} shadow-xl z-10`}>
                 <div className="py-1">
                   <button
                     onClick={() => {
                       onEdit(admin);
                       setShowDropdown(false);
                     }}
-                    className="flex items-center px-4 py-2 text-sm text-gray-700 hover:bg-gray-100 w-full text-left"
+                    className="flex items-center px-4 py-2 text-sm text-slate-300 hover:bg-slate-800/40 transition-colors w-full text-left font-mono"
                   >
                     <Edit className="h-4 w-4 mr-2" />
                     Edit Admin
@@ -298,7 +260,7 @@ function AdminRow({ admin, currentAdminId, canManage, onEdit, onDelete }: AdminR
                         onDelete(admin.id);
                         setShowDropdown(false);
                       }}
-                      className="flex items-center px-4 py-2 text-sm text-red-700 hover:bg-red-50 w-full text-left"
+                      className="flex items-center px-4 py-2 text-sm text-rose-400 hover:bg-rose-500/10 transition-colors w-full text-left font-mono"
                     >
                       <Trash2 className="h-4 w-4 mr-2" />
                       Remove Admin
@@ -315,11 +277,12 @@ function AdminRow({ admin, currentAdminId, canManage, onEdit, onDelete }: AdminR
 }
 
 interface InviteAdminModalProps {
+  isOpen: boolean;
   onClose: () => void;
   onInvite: (inviteData: { email: string; role: Admin['role']; permissions: Partial<AdminPermissions> }) => void;
 }
 
-function InviteAdminModal({ onClose, onInvite }: InviteAdminModalProps) {
+function InviteAdminModal({ isOpen, onClose, onInvite }: InviteAdminModalProps) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<Admin['role']>('viewer');
   const [permissions, setPermissions] = useState<Partial<AdminPermissions>>({});
@@ -403,71 +366,55 @@ function InviteAdminModal({ onClose, onInvite }: InviteAdminModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-[120] overflow-y-auto h-full w-full bg-slate-950/70 backdrop-blur-sm">
-      <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-white">
-        <div className="mt-3">
-          <div className="flex items-center justify-between mb-4">
-            <h3 className="text-lg font-medium text-gray-900">Invite Admin</h3>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600"
-            >
-              ×
-            </button>
-          </div>
-          
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Email Address
-              </label>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-                required
-              />
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
-                Role
-              </label>
-              <select
-                value={role}
-                onChange={(e) => {
-                  const newRole = e.target.value as Admin['role'];
-                  setRole(newRole);
-                  setPermissions(getDefaultPermissions(newRole));
-                }}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500"
-              >
-                <option value="viewer">Viewer</option>
-                <option value="operator">Operator</option>
-                <option value="admin">Admin</option>
-              </select>
-            </div>
-            
-            <div className="flex justify-end space-x-3 pt-4">
-              <button
-                type="button"
-                onClick={onClose}
-                className="px-4 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                className="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500"
-              >
-                <Shield className="h-4 w-4 inline mr-1" />
-                Send Invitation
-              </button>
-            </div>
-          </form>
+    <Modal isOpen={isOpen} onClose={onClose} title="Invite Admin" size="md">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div>
+          <p className={sectionLabel}>Email Address</p>
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            className={`w-full mt-2 px-3 py-2 border border-white/10 rounded-lg bg-slate-800/50 text-slate-100 ${monoSm} focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 transition-colors`}
+            required
+          />
         </div>
-      </div>
-    </div>
+
+        <div>
+          <p className={sectionLabel}>Role</p>
+          <div className={`${infoPanel} mt-2`}>
+            <select
+              value={role}
+              onChange={(e) => {
+                const newRole = e.target.value as Admin['role'];
+                setRole(newRole);
+                setPermissions(getDefaultPermissions(newRole));
+              }}
+              className={`w-full px-3 py-2 border border-white/10 rounded-lg bg-slate-800/50 text-slate-100 ${monoSm} focus:outline-none focus:ring-1 focus:ring-cyan-500 focus:border-cyan-500 transition-colors`}
+            >
+              <option value="viewer">Viewer</option>
+              <option value="operator">Operator</option>
+              <option value="admin">Admin</option>
+            </select>
+          </div>
+        </div>
+
+        <div className="flex justify-end space-x-3 pt-4">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 border border-white/10 rounded-lg font-mono text-sm text-slate-300 hover:bg-slate-800/40 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="px-4 py-2 bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 hover:bg-cyan-500/30 font-mono text-sm rounded-lg transition-colors"
+          >
+            <Shield className="h-4 w-4 inline mr-1" />
+            Send Invitation
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }

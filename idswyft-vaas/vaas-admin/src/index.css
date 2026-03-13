@@ -429,6 +429,9 @@ thead.bg-white\/50 {
 .form-input {
   display: block;
   width: 100%;
+  padding: 0.625rem 0.875rem;
+  font-size: 0.875rem;
+  line-height: 1.5;
   border-radius: 0.75rem;
   border: 1px solid var(--border-subtle);
   background: rgba(10, 15, 25, 0.9);
@@ -455,8 +458,17 @@ thead.bg-white\/50 {
   box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.12);
 }
 
+.form-input-error {
+  border-color: rgba(244, 63, 94, 0.6);
+}
+
+.form-input-error:focus {
+  border-color: rgba(244, 63, 94, 0.8);
+  box-shadow: 0 0 0 3px rgba(244, 63, 94, 0.12);
+}
+
 .form-input-icon {
-  padding: 0.875rem 1rem 0.875rem 2.9rem;
+  padding: 0.625rem 0.875rem 0.625rem 2.75rem;
 }
 
 .form-icon {

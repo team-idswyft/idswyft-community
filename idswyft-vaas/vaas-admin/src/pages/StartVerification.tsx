@@ -1,15 +1,15 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { 
-  Shield, 
-  User, 
-  Mail, 
-  Phone, 
+import {
+  User,
+  Mail,
+  Phone,
   ExternalLink,
   ArrowLeft,
   AlertTriangle,
   CheckCircle
 } from 'lucide-react';
+import { sectionLabel, cardSurface, monoXs, monoSm } from '../styles/tokens';
 import { apiClient } from '../services/api';
 import type { EndUser } from '../types';
 
@@ -53,7 +53,7 @@ const StartVerification: React.FC = () => {
 
     try {
       console.log('Attempting to start verification with data:', formData);
-      
+
       // Option 1: Try using the startVerification API directly (may include user creation)
       try {
         console.log('Trying startVerification API...');
@@ -83,7 +83,7 @@ const StartVerification: React.FC = () => {
 
       } catch (startVerificationError: any) {
         console.log('StartVerification API failed, trying manual approach:', startVerificationError);
-        
+
         // Option 2: Manual approach - create user then send invitation
         console.log('Creating user with createEndUser...');
         const newUser = await apiClient.createEndUser({
@@ -125,7 +125,7 @@ const StartVerification: React.FC = () => {
         method: error.config?.method,
         baseURL: error.config?.baseURL
       });
-      
+
       let errorMessage = 'Failed to start verification. ';
       if (error.response?.status === 404) {
         errorMessage += `API endpoint not found: ${error.config?.method?.toUpperCase()} ${error.config?.baseURL}${error.config?.url}. The backend server may not have this endpoint implemented yet.`;
@@ -146,7 +146,7 @@ const StartVerification: React.FC = () => {
       } else {
         errorMessage += 'Please check your network connection and try again.';
       }
-      
+
       setError(errorMessage);
       setStep('error');
     } finally {
@@ -181,30 +181,26 @@ const StartVerification: React.FC = () => {
         <div className="mb-6">
           <button
             onClick={() => navigate('/dashboard')}
-            className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700"
+            className="inline-flex items-center text-sm text-slate-500 hover:text-slate-300"
           >
             <ArrowLeft className="w-4 h-4 mr-1" />
             Back to Dashboard
           </button>
         </div>
 
-        <div className="content-card-glass p-8 text-center">
-          <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <CheckCircle className="w-8 h-8 text-green-600" />
-          </div>
-          
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">
+        <div className={`${cardSurface} p-8 text-center`}>
+          <p className={`${sectionLabel} mb-4`}>
             Verification Started Successfully!
-          </h1>
-          
-          <p className="text-gray-600 mb-6">
+          </p>
+
+          <p className="text-slate-400 mb-6">
             User has been created and verification invitation has been sent to{' '}
             <strong>{createdUser?.email}</strong>.
           </p>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6 text-left">
-            <h3 className="font-medium text-blue-900 mb-2">What happens next:</h3>
-            <ul className="text-sm text-blue-800 space-y-1">
+          <div className="bg-cyan-500/12 border border-cyan-500/25 rounded-lg p-4 mb-6 text-left">
+            <h3 className="font-medium text-cyan-100 mb-2">What happens next:</h3>
+            <ul className="text-sm text-cyan-200 space-y-1">
               <li>• User will receive an email with verification instructions</li>
               <li>• They'll click the link to access the branded verification portal</li>
               <li>• User completes document upload and liveness check</li>
@@ -214,7 +210,7 @@ const StartVerification: React.FC = () => {
 
           {verificationUrl && (
             <div className="mb-6">
-              <p className="text-sm text-gray-600 mb-3">
+              <p className="text-sm text-slate-400 mb-3">
                 You can also share this verification link directly:
               </p>
               <button
@@ -252,23 +248,19 @@ const StartVerification: React.FC = () => {
         <div className="mb-6">
           <button
             onClick={() => navigate('/dashboard')}
-            className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700"
+            className="inline-flex items-center text-sm text-slate-500 hover:text-slate-300"
           >
             <ArrowLeft className="w-4 h-4 mr-1" />
             Back to Dashboard
           </button>
         </div>
 
-        <div className="content-card-glass p-8 text-center">
-          <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-            <AlertTriangle className="w-8 h-8 text-red-600" />
-          </div>
-          
-          <h1 className="text-2xl font-bold text-gray-900 mb-4">
+        <div className={`${cardSurface} p-8 text-center`}>
+          <p className={`${sectionLabel} mb-4`}>
             Verification Start Failed
-          </h1>
-          
-          <p className="text-red-600 mb-6">{error}</p>
+          </p>
+
+          <p className="text-rose-400 mb-6">{error}</p>
 
           <div className="flex justify-center space-x-3">
             <button
@@ -294,22 +286,19 @@ const StartVerification: React.FC = () => {
       <div className="mb-6">
         <button
           onClick={() => navigate('/dashboard')}
-          className="inline-flex items-center text-sm text-gray-500 hover:text-gray-700"
+          className="inline-flex items-center text-sm text-slate-500 hover:text-slate-300"
         >
           <ArrowLeft className="w-4 h-4 mr-1" />
           Back to Dashboard
         </button>
       </div>
 
-      <div className="content-card-glass p-8">
+      <div className={`${cardSurface} p-8`}>
         <div className="text-center mb-8">
-          <div className="w-16 h-16 bg-primary-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <Shield className="w-8 h-8 text-primary-600" />
-          </div>
-          <h1 className="text-2xl font-bold text-gray-900 mb-2">
+          <p className={`${sectionLabel} mb-2`}>
             Start New Verification
-          </h1>
-          <p className="text-gray-600">
+          </p>
+          <p className="text-sm text-slate-500">
             Create a user and send them a verification invitation
           </p>
         </div>
@@ -404,9 +393,9 @@ const StartVerification: React.FC = () => {
             />
           </div>
 
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <h3 className="font-medium text-blue-900 mb-2">What will happen:</h3>
-            <ul className="text-sm text-blue-800 space-y-1">
+          <div className="bg-cyan-500/12 border border-cyan-500/25 rounded-lg p-4">
+            <h3 className="font-medium text-cyan-100 mb-2">What will happen:</h3>
+            <ul className="text-sm text-cyan-200 space-y-1">
               <li>1. A new user account will be created</li>
               <li>2. Verification invitation email will be sent automatically</li>
               <li>3. User will receive a link to your branded verification portal</li>
@@ -414,7 +403,7 @@ const StartVerification: React.FC = () => {
             </ul>
           </div>
 
-          <div className="flex justify-end space-x-3 pt-6 border-t">
+          <div className="flex justify-end space-x-3 pt-6 border-t border-white/10">
             <button
               type="button"
               onClick={() => navigate('/dashboard')}

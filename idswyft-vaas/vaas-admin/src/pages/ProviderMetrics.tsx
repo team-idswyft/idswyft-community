@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { BarChart3, RefreshCw } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import apiClient from '../services/api';
 import type { ProviderSummary, ProviderType } from '../types.js';
+import { sectionLabel, statNumber, monoXs, monoSm, cardSurface } from '../styles/tokens';
 
 type Days = 7 | 30 | 90;
 
@@ -50,29 +51,33 @@ export default function ProviderMetrics() {
   const pct = (n: number) => `${Math.min(100, Math.max(0, Math.round(n * 100)))}%`;
   const ms = (n: number) => `${Math.round(n)}ms`;
 
+  const accentColors: Record<ProviderType, string> = {
+    ocr: 'border-l-cyan-400',
+    face: 'border-l-violet-400',
+    liveness: 'border-l-emerald-400',
+  };
+
   return (
-    <div className="p-6 max-w-5xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div className="flex items-center">
-          <BarChart3 className="h-8 w-8 text-blue-600 mr-3" />
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900">Provider Performance</h1>
-            <p className="text-sm text-gray-500 mt-0.5">
-              OCR, face matching, and liveness provider metrics
-            </p>
-          </div>
+    <div className="p-6 max-w-5xl mx-auto space-y-6">
+      {/* Header */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+        <div>
+          <p className={sectionLabel}>Provider Performance</p>
+          <p className="text-sm text-slate-500 mt-1">
+            OCR, face matching, and liveness provider metrics
+          </p>
         </div>
-        <div className="flex items-center gap-3">
-          <div className="flex gap-1 border rounded-lg p-1 bg-gray-50">
+        <div className="flex items-center gap-2">
+          <div className="flex border border-white/10 rounded-lg overflow-hidden">
             {([7, 30, 90] as Days[]).map((d) => (
               <button
                 key={d}
                 onClick={() => setDays(d)}
                 disabled={loading}
-                className={`px-3 py-1 rounded text-sm font-medium transition-colors disabled:opacity-50 ${
+                className={`px-3 py-1.5 font-mono text-xs font-medium transition-colors disabled:opacity-50 ${
                   days === d
-                    ? 'bg-white shadow text-blue-600'
-                    : 'text-gray-500 hover:text-gray-700'
+                    ? 'bg-cyan-500/12 text-cyan-200'
+                    : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/40'
                 }`}
               >
                 {d}d
@@ -82,16 +87,16 @@ export default function ProviderMetrics() {
           <button
             onClick={() => loadAll(days)}
             disabled={loading}
-            className="px-4 py-2 border border-gray-300 rounded-md text-gray-700 bg-white hover:bg-gray-50 disabled:opacity-50 flex items-center"
+            className="p-2 border border-white/10 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/40 disabled:opacity-50 transition-colors"
+            title="Refresh"
           >
-            <RefreshCw className={`h-4 w-4 mr-2 ${loading ? 'animate-spin' : ''}`} />
-            Refresh
+            <RefreshCw className={`h-4 w-4 ${loading ? 'animate-spin' : ''}`} />
           </button>
         </div>
       </div>
 
       {error && (
-        <div className="mb-4 p-4 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm">
+        <div className="p-4 bg-rose-500/12 border border-rose-500/25 rounded-lg text-rose-300 text-sm">
           {error}
         </div>
       )}
@@ -99,35 +104,41 @@ export default function ProviderMetrics() {
       {loading ? (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[1, 2, 3].map((i) => (
-            <div key={i} className="border rounded-xl p-5 animate-pulse bg-gray-50 h-36" />
+            <div key={i} className={`${cardSurface} border-l-[3px] border-l-slate-700/50 p-5 animate-pulse`}>
+              <div className="h-3 bg-slate-700/50 rounded w-16 mb-3" />
+              <div className="h-7 bg-slate-700/50 rounded w-10 mb-4" />
+              <div className="space-y-2">
+                <div className="h-3 bg-slate-700/50 rounded w-full" />
+                <div className="h-3 bg-slate-700/50 rounded w-3/4" />
+              </div>
+            </div>
           ))}
         </div>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {cards.map((c) => (
-            <div key={c.type} className="border rounded-xl p-5 bg-white shadow-sm">
-              <div className="text-xs font-medium text-gray-400 uppercase tracking-wide mb-1">
-                {c.label}
-              </div>
-              <div className="text-sm text-gray-500 mb-3 font-mono truncate">{c.data.providerName}</div>
-              <div className="space-y-1.5 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Success</span>
-                  <span className={`font-semibold ${c.data.successRate >= 0.9 ? 'text-green-600' : 'text-amber-600'}`}>
+            <div key={c.type} className={`${cardSurface} border-l-[3px] ${accentColors[c.type]} p-5 hover:bg-slate-800/40 transition-colors`}>
+              <p className={`${sectionLabel} mb-1`}>{c.label}</p>
+              <p className={`${monoXs} text-slate-500 mb-4 truncate`}>{c.data.providerName}</p>
+
+              <div className="space-y-2.5">
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-500">Success</span>
+                  <span className={`${monoSm} font-semibold ${c.data.successRate >= 0.9 ? 'text-emerald-400' : 'text-amber-400'}`}>
                     {pct(c.data.successRate)}
                   </span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Avg Latency</span>
-                  <span className="font-semibold text-gray-700">{ms(c.data.avgLatencyMs)}</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-500">Avg Latency</span>
+                  <span className={`${monoSm} font-semibold text-slate-300`}>{ms(c.data.avgLatencyMs)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Avg Confidence</span>
-                  <span className="font-semibold text-gray-700">{pct(c.data.avgConfidence)}</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-500">Confidence</span>
+                  <span className={`${monoSm} font-semibold text-slate-300`}>{pct(c.data.avgConfidence)}</span>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-500">Requests</span>
-                  <span className="font-semibold text-gray-700">{c.data.totalRequests.toLocaleString()}</span>
+                <div className="flex items-center justify-between">
+                  <span className="text-sm text-slate-500">Requests</span>
+                  <span className={`${monoSm} font-semibold text-slate-300`}>{c.data.totalRequests.toLocaleString()}</span>
                 </div>
               </div>
             </div>

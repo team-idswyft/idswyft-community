@@ -29,6 +29,8 @@ import {
   Zap,
   Info
 } from 'lucide-react';
+import Modal from '../components/ui/Modal';
+import { sectionLabel, statNumber, monoXs, monoSm, cardSurface, statusPill, tableHeaderClass, infoPanel, getStatusAccent } from '../styles/tokens';
 
 export default function ApiKeys() {
   const { admin } = useAuth();
@@ -168,27 +170,6 @@ export default function ApiKeys() {
     });
   };
 
-  const getStatusBadge = (status: string) => {
-    const baseClass = "inline-flex items-center px-2 py-1 rounded-full text-xs font-medium";
-    
-    switch (status) {
-      case 'active':
-        return `${baseClass} bg-green-100 text-green-800`;
-      case 'disabled':
-        return `${baseClass} bg-yellow-100 text-yellow-800`;
-      case 'revoked':
-        return `${baseClass} bg-red-100 text-red-800`;
-      default:
-        return `${baseClass} bg-gray-100 text-gray-800`;
-    }
-  };
-
-  const getEnvironmentBadge = (environment: string) => {
-    return environment === 'production' 
-      ? 'bg-blue-100 text-blue-800' 
-      : 'bg-gray-100 text-gray-800';
-  };
-
   const apiKeyStats = {
     total: apiKeys.length,
     active: apiKeys.filter(k => k.status === 'active').length,
@@ -207,9 +188,9 @@ export default function ApiKeys() {
     return (
       <div className="p-6">
         <div className="text-center">
-          <Shield className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">Access Denied</h3>
-          <p className="mt-1 text-sm text-gray-500">
+          <Shield className="mx-auto h-12 w-12 text-slate-500" />
+          <h3 className="mt-2 text-sm font-medium text-slate-100">Access Denied</h3>
+          <p className="mt-1 text-sm text-slate-500">
             You don't have permission to manage API keys.
           </p>
         </div>
@@ -222,30 +203,10 @@ export default function ApiKeys() {
       {/* Header */}
       <div className="flex flex-col lg:flex-row lg:justify-between lg:items-start space-y-4 lg:space-y-0">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">API Key Management</h1>
-          <p className="text-gray-600 mt-1">Manage API keys for programmatic access to the VaaS platform</p>
-          
-          {/* Stats Bar */}
-          <div className="flex items-center space-x-6 mt-4">
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-              <span className="text-sm text-gray-600">Total: {apiKeyStats.total}</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-              <span className="text-sm text-gray-600">Active: {apiKeyStats.active}</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-              <span className="text-sm text-gray-600">Production: {apiKeyStats.production}</span>
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="w-3 h-3 bg-orange-500 rounded-full"></div>
-              <span className="text-sm text-gray-600">Total Requests: {apiKeyStats.totalUsage.toLocaleString()}</span>
-            </div>
-          </div>
+          <p className={sectionLabel}>API Key Management</p>
+          <p className="text-slate-400 mt-1">Manage API keys for programmatic access to the VaaS platform</p>
         </div>
-        
+
         <div className="flex flex-col sm:flex-row items-stretch sm:items-center space-y-2 sm:space-y-0 sm:space-x-3">
           <button
             onClick={loadApiKeys}
@@ -254,7 +215,7 @@ export default function ApiKeys() {
             <RefreshCw className="w-4 h-4 mr-2" />
             Refresh
           </button>
-          
+
           <button
             onClick={() => setShowCreateModal(true)}
             className="btn btn-primary"
@@ -265,20 +226,40 @@ export default function ApiKeys() {
         </div>
       </div>
 
+      {/* Stats Bar */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        <div className={`${cardSurface} border-l-[3px] border-l-cyan-400 p-5`}>
+          <p className={sectionLabel}>Total</p>
+          <p className={statNumber}>{apiKeyStats.total}</p>
+        </div>
+        <div className={`${cardSurface} border-l-[3px] border-l-emerald-400 p-5`}>
+          <p className={sectionLabel}>Active</p>
+          <p className={statNumber}>{apiKeyStats.active}</p>
+        </div>
+        <div className={`${cardSurface} border-l-[3px] border-l-violet-400 p-5`}>
+          <p className={sectionLabel}>Production</p>
+          <p className={statNumber}>{apiKeyStats.production}</p>
+        </div>
+        <div className={`${cardSurface} border-l-[3px] border-l-amber-400 p-5`}>
+          <p className={sectionLabel}>Total Requests</p>
+          <p className={statNumber}>{apiKeyStats.totalUsage.toLocaleString()}</p>
+        </div>
+      </div>
+
       {/* Filters */}
-      <div className="content-card-glass p-6">
-        <div className="pb-4 border-b border-white/20">
+      <div className={`${cardSurface} p-6`}>
+        <div className="pb-4 border-b border-white/10">
           <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between space-y-4 sm:space-y-0">
             <div className="flex flex-col sm:flex-row sm:items-center space-y-4 sm:space-y-0 sm:space-x-4">
               {/* Search */}
               <div className="relative">
-                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-400 w-4 h-4" />
+                <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-slate-500 w-4 h-4" />
                 <input
                   type="text"
                   placeholder="Search API keys..."
                   value={searchTerm}
                   onChange={(e) => setSearchTerm(e.target.value)}
-                  className="pl-10 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 w-full sm:w-64"
+                  className="pl-10 pr-4 py-2 border border-white/10 rounded-md bg-slate-900/70 text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 w-full sm:w-64"
                 />
               </div>
 
@@ -286,7 +267,7 @@ export default function ApiKeys() {
               <select
                 value={statusFilter}
                 onChange={(e) => setStatusFilter(e.target.value as any)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="px-3 py-2 border border-white/10 rounded-md bg-slate-900/70 text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
               >
                 <option value="all">All Status</option>
                 <option value="active">Active</option>
@@ -298,14 +279,14 @@ export default function ApiKeys() {
               <select
                 value={environmentFilter}
                 onChange={(e) => setEnvironmentFilter(e.target.value as any)}
-                className="px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                className="px-3 py-2 border border-white/10 rounded-md bg-slate-900/70 text-slate-100 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
               >
                 <option value="all">All Environments</option>
                 <option value="sandbox">Sandbox</option>
                 <option value="production">Production</option>
               </select>
 
-              <div className="text-sm text-gray-500">
+              <div className="text-sm text-slate-500">
                 Showing {filteredApiKeys.length} of {apiKeys.length} API keys
               </div>
             </div>
@@ -314,20 +295,20 @@ export default function ApiKeys() {
       </div>
 
       {/* API Keys List */}
-      <div className="content-card-glass">
+      <div className={cardSurface}>
         {loading ? (
           <div className="flex items-center justify-center py-12">
-            <div className="w-6 h-6 border-2 border-blue-600 border-t-transparent rounded-full animate-spin mr-3"></div>
+            <div className="w-6 h-6 border-2 border-cyan-400 border-t-transparent rounded-full animate-spin mr-3"></div>
             Loading API keys...
           </div>
         ) : filteredApiKeys.length === 0 ? (
           <div className="text-center py-12 px-6">
-            <Key className="w-12 h-12 text-gray-400 mx-auto mb-4" />
-            <h3 className="text-lg font-medium text-gray-900 mb-2">
+            <Key className="w-12 h-12 text-slate-500 mx-auto mb-4" />
+            <h3 className="text-lg font-medium text-slate-100 mb-2">
               {apiKeys.length === 0 ? 'No API keys created' : 'No API keys match your filters'}
             </h3>
-            <p className="text-gray-600 mb-4">
-              {apiKeys.length === 0 
+            <p className="text-slate-400 mb-4">
+              {apiKeys.length === 0
                 ? 'Create your first API key to start integrating with the VaaS platform'
                 : 'Try adjusting your search or filter criteria'
               }
@@ -344,111 +325,111 @@ export default function ApiKeys() {
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-white/50 backdrop-blur-sm">
+            <table className="min-w-full divide-y divide-white/10">
+              <thead className="bg-slate-900/60 backdrop-blur-sm">
                 <tr>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
+                  <th className={tableHeaderClass}>
                     API Key
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
+                  <th className={tableHeaderClass}>
                     Environment
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
+                  <th className={tableHeaderClass}>
                     Status
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
+                  <th className={tableHeaderClass}>
                     Usage
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
+                  <th className={tableHeaderClass}>
                     Last Used
                   </th>
-                  <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
+                  <th className={tableHeaderClass}>
                     Actions
                   </th>
                 </tr>
               </thead>
-              <tbody className="bg-white/30 backdrop-blur-sm divide-y divide-white/20">
+              <tbody className="bg-slate-900/55 backdrop-blur-sm divide-y divide-white/10">
                 {filteredApiKeys.map((apiKey) => (
-                  <tr key={apiKey.id} className="table-row-glass">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                  <tr key={apiKey.id} className="hover:bg-slate-800/40 transition-colors">
+                    <td className="px-5 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <Key className="w-5 h-5 text-gray-400 mr-3 flex-shrink-0" />
+                        <Key className="w-5 h-5 text-slate-500 mr-3 flex-shrink-0" />
                         <div>
-                          <div className="text-sm font-medium text-gray-900">
+                          <div className="text-sm font-medium text-slate-100">
                             {apiKey.name}
                           </div>
-                          <div className="text-xs text-gray-500 font-mono">
+                          <div className={`${monoXs} text-slate-500`}>
                             {apiKey.key_prefix}...{apiKey.key_suffix}
                           </div>
                           {apiKey.description && (
-                            <div className="text-xs text-gray-500 mt-1">
+                            <div className="text-xs text-slate-500 mt-1">
                               {apiKey.description}
                             </div>
                           )}
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${getEnvironmentBadge(apiKey.environment)}`}>
+                    <td className="px-5 py-4 whitespace-nowrap">
+                      <span className={`${statusPill} ${getStatusAccent(apiKey.environment).pill}`}>
                         {apiKey.environment}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <span className={getStatusBadge(apiKey.status)}>
+                    <td className="px-5 py-4 whitespace-nowrap">
+                      <span className={`${statusPill} ${getStatusAccent(apiKey.status).pill}`}>
                         {apiKey.status}
                       </span>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-gray-900">
+                    <td className="px-5 py-4 whitespace-nowrap">
+                      <div className={`${monoSm} text-slate-100`}>
                         {apiKey.usage_count.toLocaleString()} requests
                       </div>
                       {apiKey.rate_limit && (
-                        <div className="text-xs text-gray-500">
+                        <div className={`${monoXs} text-slate-500`}>
                           Limit: {apiKey.rate_limit}/min
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                    <td className="px-5 py-4 whitespace-nowrap">
                       {apiKey.last_used_at ? (
-                        <div>
+                        <div className={`${monoXs} text-slate-500`}>
                           <div>{formatDate(apiKey.last_used_at)}</div>
                         </div>
                       ) : (
-                        <span className="text-gray-400">Never used</span>
+                        <span className={`${monoXs} text-slate-500`}>Never used</span>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <td className="px-5 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
                         <button
                           onClick={() => handleViewUsage(apiKey)}
-                          className="text-blue-600 hover:text-blue-900"
+                          className="text-cyan-400 hover:text-cyan-300 transition-colors"
                           title="View usage"
                         >
                           <Activity className="w-4 h-4" />
                         </button>
-                        
+
                         <button
                           onClick={() => {
                             setSelectedApiKey(apiKey);
                             setShowCreateModal(true);
                           }}
-                          className="text-gray-600 hover:text-gray-900"
+                          className="text-slate-400 hover:text-slate-100 transition-colors"
                           title="Edit"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
-                        
+
                         <button
                           onClick={() => handleRotateApiKey(apiKey.id)}
-                          className="text-orange-600 hover:text-orange-900"
+                          className="text-orange-600 hover:text-orange-900 transition-colors"
                           title="Rotate key"
                         >
                           <RotateCcw className="w-4 h-4" />
                         </button>
-                        
+
                         <button
                           onClick={() => handleDeleteApiKey(apiKey.id)}
-                          className="text-red-600 hover:text-red-900"
+                          className="text-red-600 hover:text-red-900 transition-colors"
                           title="Delete"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -464,54 +445,52 @@ export default function ApiKeys() {
       </div>
 
       {/* Create/Edit API Key Modal */}
-      {showCreateModal && (
-        <ApiKeyFormModal
-          apiKey={selectedApiKey}
-          onClose={() => {
-            setShowCreateModal(false);
-            setSelectedApiKey(null);
-          }}
-          onSubmit={selectedApiKey ? 
-            (data) => handleUpdateApiKey(selectedApiKey.id, data) : 
-            handleCreateApiKey
-          }
-        />
-      )}
+      <ApiKeyFormModal
+        apiKey={selectedApiKey}
+        isOpen={showCreateModal}
+        onClose={() => {
+          setShowCreateModal(false);
+          setSelectedApiKey(null);
+        }}
+        onSubmit={selectedApiKey ?
+          (data) => handleUpdateApiKey(selectedApiKey.id, data) :
+          handleCreateApiKey
+        }
+      />
 
       {/* Secret Key Display Modal */}
-      {showSecretModal && secretKey && (
-        <SecretKeyModal
-          secretKey={secretKey}
-          onClose={() => {
-            setShowSecretModal(false);
-            setSecretKey(null);
-          }}
-        />
-      )}
+      <SecretKeyModal
+        secretKey={secretKey}
+        isOpen={showSecretModal && !!secretKey}
+        onClose={() => {
+          setShowSecretModal(false);
+          setSecretKey(null);
+        }}
+      />
 
       {/* Usage Modal */}
-      {showUsageModal && selectedApiKey && (
-        <UsageModal
-          apiKey={selectedApiKey}
-          usageData={usageData}
-          onClose={() => {
-            setShowUsageModal(false);
-            setSelectedApiKey(null);
-            setUsageData([]);
-          }}
-        />
-      )}
+      <UsageModal
+        apiKey={selectedApiKey}
+        usageData={usageData}
+        isOpen={showUsageModal && !!selectedApiKey}
+        onClose={() => {
+          setShowUsageModal(false);
+          setSelectedApiKey(null);
+          setUsageData([]);
+        }}
+      />
     </div>
   );
 }
 
 interface ApiKeyFormModalProps {
   apiKey: ApiKey | null;
+  isOpen: boolean;
   onClose: () => void;
   onSubmit: (data: ApiKeyFormData) => Promise<void>;
 }
 
-function ApiKeyFormModal({ apiKey, onClose, onSubmit }: ApiKeyFormModalProps) {
+function ApiKeyFormModal({ apiKey, isOpen, onClose, onSubmit }: ApiKeyFormModalProps) {
   const [formData, setFormData] = useState<ApiKeyFormData>({
     name: apiKey?.name || '',
     description: apiKey?.description || '',
@@ -616,164 +595,143 @@ function ApiKeyFormModal({ apiKey, onClose, onSubmit }: ApiKeyFormModalProps) {
   ];
 
   return (
-    <div className="fixed inset-0 z-[120] overflow-y-auto h-full w-full bg-slate-950/70 backdrop-blur-sm">
-      <div className="relative top-10 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
-        <div className="flex justify-between items-start mb-6">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">
-              {apiKey ? 'Edit API Key' : 'Create New API Key'}
-            </h3>
-            <p className="text-sm text-gray-500 mt-1">
-              Configure API key permissions and settings
-            </p>
+    <Modal isOpen={isOpen} onClose={onClose} title={apiKey ? 'Edit API Key' : 'Create New API Key'} size="xl">
+      <form onSubmit={handleSubmit} className="space-y-6">
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {/* Basic Information */}
+          <div className="space-y-4">
+            <div>
+              <label className="form-label">
+                Name *
+              </label>
+              <input
+                type="text"
+                value={formData.name}
+                onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
+                className={`form-input ${errors.name ? '!border-rose-500' : ''}`}
+                placeholder="My API Key"
+              />
+              {errors.name && <p className="mt-1 text-sm text-rose-400">{errors.name}</p>}
+            </div>
+
+            <div>
+              <label className="form-label">
+                Description
+              </label>
+              <textarea
+                value={formData.description}
+                onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
+                rows={3}
+                className="form-input"
+                placeholder="Optional description for this API key"
+              />
+            </div>
+
+            <div>
+              <label className="form-label">
+                Environment *
+              </label>
+              <select
+                value={formData.environment}
+                onChange={(e) => setFormData(prev => ({ ...prev, environment: e.target.value as 'sandbox' | 'production' }))}
+                className="form-input"
+              >
+                <option value="sandbox">Sandbox</option>
+                <option value="production">Production</option>
+              </select>
+            </div>
+
+            <div>
+              <label className="form-label">
+                Rate Limit (requests/minute)
+              </label>
+              <input
+                type="number"
+                min="1"
+                max="10000"
+                value={formData.rate_limit || ''}
+                onChange={(e) => setFormData(prev => ({ ...prev, rate_limit: e.target.value ? parseInt(e.target.value) : undefined }))}
+                className={`form-input ${errors.rate_limit ? '!border-rose-500' : ''}`}
+                placeholder="60"
+              />
+              {errors.rate_limit && <p className="mt-1 text-sm text-rose-400">{errors.rate_limit}</p>}
+            </div>
           </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <XCircle className="w-6 h-6" />
-          </button>
+
+          {/* Permissions */}
+          <div>
+            <p className={`${sectionLabel} mb-4`}>
+              Permissions *
+            </p>
+            {errors.permissions && <p className="mb-4 text-sm text-red-600">{errors.permissions}</p>}
+
+            <div className="space-y-4 max-h-80 overflow-y-auto">
+              {permissionGroups.map((group) => (
+                <div key={group.title} className={`${cardSurface} p-4`}>
+                  <p className={`${sectionLabel} mb-3`}>{group.title}</p>
+                  <div className="space-y-3">
+                    {group.permissions.map((permission) => (
+                      <div key={permission.key} className="flex items-start">
+                        <input
+                          type="checkbox"
+                          id={permission.key}
+                          checked={formData.permissions[permission.key]}
+                          onChange={(e) => handlePermissionChange(permission.key, e.target.checked)}
+                          className="mt-1 h-4 w-4 text-cyan-400 focus:ring-blue-500 border-white/10 rounded"
+                        />
+                        <label htmlFor={permission.key} className="ml-3 text-sm cursor-pointer">
+                          <div className="font-medium text-slate-100">{permission.label}</div>
+                          <div className="text-slate-500">{permission.description}</div>
+                        </label>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="space-y-6">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            {/* Basic Information */}
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Name *
-                </label>
-                <input
-                  type="text"
-                  value={formData.name}
-                  onChange={(e) => setFormData(prev => ({ ...prev, name: e.target.value }))}
-                  className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                    errors.name ? 'border-red-300' : 'border-gray-300'
-                  }`}
-                  placeholder="My API Key"
-                />
-                {errors.name && <p className="mt-1 text-sm text-red-600">{errors.name}</p>}
+        <div className="flex justify-end space-x-4 pt-4 border-t border-white/10">
+          <button
+            type="button"
+            onClick={onClose}
+            className="btn btn-secondary"
+            disabled={loading}
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="btn btn-primary"
+            disabled={loading}
+          >
+            {loading ? (
+              <div className="flex items-center">
+                <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                {apiKey ? 'Updating...' : 'Creating...'}
               </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Description
-                </label>
-                <textarea
-                  value={formData.description}
-                  onChange={(e) => setFormData(prev => ({ ...prev, description: e.target.value }))}
-                  rows={3}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                  placeholder="Optional description for this API key"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Environment *
-                </label>
-                <select
-                  value={formData.environment}
-                  onChange={(e) => setFormData(prev => ({ ...prev, environment: e.target.value as 'sandbox' | 'production' }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-                >
-                  <option value="sandbox">Sandbox</option>
-                  <option value="production">Production</option>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Rate Limit (requests/minute)
-                </label>
-                <input
-                  type="number"
-                  min="1"
-                  max="10000"
-                  value={formData.rate_limit || ''}
-                  onChange={(e) => setFormData(prev => ({ ...prev, rate_limit: e.target.value ? parseInt(e.target.value) : undefined }))}
-                  className={`w-full px-3 py-2 border rounded-md focus:ring-2 focus:ring-blue-500 focus:border-blue-500 ${
-                    errors.rate_limit ? 'border-red-300' : 'border-gray-300'
-                  }`}
-                  placeholder="60"
-                />
-                {errors.rate_limit && <p className="mt-1 text-sm text-red-600">{errors.rate_limit}</p>}
-              </div>
-            </div>
-
-            {/* Permissions */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-4">
-                Permissions *
-              </label>
-              {errors.permissions && <p className="mb-4 text-sm text-red-600">{errors.permissions}</p>}
-              
-              <div className="space-y-4 max-h-80 overflow-y-auto">
-                {permissionGroups.map((group) => (
-                  <div key={group.title} className="border border-gray-200 rounded-lg p-4">
-                    <h4 className="text-sm font-medium text-gray-900 mb-3">{group.title}</h4>
-                    <div className="space-y-3">
-                      {group.permissions.map((permission) => (
-                        <div key={permission.key} className="flex items-start">
-                          <input
-                            type="checkbox"
-                            id={permission.key}
-                            checked={formData.permissions[permission.key]}
-                            onChange={(e) => handlePermissionChange(permission.key, e.target.checked)}
-                            className="mt-1 h-4 w-4 text-blue-600 focus:ring-blue-500 border-gray-300 rounded"
-                          />
-                          <label htmlFor={permission.key} className="ml-3 text-sm cursor-pointer">
-                            <div className="font-medium text-gray-900">{permission.label}</div>
-                            <div className="text-gray-500">{permission.description}</div>
-                          </label>
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-
-          <div className="flex justify-end space-x-4 pt-4 border-t border-gray-200">
-            <button
-              type="button"
-              onClick={onClose}
-              className="btn btn-secondary"
-              disabled={loading}
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              className="btn btn-primary"
-              disabled={loading}
-            >
-              {loading ? (
-                <div className="flex items-center">
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                  {apiKey ? 'Updating...' : 'Creating...'}
-                </div>
-              ) : (
-                apiKey ? 'Update API Key' : 'Create API Key'
-              )}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+            ) : (
+              apiKey ? 'Update API Key' : 'Create API Key'
+            )}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }
 
 interface SecretKeyModalProps {
-  secretKey: string;
+  secretKey: string | null;
+  isOpen: boolean;
   onClose: () => void;
 }
 
-function SecretKeyModal({ secretKey, onClose }: SecretKeyModalProps) {
+function SecretKeyModal({ secretKey, isOpen, onClose }: SecretKeyModalProps) {
   const [copied, setCopied] = useState(false);
 
   const copyToClipboard = async () => {
+    if (!secretKey) return;
     try {
       await navigator.clipboard.writeText(secretKey);
       setCopied(true);
@@ -784,174 +742,130 @@ function SecretKeyModal({ secretKey, onClose }: SecretKeyModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-[120] overflow-y-auto h-full w-full bg-slate-950/70 backdrop-blur-sm">
-      <div className="relative top-20 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-white">
-        <div className="text-center">
-          <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-green-100 mb-4">
-            <Key className="h-6 w-6 text-green-600" />
-          </div>
-          
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">
-            API Key Created Successfully!
-          </h3>
-          
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4 mb-6">
-            <div className="flex">
-              <AlertTriangle className="h-5 w-5 text-yellow-400 flex-shrink-0" />
-              <div className="ml-3">
-                <h4 className="text-sm font-medium text-yellow-800">Important Security Notice</h4>
-                <p className="mt-1 text-sm text-yellow-700">
-                  This is the only time you'll see the full API key. Please copy it and store it securely.
-                </p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-gray-50 border border-gray-200 rounded-lg p-4 mb-6">
-            <label className="block text-sm font-medium text-gray-700 mb-2">
-              Your API Key
-            </label>
-            <div className="flex items-center space-x-2">
-              <code className="flex-1 bg-white border border-gray-300 rounded px-3 py-2 text-sm font-mono break-all">
-                {secretKey}
-              </code>
-              <button
-                onClick={copyToClipboard}
-                className="btn btn-secondary"
-                title="Copy to clipboard"
-              >
-                {copied ? (
-                  <CheckCircle className="w-4 h-4 text-green-600" />
-                ) : (
-                  <Copy className="w-4 h-4" />
-                )}
-              </button>
-            </div>
-          </div>
-
-          <div className="text-left bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-            <h4 className="text-sm font-medium text-blue-900 mb-2">Quick Start</h4>
-            <div className="text-sm text-blue-800 space-y-1">
-              <p>• Include this key in your API requests as a Bearer token</p>
-              <p>• Store it securely in your application's environment variables</p>
-              <p>• Never expose it in client-side code or version control</p>
-              <p>• You can rotate this key anytime from the API key management page</p>
-            </div>
-          </div>
-
-          <button
-            onClick={onClose}
-            className="btn btn-primary"
-          >
-            I've Saved My API Key
-          </button>
+    <Modal isOpen={isOpen} onClose={onClose} title="API Key Created" size="md">
+      <div className="text-center">
+        <div className="mx-auto flex items-center justify-center h-12 w-12 rounded-full bg-emerald-500/12 mb-4">
+          <Key className="h-6 w-6 text-emerald-400" />
         </div>
+
+        <div className="bg-amber-500/12 border border-amber-500/30 rounded-lg p-4 mb-6">
+          <div className="flex">
+            <AlertTriangle className="h-5 w-5 text-amber-400 flex-shrink-0" />
+            <div className="ml-3">
+              <h4 className="text-sm font-medium text-amber-300">Important Security Notice</h4>
+              <p className="mt-1 text-sm text-amber-400/80">
+                This is the only time you'll see the full API key. Please copy it and store it securely.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className={`${cardSurface} p-4 mb-6`}>
+          <label className="form-label">
+            Your API Key
+          </label>
+          <div className="flex items-center space-x-2">
+            <code className={`${monoSm} flex-1 bg-slate-900/70 border border-white/10 rounded px-3 py-2 break-all text-slate-100`}>
+              {secretKey}
+            </code>
+            <button
+              onClick={copyToClipboard}
+              className="btn btn-secondary"
+              title="Copy to clipboard"
+            >
+              {copied ? (
+                <CheckCircle className="w-4 h-4 text-emerald-400" />
+              ) : (
+                <Copy className="w-4 h-4" />
+              )}
+            </button>
+          </div>
+        </div>
+
+        <div className="text-left bg-cyan-500/12 border border-cyan-500/30 rounded-lg p-4 mb-6">
+          <h4 className="text-sm font-medium text-cyan-300 mb-2">Quick Start</h4>
+          <div className="text-sm text-cyan-400/80 space-y-1">
+            <p>Include this key in your API requests as a Bearer token</p>
+            <p>Store it securely in your application's environment variables</p>
+            <p>Never expose it in client-side code or version control</p>
+            <p>You can rotate this key anytime from the API key management page</p>
+          </div>
+        </div>
+
+        <button
+          onClick={onClose}
+          className="btn btn-primary"
+        >
+          I've Saved My API Key
+        </button>
       </div>
-    </div>
+    </Modal>
   );
 }
 
 interface UsageModalProps {
-  apiKey: ApiKey;
+  apiKey: ApiKey | null;
   usageData: ApiKeyUsage[];
+  isOpen: boolean;
   onClose: () => void;
 }
 
-function UsageModal({ apiKey, usageData, onClose }: UsageModalProps) {
+function UsageModal({ apiKey, usageData, isOpen, onClose }: UsageModalProps) {
   const totalRequests = usageData.reduce((sum, day) => sum + day.request_count, 0);
   const totalErrors = usageData.reduce((sum, day) => sum + day.error_count, 0);
   const errorRate = totalRequests > 0 ? (totalErrors / totalRequests) * 100 : 0;
 
   return (
-    <div className="fixed inset-0 z-[120] overflow-y-auto h-full w-full bg-slate-950/70 backdrop-blur-sm">
-      <div className="relative top-10 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-white">
-        <div className="flex justify-between items-start mb-6">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">
-              API Key Usage: {apiKey.name}
-            </h3>
-            <p className="text-sm text-gray-500 mt-1">
-              Usage statistics for the last 30 days
-            </p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
-          >
-            <XCircle className="w-6 h-6" />
-          </button>
+    <Modal isOpen={isOpen} onClose={onClose} title={`API Key Usage: ${apiKey?.name}`} size="xl">
+      {/* Usage Stats */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div className={`${cardSurface} border-l-[3px] border-l-cyan-400 p-5`}>
+          <p className={sectionLabel}>Total Requests</p>
+          <p className={statNumber}>{totalRequests.toLocaleString()}</p>
         </div>
 
-        {/* Usage Stats */}
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-          <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <Activity className="h-8 w-8 text-blue-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-blue-600">Total Requests</p>
-                <p className="text-2xl font-bold text-blue-900">{totalRequests.toLocaleString()}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-green-50 border border-green-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <CheckCircle className="h-8 w-8 text-green-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-green-600">Success Rate</p>
-                <p className="text-2xl font-bold text-green-900">{(100 - errorRate).toFixed(1)}%</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <XCircle className="h-8 w-8 text-red-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-red-600">Error Count</p>
-                <p className="text-2xl font-bold text-red-900">{totalErrors.toLocaleString()}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-            <div className="flex items-center">
-              <Zap className="h-8 w-8 text-yellow-600" />
-              <div className="ml-4">
-                <p className="text-sm font-medium text-yellow-600">Rate Limit</p>
-                <p className="text-2xl font-bold text-yellow-900">
-                  {apiKey.rate_limit ? `${apiKey.rate_limit}/min` : 'None'}
-                </p>
-              </div>
-            </div>
-          </div>
+        <div className={`${cardSurface} border-l-[3px] border-l-emerald-400 p-5`}>
+          <p className={sectionLabel}>Success Rate</p>
+          <p className={statNumber}>{(100 - errorRate).toFixed(1)}%</p>
         </div>
 
-        {/* Usage Chart Placeholder */}
-        <div className="content-card-glass p-6 mb-6">
-          <h4 className="text-lg font-semibold text-gray-900 mb-4">Daily Usage Trend</h4>
-          <div className="h-64 flex items-center justify-center border-2 border-gray-200 border-dashed rounded-lg">
-            <div className="text-center">
-              <TrendingUp className="mx-auto h-12 w-12 text-gray-400" />
-              <span className="mt-2 block text-sm font-medium text-gray-900">
-                Usage Chart Coming Soon
-              </span>
-              <span className="block text-sm text-gray-500">
-                Visual representation of API usage over time
-              </span>
-            </div>
-          </div>
+        <div className={`${cardSurface} border-l-[3px] border-l-rose-400 p-5`}>
+          <p className={sectionLabel}>Error Count</p>
+          <p className={statNumber}>{totalErrors.toLocaleString()}</p>
         </div>
 
-        <div className="flex justify-end">
-          <button
-            onClick={onClose}
-            className="btn btn-primary"
-          >
-            Close
-          </button>
+        <div className={`${cardSurface} border-l-[3px] border-l-amber-400 p-5`}>
+          <p className={sectionLabel}>Rate Limit</p>
+          <p className={statNumber}>
+            {apiKey?.rate_limit ? `${apiKey.rate_limit}/min` : 'None'}
+          </p>
         </div>
       </div>
-    </div>
+
+      {/* Usage Chart Placeholder */}
+      <div className={`${cardSurface} p-6 mb-6`}>
+        <h4 className="text-lg font-semibold text-slate-100 mb-4">Daily Usage Trend</h4>
+        <div className="h-64 flex items-center justify-center border-2 border-white/10 border-dashed rounded-lg">
+          <div className="text-center">
+            <TrendingUp className="mx-auto h-12 w-12 text-slate-500" />
+            <span className="mt-2 block text-sm font-medium text-slate-100">
+              Usage Chart Coming Soon
+            </span>
+            <span className="block text-sm text-slate-500">
+              Visual representation of API usage over time
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div className="flex justify-end">
+        <button
+          onClick={onClose}
+          className="btn btn-primary"
+        >
+          Close
+        </button>
+      </div>
+    </Modal>
   );
 }

@@ -5,6 +5,7 @@ import { Organization, OrganizationSettings, PlatformBranding } from '../types.j
 import { Settings as SettingsIcon, Save, AlertCircle, CheckCircle, Shield, Palette, Bell, Clock, Users, Zap } from 'lucide-react';
 import AdvancedThresholdSettings from '../components/AdvancedThresholdSettings';
 import { AssetUpload } from '../components/AssetUpload';
+import { sectionLabel, cardSurface, monoXs, monoSm } from '../styles/tokens';
 
 export default function Settings() {
   const { organization, admin } = useAuth();
@@ -29,12 +30,12 @@ export default function Settings() {
 
     try {
       const updatedSettings = { ...orgData.settings, ...updates };
-      const updated = await apiClient.updateOrganization(orgData.id, { 
-        settings: updatedSettings 
+      const updated = await apiClient.updateOrganization(orgData.id, {
+        settings: updatedSettings
       });
       setOrgData(updated);
       setSuccess('Settings updated successfully');
-      
+
       // Clear success message after 3 seconds
       setTimeout(() => setSuccess(null), 3000);
     } catch (err: any) {
@@ -51,7 +52,7 @@ export default function Settings() {
   if (!orgData) {
     return (
       <div className="flex items-center justify-center min-h-[400px]">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400"></div>
       </div>
     );
   }
@@ -78,21 +79,21 @@ export default function Settings() {
   return (
     <div className="p-6 space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-gray-900">Verification & System Settings</h1>
-        <p className="text-gray-600">Configure technical verification thresholds, security settings, and system preferences</p>
+        <p className={sectionLabel}>Verification &amp; System Settings</p>
+        <p className="text-sm text-slate-500 mt-1">Configure technical verification thresholds, security settings, and system preferences</p>
       </div>
 
       {error && (
-        <div className="bg-red-50 border border-red-200 rounded-md p-4 flex items-center space-x-2">
-          <AlertCircle className="h-5 w-5 text-red-400 flex-shrink-0" />
-          <span className="text-red-700">{error}</span>
+        <div className="bg-rose-500/12 border border-rose-500/25 rounded-md p-4 flex items-center space-x-2">
+          <AlertCircle className="h-5 w-5 text-rose-400 flex-shrink-0" />
+          <span className="text-rose-300">{error}</span>
         </div>
       )}
 
       {success && (
-        <div className="bg-green-50 border border-green-200 rounded-md p-4 flex items-center space-x-2">
-          <CheckCircle className="h-5 w-5 text-green-400 flex-shrink-0" />
-          <span className="text-green-700">{success}</span>
+        <div className="bg-emerald-500/12 border border-emerald-500/25 rounded-md p-4 flex items-center space-x-2">
+          <CheckCircle className="h-5 w-5 text-emerald-400 flex-shrink-0" />
+          <span className="text-emerald-300">{success}</span>
         </div>
       )}
 
@@ -104,44 +105,44 @@ export default function Settings() {
               onClick={() => setActiveSection('verification')}
               className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md ${
                 activeSection === 'verification'
-                  ? 'bg-blue-100 text-blue-700 border-r-2 border-blue-500'
-                  : 'text-gray-700 hover:bg-gray-100'
+                  ? 'bg-cyan-500/15 text-cyan-300 border-r-2 border-cyan-400'
+                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/60'
               }`}
             >
               <Shield className="h-4 w-4 mr-3" />
               Verification Configuration
             </button>
-            
+
             <button
               onClick={() => setActiveSection('security')}
               className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md ${
                 activeSection === 'security'
-                  ? 'bg-blue-100 text-blue-700 border-r-2 border-blue-500'
-                  : 'text-gray-700 hover:bg-gray-100'
+                  ? 'bg-cyan-500/15 text-cyan-300 border-r-2 border-cyan-400'
+                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/60'
               }`}
             >
               <Users className="h-4 w-4 mr-3" />
               Security & Access
             </button>
-            
+
             <button
               onClick={() => setActiveSection('notifications')}
               className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md ${
                 activeSection === 'notifications'
-                  ? 'bg-blue-100 text-blue-700 border-r-2 border-blue-500'
-                  : 'text-gray-700 hover:bg-gray-100'
+                  ? 'bg-cyan-500/15 text-cyan-300 border-r-2 border-cyan-400'
+                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/60'
               }`}
             >
               <Bell className="h-4 w-4 mr-3" />
               Notifications
             </button>
-            
+
             <button
               onClick={() => setActiveSection('appearance')}
               className={`w-full flex items-center px-3 py-2 text-sm font-medium rounded-md ${
                 activeSection === 'appearance'
-                  ? 'bg-blue-100 text-blue-700 border-r-2 border-blue-500'
-                  : 'text-gray-700 hover:bg-gray-100'
+                  ? 'bg-cyan-500/15 text-cyan-300 border-r-2 border-cyan-400'
+                  : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/60'
               }`}
             >
               <Palette className="h-4 w-4 mr-3" />
@@ -155,15 +156,15 @@ export default function Settings() {
           {activeSection === 'verification' && (
             <div className="space-y-6">
               {/* Primary Verification Configuration */}
-              <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
+              <div className="bg-cyan-500/12 border border-cyan-500/25 rounded-lg p-4">
                 <div className="flex">
                   <div className="flex-shrink-0">
-                    <Shield className="h-5 w-5 text-blue-400" />
+                    <Shield className="h-5 w-5 text-cyan-400" />
                   </div>
                   <div className="ml-3">
-                    <h3 className="text-sm font-medium text-blue-800">Primary Verification Configuration</h3>
-                    <p className="mt-1 text-sm text-blue-700">
-                      This is the main location for configuring all verification thresholds and technical settings. 
+                    <h3 className="text-sm font-medium text-cyan-200">Primary Verification Configuration</h3>
+                    <p className="mt-1 text-sm text-cyan-300">
+                      This is the main location for configuring all verification thresholds and technical settings.
                       For business settings like company information and branding, visit the Organization page.
                     </p>
                   </div>
@@ -171,7 +172,7 @@ export default function Settings() {
               </div>
 
               {/* Enhanced Threshold Management */}
-              <AdvancedThresholdSettings 
+              <AdvancedThresholdSettings
                 organizationId={orgData.id}
                 canEdit={canEdit}
                 onThresholdsUpdated={() => {
@@ -181,7 +182,7 @@ export default function Settings() {
                   }
                 }}
               />
-              
+
               {/* Legacy Settings (kept for backward compatibility) */}
               <VerificationSettingsSection
                 settings={orgData.settings}
@@ -223,10 +224,10 @@ export default function Settings() {
           )}
 
           {isSuperAdmin && (
-            <div className="bg-white shadow rounded-lg mt-6">
-              <div className="px-6 py-4 border-b border-gray-200">
-                <h3 className="text-lg font-medium text-gray-900">Platform Branding</h3>
-                <p className="text-sm text-gray-500 mt-1">
+            <div className={`${cardSurface} mt-6`}>
+              <div className="px-6 py-4 border-b border-white/10">
+                <p className={sectionLabel}>Platform Branding</p>
+                <p className="text-sm text-slate-500 mt-1">
                   Global branding shown when no organization override is set. Super-admin only.
                 </p>
               </div>
@@ -292,19 +293,16 @@ function VerificationSettingsSection({ settings, onSave, onQuickToggle, isLoadin
   return (
     <div className="space-y-6">
       {/* Quick Toggles */}
-      <div className="content-card-glass">
-        <div className="px-6 py-4 border-b border-white/20">
-          <h3 className="text-lg font-medium text-gray-900 flex items-center">
-            <Zap className="h-5 w-5 mr-2 text-blue-600" />
-            Quick Settings
-          </h3>
+      <div className={cardSurface}>
+        <div className="px-6 py-4 border-b border-white/10">
+          <p className={sectionLabel}>Quick Settings</p>
         </div>
-        
+
         <div className="p-6 space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <label className="text-sm font-medium text-gray-900">Liveness Detection</label>
-              <p className="text-xs text-gray-500">Require real-time selfie verification</p>
+              <label className="text-sm font-medium text-slate-100">Liveness Detection</label>
+              <p className="text-xs text-slate-500">Require real-time selfie verification</p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
@@ -314,14 +312,14 @@ function VerificationSettingsSection({ settings, onSave, onQuickToggle, isLoadin
                 disabled={!canEdit || isLoading}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              <div className="w-11 h-6 bg-slate-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-cyan-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-500 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500"></div>
             </label>
           </div>
 
           <div className="flex items-center justify-between">
             <div>
-              <label className="text-sm font-medium text-gray-900">Back of ID Required</label>
-              <p className="text-xs text-gray-500">Require both sides of ID documents</p>
+              <label className="text-sm font-medium text-slate-100">Back of ID Required</label>
+              <p className="text-xs text-slate-500">Require both sides of ID documents</p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
@@ -331,25 +329,25 @@ function VerificationSettingsSection({ settings, onSave, onQuickToggle, isLoadin
                 disabled={!canEdit || isLoading}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              <div className="w-11 h-6 bg-slate-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-cyan-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-500 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500"></div>
             </label>
           </div>
         </div>
       </div>
 
       {/* Legacy Threshold Management (Simplified) */}
-      <div className="bg-gray-50 border border-gray-200 rounded-lg">
-        <div className="px-6 py-4 border-b border-white/20">
-          <h3 className="text-lg font-medium text-gray-700">Additional Settings</h3>
-          <p className="text-sm text-gray-500 mt-1">
+      <div className={cardSurface}>
+        <div className="px-6 py-4 border-b border-white/10">
+          <p className={sectionLabel}>Additional Settings</p>
+          <p className="text-sm text-slate-500 mt-1">
             Additional verification settings that complement the advanced threshold management above.
           </p>
         </div>
-        
+
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">
+              <label className="block text-sm font-medium text-slate-400 mb-1">
                 Auto-Approve (%)
               </label>
               <input
@@ -359,12 +357,12 @@ function VerificationSettingsSection({ settings, onSave, onQuickToggle, isLoadin
                 value={formData.auto_approve_threshold}
                 onChange={(e) => handleChange('auto_approve_threshold', Number(e.target.value))}
                 disabled={!canEdit}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
+                className="w-full px-3 py-2 border border-white/10 rounded-md text-sm bg-slate-900/70 text-slate-100 focus:outline-none focus:ring-cyan-400 focus:border-cyan-400 disabled:bg-slate-800/50"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">
+              <label className="block text-sm font-medium text-slate-400 mb-1">
                 Manual Review (%)
               </label>
               <input
@@ -374,12 +372,12 @@ function VerificationSettingsSection({ settings, onSave, onQuickToggle, isLoadin
                 value={formData.manual_review_threshold}
                 onChange={(e) => handleChange('manual_review_threshold', Number(e.target.value))}
                 disabled={!canEdit}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
+                className="w-full px-3 py-2 border border-white/10 rounded-md text-sm bg-slate-900/70 text-slate-100 focus:outline-none focus:ring-cyan-400 focus:border-cyan-400 disabled:bg-slate-800/50"
               />
             </div>
 
             <div>
-              <label className="block text-sm font-medium text-gray-600 mb-1">
+              <label className="block text-sm font-medium text-slate-400 mb-1">
                 Max Attempts
               </label>
               <input
@@ -389,7 +387,7 @@ function VerificationSettingsSection({ settings, onSave, onQuickToggle, isLoadin
                 value={formData.max_verification_attempts}
                 onChange={(e) => handleChange('max_verification_attempts', Number(e.target.value))}
                 disabled={!canEdit}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-100"
+                className="w-full px-3 py-2 border border-white/10 rounded-md text-sm bg-slate-900/70 text-slate-100 focus:outline-none focus:ring-cyan-400 focus:border-cyan-400 disabled:bg-slate-800/50"
               />
             </div>
           </div>
@@ -399,7 +397,7 @@ function VerificationSettingsSection({ settings, onSave, onQuickToggle, isLoadin
               <button
                 type="submit"
                 disabled={isLoading}
-                className="inline-flex items-center px-4 py-2 border border-gray-300 text-sm font-medium rounded-md text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+                className="inline-flex items-center px-4 py-2 border border-white/10 text-sm font-medium rounded-md text-slate-300 bg-slate-900/70 hover:bg-slate-800/40 transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-400 disabled:opacity-50"
               >
                 <Save className="h-4 w-4 mr-2" />
                 {isLoading ? 'Saving...' : 'Update Additional Settings'}
@@ -425,14 +423,14 @@ function SecuritySettingsSection({ settings, onSave, isLoading, canEdit }: Setti
   };
 
   return (
-    <div className="bg-white shadow rounded-lg">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h3 className="text-lg font-medium text-gray-900">Security & Session Management</h3>
+    <div className={cardSurface}>
+      <div className="px-6 py-4 border-b border-white/10">
+        <p className={sectionLabel}>Security &amp; Session Management</p>
       </div>
-      
+
       <form onSubmit={handleSubmit} className="p-6 space-y-6">
         <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2">
+          <label className="block text-sm font-medium text-slate-300 mb-2">
             <Clock className="h-4 w-4 inline mr-1" />
             Session Timeout (minutes)
           </label>
@@ -443,19 +441,19 @@ function SecuritySettingsSection({ settings, onSave, isLoading, canEdit }: Setti
             value={formData.session_timeout}
             onChange={(e) => handleChange('session_timeout', Number(e.target.value))}
             disabled={!canEdit}
-            className="w-full md:w-64 px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50"
+            className="w-full md:w-64 px-3 py-2 border border-white/10 rounded-md bg-slate-900/70 text-slate-100 focus:outline-none focus:ring-cyan-400 focus:border-cyan-400 disabled:bg-slate-900/40"
           />
-          <p className="mt-1 text-xs text-gray-500">
+          <p className="mt-1 text-xs text-slate-500">
             How long verification sessions remain active (5-1440 minutes)
           </p>
         </div>
 
-        <div className="bg-yellow-50 border border-yellow-200 rounded-md p-4">
+        <div className="bg-amber-500/12 border border-amber-500/25 rounded-md p-4">
           <div className="flex">
-            <AlertCircle className="h-5 w-5 text-yellow-400 flex-shrink-0" />
+            <AlertCircle className="h-5 w-5 text-amber-400 flex-shrink-0" />
             <div className="ml-3">
-              <h4 className="text-sm font-medium text-yellow-800">Security Notice</h4>
-              <p className="mt-1 text-sm text-yellow-700">
+              <h4 className="text-sm font-medium text-amber-200">Security Notice</h4>
+              <p className="mt-1 text-sm text-amber-300">
                 Shorter session timeouts improve security but may impact user experience for complex verifications.
               </p>
             </div>
@@ -467,7 +465,7 @@ function SecuritySettingsSection({ settings, onSave, isLoading, canEdit }: Setti
             <button
               type="submit"
               disabled={isLoading}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-400 disabled:opacity-50"
             >
               <Save className="h-4 w-4 mr-2" />
               {isLoading ? 'Saving...' : 'Save Changes'}
@@ -490,17 +488,17 @@ function NotificationSettingsSection({ settings, onSave, onQuickToggle, isLoadin
   };
 
   return (
-    <div className="bg-white shadow rounded-lg">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h3 className="text-lg font-medium text-gray-900">Notification Preferences</h3>
+    <div className={cardSurface}>
+      <div className="px-6 py-4 border-b border-white/10">
+        <p className={sectionLabel}>Notification Preferences</p>
       </div>
-      
+
       <div className="p-6 space-y-6">
         <div className="space-y-4">
           <div className="flex items-center justify-between">
             <div>
-              <label className="text-sm font-medium text-gray-900">Email Notifications</label>
-              <p className="text-xs text-gray-500">Receive email alerts for verification events</p>
+              <label className="text-sm font-medium text-slate-100">Email Notifications</label>
+              <p className="text-xs text-slate-500">Receive email alerts for verification events</p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
@@ -510,14 +508,14 @@ function NotificationSettingsSection({ settings, onSave, onQuickToggle, isLoadin
                 disabled={!canEdit || isLoading}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              <div className="w-11 h-6 bg-slate-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-cyan-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-500 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500"></div>
             </label>
           </div>
 
           <div className="flex items-center justify-between">
             <div>
-              <label className="text-sm font-medium text-gray-900">Webhook Notifications</label>
-              <p className="text-xs text-gray-500">Send real-time events to configured webhooks</p>
+              <label className="text-sm font-medium text-slate-100">Webhook Notifications</label>
+              <p className="text-xs text-slate-500">Send real-time events to configured webhooks</p>
             </div>
             <label className="relative inline-flex items-center cursor-pointer">
               <input
@@ -527,17 +525,17 @@ function NotificationSettingsSection({ settings, onSave, onQuickToggle, isLoadin
                 disabled={!canEdit || isLoading}
                 className="sr-only peer"
               />
-              <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-blue-300 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-blue-600"></div>
+              <div className="w-11 h-6 bg-slate-600 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-cyan-500/30 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-slate-500 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-cyan-500"></div>
             </label>
           </div>
         </div>
 
-        <div className="bg-blue-50 border border-blue-200 rounded-md p-4">
+        <div className="bg-cyan-500/12 border border-cyan-500/25 rounded-md p-4">
           <div className="flex">
-            <Bell className="h-5 w-5 text-blue-400 flex-shrink-0" />
+            <Bell className="h-5 w-5 text-cyan-400 flex-shrink-0" />
             <div className="ml-3">
-              <h4 className="text-sm font-medium text-blue-800">Notification Events</h4>
-              <ul className="mt-1 text-sm text-blue-700 list-disc list-inside space-y-1">
+              <h4 className="text-sm font-medium text-cyan-200">Notification Events</h4>
+              <ul className="mt-1 text-sm text-cyan-300 list-disc list-inside space-y-1">
                 <li>Verification completion (success/failure)</li>
                 <li>Manual review requirements</li>
                 <li>System alerts and errors</li>
@@ -564,22 +562,22 @@ function AppearanceSettingsSection({ settings, onSave, isLoading, canEdit }: Set
   };
 
   return (
-    <div className="bg-white shadow rounded-lg">
-      <div className="px-6 py-4 border-b border-gray-200">
-        <h3 className="text-lg font-medium text-gray-900">Appearance & Localization</h3>
+    <div className={cardSurface}>
+      <div className="px-6 py-4 border-b border-white/10">
+        <p className={sectionLabel}>Appearance &amp; Localization</p>
       </div>
-      
+
       <form onSubmit={handleSubmit} className="p-6 space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-slate-300 mb-2">
               Theme
             </label>
             <select
               value={formData.theme}
               onChange={(e) => handleChange('theme', e.target.value as 'light' | 'dark')}
               disabled={!canEdit}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50"
+              className="w-full px-3 py-2 border border-white/10 rounded-md bg-slate-900/70 text-slate-100 focus:outline-none focus:ring-cyan-400 focus:border-cyan-400 disabled:bg-slate-900/40"
             >
               <option value="light">Light</option>
               <option value="dark">Dark</option>
@@ -587,14 +585,14 @@ function AppearanceSettingsSection({ settings, onSave, isLoading, canEdit }: Set
           </div>
 
           <div>
-            <label className="block text-sm font-medium text-gray-700 mb-2">
+            <label className="block text-sm font-medium text-slate-300 mb-2">
               Language
             </label>
             <select
               value={formData.language}
               onChange={(e) => handleChange('language', e.target.value)}
               disabled={!canEdit}
-              className="w-full px-3 py-2 border border-gray-300 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 disabled:bg-gray-50"
+              className="w-full px-3 py-2 border border-white/10 rounded-md bg-slate-900/70 text-slate-100 focus:outline-none focus:ring-cyan-400 focus:border-cyan-400 disabled:bg-slate-900/40"
             >
               <option value="en">English</option>
               <option value="es">Spanish</option>
@@ -604,14 +602,14 @@ function AppearanceSettingsSection({ settings, onSave, isLoading, canEdit }: Set
           </div>
         </div>
 
-        <div className="bg-gray-50 border border-gray-200 rounded-md p-4">
+        <div className={`${cardSurface} p-4`}>
           <div className="flex">
-            <Palette className="h-5 w-5 text-gray-400 flex-shrink-0" />
+            <Palette className="h-5 w-5 text-slate-500 flex-shrink-0" />
             <div className="ml-3">
-              <h4 className="text-sm font-medium text-gray-800">Advanced Customization</h4>
-              <p className="mt-1 text-sm text-gray-600">
+              <h4 className="text-sm font-medium text-slate-200">Advanced Customization</h4>
+              <p className="mt-1 text-sm text-slate-400">
                 For custom branding, colors, and advanced appearance options, visit the{' '}
-                <a href="/organization" className="text-blue-600 hover:text-blue-500 font-medium">
+                <a href="/organization" className="text-cyan-400 hover:text-cyan-300 font-medium">
                   Organization Settings
                 </a>{' '}
                 page.
@@ -625,7 +623,7 @@ function AppearanceSettingsSection({ settings, onSave, isLoading, canEdit }: Set
             <button
               type="submit"
               disabled={isLoading}
-              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md shadow-sm text-white bg-blue-600 hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-blue-500 disabled:opacity-50"
+              className="inline-flex items-center px-4 py-2 border border-transparent text-sm font-medium rounded-md text-white bg-cyan-600 hover:bg-cyan-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-cyan-400 disabled:opacity-50"
             >
               <Save className="h-4 w-4 mr-2" />
               {isLoading ? 'Saving...' : 'Save Changes'}

@@ -1,26 +1,18 @@
 import React, { useState, useEffect } from 'react';
-import { 
-  Search, 
-  Filter, 
-  Download, 
+import {
+  Search,
+  Filter,
+  Download,
   Plus,
-  Eye, 
+  Eye,
   Edit2,
   Trash2,
-  User,
-  Calendar,
-  Mail,
-  Phone,
-  Tag,
-  Shield,
-  AlertTriangle,
-  CheckCircle,
-  XCircle,
-  Clock,
   Send
 } from 'lucide-react';
 import { apiClient } from '../services/api';
 import type { EndUser } from '../types.js';
+import { sectionLabel, statNumber, monoXs, monoSm, cardSurface, statusPill, tableHeaderClass, infoPanel, getStatusAccent } from '../styles/tokens';
+import Modal from '../components/ui/Modal';
 
 // Type alias for EndUser verification status
 type VerificationStatus = EndUser['verification_status'];
@@ -83,10 +75,10 @@ export default function Users() {
 
       const result = await apiClient.listEndUsers(params);
       setUsers(result.users || []);
-      
+
       // Handle pagination meta safely
-      const totalPages = result.meta?.pagination?.total_pages || 
-                        result.meta?.pages || 
+      const totalPages = result.meta?.pagination?.total_pages ||
+                        result.meta?.pages ||
                         Math.ceil((result.meta?.total || 0) / 20) || 1;
       setTotalPages(totalPages);
     } catch (error) {
@@ -110,29 +102,29 @@ export default function Users() {
 
   const handleSendVerificationInvitation = async (customMessage?: string) => {
     if (!selectedUser) return;
-    
+
     try {
       setSendingInvitation(true);
-      
+
       console.log('Sending verification invitation for user:', selectedUser.id);
       const updatedUser = await apiClient.sendVerificationInvitation(selectedUser.id, {
         custom_message: customMessage,
         expiration_days: 7
       });
-      
+
       // Update the user in the list
-      setUsers(prev => prev.map(user => 
+      setUsers(prev => prev.map(user =>
         user.id === updatedUser.id ? updatedUser : user
       ));
-      
+
       // Show success message
-      alert(`✅ Verification invitation sent successfully to ${selectedUser.email}!`);
-      
+      alert(`Verification invitation sent successfully to ${selectedUser.email}!`);
+
       setShowInvitationModal(false);
       setSelectedUser(null);
     } catch (error: any) {
       console.error('Failed to send verification invitation:', error);
-      
+
       // Show detailed error message
       let errorMessage = 'Failed to send verification invitation. ';
       if (error.response?.data?.error?.message) {
@@ -148,49 +140,15 @@ export default function Users() {
       } else {
         errorMessage += 'Please check your network connection and try again.';
       }
-      
-      alert(`❌ ${errorMessage}`);
+
+      alert(errorMessage);
     } finally {
       setSendingInvitation(false);
     }
   };
 
-  const getStatusIcon = (status: VerificationStatus) => {
-    switch (status) {
-      case 'verified':
-        return <CheckCircle className="w-4 h-4 text-green-500" />;
-      case 'failed':
-        return <XCircle className="w-4 h-4 text-red-500" />;
-      case 'manual_review':
-        return <AlertTriangle className="w-4 h-4 text-yellow-500" />;
-      case 'in_progress':
-        return <Clock className="w-4 h-4 text-blue-500" />;
-      case 'expired':
-        return <XCircle className="w-4 h-4 text-slate-500" />;
-      default:
-        return <Clock className="w-4 h-4 text-slate-500" />;
-    }
-  };
-
   const getStatusBadge = (status: VerificationStatus) => {
-    const baseClass = "inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium";
-    
-    switch (status) {
-      case 'verified':
-        return `${baseClass} bg-green-100 text-green-800`;
-      case 'failed':
-        return `${baseClass} bg-red-100 text-red-800`;
-      case 'manual_review':
-        return `${baseClass} bg-yellow-100 text-yellow-800`;
-      case 'in_progress':
-        return `${baseClass} bg-cyan-500/15 text-cyan-200`;
-      case 'pending':
-        return `${baseClass} bg-cyan-500/15 text-cyan-200`;
-      case 'expired':
-        return `${baseClass} bg-slate-800/70 text-slate-200`;
-      default:
-        return `${baseClass} bg-slate-800/70 text-slate-200`;
-    }
+    return `${statusPill} ${getStatusAccent(status).pill}`;
   };
 
   const formatDate = (dateString: string) => {
@@ -226,16 +184,17 @@ export default function Users() {
 
   return (
     <div className="p-6 space-y-8">
+      {/* Page Header */}
       <div className="flex justify-between items-start">
         <div>
-          <h1 className="text-2xl font-semibold text-slate-100">End Users</h1>
-          <p className="text-slate-400 mt-1">Manage and monitor end user accounts and verification status</p>
+          <p className={sectionLabel}>End Users</p>
+          <p className="text-sm text-slate-500 mt-1">Manage and monitor end user accounts and verification status</p>
         </div>
-        
+
         <div className="flex space-x-3">
           <button
             onClick={exportUsers}
-            className="btn btn-secondary"
+            className="inline-flex items-center border border-white/10 rounded-lg font-mono text-sm px-4 py-2 text-slate-300 hover:bg-slate-800/40 transition-colors disabled:opacity-50"
             disabled={loading}
           >
             <Download className="w-4 h-4 mr-2" />
@@ -243,7 +202,7 @@ export default function Users() {
           </button>
           <button
             onClick={() => setShowCreateForm(true)}
-            className="btn btn-primary"
+            className="inline-flex items-center bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 hover:bg-cyan-500/30 rounded-lg font-mono text-sm px-4 py-2 transition-colors"
           >
             <Plus className="w-4 h-4 mr-2" />
             Add User
@@ -252,7 +211,7 @@ export default function Users() {
       </div>
 
       {/* Filters */}
-      <div className="content-card-glass p-6">
+      <div className={`${cardSurface} p-6`}>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           <div>
             <label className="form-label">Search</label>
@@ -292,8 +251,8 @@ export default function Users() {
               className="form-input"
               placeholder="Enter tags (comma-separated)"
               value={filters.tags.join(', ')}
-              onChange={(e) => setFilters(prev => ({ 
-                ...prev, 
+              onChange={(e) => setFilters(prev => ({
+                ...prev,
                 tags: e.target.value.split(',').map(tag => tag.trim()).filter(Boolean)
               }))}
             />
@@ -310,7 +269,7 @@ export default function Users() {
               });
               setCurrentPage(1);
             }}
-            className="btn btn-secondary mr-3"
+            className="inline-flex items-center border border-white/10 rounded-lg font-mono text-sm px-4 py-2 text-slate-300 hover:bg-slate-800/40 transition-colors mr-3"
           >
             Clear Filters
           </button>
@@ -319,7 +278,7 @@ export default function Users() {
               setCurrentPage(1);
               loadUsers();
             }}
-            className="btn btn-primary"
+            className="inline-flex items-center bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 hover:bg-cyan-500/30 rounded-lg font-mono text-sm px-4 py-2 transition-colors"
           >
             <Filter className="w-4 h-4 mr-2" />
             Apply Filters
@@ -328,153 +287,145 @@ export default function Users() {
       </div>
 
       {/* User List */}
-      <div className="content-card-glass">
+      <div className={cardSurface}>
         <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200">
-            <thead className="bg-slate-900/60">
+          <table className="min-w-full divide-y divide-white/10">
+            <thead>
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  User
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Contact
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Verification Status
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Tags
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Created
-                </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-500 uppercase tracking-wider">
-                  Actions
-                </th>
+                <th className={tableHeaderClass}>User</th>
+                <th className={tableHeaderClass}>Contact</th>
+                <th className={tableHeaderClass}>Verification Status</th>
+                <th className={tableHeaderClass}>Tags</th>
+                <th className={tableHeaderClass}>Created</th>
+                <th className={tableHeaderClass}>Actions</th>
               </tr>
             </thead>
-            <tbody className="bg-slate-900/55 backdrop-blur-sm divide-y divide-white/20">
+            <tbody className="divide-y divide-white/10">
               {loading ? (
-                <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-slate-500">
-                    <div className="flex items-center justify-center">
-                      <div className="w-5 h-5 border-2 border-primary-600 border-t-transparent rounded-full animate-spin mr-2"></div>
-                      Loading users...
-                    </div>
-                  </td>
-                </tr>
+                Array.from({ length: 5 }).map((_, i) => (
+                  <tr key={i} className="animate-pulse">
+                    <td className="px-5 py-4">
+                      <div className="flex items-center space-x-3">
+                        <div className="w-8 h-8 bg-slate-700/50 rounded-full" />
+                        <div className="space-y-2">
+                          <div className="h-3 w-28 bg-slate-700/50 rounded" />
+                          <div className="h-2.5 w-16 bg-slate-700/50 rounded" />
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-5 py-4"><div className="h-3 w-32 bg-slate-700/50 rounded" /></td>
+                    <td className="px-5 py-4"><div className="h-5 w-20 bg-slate-700/50 rounded-full" /></td>
+                    <td className="px-5 py-4"><div className="h-5 w-14 bg-slate-700/50 rounded" /></td>
+                    <td className="px-5 py-4"><div className="h-3 w-24 bg-slate-700/50 rounded" /></td>
+                    <td className="px-5 py-4"><div className="h-3 w-16 bg-slate-700/50 rounded" /></td>
+                  </tr>
+                ))
               ) : !users || users.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-slate-500">
+                  <td colSpan={6} className={`px-5 py-8 text-center text-slate-500 ${monoSm}`}>
                     No users found matching your criteria
                   </td>
                 </tr>
               ) : (
                 users.map((user) => (
-                  <tr key={user.id} className="hover:bg-slate-900/60">
-                    <td className="px-6 py-4 whitespace-nowrap">
+                  <tr key={user.id} className="hover:bg-slate-800/40 transition-colors">
+                    <td className="px-5 py-4 whitespace-nowrap">
                       <div className="flex items-center">
-                        <User className="w-8 h-8 text-slate-500 mr-3" />
+                        <div className="w-8 h-8 rounded-full bg-slate-800 border border-white/10 flex items-center justify-center text-slate-400 text-xs font-mono mr-3">
+                          {user.first_name && user.last_name
+                            ? `${user.first_name[0]}${user.last_name[0]}`
+                            : user.email ? user.email[0].toUpperCase() : '?'}
+                        </div>
                         <div>
-                          <div className="text-sm font-medium text-slate-100">
-                            {user.first_name && user.last_name 
-                              ? `${user.first_name} ${user.last_name}` 
+                          <div className={`${monoSm} text-slate-100`}>
+                            {user.first_name && user.last_name
+                              ? `${user.first_name} ${user.last_name}`
                               : user.email || 'Anonymous User'}
                           </div>
-                          <div className="text-sm text-slate-500">
-                            ID: {user.id.substring(0, 8)}...
+                          <div className={`${monoXs} text-slate-500`}>
+                            {user.id.substring(0, 8)}...
                           </div>
                           {user.external_id && (
-                            <div className="text-xs text-slate-500">
-                              External: {user.external_id}
+                            <div className={`${monoXs} text-slate-500`}>
+                              ext: {user.external_id}
                             </div>
                           )}
                         </div>
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="text-sm text-slate-100">
+                    <td className="px-5 py-4 whitespace-nowrap">
+                      <div className="space-y-1">
                         {user.email && (
-                          <div className="flex items-center mb-1">
-                            <Mail className="w-3 h-3 mr-1 text-slate-500" />
+                          <div className={`${monoSm} text-slate-300`}>
                             {user.email}
                           </div>
                         )}
                         {user.phone && (
-                          <div className="flex items-center">
-                            <Phone className="w-3 h-3 mr-1 text-slate-500" />
+                          <div className={`${monoXs} text-slate-500`}>
                             {user.phone}
                           </div>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        {getStatusIcon(user.verification_status)}
-                        <span className={`ml-2 ${getStatusBadge(user.verification_status)}`}>
+                    <td className="px-5 py-4 whitespace-nowrap">
+                      <div>
+                        <span className={getStatusBadge(user.verification_status)}>
                           {user.verification_status.replace('_', ' ')}
                         </span>
                       </div>
                       {user.verification_completed_at && (
-                        <div className="text-xs text-slate-500 mt-1">
+                        <div className={`${monoXs} text-slate-500 mt-1`}>
                           Completed: {formatDate(user.verification_completed_at)}
                         </div>
                       )}
                       {user.invitation_sent && (
-                        <div className="text-xs text-green-600 mt-1 flex items-center">
-                          <Send className="w-3 h-3 mr-1" />
+                        <div className={`${monoXs} text-emerald-400 mt-1`}>
                           Invitation sent {user.invitation_sent_at && formatDate(user.invitation_sent_at)}
                         </div>
                       )}
                       {!user.invitation_sent && user.email && user.verification_status === 'pending' && (
-                        <div className="text-xs text-orange-600 mt-1 flex items-center">
-                          <AlertTriangle className="w-3 h-3 mr-1" />
+                        <div className={`${monoXs} text-amber-400 mt-1`}>
                           Ready to send invitation
                         </div>
                       )}
                       {!user.invitation_sent && !user.email && user.verification_status === 'pending' && (
-                        <div className="text-xs text-red-600 mt-1 flex items-center">
-                          <AlertTriangle className="w-3 h-3 mr-1" />
+                        <div className={`${monoXs} text-rose-400 mt-1`}>
                           Email required for invitation
                         </div>
                       )}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
+                    <td className="px-5 py-4 whitespace-nowrap">
                       <div className="flex flex-wrap gap-1">
                         {user.tags && user.tags.length > 0 ? (
                           user.tags.slice(0, 3).map((tag, index) => (
                             <span
                               key={index}
-                              className="inline-flex items-center px-2 py-1 text-xs font-medium rounded-md bg-cyan-500/15 text-cyan-200"
+                              className={`${monoXs} px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20`}
                             >
-                              <Tag className="w-3 h-3 mr-1" />
                               {tag}
                             </span>
                           ))
                         ) : (
-                          <span className="text-sm text-slate-500">No tags</span>
+                          <span className={`${monoXs} text-slate-600`}>--</span>
                         )}
                         {user.tags && user.tags.length > 3 && (
-                          <span className="text-xs text-slate-500">
-                            +{user.tags.length - 3} more
+                          <span className={`${monoXs} text-slate-500`}>
+                            +{user.tags.length - 3}
                           </span>
                         )}
                       </div>
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-500">
-                      <div className="flex items-center">
-                        <Calendar className="w-4 h-4 mr-1" />
-                        {formatDate(user.created_at)}
-                      </div>
+                    <td className={`px-5 py-4 whitespace-nowrap ${monoXs} text-slate-500`}>
+                      {formatDate(user.created_at)}
                     </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <td className="px-5 py-4 whitespace-nowrap text-sm font-medium">
                       <div className="flex items-center space-x-2">
                         <button
                           onClick={() => {
                             setSelectedUser(user);
                             setShowDetails(true);
                           }}
-                          className="text-primary-600 hover:text-primary-900"
+                          className="p-1.5 text-slate-400 hover:text-cyan-300 hover:bg-slate-800/40 rounded transition-colors"
                           title="View Details"
                         >
                           <Eye className="w-4 h-4" />
@@ -484,7 +435,7 @@ export default function Users() {
                             setSelectedUser(user);
                             setShowEditForm(true);
                           }}
-                          className="text-cyan-300 hover:text-cyan-200"
+                          className="p-1.5 text-slate-400 hover:text-cyan-300 hover:bg-slate-800/40 rounded transition-colors"
                           title="Edit User"
                         >
                           <Edit2 className="w-4 h-4" />
@@ -495,20 +446,20 @@ export default function Users() {
                               setSelectedUser(user);
                               setShowInvitationModal(true);
                             }}
-                            className="text-emerald-300 hover:text-emerald-200 bg-emerald-500/15 hover:bg-emerald-500/25 p-1.5 rounded"
+                            className="p-1.5 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded transition-colors"
                             title="Send Verification Link"
                           >
                             <Send className="w-4 h-4" />
                           </button>
                         )}
                         {!user.email && (
-                          <div className="text-slate-500 p-1.5" title="No email address - cannot send invitation">
-                            <Send className="w-4 h-4 opacity-30" />
+                          <div className="p-1.5 text-slate-600" title="No email address - cannot send invitation">
+                            <Send className="w-4 h-4" />
                           </div>
                         )}
                         <button
                           onClick={() => setDeleteConfirm(user.id)}
-                          className="text-red-600 hover:text-red-900"
+                          className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded transition-colors"
                           title="Delete User"
                         >
                           <Trash2 className="w-4 h-4" />
@@ -524,43 +475,43 @@ export default function Users() {
 
         {/* Pagination */}
         {totalPages > 1 && (
-          <div className="bg-slate-900/70 backdrop-blur-sm px-4 py-3 flex items-center justify-between border-t border-white/20 sm:px-6">
+          <div className="px-5 py-3 flex items-center justify-between border-t border-white/10">
             <div className="flex-1 flex justify-between sm:hidden">
               <button
                 onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                 disabled={currentPage === 1}
-                className="relative inline-flex items-center px-4 py-2 border border-white/15 text-sm font-medium rounded-md text-slate-300 bg-slate-900 hover:bg-slate-900/60 disabled:opacity-50"
+                className="border border-white/10 rounded-lg font-mono text-sm px-4 py-2 text-slate-300 hover:bg-slate-800/40 transition-colors disabled:opacity-50"
               >
                 Previous
               </button>
               <button
                 onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                 disabled={currentPage === totalPages}
-                className="ml-3 relative inline-flex items-center px-4 py-2 border border-white/15 text-sm font-medium rounded-md text-slate-300 bg-slate-900 hover:bg-slate-900/60 disabled:opacity-50"
+                className="border border-white/10 rounded-lg font-mono text-sm px-4 py-2 text-slate-300 hover:bg-slate-800/40 transition-colors disabled:opacity-50"
               >
                 Next
               </button>
             </div>
             <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
               <div>
-                <p className="text-sm text-slate-300">
-                  Page <span className="font-medium">{currentPage}</span> of{' '}
-                  <span className="font-medium">{totalPages}</span>
+                <p className={`${monoXs} text-slate-500`}>
+                  Page <span className="text-slate-300">{currentPage}</span> of{' '}
+                  <span className="text-slate-300">{totalPages}</span>
                 </p>
               </div>
               <div>
-                <nav className="relative z-0 inline-flex rounded-md shadow-sm -space-x-px">
+                <nav className="inline-flex items-center space-x-1">
                   <button
                     onClick={() => setCurrentPage(prev => Math.max(prev - 1, 1))}
                     disabled={currentPage === 1}
-                    className="relative inline-flex items-center px-2 py-2 rounded-l-md border border-white/15 bg-slate-900 text-sm font-medium text-slate-500 hover:bg-slate-900/60 disabled:opacity-50"
+                    className="border border-white/10 rounded-lg font-mono text-sm px-3 py-1.5 text-slate-400 hover:bg-slate-800/40 transition-colors disabled:opacity-50"
                   >
                     Previous
                   </button>
                   <button
                     onClick={() => setCurrentPage(prev => Math.min(prev + 1, totalPages))}
                     disabled={currentPage === totalPages}
-                    className="relative inline-flex items-center px-2 py-2 rounded-r-md border border-white/15 bg-slate-900 text-sm font-medium text-slate-500 hover:bg-slate-900/60 disabled:opacity-50"
+                    className="border border-white/10 rounded-lg font-mono text-sm px-3 py-1.5 text-slate-400 hover:bg-slate-800/40 transition-colors disabled:opacity-50"
                   >
                     Next
                   </button>
@@ -623,49 +574,52 @@ export default function Users() {
       )}
 
       {/* Send Verification Invitation Modal */}
-      {showInvitationModal && selectedUser && (
-        <div className="fixed inset-0 z-[120] overflow-y-auto h-full w-full bg-slate-950/70 backdrop-blur-sm">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-slate-900">
-            <div className="flex items-center mb-4">
-              <Send className="w-6 h-6 text-green-500 mr-3" />
-              <h3 className="text-lg font-semibold text-slate-100">Send Verification Link</h3>
+      <Modal
+        isOpen={showInvitationModal && !!selectedUser}
+        onClose={() => {
+          setShowInvitationModal(false);
+          setSelectedUser(null);
+        }}
+        title="Send Verification Link"
+        size="md"
+      >
+        {selectedUser && (
+          <div className="space-y-5">
+            <p className="text-slate-400 text-sm">
+              Send a verification invitation email to{' '}
+              <span className={`${monoSm} text-slate-200`}>{selectedUser.first_name} {selectedUser.last_name}</span>{' '}
+              at <span className={`${monoSm} text-slate-200`}>{selectedUser.email}</span>.
+            </p>
+
+            <div className={infoPanel}>
+              <p className={sectionLabel}>What happens next</p>
+              <ul className={`${monoXs} text-slate-400 space-y-1.5 mt-2`}>
+                <li>User receives an email with a verification link</li>
+                <li>Link is valid for 7 days</li>
+                <li>User completes verification on your branded portal</li>
+                <li>You will receive notification of completion</li>
+              </ul>
             </div>
-            
-            <div className="mb-6">
-              <p className="text-slate-400 mb-4">
-                Send a verification invitation email to <strong>{selectedUser.first_name} {selectedUser.last_name}</strong> at <strong>{selectedUser.email}</strong>.
-              </p>
-              
-              <div className="bg-cyan-500/10 border border-cyan-500/25 rounded-lg p-4 mb-4">
-                <h4 className="text-sm font-medium text-cyan-200 mb-2">What happens next:</h4>
-                <ul className="text-sm text-blue-700 space-y-1">
-                  <li>• User receives an email with a verification link</li>
-                  <li>• Link is valid for 7 days</li>
-                  <li>• User completes verification on your branded portal</li>
-                  <li>• You'll receive notification of completion</li>
-                </ul>
-              </div>
-              
-              <div className="mb-4">
-                <label className="block text-sm font-medium text-slate-300 mb-2">
-                  Custom Message (Optional)
-                </label>
-                <textarea
-                  id="customMessage"
-                  rows={3}
-                  className="w-full px-3 py-2 border border-white/15 rounded-md focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500"
-                  placeholder="Add a personalized message to the invitation email..."
-                />
-              </div>
+
+            <div>
+              <label className={`${sectionLabel} block mb-2`}>
+                Custom Message (Optional)
+              </label>
+              <textarea
+                id="customMessage"
+                rows={3}
+                className="w-full px-3 py-2 border border-white/10 rounded-lg bg-slate-800/50 text-slate-100 placeholder-slate-600 focus:ring-2 focus:ring-cyan-500 focus:border-cyan-500 font-mono text-sm"
+                placeholder="Add a personalized message to the invitation email..."
+              />
             </div>
-            
-            <div className="flex justify-end space-x-3">
+
+            <div className="flex justify-end space-x-3 pt-2">
               <button
                 onClick={() => {
                   setShowInvitationModal(false);
                   setSelectedUser(null);
                 }}
-                className="px-4 py-2 border border-white/15 rounded-md text-slate-300 bg-slate-900 hover:bg-slate-900/60"
+                className="px-4 py-2 border border-white/10 rounded-lg font-mono text-sm text-slate-300 hover:bg-slate-800/40 transition-colors"
                 disabled={sendingInvitation}
               >
                 Cancel
@@ -676,46 +630,47 @@ export default function Users() {
                   handleSendVerificationInvitation(customMessage);
                 }}
                 disabled={sendingInvitation}
-                className="px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
+                className="px-4 py-2 bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 hover:bg-cyan-500/30 rounded-lg font-mono text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center"
               >
                 {sendingInvitation && (
-                  <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                  <div className="w-4 h-4 border-2 border-cyan-300 border-t-transparent rounded-full animate-spin mr-2"></div>
                 )}
                 {sendingInvitation ? 'Sending...' : 'Send Invitation'}
               </button>
             </div>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* Delete Confirmation Modal */}
-      {deleteConfirm && (
-        <div className="fixed inset-0 z-[120] overflow-y-auto h-full w-full bg-slate-950/70 backdrop-blur-sm">
-          <div className="relative top-20 mx-auto p-5 border w-96 shadow-lg rounded-md bg-slate-900">
-            <div className="flex items-center mb-4">
-              <AlertTriangle className="w-6 h-6 text-red-500 mr-3" />
-              <h3 className="text-lg font-semibold text-slate-100">Delete User</h3>
-            </div>
-            <p className="text-slate-400 mb-6">
+      <Modal
+        isOpen={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        title="Delete User"
+        size="sm"
+      >
+        <div className="space-y-5">
+          <div className={infoPanel}>
+            <p className="text-slate-300 text-sm">
               Are you sure you want to delete this user? This action cannot be undone.
             </p>
-            <div className="flex justify-end space-x-3">
-              <button
-                onClick={() => setDeleteConfirm(null)}
-                className="btn btn-secondary"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleDeleteUser(deleteConfirm)}
-                className="btn btn-danger"
-              >
-                Delete User
-              </button>
-            </div>
+          </div>
+          <div className="flex justify-end space-x-3 pt-2">
+            <button
+              onClick={() => setDeleteConfirm(null)}
+              className="px-4 py-2 border border-white/10 rounded-lg font-mono text-sm text-slate-300 hover:bg-slate-800/40 transition-colors"
+            >
+              Cancel
+            </button>
+            <button
+              onClick={() => deleteConfirm && handleDeleteUser(deleteConfirm)}
+              className="px-4 py-2 bg-rose-500/20 border border-rose-400/40 text-rose-200 hover:bg-rose-500/30 rounded-lg font-mono text-sm transition-colors"
+            >
+              Delete User
+            </button>
           </div>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }
@@ -748,151 +703,141 @@ function UserDetailsModal({ user, onClose, onUserUpdated }: UserDetailsModalProp
   };
 
   return (
-    <div className="fixed inset-0 z-[120] overflow-y-auto h-full w-full bg-slate-950/70 backdrop-blur-sm">
-      <div className="relative top-8 mx-auto p-5 border w-11/12 max-w-4xl shadow-lg rounded-md bg-slate-900 max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-start mb-6">
-          <div>
-            <h3 className="text-lg font-semibold text-slate-100">User Details</h3>
-            <p className="text-sm text-slate-500 mt-1">ID: {user.id}</p>
-          </div>
-          <button
-            onClick={onClose}
-            className="text-slate-500 hover:text-slate-400"
-          >
-            <XCircle className="w-6 h-6" />
-          </button>
-        </div>
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title="User Details"
+      size="xl"
+    >
+      <div className="space-y-1 mb-6">
+        <p className={`${monoXs} text-slate-500`}>ID: {user.id}</p>
+      </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* User Information */}
-          <div className="space-y-4">
-            <div className="bg-slate-900/60 p-4 rounded-lg">
-              <h4 className="font-medium text-slate-100 mb-3 flex items-center">
-                <User className="w-4 h-4 mr-2" />
-                User Information
-              </h4>
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Name:</span>
-                  <span className="font-medium">
-                    {user.first_name && user.last_name 
-                      ? `${user.first_name} ${user.last_name}` 
-                      : 'Not provided'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Email:</span>
-                  <span className="font-medium">{user.email || 'Not provided'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Phone:</span>
-                  <span className="font-medium">{user.phone || 'Not provided'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">External ID:</span>
-                  <span className="font-medium">{user.external_id || 'Not provided'}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Status:</span>
-                  <span className={`font-medium ${user.verification_status === 'verified' ? 'text-green-600' : user.verification_status === 'failed' ? 'text-red-600' : 'text-yellow-600'}`}>
-                    {user.verification_status.replace('_', ' ')}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-slate-500">Created:</span>
-                  <span className="font-medium">{new Date(user.created_at).toLocaleDateString()}</span>
-                </div>
-                {user.verification_completed_at && (
-                  <div className="flex justify-between">
-                    <span className="text-slate-500">Verified:</span>
-                    <span className="font-medium">{new Date(user.verification_completed_at).toLocaleDateString()}</span>
-                  </div>
-                )}
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* User Information */}
+        <div className="space-y-4">
+          <div className={infoPanel}>
+            <p className={sectionLabel}>User Information</p>
+            <div className="space-y-2.5 text-sm mt-3">
+              <div className="flex justify-between">
+                <span className="text-slate-500">Name</span>
+                <span className={`${monoSm} text-slate-200`}>
+                  {user.first_name && user.last_name
+                    ? `${user.first_name} ${user.last_name}`
+                    : 'Not provided'}
+                </span>
               </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Email</span>
+                <span className={`${monoSm} text-slate-200`}>{user.email || 'Not provided'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Phone</span>
+                <span className={`${monoSm} text-slate-200`}>{user.phone || 'Not provided'}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">External ID</span>
+                <span className={`${monoXs} text-slate-200`}>{user.external_id || 'Not provided'}</span>
+              </div>
+              <div className="flex justify-between items-center">
+                <span className="text-slate-500">Status</span>
+                <span className={`${statusPill} ${getStatusAccent(user.verification_status).pill}`}>
+                  {user.verification_status.replace('_', ' ')}
+                </span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-slate-500">Created</span>
+                <span className={`${monoXs} text-slate-200`}>{new Date(user.created_at).toLocaleDateString()}</span>
+              </div>
+              {user.verification_completed_at && (
+                <div className="flex justify-between">
+                  <span className="text-slate-500">Verified</span>
+                  <span className={`${monoXs} text-slate-200`}>{new Date(user.verification_completed_at).toLocaleDateString()}</span>
+                </div>
+              )}
             </div>
-
-            {/* Tags */}
-            <div className="bg-slate-900/60 p-4 rounded-lg">
-              <h4 className="font-medium text-slate-100 mb-3 flex items-center">
-                <Tag className="w-4 h-4 mr-2" />
-                Tags
-              </h4>
-              <div className="flex flex-wrap gap-2">
-                {user.tags && user.tags.length > 0 ? (
-                  user.tags.map((tag, index) => (
-                    <span
-                      key={index}
-                      className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-cyan-500/15 text-cyan-200"
-                    >
-                      {tag}
-                    </span>
-                  ))
-                ) : (
-                  <span className="text-slate-500 text-sm">No tags assigned</span>
-                )}
-              </div>
-            </div>
-
-            {/* Metadata */}
-            {user.metadata && Object.keys(user.metadata).length > 0 && (
-              <div className="bg-slate-900/60 p-4 rounded-lg">
-                <h4 className="font-medium text-slate-100 mb-3">Custom Metadata</h4>
-                <div className="space-y-2 text-sm">
-                  {Object.entries(user.metadata).map(([key, value]) => (
-                    <div key={key} className="flex justify-between">
-                      <span className="text-slate-500">{key}:</span>
-                      <span className="font-medium">{String(value)}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
           </div>
 
-          {/* Verification History */}
-          <div>
-            <h4 className="font-medium text-slate-100 mb-3 flex items-center">
-              <Shield className="w-4 h-4 mr-2" />
-              Verification History
-            </h4>
-            {loadingVerifications ? (
-              <div className="flex items-center justify-center py-8">
-                <div className="w-5 h-5 border-2 border-primary-600 border-t-transparent rounded-full animate-spin mr-2"></div>
-                Loading verifications...
-              </div>
-            ) : verifications.length === 0 ? (
-              <p className="text-slate-500 text-center py-8">No verifications found</p>
-            ) : (
-              <div className="space-y-3 max-h-96 overflow-y-auto">
-                {verifications.map((verification, index) => (
-                  <div key={index} className="border border-white/10 rounded-lg p-3">
-                    <div className="flex items-center justify-between mb-2">
-                      <span className="text-sm font-medium">
-                        Verification #{verification.id?.substring(0, 8)}...
-                      </span>
-                      <span className={`text-xs px-2 py-1 rounded-full ${
-                        verification.status === 'completed' ? 'bg-green-100 text-green-800' :
-                        verification.status === 'failed' ? 'bg-red-100 text-red-800' :
-                        'bg-yellow-100 text-yellow-800'
-                      }`}>
-                        {verification.status}
-                      </span>
-                    </div>
-                    <div className="text-xs text-slate-500">
-                      {new Date(verification.created_at).toLocaleDateString()}
-                    </div>
+          {/* Tags */}
+          <div className={infoPanel}>
+            <p className={sectionLabel}>Tags</p>
+            <div className="flex flex-wrap gap-2 mt-3">
+              {user.tags && user.tags.length > 0 ? (
+                user.tags.map((tag, index) => (
+                  <span
+                    key={index}
+                    className={`${monoXs} px-2 py-0.5 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20`}
+                  >
+                    {tag}
+                  </span>
+                ))
+              ) : (
+                <span className={`${monoXs} text-slate-600`}>No tags assigned</span>
+              )}
+            </div>
+          </div>
+
+          {/* Metadata */}
+          {user.metadata && Object.keys(user.metadata).length > 0 && (
+            <div className={infoPanel}>
+              <p className={sectionLabel}>Custom Metadata</p>
+              <div className="space-y-2 text-sm mt-3">
+                {Object.entries(user.metadata).map(([key, value]) => (
+                  <div key={key} className="flex justify-between">
+                    <span className="text-slate-500">{key}</span>
+                    <span className={`${monoXs} text-slate-200`}>{String(value)}</span>
                   </div>
                 ))}
               </div>
-            )}
-          </div>
+            </div>
+          )}
+        </div>
+
+        {/* Verification History */}
+        <div>
+          <p className={`${sectionLabel} mb-3`}>Verification History</p>
+          {loadingVerifications ? (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <div key={i} className={`${cardSurface} p-3 animate-pulse`}>
+                  <div className="flex justify-between mb-2">
+                    <div className="h-3 w-28 bg-slate-700/50 rounded" />
+                    <div className="h-5 w-16 bg-slate-700/50 rounded-full" />
+                  </div>
+                  <div className="h-2.5 w-20 bg-slate-700/50 rounded" />
+                </div>
+              ))}
+            </div>
+          ) : verifications.length === 0 ? (
+            <div className={infoPanel}>
+              <p className={`${monoXs} text-slate-500 text-center py-4`}>No verifications found</p>
+            </div>
+          ) : (
+            <div className="space-y-3 max-h-96 overflow-y-auto">
+              {verifications.map((verification, index) => (
+                <div key={index} className={`${cardSurface} border-l-[3px] ${getStatusAccent(verification.status).border} p-3`}>
+                  <div className="flex items-center justify-between mb-2">
+                    <span className={`${monoSm} text-slate-200`}>
+                      #{verification.id?.substring(0, 8)}...
+                    </span>
+                    <span className={`${statusPill} ${getStatusAccent(verification.status).pill}`}>
+                      {verification.status}
+                    </span>
+                  </div>
+                  <div className={`${monoXs} text-slate-500`}>
+                    {new Date(verification.created_at).toLocaleDateString()}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }
 
-// User Form Modal Component  
+// User Form Modal Component
 interface UserFormModalProps {
   title: string;
   user?: EndUser;
@@ -974,20 +919,17 @@ function UserFormModal({ title, user, onClose, onSubmit }: UserFormModalProps) {
   };
 
   return (
-    <div className="fixed inset-0 z-[120] overflow-y-auto h-full w-full bg-slate-950/70 backdrop-blur-sm">
-      <div className="relative top-8 mx-auto p-5 border w-11/12 max-w-2xl shadow-lg rounded-md bg-slate-900 max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-start mb-6">
-          <h3 className="text-lg font-semibold text-slate-100">{title}</h3>
-          <button
-            onClick={onClose}
-            className="text-slate-500 hover:text-slate-400"
-          >
-            <XCircle className="w-6 h-6" />
-          </button>
-        </div>
-
-        <form onSubmit={handleSubmit} className="space-y-6">
-          {/* Basic Information */}
+    <Modal
+      isOpen={true}
+      onClose={onClose}
+      title={title}
+      size="lg"
+      closeOnOverlayClick={false}
+    >
+      <form onSubmit={handleSubmit} className="space-y-6">
+        {/* Basic Information */}
+        <div>
+          <p className={`${sectionLabel} mb-3`}>Basic Information</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="form-label">First Name</label>
@@ -1010,7 +952,10 @@ function UserFormModal({ title, user, onClose, onSubmit }: UserFormModalProps) {
               />
             </div>
           </div>
+        </div>
 
+        <div>
+          <p className={`${sectionLabel} mb-3`}>Contact</p>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="form-label">Email *</label>
@@ -1034,127 +979,127 @@ function UserFormModal({ title, user, onClose, onSubmit }: UserFormModalProps) {
               />
             </div>
           </div>
+        </div>
 
-          <div>
-            <label className="form-label">External ID</label>
-            <input
-              type="text"
-              className="form-input"
-              value={formData.external_id}
-              onChange={(e) => setFormData(prev => ({ ...prev, external_id: e.target.value }))}
-              placeholder="Enter external system ID (optional)"
-            />
+        <div>
+          <label className="form-label">External ID</label>
+          <input
+            type="text"
+            className="form-input"
+            value={formData.external_id}
+            onChange={(e) => setFormData(prev => ({ ...prev, external_id: e.target.value }))}
+            placeholder="Enter external system ID (optional)"
+          />
+        </div>
+
+        {/* Tags */}
+        <div>
+          <p className={`${sectionLabel} mb-3`}>Tags</p>
+          <div className="space-y-3">
+            <div className="flex gap-2">
+              <input
+                type="text"
+                className="form-input flex-1"
+                placeholder="Add a tag"
+                value={newTag}
+                onChange={(e) => setNewTag(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
+              />
+              <button
+                type="button"
+                onClick={addTag}
+                className="px-4 py-2 border border-white/10 rounded-lg font-mono text-sm text-slate-300 hover:bg-slate-800/40 transition-colors"
+              >
+                Add Tag
+              </button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {formData.tags.map((tag, index) => (
+                <span
+                  key={index}
+                  className={`${monoXs} inline-flex items-center px-2.5 py-1 rounded bg-cyan-500/10 text-cyan-300 border border-cyan-500/20`}
+                >
+                  {tag}
+                  <button
+                    type="button"
+                    onClick={() => removeTag(tag)}
+                    className="ml-1.5 hover:text-cyan-100 transition-colors"
+                  >
+                    x
+                  </button>
+                </span>
+              ))}
+            </div>
           </div>
+        </div>
 
-          {/* Tags */}
-          <div>
-            <label className="form-label">Tags</label>
-            <div className="space-y-3">
+        {/* Metadata */}
+        <div>
+          <p className={`${sectionLabel} mb-3`}>Custom Metadata</p>
+          <div className="space-y-3">
+            <div className="grid grid-cols-2 gap-2">
+              <input
+                type="text"
+                className="form-input"
+                placeholder="Metadata key"
+                value={newMetadataKey}
+                onChange={(e) => setNewMetadataKey(e.target.value)}
+              />
               <div className="flex gap-2">
                 <input
                   type="text"
                   className="form-input flex-1"
-                  placeholder="Add a tag"
-                  value={newTag}
-                  onChange={(e) => setNewTag(e.target.value)}
-                  onKeyPress={(e) => e.key === 'Enter' && (e.preventDefault(), addTag())}
+                  placeholder="Metadata value"
+                  value={newMetadataValue}
+                  onChange={(e) => setNewMetadataValue(e.target.value)}
                 />
                 <button
                   type="button"
-                  onClick={addTag}
-                  className="btn btn-secondary"
+                  onClick={addMetadata}
+                  className="px-4 py-2 border border-white/10 rounded-lg font-mono text-sm text-slate-300 hover:bg-slate-800/40 transition-colors"
                 >
-                  Add Tag
+                  Add
                 </button>
               </div>
-              <div className="flex flex-wrap gap-2">
-                {formData.tags.map((tag, index) => (
-                  <span
-                    key={index}
-                    className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-cyan-500/15 text-cyan-200"
-                  >
-                    {tag}
-                    <button
-                      type="button"
-                      onClick={() => removeTag(tag)}
-                      className="ml-1 hover:text-cyan-300"
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
             </div>
-          </div>
-
-          {/* Metadata */}
-          <div>
-            <label className="form-label">Custom Metadata</label>
-            <div className="space-y-3">
-              <div className="grid grid-cols-2 gap-2">
-                <input
-                  type="text"
-                  className="form-input"
-                  placeholder="Metadata key"
-                  value={newMetadataKey}
-                  onChange={(e) => setNewMetadataKey(e.target.value)}
-                />
-                <div className="flex gap-2">
-                  <input
-                    type="text"
-                    className="form-input flex-1"
-                    placeholder="Metadata value"
-                    value={newMetadataValue}
-                    onChange={(e) => setNewMetadataValue(e.target.value)}
-                  />
+            <div className="space-y-2">
+              {Object.entries(formData.metadata).map(([key, value]) => (
+                <div key={key} className={`flex items-center justify-between ${infoPanel} !p-2.5 !space-y-0`}>
+                  <span className={monoXs}>
+                    <span className="text-slate-400">{key}:</span>{' '}
+                    <span className="text-slate-200">{value}</span>
+                  </span>
                   <button
                     type="button"
-                    onClick={addMetadata}
-                    className="btn btn-secondary"
+                    onClick={() => removeMetadata(key)}
+                    className="text-rose-400 hover:text-rose-300 transition-colors p-1"
                   >
-                    Add
+                    <Trash2 className="w-3.5 h-3.5" />
                   </button>
                 </div>
-              </div>
-              <div className="space-y-2">
-                {Object.entries(formData.metadata).map(([key, value]) => (
-                  <div key={key} className="flex items-center justify-between bg-slate-900/60 p-2 rounded">
-                    <span className="text-sm">
-                      <strong>{key}:</strong> {value}
-                    </span>
-                    <button
-                      type="button"
-                      onClick={() => removeMetadata(key)}
-                      className="text-red-600 hover:text-red-800"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </div>
-                ))}
-              </div>
+              ))}
             </div>
           </div>
+        </div>
 
-          {/* Submit Buttons */}
-          <div className="flex justify-end space-x-3 pt-6 border-t">
-            <button
-              type="button"
-              onClick={onClose}
-              className="btn btn-secondary"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={loading}
-              className="btn btn-primary"
-            >
-              {loading ? 'Saving...' : user ? 'Update User' : 'Create User'}
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        {/* Submit Buttons */}
+        <div className="flex justify-end space-x-3 pt-6 border-t border-white/10">
+          <button
+            type="button"
+            onClick={onClose}
+            className="px-4 py-2 border border-white/10 rounded-lg font-mono text-sm text-slate-300 hover:bg-slate-800/40 transition-colors"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            disabled={loading}
+            className="px-4 py-2 bg-cyan-500/20 border border-cyan-400/40 text-cyan-200 hover:bg-cyan-500/30 rounded-lg font-mono text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {loading ? 'Saving...' : user ? 'Update User' : 'Create User'}
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 }
-

@@ -5,21 +5,15 @@ import { DashboardStats, UsageStats, VerificationSession } from '../types.js';
 import {
   BarChart3,
   TrendingUp,
-  TrendingDown,
   Users,
-  CheckCircle,
   AlertTriangle,
-  Calendar,
   Download,
   RefreshCw,
-  Filter,
-  PieChart,
-  Activity,
-  Clock,
   Target,
   Eye,
-  FileText
+  CheckCircle
 } from 'lucide-react';
+import { sectionLabel, statNumber, monoXs, monoSm, cardSurface, statusPill, tableHeaderClass, infoPanel, getStatusAccent } from '../styles/tokens';
 
 export default function Analytics() {
   const { organization, admin } = useAuth();
@@ -36,7 +30,7 @@ export default function Analytics() {
     try {
       setError(null);
       setRefreshing(true);
-      
+
       // Fetch analytics data in parallel
       const [statsResponse, usageResponse, verificationsResponse] = await Promise.all([
         apiClient.getVerificationStats(selectedPeriod),
@@ -77,9 +71,9 @@ export default function Analytics() {
     return (
       <div className="p-6">
         <div className="text-center">
-          <AlertTriangle className="mx-auto h-12 w-12 text-gray-400" />
-          <h3 className="mt-2 text-sm font-medium text-gray-900">Access Denied</h3>
-          <p className="mt-1 text-sm text-gray-500">
+          <AlertTriangle className="mx-auto h-12 w-12 text-slate-500" />
+          <h3 className="mt-2 text-sm font-medium text-slate-100">Access Denied</h3>
+          <p className="mt-1 text-sm text-slate-500">
             You don't have permission to view analytics data.
           </p>
         </div>
@@ -91,18 +85,18 @@ export default function Analytics() {
     return (
       <div className="p-6">
         <div className="animate-pulse space-y-6">
-          <div className="h-8 bg-gray-200 rounded w-1/4"></div>
+          <div className="h-8 bg-slate-700/50 rounded w-1/4"></div>
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {[1, 2, 3, 4].map((i) => (
-              <div key={i} className="content-card-glass p-6">
-                <div className="h-4 bg-gray-200 rounded w-3/4 mb-4"></div>
-                <div className="h-8 bg-gray-200 rounded w-1/2"></div>
+              <div key={i} className={`${cardSurface} border-l-[3px] border-l-slate-700/50 p-5`}>
+                <div className="h-4 bg-slate-700/50 rounded w-3/4 mb-4"></div>
+                <div className="h-8 bg-slate-700/50 rounded w-1/2"></div>
               </div>
             ))}
           </div>
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-            <div className="h-96 bg-gray-200 rounded"></div>
-            <div className="h-96 bg-gray-200 rounded"></div>
+            <div className={`${cardSurface} h-96`}></div>
+            <div className={`${cardSurface} h-96`}></div>
           </div>
         </div>
       </div>
@@ -112,10 +106,10 @@ export default function Analytics() {
   if (error) {
     return (
       <div className="p-6">
-        <div className="content-card-glass p-6 text-center">
-          <AlertTriangle className="w-12 h-12 text-red-500 mx-auto mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Error Loading Analytics</h3>
-          <p className="text-gray-600 mb-4">{error}</p>
+        <div className={`${cardSurface} p-6 text-center`}>
+          <AlertTriangle className="w-12 h-12 text-rose-400 mx-auto mb-4" />
+          <h3 className="text-lg font-semibold text-slate-100 mb-2">Error Loading Analytics</h3>
+          <p className="text-slate-400 mb-4">{error}</p>
           <button onClick={handleRefresh} className="btn btn-primary">
             <RefreshCw className="w-4 h-4 mr-2" />
             Retry
@@ -130,21 +124,27 @@ export default function Analytics() {
       {/* Header */}
       <div className="flex items-center justify-between">
         <div>
-          <h1 className="text-3xl font-bold text-gray-900">Analytics</h1>
-          <p className="text-gray-600 mt-1">Detailed insights and performance metrics for your verification platform</p>
+          <p className={sectionLabel}>Analytics</p>
+          <p className="text-slate-400 mt-1 text-sm">Detailed insights and performance metrics for your verification platform</p>
         </div>
         <div className="flex items-center space-x-3">
           {/* Period Selector */}
-          <select
-            value={selectedPeriod}
-            onChange={(e) => setSelectedPeriod(Number(e.target.value) as 7 | 30 | 90)}
-            className="px-3 py-2 border border-gray-300 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
-          >
-            <option value={7}>Last 7 days</option>
-            <option value={30}>Last 30 days</option>
-            <option value={90}>Last 90 days</option>
-          </select>
-          
+          <div className="border border-white/10 rounded-lg overflow-hidden flex">
+            {([7, 30, 90] as const).map((period) => (
+              <button
+                key={period}
+                onClick={() => setSelectedPeriod(period)}
+                className={`font-mono text-xs px-3 py-2 transition-colors ${
+                  selectedPeriod === period
+                    ? 'bg-slate-700/60 text-slate-100'
+                    : 'text-slate-500 hover:bg-slate-800/40 hover:text-slate-300'
+                }`}
+              >
+                {period}d
+              </button>
+            ))}
+          </div>
+
           {canExportAnalytics && (
             <button
               onClick={handleExport}
@@ -154,7 +154,7 @@ export default function Analytics() {
               Export
             </button>
           )}
-          
+
           <button
             onClick={handleRefresh}
             disabled={refreshing}
@@ -167,7 +167,7 @@ export default function Analytics() {
       </div>
 
       {/* Analytics Tabs */}
-      <div className="border-b border-gray-200">
+      <div className="border-b border-white/10">
         <nav className="-mb-px flex space-x-8">
           {[
             { id: 'overview', name: 'Overview', icon: BarChart3 },
@@ -180,8 +180,8 @@ export default function Analytics() {
               onClick={() => setActiveTab(tab.id as any)}
               className={`flex items-center py-4 px-1 border-b-2 font-medium text-sm ${
                 activeTab === tab.id
-                  ? 'border-blue-500 text-blue-600'
-                  : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300'
+                  ? 'border-cyan-400 text-cyan-300'
+                  : 'border-transparent text-slate-500 hover:text-slate-300 hover:border-white/10'
               }`}
             >
               <tab.icon className="h-4 w-4 mr-2" />
@@ -219,44 +219,30 @@ interface TabProps {
 }
 
 function OverviewTab({ stats, usage, selectedPeriod }: TabProps) {
-  const getSuccessRateColor = (rate: number) => {
-    if (rate >= 90) return 'text-green-600';
-    if (rate >= 70) return 'text-yellow-600';
-    return 'text-red-600';
-  };
-
   const overviewStats = [
     {
       name: 'Total Verifications',
       value: stats?.verification_sessions.total?.toLocaleString() || '0',
-      change: '+12.5%',
-      changeType: 'increase' as const,
-      icon: CheckCircle,
-      color: 'blue'
+      accent: 'border-l-cyan-400',
+      textColor: 'text-slate-100'
     },
     {
       name: 'Success Rate',
       value: `${stats?.verification_sessions.success_rate || 0}%`,
-      change: '+2.1%',
-      changeType: 'increase' as const,
-      icon: Target,
-      color: 'green'
+      accent: 'border-l-emerald-400',
+      textColor: 'text-emerald-400'
     },
     {
       name: 'Avg. Completion Time',
       value: '2.4 min',
-      change: '-0.8 min',
-      changeType: 'decrease' as const,
-      icon: Clock,
-      color: 'yellow'
+      accent: 'border-l-amber-400',
+      textColor: 'text-amber-400'
     },
     {
       name: 'Active Users',
       value: stats?.end_users.total?.toLocaleString() || '0',
-      change: '+8.3%',
-      changeType: 'increase' as const,
-      icon: Users,
-      color: 'purple'
+      accent: 'border-l-violet-400',
+      textColor: 'text-violet-400'
     }
   ];
 
@@ -265,29 +251,9 @@ function OverviewTab({ stats, usage, selectedPeriod }: TabProps) {
       {/* Key Metrics */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         {overviewStats.map((stat, index) => (
-          <div key={index} className="stat-card-glass p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm font-medium text-gray-600">{stat.name}</p>
-                <p className="text-3xl font-bold text-gray-900 mt-2">{stat.value}</p>
-                <div className="flex items-center mt-2">
-                  {stat.changeType === 'increase' ? (
-                    <TrendingUp className="w-4 h-4 text-green-500 mr-1" />
-                  ) : (
-                    <TrendingDown className="w-4 h-4 text-red-500 mr-1" />
-                  )}
-                  <span className={`text-sm font-medium ${
-                    stat.changeType === 'increase' ? 'text-green-600' : 'text-red-600'
-                  }`}>
-                    {stat.change}
-                  </span>
-                  <span className="text-sm text-gray-500 ml-1">vs last period</span>
-                </div>
-              </div>
-              <div className="p-3 rounded-full bg-gray-50">
-                <stat.icon className="h-6 w-6 text-gray-600" />
-              </div>
-            </div>
+          <div key={index} className={`${cardSurface} border-l-[3px] ${stat.accent} p-5`}>
+            <p className={sectionLabel}>{stat.name}</p>
+            <p className={`${statNumber} ${stat.textColor} mt-2`}>{stat.value}</p>
           </div>
         ))}
       </div>
@@ -295,12 +261,9 @@ function OverviewTab({ stats, usage, selectedPeriod }: TabProps) {
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Verification Status Distribution */}
-        <div className="content-card-glass">
-          <div className="p-6 border-b border-white/20">
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-              <PieChart className="h-5 w-5 mr-2 text-blue-600" />
-              Verification Status Distribution
-            </h3>
+        <div className={cardSurface}>
+          <div className="p-6 border-b border-white/10">
+            <p className={sectionLabel}>Verification Status Distribution</p>
           </div>
           <div className="p-6">
             <div className="space-y-4">
@@ -333,43 +296,40 @@ function OverviewTab({ stats, usage, selectedPeriod }: TabProps) {
         </div>
 
         {/* Usage Overview */}
-        <div className="content-card-glass">
-          <div className="p-6 border-b border-white/20">
-            <h3 className="text-lg font-semibold text-gray-900 flex items-center">
-              <Activity className="h-5 w-5 mr-2 text-green-600" />
-              Usage Summary
-            </h3>
+        <div className={cardSurface}>
+          <div className="p-6 border-b border-white/10">
+            <p className={sectionLabel}>Usage Summary</p>
           </div>
           <div className="p-6">
             {usage ? (
               <div className="space-y-6">
                 <div>
                   <div className="flex items-center justify-between mb-2">
-                    <span className="text-sm font-medium text-gray-600">Monthly Verifications</span>
-                    <span className="text-sm text-gray-900">
+                    <span className="text-sm font-medium text-slate-400">Monthly Verifications</span>
+                    <span className={`${monoSm} text-slate-100`}>
                       {usage.current_period.verification_count} / {usage.monthly_limit}
                     </span>
                   </div>
-                  <div className="w-full bg-gray-200 rounded-full h-2">
+                  <div className="w-full bg-slate-700/50 rounded-full h-2">
                     <div
-                      className="bg-blue-600 h-2 rounded-full"
+                      className="bg-cyan-500 h-2 rounded-full"
                       style={{
                         width: `${Math.min((usage.current_period.verification_count / usage.monthly_limit) * 100, 100)}%`
                       }}
                     />
                   </div>
                 </div>
-                
+
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <p className="text-sm text-gray-600">API Calls</p>
-                    <p className="text-lg font-semibold text-gray-900">
+                    <p className={sectionLabel}>API Calls</p>
+                    <p className={`${statNumber} text-slate-100 mt-1`}>
                       {usage.current_period.api_calls.toLocaleString()}
                     </p>
                   </div>
                   <div>
-                    <p className="text-sm text-gray-600">Storage Used</p>
-                    <p className="text-lg font-semibold text-gray-900">
+                    <p className={sectionLabel}>Storage Used</p>
+                    <p className={`${statNumber} text-slate-100 mt-1`}>
                       {usage.current_period.storage_used_mb.toFixed(1)} MB
                     </p>
                   </div>
@@ -377,8 +337,8 @@ function OverviewTab({ stats, usage, selectedPeriod }: TabProps) {
               </div>
             ) : (
               <div className="text-center py-8">
-                <BarChart3 className="w-12 h-12 text-gray-300 mx-auto mb-4" />
-                <p className="text-gray-500">Usage data unavailable</p>
+                <BarChart3 className="w-12 h-12 text-slate-500 mx-auto mb-4" />
+                <p className="text-slate-500">Usage data unavailable</p>
               </div>
             )}
           </div>
@@ -391,21 +351,21 @@ function OverviewTab({ stats, usage, selectedPeriod }: TabProps) {
 function TrendsTab({ stats, selectedPeriod }: TabProps) {
   return (
     <div className="space-y-6">
-      <div className="bg-white rounded-lg border border-gray-200">
-        <div className="p-6 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Verification Trends</h3>
-          <p className="text-sm text-gray-600 mt-1">
+      <div className={cardSurface}>
+        <div className="p-6 border-b border-white/10">
+          <p className={sectionLabel}>Verification Trends</p>
+          <p className="text-sm text-slate-400 mt-1">
             Performance trends over the last {selectedPeriod} days
           </p>
         </div>
         <div className="p-6">
-          <div className="h-64 flex items-center justify-center border-2 border-gray-200 border-dashed rounded-lg">
+          <div className="h-64 flex items-center justify-center border-2 border-white/10 border-dashed rounded-lg">
             <div className="text-center">
-              <TrendingUp className="mx-auto h-12 w-12 text-gray-400" />
-              <span className="mt-2 block text-sm font-medium text-gray-900">
+              <TrendingUp className="mx-auto h-12 w-12 text-slate-500" />
+              <span className="mt-2 block text-sm font-medium text-slate-100">
                 Trend Charts Coming Soon
               </span>
-              <span className="block text-sm text-gray-500">
+              <span className="block text-sm text-slate-500">
                 Historical verification trends and patterns will be displayed here
               </span>
             </div>
@@ -414,26 +374,26 @@ function TrendsTab({ stats, selectedPeriod }: TabProps) {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="content-card-glass">
-          <div className="p-6 border-b border-white/20">
-            <h3 className="text-lg font-semibold text-gray-900">Success Rate Trend</h3>
+        <div className={cardSurface}>
+          <div className="p-6 border-b border-white/10">
+            <p className={sectionLabel}>Success Rate Trend</p>
           </div>
           <div className="p-6">
             <div className="text-center py-12">
-              <Target className="mx-auto h-8 w-8 text-gray-400 mb-2" />
-              <p className="text-sm text-gray-500">Success rate timeline chart</p>
+              <Target className="mx-auto h-8 w-8 text-slate-500 mb-2" />
+              <p className="text-sm text-slate-500">Success rate timeline chart</p>
             </div>
           </div>
         </div>
 
-        <div className="content-card-glass">
-          <div className="p-6 border-b border-white/20">
-            <h3 className="text-lg font-semibold text-gray-900">Volume Trend</h3>
+        <div className={cardSurface}>
+          <div className="p-6 border-b border-white/10">
+            <p className={sectionLabel}>Volume Trend</p>
           </div>
           <div className="p-6">
             <div className="text-center py-12">
-              <BarChart3 className="mx-auto h-8 w-8 text-gray-400 mb-2" />
-              <p className="text-sm text-gray-500">Volume trend chart</p>
+              <BarChart3 className="mx-auto h-8 w-8 text-slate-500 mb-2" />
+              <p className="text-sm text-slate-500">Volume trend chart</p>
             </div>
           </div>
         </div>
@@ -443,97 +403,87 @@ function TrendsTab({ stats, selectedPeriod }: TabProps) {
 }
 
 function UsersTab({ stats, recentVerifications }: TabProps) {
+  const userStats = [
+    {
+      name: 'Total Users',
+      value: stats?.end_users.total || 0,
+      accent: 'border-l-cyan-400',
+      textColor: 'text-slate-100'
+    },
+    {
+      name: 'Verified Users',
+      value: stats?.end_users.verified || 0,
+      accent: 'border-l-emerald-400',
+      textColor: 'text-emerald-400'
+    },
+    {
+      name: 'Pending Review',
+      value: stats?.end_users.manual_review || 0,
+      accent: 'border-l-amber-400',
+      textColor: 'text-amber-400'
+    }
+  ];
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="stat-card-glass p-6">
-          <div className="flex items-center">
-            <Users className="h-8 w-8 text-blue-600" />
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Total Users</p>
-              <p className="text-2xl font-bold text-gray-900">{stats?.end_users.total || 0}</p>
-            </div>
+        {userStats.map((stat, index) => (
+          <div key={index} className={`${cardSurface} border-l-[3px] ${stat.accent} p-5`}>
+            <p className={sectionLabel}>{stat.name}</p>
+            <p className={`${statNumber} ${stat.textColor} mt-2`}>{stat.value}</p>
           </div>
-        </div>
-        
-        <div className="stat-card-glass p-6">
-          <div className="flex items-center">
-            <CheckCircle className="h-8 w-8 text-green-600" />
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Verified Users</p>
-              <p className="text-2xl font-bold text-gray-900">{stats?.end_users.verified || 0}</p>
-            </div>
-          </div>
-        </div>
-        
-        <div className="stat-card-glass p-6">
-          <div className="flex items-center">
-            <Clock className="h-8 w-8 text-yellow-600" />
-            <div className="ml-4">
-              <p className="text-sm font-medium text-gray-600">Pending Review</p>
-              <p className="text-2xl font-bold text-gray-900">{stats?.end_users.manual_review || 0}</p>
-            </div>
-          </div>
-        </div>
+        ))}
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200">
-        <div className="p-6 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Recent Activity</h3>
+      <div className={cardSurface}>
+        <div className="p-6 border-b border-white/10">
+          <p className={sectionLabel}>Recent Activity</p>
         </div>
         <div className="overflow-hidden">
           <table className="min-w-full">
-            <thead className="bg-white/50 backdrop-blur-sm">
+            <thead className="bg-slate-900/60 backdrop-blur-sm">
               <tr>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
+                <th className={tableHeaderClass}>
                   User
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
+                <th className={tableHeaderClass}>
                   Status
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
+                <th className={tableHeaderClass}>
                   Date
                 </th>
-                <th className="px-6 py-3 text-left text-xs font-medium text-slate-600 uppercase tracking-wider">
+                <th className={tableHeaderClass}>
                   Actions
                 </th>
               </tr>
             </thead>
-            <tbody className="bg-white/30 backdrop-blur-sm divide-y divide-white/20">
+            <tbody className="bg-slate-900/40 backdrop-blur-sm divide-y divide-white/10">
               {recentVerifications?.slice(0, 5).map((verification) => (
-                <tr key={verification.id}>
-                  <td className="px-6 py-4 whitespace-nowrap">
+                <tr key={verification.id} className="hover:bg-slate-800/40 transition-colors">
+                  <td className="px-5 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <div className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center">
-                        <Users className="w-5 h-5 text-gray-500" />
+                      <div className="w-10 h-10 bg-slate-800/50 rounded-full flex items-center justify-center">
+                        <Users className="w-5 h-5 text-slate-500" />
                       </div>
                       <div className="ml-4">
-                        <div className="text-sm font-medium text-gray-900">
+                        <div className={`${monoSm} font-medium text-slate-100`}>
                           {verification.vaas_end_users?.first_name} {verification.vaas_end_users?.last_name || 'Unknown User'}
                         </div>
-                        <div className="text-sm text-gray-500">
+                        <div className={`${monoXs} text-slate-500`}>
                           {verification.vaas_end_users?.email || 'No email'}
                         </div>
                       </div>
                     </div>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                      verification.status === 'completed' 
-                        ? 'bg-green-100 text-green-800'
-                        : verification.status === 'failed'
-                        ? 'bg-red-100 text-red-800'
-                        : verification.status === 'processing'
-                        ? 'bg-yellow-100 text-yellow-800'
-                        : 'bg-gray-100 text-gray-800'
-                    }`}>
+                  <td className="px-5 py-4 whitespace-nowrap">
+                    <span className={`${statusPill} ${getStatusAccent(verification.status).pill}`}>
                       {verification.status}
                     </span>
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                  <td className={`px-5 py-4 whitespace-nowrap ${monoXs} text-slate-100`}>
                     {new Date(verification.created_at).toLocaleDateString()}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                  <td className="px-5 py-4 whitespace-nowrap text-sm text-slate-500">
                     <button className="text-indigo-600 hover:text-indigo-900">
                       <Eye className="w-4 h-4" />
                     </button>
@@ -541,7 +491,7 @@ function UsersTab({ stats, recentVerifications }: TabProps) {
                 </tr>
               )) || (
                 <tr>
-                  <td colSpan={4} className="px-6 py-4 text-center text-sm text-gray-500">
+                  <td colSpan={4} className="px-5 py-4 text-center text-sm text-slate-500">
                     No recent activity
                   </td>
                 </tr>
@@ -558,113 +508,113 @@ function PerformanceTab({ stats, usage }: TabProps) {
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div className="content-card-glass">
-          <div className="p-6 border-b border-white/20">
-            <h3 className="text-lg font-semibold text-gray-900">System Performance</h3>
+        <div className={cardSurface}>
+          <div className="p-6 border-b border-white/10">
+            <p className={sectionLabel}>System Performance</p>
           </div>
           <div className="p-6 space-y-6">
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-600">API Response Time</span>
-                <span className="text-sm text-gray-900">245ms avg</span>
+                <span className="text-sm font-medium text-slate-400">API Response Time</span>
+                <span className={`${monoSm} text-slate-100`}>245ms avg</span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="w-full bg-slate-700/50 rounded-full h-2">
                 <div className="bg-green-600 h-2 rounded-full" style={{ width: '85%' }}></div>
               </div>
-              <p className="text-xs text-gray-500 mt-1">Excellent performance</p>
+              <p className={`${monoXs} text-slate-500 mt-1`}>Excellent performance</p>
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-600">Uptime</span>
-                <span className="text-sm text-gray-900">99.9%</span>
+                <span className="text-sm font-medium text-slate-400">Uptime</span>
+                <span className={`${monoSm} text-slate-100`}>99.9%</span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="w-full bg-slate-700/50 rounded-full h-2">
                 <div className="bg-green-600 h-2 rounded-full" style={{ width: '99%' }}></div>
               </div>
-              <p className="text-xs text-gray-500 mt-1">Last 30 days</p>
+              <p className={`${monoXs} text-slate-500 mt-1`}>Last 30 days</p>
             </div>
 
             <div>
               <div className="flex items-center justify-between mb-2">
-                <span className="text-sm font-medium text-gray-600">Error Rate</span>
-                <span className="text-sm text-gray-900">0.1%</span>
+                <span className="text-sm font-medium text-slate-400">Error Rate</span>
+                <span className={`${monoSm} text-slate-100`}>0.1%</span>
               </div>
-              <div className="w-full bg-gray-200 rounded-full h-2">
+              <div className="w-full bg-slate-700/50 rounded-full h-2">
                 <div className="bg-green-600 h-2 rounded-full" style={{ width: '5%' }}></div>
               </div>
-              <p className="text-xs text-gray-500 mt-1">Within acceptable limits</p>
+              <p className={`${monoXs} text-slate-500 mt-1`}>Within acceptable limits</p>
             </div>
           </div>
         </div>
 
-        <div className="content-card-glass">
-          <div className="p-6 border-b border-white/20">
-            <h3 className="text-lg font-semibold text-gray-900">Quality Metrics</h3>
+        <div className={cardSurface}>
+          <div className="p-6 border-b border-white/10">
+            <p className={sectionLabel}>Quality Metrics</p>
           </div>
           <div className="p-6 space-y-4">
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div className={`${infoPanel} flex items-center justify-between`}>
               <div>
-                <p className="text-sm font-medium text-gray-900">Manual Review Rate</p>
-                <p className="text-xs text-gray-600">Verifications requiring manual review</p>
+                <p className="text-sm font-medium text-slate-100">Manual Review Rate</p>
+                <p className={`${monoXs} text-slate-400`}>Verifications requiring manual review</p>
               </div>
               <div className="text-right">
-                <p className="text-lg font-semibold text-gray-900">
+                <p className={`${monoSm} font-semibold text-slate-100`}>
                   {((stats?.end_users.manual_review || 0) / (stats?.end_users.total || 1) * 100).toFixed(1)}%
                 </p>
               </div>
             </div>
 
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div className={`${infoPanel} flex items-center justify-between`}>
               <div>
-                <p className="text-sm font-medium text-gray-900">Avg. Processing Time</p>
-                <p className="text-xs text-gray-600">Time to complete verification</p>
+                <p className="text-sm font-medium text-slate-100">Avg. Processing Time</p>
+                <p className={`${monoXs} text-slate-400`}>Time to complete verification</p>
               </div>
               <div className="text-right">
-                <p className="text-lg font-semibold text-gray-900">2.4 min</p>
+                <p className={`${monoSm} font-semibold text-slate-100`}>2.4 min</p>
               </div>
             </div>
 
-            <div className="flex items-center justify-between p-4 bg-gray-50 rounded-lg">
+            <div className={`${infoPanel} flex items-center justify-between`}>
               <div>
-                <p className="text-sm font-medium text-gray-900">Success Rate</p>
-                <p className="text-xs text-gray-600">Verifications completed successfully</p>
+                <p className="text-sm font-medium text-slate-100">Success Rate</p>
+                <p className={`${monoXs} text-slate-400`}>Verifications completed successfully</p>
               </div>
               <div className="text-right">
-                <p className="text-lg font-semibold text-gray-900">{stats?.verification_sessions.success_rate || 0}%</p>
+                <p className={`${monoSm} font-semibold text-slate-100`}>{stats?.verification_sessions.success_rate || 0}%</p>
               </div>
             </div>
           </div>
         </div>
       </div>
 
-      <div className="bg-white rounded-lg border border-gray-200">
-        <div className="p-6 border-b border-gray-200">
-          <h3 className="text-lg font-semibold text-gray-900">Performance Recommendations</h3>
+      <div className={cardSurface}>
+        <div className="p-6 border-b border-white/10">
+          <p className={sectionLabel}>Performance Recommendations</p>
         </div>
         <div className="p-6">
           <div className="space-y-4">
             <div className="flex items-start space-x-3">
               <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="text-sm font-medium text-gray-900">API Performance: Excellent</p>
-                <p className="text-sm text-gray-600">Response times are well within acceptable limits.</p>
+                <p className="text-sm font-medium text-slate-100">API Performance: Excellent</p>
+                <p className="text-sm text-slate-400">Response times are well within acceptable limits.</p>
               </div>
             </div>
-            
+
             <div className="flex items-start space-x-3">
               <AlertTriangle className="h-5 w-5 text-yellow-500 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="text-sm font-medium text-gray-900">Manual Review Rate: Monitor</p>
-                <p className="text-sm text-gray-600">Consider adjusting confidence thresholds to optimize automatic approvals.</p>
+                <p className="text-sm font-medium text-slate-100">Manual Review Rate: Monitor</p>
+                <p className="text-sm text-slate-400">Consider adjusting confidence thresholds to optimize automatic approvals.</p>
               </div>
             </div>
-            
+
             <div className="flex items-start space-x-3">
               <CheckCircle className="h-5 w-5 text-green-500 mt-0.5 flex-shrink-0" />
               <div>
-                <p className="text-sm font-medium text-gray-900">System Uptime: Excellent</p>
-                <p className="text-sm text-gray-600">Uptime is consistently above 99.9%.</p>
+                <p className="text-sm font-medium text-slate-100">System Uptime: Excellent</p>
+                <p className="text-sm text-slate-400">Uptime is consistently above 99.9%.</p>
               </div>
             </div>
           </div>
@@ -683,21 +633,21 @@ interface StatusBarProps {
 
 function StatusBar({ label, value, total, color }: StatusBarProps) {
   const percentage = total > 0 ? (value / total) * 100 : 0;
-  
+
   const colorClasses = {
     green: 'bg-green-500',
     red: 'bg-red-500',
     yellow: 'bg-yellow-500',
-    blue: 'bg-blue-500'
+    blue: 'bg-cyan-500'
   };
 
   return (
     <div>
       <div className="flex items-center justify-between mb-1">
-        <span className="text-sm font-medium text-gray-700">{label}</span>
-        <span className="text-sm text-gray-900">{value} ({percentage.toFixed(1)}%)</span>
+        <span className="text-sm font-medium text-slate-300">{label}</span>
+        <span className={`${monoSm} text-slate-100`}>{value} ({percentage.toFixed(1)}%)</span>
       </div>
-      <div className="w-full bg-gray-200 rounded-full h-2">
+      <div className="w-full bg-slate-700/50 rounded-full h-2">
         <div
           className={`h-2 rounded-full ${colorClasses[color]}`}
           style={{ width: `${percentage}%` }}

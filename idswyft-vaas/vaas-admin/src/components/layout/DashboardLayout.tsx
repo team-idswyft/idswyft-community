@@ -203,7 +203,7 @@ export default function DashboardLayout() {
         </div>
 
         <div className="hidden lg:flex lg:w-72 lg:flex-col">
-          <Sidebar className="animate-slide-in-left" />
+          <Sidebar />
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
