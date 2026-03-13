@@ -79,6 +79,7 @@ export class ConsistencyMonitor {
       let totalChecked = 0;
       let inconsistentCount = 0;
       let fixedCount = 0;
+      let skippedNotFound = 0;
 
       // Check each verification
       for (const verification of recentVerifications) {
@@ -87,11 +88,18 @@ export class ConsistencyMonitor {
             verification.id
           );
 
+          // Skip orphaned records — they exist in verification_requests
+          // but the joined query returns null (missing related data)
+          if (consistencyResult.notFound) {
+            skippedNotFound++;
+            continue;
+          }
+
           totalChecked++;
 
           if (!consistencyResult.isConsistent) {
             inconsistentCount++;
-            
+
             logger.warn('Consistency issues found in verification', {
               verificationId: verification.id,
               status: verification.status,
@@ -104,9 +112,9 @@ export class ConsistencyMonitor {
               const recalculated = await this.consistencyService.recalculateConsistentScores(
                 verification.id
               );
-              
+
               fixedCount++;
-              
+
               logger.info('Verification consistency automatically fixed', {
                 verificationId: verification.id,
                 oldStatus: verification.status,
@@ -129,15 +137,20 @@ export class ConsistencyMonitor {
       }
 
       // Log summary
+      if (skippedNotFound > 0) {
+        logger.debug('Consistency check skipped orphaned records', { skippedNotFound });
+      }
+
       if (totalChecked > 0) {
         const consistentCount = totalChecked - inconsistentCount;
         const consistencyRate = (consistentCount / totalChecked * 100).toFixed(1);
-        
+
         logger.info('Consistency check completed', {
           totalChecked,
           consistentCount,
           inconsistentCount,
           fixedCount,
+          skippedNotFound,
           consistencyRate: `${consistencyRate}%`
         });
 

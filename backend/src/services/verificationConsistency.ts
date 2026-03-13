@@ -97,6 +97,7 @@ export class VerificationConsistencyService {
    */
   async validateVerificationConsistency(verificationId: string): Promise<{
     isConsistent: boolean;
+    notFound?: boolean;
     issues: string[];
     recommendations: string[];
   }> {
@@ -117,6 +118,7 @@ export class VerificationConsistencyService {
     if (!verification) {
       return {
         isConsistent: false,
+        notFound: true,
         issues: ['Verification not found'],
         recommendations: ['Ensure verification exists before validation']
       };
