@@ -1,19 +1,19 @@
-FROM node:20-alpine AS base
-# Cache bust: 2026-03-13
+FROM node:20-slim AS base
 WORKDIR /app
 
-# Native build dependencies for sharp (image processing) and canvas (face recognition)
-# libc6-compat provides glibc compatibility (ld-linux-x86-64.so.2) needed by onnxruntime-node
-RUN apk add --no-cache \
+# Native build dependencies for sharp, canvas (face recognition), and onnxruntime-node
+# Using slim (Debian) instead of Alpine because onnxruntime-node requires full glibc
+RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     make \
     g++ \
-    cairo-dev \
-    jpeg-dev \
-    pango-dev \
-    giflib-dev \
-    librsvg-dev \
-    libc6-compat
+    libcairo2-dev \
+    libjpeg-dev \
+    libpango1.0-dev \
+    libgif-dev \
+    librsvg2-dev \
+    pkg-config \
+    && rm -rf /var/lib/apt/lists/*
 
 COPY package*.json ./
 RUN npm install --include=optional
