@@ -1,11 +1,12 @@
+import crypto from 'crypto';
 import { vaasSupabase } from '../config/database.js';
 import { idswyftApiService } from './idswyftApiService.js';
 import { webhookService } from './webhookService.js';
-import { 
-  VaasEndUser, 
-  VaasVerificationSession, 
+import {
+  VaasEndUser,
+  VaasVerificationSession,
   VaasStartVerificationRequest,
-  VaasStartVerificationResponse 
+  VaasStartVerificationResponse
 } from '../types/index.js';
 
 export class VerificationService {
@@ -14,71 +15,73 @@ export class VerificationService {
     try {
       // Create or get end user
       let endUser = await this.getOrCreateEndUser(organizationId, request.end_user);
-      
-      // Create user in main Idswyft API
-      const idswyftUser = await idswyftApiService.createUser(
-        idswyftApiService.mapVaasUserToIdswyftUser(endUser)
-      );
-      
-      // Start verification in main API
-      const verificationRequest = {
-        user_id: idswyftUser.id,
-        require_liveness: request.settings?.require_liveness ?? true,
-        require_back_of_id: request.settings?.require_back_of_id ?? true,
-        webhook_url: `${process.env.VAAS_WEBHOOK_BASE_URL}/webhooks/idswyft`,
-        success_redirect_url: request.settings?.success_redirect_url,
-        failure_redirect_url: request.settings?.failure_redirect_url,
-        metadata: {
-          vaas_organization_id: organizationId,
-          vaas_end_user_id: endUser.id,
-          callback_url: request.settings?.callback_url
-        }
-      };
-      
-      const idswyftVerification = await idswyftApiService.startVerification(verificationRequest);
-      
+
+      // Create user in main Idswyft API (best-effort — VaaS flow can proceed without it)
+      let idswyftUserId: string | null = null;
+      let idswyftVerificationId: string | null = null;
+      try {
+        const idswyftUser = await idswyftApiService.createUser(
+          idswyftApiService.mapVaasUserToIdswyftUser(endUser)
+        );
+        idswyftUserId = idswyftUser.id;
+
+        // Create verification record in main API
+        const idswyftVerification = await idswyftApiService.startVerification({
+          user_id: idswyftUser.id,
+          organization_id: organizationId,
+        });
+        idswyftVerificationId = idswyftVerification.verification_id;
+      } catch (mainApiError: any) {
+        console.warn('[VerificationService] Main API integration failed (non-blocking):', mainApiError.message);
+        // Continue — VaaS sessions work independently of the main API
+      }
+
+      // Generate session token and expiry locally
+      const sessionToken = crypto.randomBytes(32).toString('hex');
+      const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
+
       // Create VaaS verification session
       const { data: session, error } = await vaasSupabase
         .from('vaas_verification_sessions')
         .insert({
           organization_id: organizationId,
           end_user_id: endUser.id,
-          idswyft_verification_id: idswyftVerification.verification_id,
-          idswyft_user_id: idswyftUser.id,
+          idswyft_verification_id: idswyftVerificationId,
+          idswyft_user_id: idswyftUserId,
           status: 'pending',
-          session_token: idswyftVerification.session_token,
-          expires_at: idswyftVerification.expires_at,
+          session_token: sessionToken,
+          expires_at: expiresAt.toISOString(),
           results: {}
         })
         .select()
         .single();
-        
+
       if (error) {
         throw new Error(`Failed to create verification session: ${error.message}`);
       }
-      
+
       // Update end user status
       await vaasSupabase
         .from('vaas_end_users')
         .update({ verification_status: 'in_progress' })
         .eq('id', endUser.id);
-      
-      // Send webhook notification
-      await webhookService.sendWebhook(organizationId, 'verification.started', {
+
+      // Send webhook notification (fire-and-forget)
+      webhookService.sendWebhook(organizationId, 'verification.started', {
         verification_session: session,
         end_user: endUser
-      });
-      
-      // Generate VaaS customer portal URL instead of main platform URL
+      }).catch(err => console.error('[VerificationService] Webhook failed:', err.message));
+
+      // Generate VaaS customer portal URL
       const customerPortalUrl = process.env.VAAS_CUSTOMER_PORTAL_URL || 'https://customer.idswyft.app';
-      const vaasVerificationUrl = `${customerPortalUrl}/verify?session=${session.session_token}`;
-      
+      const vaasVerificationUrl = `${customerPortalUrl}/verify/${sessionToken}`;
+
       return {
         session_id: session.id,
         verification_url: vaasVerificationUrl,
         end_user: endUser,
-        expires_at: idswyftVerification.expires_at,
-        session_token: session.session_token // Include token for debugging/admin use
+        expires_at: expiresAt.toISOString(),
+        session_token: sessionToken
       };
     } catch (error: any) {
       console.error('[VerificationService] Start verification failed:', error);

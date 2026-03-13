@@ -30,6 +30,7 @@ interface IdswyftApiVerification {
 
 interface IdswyftStartVerificationRequest {
   user_id: string;
+  organization_id?: string;
   require_liveness?: boolean;
   require_back_of_id?: boolean;
   webhook_url?: string;
@@ -40,9 +41,7 @@ interface IdswyftStartVerificationRequest {
 
 interface IdswyftStartVerificationResponse {
   verification_id: string;
-  verification_url: string;
-  session_token: string;
-  expires_at: string;
+  status: string;
 }
 
 export class IdswyftApiService {
@@ -119,13 +118,20 @@ export class IdswyftApiService {
   
   async startVerification(request: IdswyftStartVerificationRequest): Promise<IdswyftStartVerificationResponse> {
     try {
-      const response: AxiosResponse<{ success: boolean; data: IdswyftStartVerificationResponse }> = await this.client.post('/api/verifications/start', request);
-      
+      // Uses /api/vaas/verify which accepts service token auth
+      const response = await this.client.post('/api/vaas/verify', {
+        user_id: request.user_id,
+        organization_id: request.organization_id,
+      });
+
       if (!response.data.success) {
         throw new Error('Failed to start verification in main Idswyft API');
       }
-      
-      return response.data.data;
+
+      return {
+        verification_id: response.data.verification_id,
+        status: response.data.status,
+      };
     } catch (error: any) {
       console.error('[IdswyftAPI] Start verification failed:', error.response?.data || error.message);
       throw new Error(`Failed to start verification: ${error.response?.data?.error?.message || error.message}`);
@@ -134,13 +140,22 @@ export class IdswyftApiService {
   
   async getVerification(verificationId: string): Promise<IdswyftApiVerification> {
     try {
-      const response: AxiosResponse<{ success: boolean; data: IdswyftApiVerification }> = await this.client.get(`/api/verifications/${verificationId}`);
-      
+      const response = await this.client.get(`/api/vaas/verify/${verificationId}/status`);
+
       if (!response.data.success) {
         throw new Error('Failed to get verification from main Idswyft API');
       }
-      
-      return response.data.data;
+
+      const v = response.data.verification;
+      return {
+        id: v.id,
+        user_id: '',
+        status: v.status,
+        confidence_score: v.confidence_score,
+        failure_reasons: v.failure_reason ? [v.failure_reason] : undefined,
+        created_at: '',
+        updated_at: v.updated_at,
+      };
     } catch (error: any) {
       console.error('[IdswyftAPI] Get verification failed:', error.response?.data || error.message);
       throw new Error(`Failed to get verification: ${error.response?.data?.error?.message || error.message}`);
