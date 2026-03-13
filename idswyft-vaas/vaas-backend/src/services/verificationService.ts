@@ -2,6 +2,7 @@ import crypto from 'crypto';
 import { vaasSupabase } from '../config/database.js';
 import { idswyftApiService } from './idswyftApiService.js';
 import { webhookService } from './webhookService.js';
+import { emailService } from './emailService.js';
 import {
   VaasEndUser,
   VaasVerificationSession,
@@ -75,6 +76,10 @@ export class VerificationService {
       // Generate VaaS customer portal URL
       const customerPortalUrl = process.env.VAAS_CUSTOMER_PORTAL_URL || 'https://customer.idswyft.app';
       const vaasVerificationUrl = `${customerPortalUrl}/verify/${sessionToken}`;
+
+      // Send verification invitation email (fire-and-forget)
+      this.sendVerificationEmail(organizationId, endUser, vaasVerificationUrl, expiresAt)
+        .catch(err => console.error('[VerificationService] Email send failed:', err.message));
 
       return {
         session_id: session.id,
@@ -372,6 +377,41 @@ export class VerificationService {
     return updatedSession;
   }
   
+  private async sendVerificationEmail(
+    organizationId: string,
+    endUser: VaasEndUser,
+    verificationUrl: string,
+    expiresAt: Date
+  ): Promise<void> {
+    if (!endUser.email) return;
+
+    // Fetch organization for branding
+    const { data: organization } = await vaasSupabase
+      .from('vaas_organizations')
+      .select('name, branding')
+      .eq('id', organizationId)
+      .single();
+
+    const orgName = organization?.name || 'Idswyft';
+    const userName = [endUser.first_name, endUser.last_name].filter(Boolean).join(' ') || 'there';
+
+    await emailService.sendVerificationInvitation({
+      userEmail: endUser.email,
+      userName,
+      organizationName: orgName,
+      verificationUrl,
+      expiresAt: expiresAt.toISOString(),
+      organizationBranding: organization?.branding ? {
+        primary_color: organization.branding.primary_color,
+        logo_url: organization.branding.logo_url,
+        company_name: organization.branding.company_name || orgName,
+        welcome_message: organization.branding.welcome_message
+      } : undefined
+    });
+
+    console.log('[VerificationService] Verification invitation email sent to:', endUser.email);
+  }
+
   private async getOrCreateEndUser(organizationId: string, userData: VaasStartVerificationRequest['end_user']): Promise<VaasEndUser> {
     // Try to find existing user by external_id or email
     let existingUser = null;
