@@ -13,6 +13,10 @@ RUN npm ci
 # Copy source code
 COPY . .
 
+# Accept build-time env vars for Vite (Railway injects these as ARGs)
+ARG VITE_API_URL
+ARG VITE_NODE_ENV
+
 # Build the application
 RUN npm run build
 
