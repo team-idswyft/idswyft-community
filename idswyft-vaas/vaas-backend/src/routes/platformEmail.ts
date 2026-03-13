@@ -25,6 +25,7 @@ router.get('/config', async (req: PlatformAdminRequest, res) => {
           primary_color: '#22d3ee',
           footer_text: 'Powered by Idswyft VaaS',
           company_name: 'Idswyft',
+          from_email: 'noreply@mail.idswyft.app',
         },
       };
       return res.json(response);
@@ -44,13 +45,14 @@ router.get('/config', async (req: PlatformAdminRequest, res) => {
 // PUT /api/platform/email/config — update email branding
 router.put('/config', async (req: PlatformAdminRequest, res) => {
   try {
-    const { logo_url, primary_color, footer_text, company_name } = req.body;
+    const { logo_url, primary_color, footer_text, company_name, from_email } = req.body;
 
     const updates: Record<string, any> = { updated_at: new Date().toISOString() };
     if (logo_url !== undefined) updates.logo_url = logo_url;
     if (primary_color !== undefined) updates.primary_color = primary_color;
     if (footer_text !== undefined) updates.footer_text = footer_text;
     if (company_name !== undefined) updates.company_name = company_name;
+    if (from_email !== undefined) updates.from_email = from_email;
 
     const { data, error } = await vaasSupabase
       .from('platform_email_config')

@@ -55,6 +55,7 @@ interface EmailConfig {
   primary_color: string;
   footer_text: string;
   company_name: string;
+  from_email: string;
 }
 
 // ── Dark-theme constants ────────────────────────────────────────────────────
@@ -77,7 +78,7 @@ export class EmailService {
 
   constructor() {
     this.resendApiKey = process.env.RESEND_API_KEY || '';
-    this.fromAddress = process.env.EMAIL_FROM || 'Idswyft VaaS <noreply@idswyft.app>';
+    this.fromAddress = process.env.EMAIL_FROM || 'Idswyft VaaS <noreply@mail.idswyft.app>';
 
     this.isConfigured = !!this.resendApiKey;
 
@@ -104,12 +105,13 @@ export class EmailService {
       primary_color: '#22d3ee',
       footer_text: 'Powered by Idswyft VaaS',
       company_name: 'Idswyft',
+      from_email: 'noreply@mail.idswyft.app',
     };
 
     try {
       const { data, error } = await vaasSupabase
         .from('platform_email_config')
-        .select('logo_url, primary_color, footer_text, company_name')
+        .select('logo_url, primary_color, footer_text, company_name, from_email')
         .eq('id', 'default')
         .single();
 
@@ -121,6 +123,7 @@ export class EmailService {
           primary_color: data.primary_color || defaults.primary_color,
           footer_text: data.footer_text || defaults.footer_text,
           company_name: data.company_name || defaults.company_name,
+          from_email: data.from_email || defaults.from_email,
         };
       }
     } catch {
@@ -172,6 +175,12 @@ ${inner}
         setTimeout(() => reject(new Error('Resend request timeout after 8 seconds')), 8000)
       );
 
+      // Use platform-configured from address, falling back to constructor default
+      const emailConfig = await this.getEmailConfig();
+      const fromAddr = emailConfig.from_email
+        ? `${emailConfig.company_name} <${emailConfig.from_email}>`
+        : this.fromAddress;
+
       const fetchPromise = fetch('https://api.resend.com/emails', {
         method: 'POST',
         headers: {
@@ -179,7 +188,7 @@ ${inner}
           'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          from: this.fromAddress,
+          from: fromAddr,
           to: [options.to],
           subject: options.subject,
           html: options.html,

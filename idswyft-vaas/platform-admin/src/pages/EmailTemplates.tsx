@@ -13,6 +13,7 @@ interface EmailConfig {
   primary_color: string;
   footer_text: string;
   company_name: string;
+  from_email: string;
 }
 
 const TEMPLATE_TABS = ['welcome', 'notification', 'verification', 'invitation'] as const;
@@ -24,6 +25,7 @@ export default function EmailTemplates() {
     primary_color: '#22d3ee',
     footer_text: '',
     company_name: '',
+    from_email: 'noreply@mail.idswyft.app',
   });
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -55,6 +57,7 @@ export default function EmailTemplates() {
         primary_color: data.primary_color || '#22d3ee',
         footer_text: data.footer_text || '',
         company_name: data.company_name || '',
+        from_email: data.from_email || 'noreply@mail.idswyft.app',
       });
     } catch (err) {
       console.error('Failed to load email config:', err);
@@ -137,6 +140,20 @@ export default function EmailTemplates() {
                 className="form-input"
                 placeholder="https://example.com/logo.png"
               />
+            </div>
+
+            <div className="form-group">
+              <label className="form-label">From Email Address</label>
+              <input
+                type="email"
+                value={config.from_email}
+                onChange={(e) => setConfig({ ...config, from_email: e.target.value })}
+                className="form-input"
+                placeholder="noreply@mail.idswyft.app"
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Sender address for all outbound emails. Must be a verified domain.
+              </p>
             </div>
 
             <div className="form-group">

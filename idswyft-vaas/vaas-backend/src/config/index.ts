@@ -127,7 +127,7 @@ export const config = {
   // Email (for notifications)
   email: {
     provider: process.env.EMAIL_PROVIDER || 'smtp',
-    fromAddress: process.env.EMAIL_FROM || 'noreply@idswyft.app',
+    fromAddress: process.env.EMAIL_FROM || 'noreply@mail.idswyft.app',
     smtpHost: process.env.SMTP_HOST,
     smtpPort: parseInt(process.env.SMTP_PORT || '587'),
     smtpUser: process.env.SMTP_USER,
