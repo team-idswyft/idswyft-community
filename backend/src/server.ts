@@ -106,7 +106,15 @@ if (config.storage.provider === 'local') {
   app.get('/api/files/*', authenticateAPIKey, serveLocalFile);
 }
 
-// Health check endpoint
+// Health check endpoint (bare /health for Railway health checks + /api/health for API consumers)
+app.get('/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    version: '1.0.0',
+    environment: config.nodeEnv
+  });
+});
 app.get('/api/health', (req, res) => {
   res.json({
     status: 'healthy',
