@@ -26,11 +26,15 @@ type AuthAction =
   | { type: 'REFRESH_SUCCESS'; payload: { admin: PlatformAdmin } }
   | { type: 'REFRESH_FAILURE' };
 
+// If a token exists in localStorage, start in loading state so auth guards
+// wait for the refresh to complete instead of immediately redirecting to login.
+const hasExistingToken = platformApi.isAuthenticated();
+
 const initialState: AuthState = {
   isAuthenticated: false,
   admin: null,
   token: null,
-  loading: false,
+  loading: hasExistingToken,
   error: null,
 };
 

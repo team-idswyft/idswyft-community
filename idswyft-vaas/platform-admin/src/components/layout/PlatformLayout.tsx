@@ -26,10 +26,22 @@ const navigationItems = [
 ];
 
 export default function PlatformLayout() {
-  const { isAuthenticated, admin, logout } = useAuth();
+  const { isAuthenticated, loading, admin, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const location = useLocation();
+
+  // Still verifying token on page refresh — wait before redirecting
+  if (!isAuthenticated && loading) {
+    return (
+      <div className="dashboard-bg flex h-screen items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="h-8 w-8 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent" />
+          <p className="text-sm text-slate-400">Verifying session...</p>
+        </div>
+      </div>
+    );
+  }
 
   if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
