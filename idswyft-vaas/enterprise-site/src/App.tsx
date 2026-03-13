@@ -192,12 +192,19 @@ function App() {
       try {
         const response = await fetch(`${vaasBackendUrl}/api/assets/platform`)
         const payload = await response.json()
-        const remoteLogoUrl = payload?.data?.logo_url
-        if (response.ok && typeof remoteLogoUrl === 'string' && remoteLogoUrl.trim()) {
-          setLogoUrl(remoteLogoUrl)
+        if (response.ok) {
+          const remoteLogoUrl = payload?.data?.logo_url
+          if (typeof remoteLogoUrl === 'string' && remoteLogoUrl.trim()) {
+            setLogoUrl(remoteLogoUrl)
+          }
+          const faviconUrl = payload?.data?.favicon_url
+          if (typeof faviconUrl === 'string' && faviconUrl.trim()) {
+            const link = document.querySelector("link[rel='icon']") as HTMLLinkElement
+            if (link) link.href = faviconUrl
+          }
         }
       } catch {
-        // Keep local fallback logo when branding endpoint is unavailable.
+        // Keep local fallback logo/favicon when branding endpoint is unavailable.
       }
     }
 

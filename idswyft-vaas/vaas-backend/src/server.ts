@@ -9,6 +9,7 @@ import config from './config/index.js';
 import { connectVaasDB } from './config/database.js';
 import { sessionExpirationService } from './services/sessionExpirationService.js';
 import { seedPlatformAdmin } from './scripts/seedPlatformAdmin.js';
+import { authRateLimit } from './middleware/rateLimit.js';
 
 // Import routes
 console.log('📦 Importing route modules...');
@@ -159,6 +160,10 @@ const limiter = rateLimit({
   legacyHeaders: false,
 });
 app.use('/api/', limiter);
+
+// Stricter rate limiting for authentication endpoints (brute-force protection)
+app.use('/api/auth/login', authRateLimit);
+app.use('/api/platform/auth/login', authRateLimit);
 
 // Health check endpoint
 app.get('/health', (req, res) => {

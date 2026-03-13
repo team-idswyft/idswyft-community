@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { verificationService } from '../services/verificationService.js';
 import { requireAuth, requireApiKey, requirePermission, AuthenticatedRequest } from '../middleware/auth.js';
 import { validateStartVerification, validatePagination } from '../middleware/validation.js';
+import { apiKeyRateLimit } from '../middleware/rateLimit.js';
 import { VaasApiResponse, VaasStartVerificationRequest } from '../types/index.js';
 import { vaasSupabase } from '../config/database.js';
 
@@ -21,7 +22,15 @@ router.post('/start', async (req: AuthenticatedRequest, res) => {
           else resolve();
         });
       });
-      
+
+      // Per-API-key rate limiting
+      if ((req as any).apiKey) {
+        await new Promise<void>((resolve) => {
+          apiKeyRateLimit(req, res, () => resolve());
+        });
+        if (res.headersSent) return;
+      }
+
       organizationId = (req as any).apiKey.organization_id;
     } else {
       // Validate admin auth
@@ -132,7 +141,15 @@ router.get('/:id', async (req: AuthenticatedRequest, res) => {
           else resolve();
         });
       });
-      
+
+      // Per-API-key rate limiting
+      if ((req as any).apiKey) {
+        await new Promise<void>((resolve) => {
+          apiKeyRateLimit(req, res, () => resolve());
+        });
+        if (res.headersSent) return;
+      }
+
       organizationId = (req as any).apiKey.organization_id;
     } else {
       await new Promise<void>((resolve, reject) => {
@@ -141,9 +158,9 @@ router.get('/:id', async (req: AuthenticatedRequest, res) => {
           else resolve();
         });
       });
-      
+
       organizationId = req.admin!.organization_id;
-      
+
       if (!req.admin!.permissions.view_verifications) {
         const response: VaasApiResponse = {
           success: false,

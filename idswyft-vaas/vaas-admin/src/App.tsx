@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { AuthProvider } from './contexts/AuthContext';
 import Login from './components/auth/Login';
@@ -30,7 +30,31 @@ const DevInfo = () => (
 
 // No placeholder components needed - all routes are implemented
 
+// ── Dynamic favicon from platform branding ───────────────────────────────────
+function usePlatformFavicon() {
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002/api';
+
+  useEffect(() => {
+    const loadFavicon = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/assets/platform`);
+        const payload = await response.json();
+        const faviconUrl = payload?.data?.favicon_url;
+        if (response.ok && typeof faviconUrl === 'string' && faviconUrl.trim()) {
+          const link = document.querySelector("link[rel='icon']") as HTMLLinkElement;
+          if (link) link.href = faviconUrl;
+        }
+      } catch {
+        // Keep static fallback favicon.
+      }
+    };
+
+    loadFavicon();
+  }, [API_BASE_URL]);
+}
+
 function App() {
+  usePlatformFavicon();
   return (
     <AuthProvider>
       <Router>

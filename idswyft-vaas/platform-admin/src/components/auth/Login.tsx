@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Navigate, useNavigate } from 'react-router-dom';
 import { Eye, EyeOff, AlertCircle, Shield, Lock, Mail } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
@@ -12,6 +12,26 @@ export default function Login() {
   const [validationErrors, setValidationErrors] = useState<Record<string, string>>({});
   const [submitting, setSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  const [logoUrl, setLogoUrl] = useState('/idswyft-logo.png');
+
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002/api';
+
+  useEffect(() => {
+    const loadPlatformLogo = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/assets/platform`);
+        const payload = await response.json();
+        const remoteLogo = payload?.data?.logo_url;
+        if (response.ok && typeof remoteLogo === 'string' && remoteLogo.trim()) {
+          setLogoUrl(remoteLogo);
+        }
+      } catch {
+        // Keep fallback logo if branding endpoint is unavailable.
+      }
+    };
+
+    loadPlatformLogo();
+  }, [API_BASE_URL]);
 
   if (isAuthenticated) {
     return <Navigate to="/dashboard" replace />;
@@ -72,7 +92,7 @@ export default function Login() {
                 <Shield className="h-6 w-6" />
               </div>
               <div>
-                <img src="/idswyft-logo.png" alt="Idswyft Platform" className="h-8 w-auto" />
+                <img src={logoUrl} alt="Idswyft Platform" className="h-8 w-auto" />
                 <p className="mt-1 text-xs uppercase tracking-[0.12em] text-slate-500">Platform Administration</p>
               </div>
             </div>
@@ -113,7 +133,7 @@ export default function Login() {
           <div className="w-full max-w-md animate-fade-in">
             {/* Mobile header */}
             <div className="mb-8 text-center lg:hidden">
-              <img src="/idswyft-logo.png" alt="Idswyft Platform" className="mx-auto h-8 w-auto" />
+              <img src={logoUrl} alt="Idswyft Platform" className="mx-auto h-8 w-auto" />
               <p className="mt-2 text-xs uppercase tracking-[0.14em] text-slate-500">Platform Administration</p>
             </div>
 

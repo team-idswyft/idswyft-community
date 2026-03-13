@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, Link, useLocation, Navigate } from 'react-router-dom';
 import {
   Menu,
@@ -29,7 +29,27 @@ export default function PlatformLayout() {
   const { isAuthenticated, loading, admin, logout } = useAuth();
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [logoUrl, setLogoUrl] = useState('/idswyft-logo.png');
   const location = useLocation();
+
+  const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3002/api';
+
+  useEffect(() => {
+    const loadPlatformLogo = async () => {
+      try {
+        const response = await fetch(`${API_BASE_URL}/assets/platform`);
+        const payload = await response.json();
+        const remoteLogo = payload?.data?.logo_url;
+        if (response.ok && typeof remoteLogo === 'string' && remoteLogo.trim()) {
+          setLogoUrl(remoteLogo);
+        }
+      } catch {
+        // Keep fallback logo if branding endpoint is unavailable.
+      }
+    };
+
+    loadPlatformLogo();
+  }, [API_BASE_URL]);
 
   // Still verifying token on page refresh — wait before redirecting
   if (!isAuthenticated && loading) {
@@ -113,7 +133,7 @@ export default function PlatformLayout() {
   const Sidebar = ({ className = '' }: { className?: string }) => (
     <aside className={`sidebar-glass flex h-full flex-col ${className}`}>
       <div className="border-b border-white/10 px-6 py-5">
-        <img src="/idswyft-logo.png" alt="Idswyft Platform" className="h-8 w-auto" />
+        <img src={logoUrl} alt="Idswyft Platform" className="h-8 w-auto" />
       </div>
 
       <div className="border-b border-white/10 px-6 py-4">

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { requireAuth, requireApiKey, requirePermission, AuthenticatedRequest } from '../middleware/auth.js';
 import { validatePagination } from '../middleware/validation.js';
+import { apiKeyRateLimit } from '../middleware/rateLimit.js';
 import { VaasApiResponse, VaasEndUser } from '../types/index.js';
 import { vaasSupabase } from '../config/database.js';
 import { emailService } from '../services/emailService.js';
@@ -92,9 +93,17 @@ router.post('/', async (req: AuthenticatedRequest, res) => {
           else resolve();
         });
       });
-      
+
+      // Per-API-key rate limiting
+      if ((req as any).apiKey) {
+        await new Promise<void>((resolve) => {
+          apiKeyRateLimit(req, res, () => resolve());
+        });
+        if (res.headersSent) return;
+      }
+
       organizationId = (req as any).apiKey.organization_id;
-      
+
       // Check API key scopes
       if (!(req as any).apiKey.scopes.includes('write')) {
         const response: VaasApiResponse = {
@@ -291,9 +300,17 @@ router.get('/:id', async (req: AuthenticatedRequest, res) => {
           else resolve();
         });
       });
-      
+
+      // Per-API-key rate limiting
+      if ((req as any).apiKey) {
+        await new Promise<void>((resolve) => {
+          apiKeyRateLimit(req, res, () => resolve());
+        });
+        if (res.headersSent) return;
+      }
+
       organizationId = (req as any).apiKey.organization_id;
-      
+
       // Check API key scopes
       if (!(req as any).apiKey.scopes.includes('read')) {
         const response: VaasApiResponse = {
