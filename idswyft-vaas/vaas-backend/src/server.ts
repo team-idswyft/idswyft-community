@@ -90,7 +90,7 @@ app.use(cors({
   credentials: true,
   optionsSuccessStatus: 200,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Requested-With']
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-API-Key', 'X-Requested-With', 'Idempotency-Key', 'X-Sandbox-Mode']
 }));
 
 // Debug middleware to log all requests in development

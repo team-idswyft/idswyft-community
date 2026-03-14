@@ -204,7 +204,7 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
         setCurrentStep(3);
         return;
       }
-      if (results.status === 'failed') {
+      if (results.final_result === 'failed') {
         setFinalStatus('failed');
         setVerificationResults(results);
         setCurrentStep(5);
@@ -225,8 +225,8 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
       const results = await verificationAPI.getResults(session, vId);
       if (!mountedRef.current) return;
 
-      if (results.status === 'verified' || results.status === 'failed' || results.status === 'manual_review') {
-        setFinalStatus(results.status);
+      if (results.final_result != null) {
+        setFinalStatus(results.final_result);
         setVerificationResults(results);
         return;
       }
