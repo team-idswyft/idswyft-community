@@ -1,5 +1,7 @@
 import React, { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import { Player } from '@remotion/player'
+import { VerificationShowcase } from '../remotion/VerificationShowcase'
 import { C, injectFonts } from '../theme'
 
 const JS_CODE = `const BASE = 'https://api.idswyft.app'
@@ -293,6 +295,81 @@ export function HomePage() {
               )}
             </React.Fragment>
           ))}
+        </div>
+      </section>
+
+      {/* 2.5. VERIFICATION SHOWCASE VIDEO */}
+      <section style={{ background: C.bg, padding: '96px 24px', borderTop: `1px solid ${C.border}` }}>
+        <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 64, flexWrap: 'wrap', justifyContent: 'center' }}>
+
+          {/* Left column: marketing copy */}
+          <div style={{ flex: '1 1 380px', maxWidth: 480 }}>
+            <div style={{ fontFamily: C.mono, fontSize: 11, color: C.cyan, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 16 }}>
+              See it in action
+            </div>
+            <h2 style={{ fontFamily: C.sans, fontSize: 32, fontWeight: 700, color: C.text, lineHeight: 1.2, marginBottom: 16 }}>
+              From document scan to verified identity — in under 3 minutes
+            </h2>
+            <p style={{ color: C.muted, fontSize: 15, lineHeight: 1.7, marginBottom: 32 }}>
+              Your users scan the front and back of their ID, take a quick live photo,
+              and our engine handles the rest. Cross-validation, barcode parsing,
+              liveness checks, and face matching — all in one seamless flow.
+            </p>
+
+            {/* Feature bullets */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginBottom: 36 }}>
+              {[
+                { title: 'Smart document detection', desc: 'Automatic ID type recognition with guided capture overlay.' },
+                { title: 'Cross-validation engine', desc: 'Front-side OCR vs back-side barcode — inconsistencies flagged instantly.' },
+                { title: 'Liveness + face match', desc: 'Anti-spoof live capture compared against the document photo in real time.' },
+                { title: 'Instant results', desc: 'Verified, failed, or flagged for review — webhook delivered within seconds.' },
+              ].map(({ title, desc }) => (
+                <div key={title} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
+                  <div style={{ width: 6, height: 6, borderRadius: '50%', background: C.cyan, marginTop: 7, flexShrink: 0 }} />
+                  <div>
+                    <div style={{ fontFamily: C.sans, fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 3 }}>{title}</div>
+                    <div style={{ fontSize: 13, color: C.muted, lineHeight: 1.55 }}>{desc}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Stats row */}
+            <div style={{ display: 'flex', gap: 32 }}>
+              {[
+                { value: '<3 min', label: 'Verification time' },
+                { value: '99.8%', label: 'Accuracy rate' },
+                { value: '5 steps', label: 'Guided flow' },
+              ].map(({ value, label }) => (
+                <div key={label}>
+                  <div style={{ fontFamily: C.mono, fontSize: 18, fontWeight: 600, color: C.cyan }}>{value}</div>
+                  <div style={{ fontFamily: C.mono, fontSize: 11, color: C.muted, marginTop: 2 }}>{label}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Right column: phone mockup */}
+          <div style={{ flex: '0 0 auto', position: 'relative' }}>
+            {/* Ambient glow behind phone */}
+            <div style={{
+              position: 'absolute', top: '10%', left: '50%', transform: 'translateX(-50%)',
+              width: 300, height: 500, borderRadius: '50%',
+              background: 'radial-gradient(ellipse, rgba(34,211,238,0.06) 0%, transparent 70%)',
+              pointerEvents: 'none',
+            }} />
+            <Player
+              component={VerificationShowcase}
+              durationInFrames={1140}
+              fps={30}
+              compositionWidth={390}
+              compositionHeight={844}
+              style={{ width: 290, height: 628, borderRadius: 36, position: 'relative', zIndex: 1 }}
+              autoPlay
+              loop
+              controls={false}
+            />
+          </div>
         </div>
       </section>
 
