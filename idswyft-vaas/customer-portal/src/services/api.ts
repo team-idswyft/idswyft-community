@@ -12,8 +12,8 @@ export type { ApiError };
 
 const API_ORIGIN = import.meta.env.VITE_VAAS_API_URL || import.meta.env.VITE_API_URL;
 const BASE_URL = API_ORIGIN
-  ? `${API_ORIGIN}/api/v1`
-  : 'http://localhost:3002/api/v1';
+  ? `${API_ORIGIN}/api`
+  : 'http://localhost:3002/api';
 
 class CustomerPortalAPI {
   private client: AxiosInstance;
