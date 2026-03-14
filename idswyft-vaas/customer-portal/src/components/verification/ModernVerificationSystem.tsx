@@ -39,6 +39,7 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
   const [currentStep, setCurrentStep] = useState(1);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [staleMessage, setStaleMessage] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
   const [documents, setDocuments] = useState<{ front?: File; back?: File }>({});
   const [frontPreviewUrl, setFrontPreviewUrl] = useState<string | null>(null);
@@ -81,9 +82,13 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
           setOrganizationName(sessionData.organization.name);
         }
         setLoading(false);
-      } catch (err) {
+      } catch (err: any) {
         if (!mountedRef.current) return;
-        setError(`Failed to initialize verification: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        if (err?.status === 410) {
+          setStaleMessage(err.message || 'This verification link is no longer active.');
+        } else {
+          setError(`Failed to initialize verification: ${err instanceof Error ? err.message : 'Unknown error'}`);
+        }
         setLoading(false);
       }
     };
@@ -388,6 +393,31 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
             </div>
             <h2 className={`text-xl font-semibold mb-2 ${t.text}`}>Initializing Verification</h2>
             <p className={`text-sm ${t.textSec}`}>Setting up your secure session...</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Stale link state ───────────────────────────────────────────────────────
+  if (staleMessage) {
+    return (
+      <div className={`min-h-screen ${t.bg} flex items-center justify-center p-4`}>
+        <div className="w-full max-w-lg">
+          <BrandedHeader className="mb-6" />
+          <div className="portal-card p-8 text-center animate-fade-in">
+            <div className="w-14 h-14 mx-auto mb-5 bg-gradient-to-br from-cyan-400/20 to-cyan-500/20 border border-cyan-400/30 rounded-full flex items-center justify-center">
+              <svg className="w-7 h-7 text-cyan-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+              </svg>
+            </div>
+            <h2 className={`text-xl font-semibold mb-2 ${t.text}`}>Verification Link Used</h2>
+            <p className={`text-sm ${t.textSec}`}>{staleMessage}</p>
+          </div>
+          <div className="mt-6 text-center">
+            <p className={`text-xs ${t.textSec}`}>
+              If you need to verify again, please request a new link from the organization.
+            </p>
           </div>
         </div>
       </div>

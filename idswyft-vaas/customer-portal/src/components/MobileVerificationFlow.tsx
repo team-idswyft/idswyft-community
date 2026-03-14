@@ -378,6 +378,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
   // Session state
   const [session, setSession] = useState<VerificationSession | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [staleMessage, setStaleMessage] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
   // Verification flow state
@@ -449,7 +450,11 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
         setLoading(false);
       } catch (err: any) {
         if (!mountedRef.current) return;
-        setError(err.message || 'Failed to load verification session');
+        if (err?.status === 410) {
+          setStaleMessage(err.message || 'This verification link is no longer active.');
+        } else {
+          setError(err.message || 'Failed to load verification session');
+        }
         setLoading(false);
       }
     };
@@ -720,6 +725,33 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
             fontFamily: "'JetBrains Mono', monospace", fontSize: 12,
             color: 'var(--muted)', letterSpacing: '0.08em',
           }}>Preparing your session\u2026</span>
+        </div>
+      </div>
+    );
+  }
+
+  // ─── Stale link state ───────────────────────────────────────────────
+  if (staleMessage) {
+    return (
+      <div style={shellStyle}>
+        <style>{css}</style>
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 32px', gap: 16, textAlign: 'center' }}>
+          <div style={{
+            width: 88, height: 88, borderRadius: '50%',
+            border: '2px solid rgba(0,212,180,0.3)',
+            background: 'rgba(0,212,180,0.07)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontSize: 36,
+          }}>{'\u2713'}</div>
+          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800, letterSpacing: '-0.025em', lineHeight: 1.12 }}>
+            Verification Link Used
+          </h2>
+          <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: 'var(--muted)', lineHeight: 1.55 }}>
+            {staleMessage}
+          </p>
+          <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: 'var(--muted)', lineHeight: 1.55, marginTop: 8 }}>
+            If you need to verify again, please request a new link from the organization.
+          </p>
         </div>
       </div>
     );

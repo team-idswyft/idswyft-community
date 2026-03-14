@@ -472,16 +472,27 @@ router.get('/session/:token', async (req, res) => {
       return res.status(410).json(response);
     }
     
-    // Check if session is terminated
-    if (session.status === 'terminated') {
+    // Block access to sessions that have reached a terminal status.
+    // Once verified/failed/completed/manual_review/terminated, the link is stale.
+    const terminalStatuses = ['verified', 'failed', 'completed', 'manual_review', 'terminated'];
+    if (terminalStatuses.includes(session.status)) {
+      const messages: Record<string, string> = {
+        verified:      'This identity has already been verified. The link is no longer active.',
+        completed:     'This identity has already been verified. The link is no longer active.',
+        failed:        'This verification has already been processed. Please request a new link if needed.',
+        manual_review: 'This verification is under review. You will be notified of the result.',
+        terminated:    'This verification link has been deactivated.',
+      };
+
       const response: VaasApiResponse = {
         success: false,
         error: {
-          code: 'SESSION_TERMINATED',
-          message: 'This verification has been completed successfully. The session link is now inactive for security.'
+          code: 'SESSION_COMPLETED',
+          message: messages[session.status] || 'This verification link is no longer active.',
+          details: { status: session.status }
         }
       };
-      
+
       return res.status(410).json(response);
     }
     
