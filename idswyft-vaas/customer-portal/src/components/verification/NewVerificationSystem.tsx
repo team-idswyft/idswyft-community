@@ -4,6 +4,8 @@ import { VerificationSession } from '../../types';
 import customerPortalAPI from '../../services/api';
 import { useOrganization } from '../../contexts/OrganizationContext';
 import BrandedHeader from '../BrandedHeader';
+import CountrySelector from './CountrySelector';
+import DocumentTypeSelector from './DocumentTypeSelector';
 import {
   Shield,
   Upload,
@@ -11,6 +13,7 @@ import {
   CheckCircle,
   AlertCircle,
   FileText,
+  Globe,
   User,
   Loader,
   ArrowRight
@@ -121,6 +124,21 @@ export const NewVerificationSystem: React.FC<NewVerificationSystemProps> = ({ se
     }
   };
 
+  const handleCountrySelect = (countryCode: string) => {
+    if (!verificationEngine) return;
+    verificationEngine.setCountry(countryCode);
+  };
+
+  const handleDocumentTypeSelect = (documentType: string) => {
+    if (!verificationEngine) return;
+    verificationEngine.setDocumentType(documentType);
+  };
+
+  const handleCountryBack = () => {
+    if (!verificationEngine) return;
+    verificationEngine.goBackToCountry();
+  };
+
   const getStepIcon = (status: VerificationStatus) => {
     if (status === VerificationStatusValues.PENDING) return <Loader className="w-5 h-5 animate-spin" />;
     if (status.includes('processing')) return <Loader className="w-5 h-5 animate-spin" />;
@@ -191,7 +209,12 @@ export const NewVerificationSystem: React.FC<NewVerificationSystemProps> = ({ se
     );
   }
 
-  const canUploadFront = verificationState?.status === VerificationStatusValues.PENDING;
+  // Derived state flags
+  const needsCountrySelection = verificationState?.currentStep === 1 && !verificationState?.issuingCountry;
+  const needsDocTypeSelection = verificationState?.currentStep === 2 && verificationState?.issuingCountry && !verificationState?.selectedDocumentType;
+  const countryAndDocSelected = !!verificationState?.issuingCountry && !!verificationState?.selectedDocumentType;
+
+  const canUploadFront = countryAndDocSelected && verificationState?.status === VerificationStatusValues.PENDING;
   const canUploadBack = verificationState?.status === VerificationStatusValues.FRONT_DOCUMENT_PROCESSED;
   const canLiveCapture = verificationState?.status === VerificationStatusValues.CROSS_VALIDATION_COMPLETED;
   const isComplete = [VerificationStatusValues.VERIFIED, VerificationStatusValues.FAILED, VerificationStatusValues.MANUAL_REVIEW].includes(verificationState?.status);
@@ -212,7 +235,7 @@ export const NewVerificationSystem: React.FC<NewVerificationSystemProps> = ({ se
           <div className="mb-8">
             <div className="flex items-center justify-between mb-4">
               <span className="text-sm font-medium text-gray-900">
-                Step {verificationState?.currentStep || 1} of {verificationState?.totalSteps || 6}
+                Step {verificationState?.currentStep || 1} of {verificationState?.totalSteps || 8}
               </span>
               <span className="text-sm text-gray-500">
                 {getStepTitle(verificationState?.status)}
@@ -221,7 +244,7 @@ export const NewVerificationSystem: React.FC<NewVerificationSystemProps> = ({ se
             <div className="w-full bg-gray-200 rounded-full h-2">
               <div
                 className="bg-blue-600 h-2 rounded-full transition-all duration-300"
-                style={{ width: `${((verificationState?.currentStep || 1) / (verificationState?.totalSteps || 6)) * 100}%` }}
+                style={{ width: `${((verificationState?.currentStep || 1) / (verificationState?.totalSteps || 8)) * 100}%` }}
               />
             </div>
           </div>
@@ -246,113 +269,146 @@ export const NewVerificationSystem: React.FC<NewVerificationSystemProps> = ({ se
             </div>
           )}
 
-          {/* Upload Sections */}
-          <div className="space-y-6">
-            {/* Front Document Upload */}
-            <div className={`border rounded-lg p-6 ${canUploadFront ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}`}>
-              <div className="flex items-center mb-4">
-                <FileText className="w-6 h-6 text-blue-600" />
-                <h3 className="text-lg font-semibold ml-3">Front of ID Document</h3>
-                {verificationState?.frontDocumentUploaded && (
-                  <CheckCircle className="w-5 h-5 text-green-500 ml-auto" />
+          {/* Country Selection Step */}
+          {needsCountrySelection && (
+            <CountrySelector onSelect={handleCountrySelect} />
+          )}
+
+          {/* Document Type Selection Step */}
+          {needsDocTypeSelection && (
+            <DocumentTypeSelector
+              countryCode={verificationState.issuingCountry}
+              onSelect={handleDocumentTypeSelect}
+              onBack={handleCountryBack}
+            />
+          )}
+
+          {/* Upload Sections — only shown after country + doc type selected */}
+          {countryAndDocSelected && (
+            <div className="space-y-6">
+              {/* Country/doc type summary badge */}
+              <div className="flex items-center gap-3 px-4 py-2 bg-gray-50 border border-gray-200 rounded-lg text-sm">
+                <Globe className="w-4 h-4 text-gray-400" />
+                <span className="text-gray-700">
+                  Country: <strong>{verificationState.issuingCountry}</strong>
+                </span>
+                <span className="text-gray-300">|</span>
+                <span className="text-gray-700">
+                  Document: <strong>{verificationState.selectedDocumentType?.replace(/_/g, ' ')}</strong>
+                </span>
+                <button
+                  onClick={handleCountryBack}
+                  className="ml-auto text-blue-600 hover:text-blue-800 text-xs"
+                >
+                  Change
+                </button>
+              </div>
+
+              {/* Front Document Upload */}
+              <div className={`border rounded-lg p-6 ${canUploadFront ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}`}>
+                <div className="flex items-center mb-4">
+                  <FileText className="w-6 h-6 text-blue-600" />
+                  <h3 className="text-lg font-semibold ml-3">Front of ID Document</h3>
+                  {verificationState?.frontDocumentUploaded && (
+                    <CheckCircle className="w-5 h-5 text-green-500 ml-auto" />
+                  )}
+                </div>
+
+                {canUploadFront ? (
+                  <div>
+                    <p className="text-gray-600 mb-4">Upload the front side of your government-issued ID</p>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleFrontDocumentUpload(file);
+                      }}
+                      disabled={uploading}
+                      className="w-full"
+                    />
+                  </div>
+                ) : (
+                  <p className="text-gray-500">
+                    {verificationState?.frontDocumentUploaded ? 'Front document uploaded successfully' : 'Waiting for previous step...'}
+                  </p>
                 )}
               </div>
 
-              {canUploadFront ? (
-                <div>
-                  <p className="text-gray-600 mb-4">Upload the front side of your government-issued ID</p>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleFrontDocumentUpload(file);
-                    }}
-                    disabled={uploading}
-                    className="w-full"
-                  />
+              {/* Back Document Upload */}
+              <div className={`border rounded-lg p-6 ${canUploadBack ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}`}>
+                <div className="flex items-center mb-4">
+                  <FileText className="w-6 h-6 text-blue-600" />
+                  <h3 className="text-lg font-semibold ml-3">Back of ID Document</h3>
+                  {verificationState?.backDocumentUploaded && (
+                    <CheckCircle className="w-5 h-5 text-green-500 ml-auto" />
+                  )}
                 </div>
-              ) : (
-                <p className="text-gray-500">
-                  {verificationState?.frontDocumentUploaded ? 'Front document uploaded successfully' : 'Waiting for previous step...'}
-                </p>
-              )}
-            </div>
 
-            {/* Back Document Upload */}
-            <div className={`border rounded-lg p-6 ${canUploadBack ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}`}>
-              <div className="flex items-center mb-4">
-                <FileText className="w-6 h-6 text-blue-600" />
-                <h3 className="text-lg font-semibold ml-3">Back of ID Document</h3>
-                {verificationState?.backDocumentUploaded && (
-                  <CheckCircle className="w-5 h-5 text-green-500 ml-auto" />
+                {canUploadBack ? (
+                  <div>
+                    <p className="text-gray-600 mb-4">Upload the back side of your government-issued ID</p>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => {
+                        const file = e.target.files?.[0];
+                        if (file) handleBackDocumentUpload(file);
+                      }}
+                      disabled={uploading}
+                      className="w-full"
+                    />
+                  </div>
+                ) : (
+                  <p className="text-gray-500">
+                    {verificationState?.backDocumentUploaded ? 'Back document uploaded successfully' : 'Complete front document first'}
+                  </p>
                 )}
               </div>
 
-              {canUploadBack ? (
-                <div>
-                  <p className="text-gray-600 mb-4">Upload the back side of your government-issued ID</p>
-                  <input
-                    type="file"
-                    accept="image/*"
-                    onChange={(e) => {
-                      const file = e.target.files?.[0];
-                      if (file) handleBackDocumentUpload(file);
-                    }}
-                    disabled={uploading}
-                    className="w-full"
-                  />
+              {/* Live Capture */}
+              <div className={`border rounded-lg p-6 ${canLiveCapture ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}`}>
+                <div className="flex items-center mb-4">
+                  <Camera className="w-6 h-6 text-blue-600" />
+                  <h3 className="text-lg font-semibold ml-3">Live Selfie</h3>
+                  {verificationState?.liveCaptureUploaded && (
+                    <CheckCircle className="w-5 h-5 text-green-500 ml-auto" />
+                  )}
                 </div>
-              ) : (
-                <p className="text-gray-500">
-                  {verificationState?.backDocumentUploaded ? 'Back document uploaded successfully' : 'Complete front document first'}
-                </p>
-              )}
-            </div>
 
-            {/* Live Capture */}
-            <div className={`border rounded-lg p-6 ${canLiveCapture ? 'border-blue-300 bg-blue-50' : 'border-gray-200'}`}>
-              <div className="flex items-center mb-4">
-                <Camera className="w-6 h-6 text-blue-600" />
-                <h3 className="text-lg font-semibold ml-3">Live Selfie</h3>
-                {verificationState?.liveCaptureUploaded && (
-                  <CheckCircle className="w-5 h-5 text-green-500 ml-auto" />
+                {canLiveCapture ? (
+                  <div>
+                    <p className="text-gray-600 mb-4">Take a selfie to complete verification</p>
+                    <button
+                      onClick={() => {
+                        const canvas = document.createElement('canvas');
+                        canvas.width = 640;
+                        canvas.height = 480;
+                        const ctx = canvas.getContext('2d');
+                        if (ctx) {
+                          ctx.fillStyle = '#f0f0f0';
+                          ctx.fillRect(0, 0, canvas.width, canvas.height);
+                          ctx.fillStyle = '#666';
+                          ctx.font = '20px Arial';
+                          ctx.textAlign = 'center';
+                          ctx.fillText('Sample Selfie', canvas.width / 2, canvas.height / 2);
+                          handleLiveCaptureUpload(canvas.toDataURL());
+                        }
+                      }}
+                      disabled={uploading}
+                      className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                    >
+                      {uploading ? 'Processing...' : 'Take Selfie'}
+                    </button>
+                  </div>
+                ) : (
+                  <p className="text-gray-500">
+                    {verificationState?.liveCaptureUploaded ? 'Selfie captured successfully' : 'Complete document verification first'}
+                  </p>
                 )}
               </div>
-
-              {canLiveCapture ? (
-                <div>
-                  <p className="text-gray-600 mb-4">Take a selfie to complete verification</p>
-                  <button
-                    onClick={() => {
-                      // Implement camera capture
-                      const canvas = document.createElement('canvas');
-                      canvas.width = 640;
-                      canvas.height = 480;
-                      const ctx = canvas.getContext('2d');
-                      if (ctx) {
-                        ctx.fillStyle = '#f0f0f0';
-                        ctx.fillRect(0, 0, canvas.width, canvas.height);
-                        ctx.fillStyle = '#666';
-                        ctx.font = '20px Arial';
-                        ctx.textAlign = 'center';
-                        ctx.fillText('Sample Selfie', canvas.width / 2, canvas.height / 2);
-                        handleLiveCaptureUpload(canvas.toDataURL());
-                      }
-                    }}
-                    disabled={uploading}
-                    className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50"
-                  >
-                    {uploading ? 'Processing...' : 'Take Selfie'}
-                  </button>
-                </div>
-              ) : (
-                <p className="text-gray-500">
-                  {verificationState?.liveCaptureUploaded ? 'Selfie captured successfully' : 'Complete document verification first'}
-                </p>
-              )}
             </div>
-          </div>
+          )}
 
           {/* Final Result */}
           {isComplete && (

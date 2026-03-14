@@ -300,6 +300,7 @@ export interface VaasStartVerificationRequest {
     external_id?: string;
     metadata?: Record<string, any>;
   };
+  issuing_country?: string; // ISO 3166-1 alpha-2
   settings?: {
     require_liveness?: boolean;
     require_back_of_id?: boolean;

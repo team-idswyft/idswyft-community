@@ -34,14 +34,26 @@ function makeFrontResult(): FrontExtractionResult {
 }
 
 describe('Gate 2 — Back Document Integrity', () => {
+  // ─── US Documents (default, no issuingCountry) ────────────────
+
   it('PASSES when barcode decoded and no MRZ issues', () => {
     const result = evaluateGate2(makeBackResult(), makeFrontResult());
     expect(result.passed).toBe(true);
     expect(result.rejection_reason).toBeNull();
   });
 
-  it('FAILS with BACK_BARCODE_NOT_FOUND when qr_payload is null', () => {
+  it('FAILS with BACK_BARCODE_NOT_FOUND when qr_payload is null (US)', () => {
     const result = evaluateGate2(makeBackResult({ qr_payload: null, barcode_format: null }), makeFrontResult());
+    expect(result.passed).toBe(false);
+    expect(result.rejection_reason).toBe('BACK_BARCODE_NOT_FOUND');
+  });
+
+  it('FAILS with BACK_BARCODE_NOT_FOUND for explicit US without barcode', () => {
+    const result = evaluateGate2(
+      makeBackResult({ qr_payload: null, barcode_format: null }),
+      makeFrontResult(),
+      'US',
+    );
     expect(result.passed).toBe(false);
     expect(result.rejection_reason).toBe('BACK_BARCODE_NOT_FOUND');
   });
@@ -104,5 +116,95 @@ describe('Gate 2 — Back Document Integrity', () => {
   it('provides user_message on failure', () => {
     const result = evaluateGate2(makeBackResult({ qr_payload: null, barcode_format: null }), makeFrontResult());
     expect(result.user_message).toBeTruthy();
+  });
+
+  // ─── International Documents (non-US) ────────────────────────
+
+  it('PASSES for non-US document with MRZ only (no barcode)', () => {
+    const back = makeBackResult({
+      qr_payload: null,
+      barcode_format: 'MRZ_TD1',
+      raw_barcode_data: null,
+      mrz_result: {
+        raw_lines: [
+          'IDGBRDOE<<JOHN<<<<<<<<<<<<<<<',
+          '1234567890GBR9001150M3012318',
+          '<<<<<<<<<<<<<<<<<<<<<<<<<<<<<',
+        ],
+        checksums_valid: true,
+      },
+    });
+
+    const result = evaluateGate2(back, makeFrontResult(), 'GB');
+    expect(result.passed).toBe(true);
+  });
+
+  it('PASSES for non-US document with MRZ-populated qr_payload', () => {
+    const back = makeBackResult({
+      qr_payload: {
+        first_name: 'JOHN',
+        last_name: 'DOE',
+        date_of_birth: '1990-01-15',
+        id_number: '1234567890',
+        expiry_date: '2030-12-31',
+        nationality: 'GBR',
+      },
+      barcode_format: 'MRZ_TD3',
+      raw_barcode_data: null,
+      mrz_result: {
+        raw_lines: [
+          'P<GBRDOE<<JOHN<<<<<<<<<<<<<<<<<<<<<<<<<<<<<',
+          '12345678901GBR9001150M3012310<<<<<<<<<<<<<<0',
+        ],
+        checksums_valid: true,
+      },
+    });
+
+    const result = evaluateGate2(back, makeFrontResult(), 'GB');
+    expect(result.passed).toBe(true);
+  });
+
+  it('FAILS for non-US document with neither barcode nor MRZ', () => {
+    const back = makeBackResult({
+      qr_payload: null,
+      barcode_format: null,
+      raw_barcode_data: null,
+      mrz_result: null,
+    });
+
+    const result = evaluateGate2(back, makeFrontResult(), 'DE');
+    expect(result.passed).toBe(false);
+    expect(result.rejection_reason).toBe('BACK_BARCODE_NOT_FOUND');
+    expect(result.rejection_detail).toContain('MRZ');
+  });
+
+  it('FAILS for non-US document with invalid MRZ checksums', () => {
+    const back = makeBackResult({
+      qr_payload: null,
+      barcode_format: 'MRZ_TD1',
+      raw_barcode_data: null,
+      mrz_result: {
+        raw_lines: ['IDDEUDOE<<JOHN<<<<<<<<<<<<<<<'],
+        checksums_valid: false,
+      },
+    });
+
+    const result = evaluateGate2(back, makeFrontResult(), 'DE');
+    expect(result.passed).toBe(false);
+    expect(result.rejection_reason).toBe('BACK_MRZ_CHECKSUM_FAILED');
+  });
+
+  it('treats null issuingCountry as US (backward compatibility)', () => {
+    const back = makeBackResult({ qr_payload: null, barcode_format: null });
+    const result = evaluateGate2(back, makeFrontResult(), null);
+    expect(result.passed).toBe(false);
+    expect(result.rejection_reason).toBe('BACK_BARCODE_NOT_FOUND');
+  });
+
+  it('treats undefined issuingCountry as US (backward compatibility)', () => {
+    const back = makeBackResult({ qr_payload: null, barcode_format: null });
+    const result = evaluateGate2(back, makeFrontResult(), undefined);
+    expect(result.passed).toBe(false);
+    expect(result.rejection_reason).toBe('BACK_BARCODE_NOT_FOUND');
   });
 });

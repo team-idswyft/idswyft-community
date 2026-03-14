@@ -2,6 +2,8 @@
 
 export const VerificationStep = {
   WELCOME: 'welcome',
+  COUNTRY_SELECTION: 'country_selection',
+  DOCUMENT_TYPE_SELECTION: 'document_type_selection',
   FRONT_DOCUMENT_UPLOAD: 'front_document_upload',
   FRONT_DOCUMENT_PROCESSING: 'front_document_processing',
   BACK_DOCUMENT_UPLOAD: 'back_document_upload',
@@ -30,6 +32,8 @@ export interface VerificationState {
   verificationId?: string;
   currentStep: VerificationStep;
   status: VerificationStatus;
+  issuingCountry?: string;           // ISO alpha-2 country code
+  selectedDocumentType?: string;     // e.g. 'drivers_license', 'passport', 'national_id'
   documents: {
     front?: {
       file: File;

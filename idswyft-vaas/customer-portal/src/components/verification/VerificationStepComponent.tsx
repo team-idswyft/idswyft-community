@@ -4,10 +4,15 @@ import { VerificationStep, VerificationStatus, VerificationState } from '../../t
 import { VerificationSession } from '../../types';
 import { Upload, FileText, Camera, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import LiveCaptureComponent from '../LiveCaptureComponent';
+import CountrySelector from './CountrySelector';
+import DocumentTypeSelector from './DocumentTypeSelector';
 
 interface VerificationStepComponentProps {
   state: VerificationState;
   session: VerificationSession | null;
+  onCountrySelect: (countryCode: string) => void;
+  onDocumentTypeSelect: (documentType: string) => void;
+  onCountryBack: () => void;
   onFrontDocumentUpload: (file: File, documentType: string) => Promise<void>;
   onBackDocumentUpload: (file: File, documentType: string) => Promise<void>;
   onLiveCapture: (imageData: string) => Promise<void>;
@@ -16,6 +21,9 @@ interface VerificationStepComponentProps {
 export const VerificationStepComponent: React.FC<VerificationStepComponentProps> = ({
   state,
   session,
+  onCountrySelect,
+  onDocumentTypeSelect,
+  onCountryBack,
   onFrontDocumentUpload,
   onBackDocumentUpload,
   onLiveCapture,
@@ -74,6 +82,18 @@ export const VerificationStepComponent: React.FC<VerificationStepComponentProps>
 
   const renderStep = () => {
     switch (state.currentStep) {
+      case VerificationStep.COUNTRY_SELECTION:
+        return <CountrySelector onSelect={onCountrySelect} />;
+
+      case VerificationStep.DOCUMENT_TYPE_SELECTION:
+        return (
+          <DocumentTypeSelector
+            countryCode={state.issuingCountry || 'US'}
+            onSelect={onDocumentTypeSelect}
+            onBack={onCountryBack}
+          />
+        );
+
       case VerificationStep.FRONT_DOCUMENT_UPLOAD:
         return (
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">

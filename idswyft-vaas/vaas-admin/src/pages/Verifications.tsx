@@ -11,12 +11,32 @@ import {
   MoreHorizontal,
   FileText,
   User,
-  Calendar
+  Calendar,
+  Globe
 } from 'lucide-react';
 import { apiClient } from '../services/api';
 import type { VerificationSession } from '../types.js';
 import Modal from '../components/ui/Modal';
 import { sectionLabel, monoXs, monoSm, cardSurface, statusPill, tableHeaderClass, infoPanel, getStatusAccent } from '../styles/tokens';
+
+/** Convert ISO alpha-2 country code to flag emoji */
+function countryFlag(code?: string): string {
+  if (!code || code.length !== 2) return '';
+  const upper = code.toUpperCase();
+  return String.fromCodePoint(
+    upper.charCodeAt(0) + 0x1F1A5,
+    upper.charCodeAt(1) + 0x1F1A5
+  );
+}
+
+const COUNTRY_NAMES: Record<string, string> = {
+  US: 'United States', GB: 'United Kingdom', CA: 'Canada', AU: 'Australia',
+  NZ: 'New Zealand', DE: 'Germany', FR: 'France', IT: 'Italy', ES: 'Spain',
+  NL: 'Netherlands', BR: 'Brazil', MX: 'Mexico', AR: 'Argentina',
+  JP: 'Japan', KR: 'South Korea', IN: 'India', SG: 'Singapore',
+  PH: 'Philippines', TH: 'Thailand', VN: 'Vietnam',
+  CL: 'Chile', CO: 'Colombia', PE: 'Peru',
+};
 
 // Type alias for VerificationSession status
 type VerificationSessionStatus = VerificationSession['status'];
@@ -301,7 +321,7 @@ export default function Verifications() {
                   Status
                 </th>
                 <th className={tableHeaderClass}>
-                  Type
+                  Country
                 </th>
                 <th className={tableHeaderClass}>
                   Created
@@ -352,7 +372,14 @@ export default function Verifications() {
                       </div>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-100">
-                      Document Verification
+                      {verification.issuing_country ? (
+                        <span title={COUNTRY_NAMES[verification.issuing_country] || verification.issuing_country}>
+                          {countryFlag(verification.issuing_country)}{' '}
+                          <span className={monoXs}>{verification.issuing_country}</span>
+                        </span>
+                      ) : (
+                        <span className="text-slate-500">--</span>
+                      )}
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap">
                       <div className={`flex items-center ${monoXs} text-slate-500`}>
@@ -575,6 +602,15 @@ function VerificationDetailsModal({ verification, isOpen, onClose, onStatusUpdat
                   <span className="text-slate-500">Customer:</span>
                   <span className={`${monoSm} font-medium`}>{verification.vaas_end_users?.email || 'Anonymous'}</span>
                 </div>
+                {verification.issuing_country && (
+                  <div className="flex justify-between">
+                    <span className="text-slate-500">Country:</span>
+                    <span className={`${monoSm} font-medium`}>
+                      {countryFlag(verification.issuing_country)}{' '}
+                      {COUNTRY_NAMES[verification.issuing_country] || verification.issuing_country}
+                    </span>
+                  </div>
+                )}
                 <div className="flex justify-between">
                   <span className="text-slate-500">Created:</span>
                   <span className={`${monoXs} font-medium`}>{formatDate(verification.created_at)}</span>

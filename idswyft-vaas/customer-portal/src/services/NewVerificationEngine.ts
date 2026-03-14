@@ -49,6 +49,10 @@ export interface VerificationState {
   currentStep: number;
   totalSteps: number;
 
+  // Country / document type selection
+  issuingCountry: string | null;     // ISO alpha-2
+  selectedDocumentType: string | null; // e.g. 'drivers_license', 'passport', 'national_id'
+
   // Document upload states
   frontDocumentUploaded: boolean;
   backDocumentUploaded: boolean;
@@ -91,7 +95,10 @@ export class CustomerPortalVerificationEngine {
       id: verificationId,
       status: VerificationStatusValues.PENDING,
       currentStep: 1,
-      totalSteps: 6,
+      totalSteps: 8,
+
+      issuingCountry: null,
+      selectedDocumentType: null,
 
       frontDocumentUploaded: false,
       backDocumentUploaded: false,
@@ -131,19 +138,56 @@ export class CustomerPortalVerificationEngine {
   }
 
   /**
-   * STEP 1: Initialize verification
+   * STEP 1: Initialize verification — prompt for country selection
    */
   async initializeVerification(): Promise<void> {
     this.updateState({
       status: VerificationStatusValues.PENDING,
       currentStep: 1,
-      processingMessage: 'Verification initialized - ready to upload front document',
+      processingMessage: 'Please select the country that issued your document',
       canProceedToNext: true
     });
   }
 
   /**
-   * STEP 2: Upload front document
+   * STEP 2: Set issuing country
+   */
+  setCountry(countryCode: string): void {
+    this.updateState({
+      issuingCountry: countryCode.toUpperCase(),
+      currentStep: 2,
+      processingMessage: 'Please select your document type',
+      canProceedToNext: true
+    });
+  }
+
+  /**
+   * STEP 3: Set document type
+   */
+  setDocumentType(documentType: string): void {
+    this.updateState({
+      selectedDocumentType: documentType,
+      currentStep: 3,
+      processingMessage: 'Ready to upload front document',
+      canProceedToNext: true
+    });
+  }
+
+  /**
+   * Go back to country selection
+   */
+  goBackToCountry(): void {
+    this.updateState({
+      issuingCountry: null,
+      selectedDocumentType: null,
+      currentStep: 1,
+      processingMessage: 'Please select the country that issued your document',
+      canProceedToNext: true
+    });
+  }
+
+  /**
+   * STEP 4: Upload front document
    */
   async uploadFrontDocument(file: File): Promise<void> {
     this.updateState({
@@ -161,7 +205,7 @@ export class CustomerPortalVerificationEngine {
       // Start processing status
       this.updateState({
         status: VerificationStatusValues.FRONT_DOCUMENT_PROCESSING,
-        currentStep: 2,
+        currentStep: 4,
         processingMessage: 'Processing front document with OCR...'
       });
 
@@ -179,7 +223,7 @@ export class CustomerPortalVerificationEngine {
   }
 
   /**
-   * STEP 3: Upload back document
+   * STEP 5: Upload back document
    */
   async uploadBackDocument(file: File): Promise<void> {
     if (!this.state.frontOcrAvailable) {
@@ -201,7 +245,7 @@ export class CustomerPortalVerificationEngine {
       // Start processing status
       this.updateState({
         status: VerificationStatusValues.BACK_DOCUMENT_PROCESSING,
-        currentStep: 3,
+        currentStep: 5,
         processingMessage: 'Processing back document with barcode scanning...'
       });
 
@@ -219,12 +263,12 @@ export class CustomerPortalVerificationEngine {
   }
 
   /**
-   * STEP 4: Cross-validation (automatic after back document)
+   * STEP 6: Cross-validation (automatic after back document)
    */
   private async performCrossValidation(): Promise<void> {
     this.updateState({
       status: VerificationStatusValues.CROSS_VALIDATION_PROCESSING,
-      currentStep: 4,
+      currentStep: 6,
       processingMessage: 'Cross-validating front and back documents...'
     });
 
@@ -233,7 +277,7 @@ export class CustomerPortalVerificationEngine {
   }
 
   /**
-   * STEP 5: Upload live capture
+   * STEP 7: Upload live capture
    */
   async uploadLiveCapture(imageData: string): Promise<void> {
     if (!this.state.crossValidationComplete) {
@@ -255,7 +299,7 @@ export class CustomerPortalVerificationEngine {
       // Start processing status
       this.updateState({
         status: VerificationStatusValues.LIVE_CAPTURE_PROCESSING,
-        currentStep: 5,
+        currentStep: 7,
         processingMessage: 'Processing live capture - face matching and liveness detection...'
       });
 
@@ -381,7 +425,7 @@ export class CustomerPortalVerificationEngine {
           this.updateState({
             isProcessing: false,
             canProceedToNext: true,
-            currentStep: 5,
+            currentStep: 7,
             processingMessage: 'Documents validated successfully - ready for live capture'
           });
         } else {
@@ -405,7 +449,7 @@ export class CustomerPortalVerificationEngine {
         this.updateState({
           isProcessing: false,
           canProceedToNext: false,
-          currentStep: 6,
+          currentStep: 8,
           finalResult: 'verified',
           resultMessage: 'Verification completed successfully! Your identity has been verified.'
         });
@@ -415,7 +459,7 @@ export class CustomerPortalVerificationEngine {
         this.updateState({
           isProcessing: false,
           canProceedToNext: false,
-          currentStep: 6,
+          currentStep: 8,
           finalResult: 'failed',
           resultMessage: this.state.errorMessage || 'Verification failed. Please try again with valid documents.'
         });
@@ -425,7 +469,7 @@ export class CustomerPortalVerificationEngine {
         this.updateState({
           isProcessing: false,
           canProceedToNext: false,
-          currentStep: 6,
+          currentStep: 8,
           finalResult: 'manual_review',
           resultMessage: 'Your verification requires manual review. You will be notified of the result within 24 hours.'
         });

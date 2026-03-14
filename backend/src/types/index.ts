@@ -44,6 +44,7 @@ export interface Document {
   file_size: number;
   mime_type: string;
   document_type: DocumentType;
+  issuing_country?: string; // ISO 3166-1 alpha-2
   ocr_data?: OCRData;
   ocr_extracted?: boolean;
   quality_score?: number;
@@ -76,6 +77,7 @@ export interface OCRData {
   document_number?: string;
   expiration_date?: string;
   issuing_authority?: string;
+  issuing_country?: string; // ISO 3166-1 alpha-2
   nationality?: string;
   address?: string;
   raw_text?: string;
@@ -170,6 +172,7 @@ export interface AdminUser {
 export interface VerifyDocumentRequest {
   user_id: string;
   document_type: DocumentType;
+  issuing_country?: string; // ISO 3166-1 alpha-2
   sandbox?: boolean;
 }
 

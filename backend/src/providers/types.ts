@@ -3,7 +3,7 @@ import { OCRData } from '../types/index.js';
 // ── OCR Provider ──────────────────────────────────────
 export interface OCRProvider {
   readonly name: string;
-  processDocument(buffer: Buffer, documentType: string): Promise<OCRData>;
+  processDocument(buffer: Buffer, documentType: string, issuingCountry?: string): Promise<OCRData>;
 }
 
 // ── Face Matching Provider ────────────────────────────

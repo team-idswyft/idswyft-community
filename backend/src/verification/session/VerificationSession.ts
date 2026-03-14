@@ -52,6 +52,7 @@ export interface SessionDeps {
 export interface SessionHydration {
   session_id?: string;
   current_step?: VerificationStatusType;
+  issuing_country?: string | null;
   rejection_reason?: string | null;
   rejection_detail?: string | null;
   front_extraction?: FrontExtractionResult | null;
@@ -72,6 +73,7 @@ export class VerificationSession {
     this.state = {
       session_id: hydration?.session_id ?? randomUUID(),
       current_step: hydration?.current_step ?? VerificationStatus.AWAITING_FRONT,
+      issuing_country: hydration?.issuing_country ?? null,
       rejection_reason: (hydration?.rejection_reason as any) ?? null,
       rejection_detail: hydration?.rejection_detail ?? null,
       front_extraction: hydration?.front_extraction ?? null,
@@ -119,7 +121,7 @@ export class VerificationSession {
     this.transition(VerificationStatus.BACK_PROCESSING);
 
     const backResult = await this.deps.extractBack(imageBuffer);
-    const gate2 = evaluateGate2(backResult, this.state.front_extraction!);
+    const gate2 = evaluateGate2(backResult, this.state.front_extraction!, this.state.issuing_country);
 
     if (!gate2.passed) {
       return this.hardReject(gate2);

@@ -44,8 +44,8 @@ interface VerificationResults {
 }
 
 class VerificationAPI {
-  async startVerification(session: VerificationSession): Promise<string> {
-    return newVerificationApi.startVerification(session);
+  async startVerification(session: VerificationSession, issuingCountry?: string): Promise<string> {
+    return newVerificationApi.startVerification(session, issuingCountry);
   }
 
   async uploadDocument(
@@ -53,9 +53,10 @@ class VerificationAPI {
     verificationId: string,
     file: File,
     documentType: string,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    issuingCountry?: string,
   ): Promise<void> {
-    await newVerificationApi.uploadFrontDocument(session, verificationId, file, documentType);
+    await newVerificationApi.uploadFrontDocument(session, verificationId, file, documentType, issuingCountry);
     const results = await this.getResults(session, verificationId);
     if (results.status === 'failed' || results.status === 'manual_review') {
       throw new Error(results.failure_reason || results.manual_review_reason || results.rejection_detail || 'Front document verification failed');
@@ -68,9 +69,10 @@ class VerificationAPI {
     verificationId: string,
     file: File,
     documentType: string,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    issuingCountry?: string,
   ): Promise<void> {
-    await newVerificationApi.uploadBackDocument(session, verificationId, file, documentType);
+    await newVerificationApi.uploadBackDocument(session, verificationId, file, documentType, issuingCountry);
     const results = await this.getResults(session, verificationId);
     if (results.status === 'failed' || results.status === 'manual_review') {
       throw new Error(results.failure_reason || results.manual_review_reason || results.rejection_detail || 'Back document verification failed');

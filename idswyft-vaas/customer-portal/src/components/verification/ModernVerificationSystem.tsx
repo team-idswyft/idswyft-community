@@ -16,11 +16,12 @@ interface ModernVerificationSystemProps {
 
 // ── Step definitions ─────────────────────────────────────────────────────────
 const STEPS = [
-  { step: 1, label: 'Front ID' },
-  { step: 2, label: 'Scanning' },
-  { step: 3, label: 'Back ID' },
-  { step: 4, label: 'Live Capture' },
-  { step: 5, label: 'Done' },
+  { step: 1, label: 'Country' },
+  { step: 2, label: 'Front ID' },
+  { step: 3, label: 'Scanning' },
+  { step: 4, label: 'Back ID' },
+  { step: 5, label: 'Live Capture' },
+  { step: 6, label: 'Done' },
 ];
 
 // ── Theme tokens ─────────────────────────────────────────────────────────────
@@ -44,6 +45,7 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
   const [documents, setDocuments] = useState<{ front?: File; back?: File }>({});
   const [frontPreviewUrl, setFrontPreviewUrl] = useState<string | null>(null);
   const [backPreviewUrl, setBackPreviewUrl] = useState<string | null>(null);
+  const [issuingCountry, setIssuingCountry] = useState<string | null>(null);
   const [documentType, setDocumentType] = useState<string>('drivers_license');
   const [ocrData, setOcrData] = useState<any>(null);
   const [backOfIdUploaded, setBackOfIdUploaded] = useState(false);
@@ -122,12 +124,12 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
     try {
       let currentVerificationId = verificationId;
       if (!currentVerificationId) {
-        currentVerificationId = await verificationAPI.startVerification(session);
+        currentVerificationId = await verificationAPI.startVerification(session, issuingCountry || undefined);
         setVerificationId(currentVerificationId);
       }
 
-      await verificationAPI.uploadDocument(session, currentVerificationId, documents.front, documentType);
-      setCurrentStep(2);
+      await verificationAPI.uploadDocument(session, currentVerificationId, documents.front, documentType, undefined, issuingCountry || undefined);
+      setCurrentStep(3);
       pollForOCRCompletion(currentVerificationId);
     } catch (err) {
       setError(`Failed to upload front document: ${err instanceof Error ? err.message : 'Unknown error'}`);
@@ -143,9 +145,9 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
     setError(null);
 
     try {
-      await verificationAPI.uploadBackOfId(session, verificationId, documents.back, documentType);
+      await verificationAPI.uploadBackOfId(session, verificationId, documents.back, documentType, undefined, issuingCountry || undefined);
       setBackOfIdUploaded(true);
-      setCurrentStep(4);
+      setCurrentStep(5);
     } catch (err) {
       setError(`Failed to upload back document: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
@@ -172,7 +174,7 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
       const file = new File([blob], 'selfie.jpg', { type: 'image/jpeg' });
 
       await verificationAPI.captureSelfie(session, verificationId, file);
-      setCurrentStep(5);
+      setCurrentStep(6);
       await handleSubmitVerification();
       pollForFinalResults(verificationId);
     } catch (err) {
@@ -206,13 +208,13 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
 
       if (results.ocr_data && Object.keys(results.ocr_data).length > 0) {
         setOcrData(results.ocr_data);
-        setCurrentStep(3);
+        setCurrentStep(4);
         return;
       }
       if (results.final_result === 'failed') {
         setFinalStatus('failed');
         setVerificationResults(results);
-        setCurrentStep(5);
+        setCurrentStep(6);
         customerPortalAPI.reportResult(sessionToken, results).catch(() => {});
         return;
       }
@@ -445,8 +447,79 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
   // ── Step content renderer ──────────────────────────────────────────────────
   const renderStepContent = () => {
     switch (currentStep) {
-      // ── 1: Upload front document ───────────────────────────────────────
+      // ── 1: Country + Document Type Selection ──────────────────────────
       case 1:
+        return (
+          <div className="space-y-5 animate-fade-in">
+            <div className="text-center">
+              <h2 className={`text-xl font-semibold mb-1 ${t.text}`}>Select Country & Document Type</h2>
+              <p className={`text-sm ${t.textSec}`}>Tell us about the document you'll be verifying</p>
+            </div>
+
+            <div>
+              <label className={`block text-sm font-medium mb-2 ${t.text}`}>Issuing Country</label>
+              <select
+                value={issuingCountry || ''}
+                onChange={e => setIssuingCountry(e.target.value || null)}
+                className={`w-full px-4 py-2.5 rounded-xl border ${t.input} focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all`}
+              >
+                <option value="">Choose country...</option>
+                <optgroup label="Americas">
+                  <option value="US">United States</option>
+                  <option value="CA">Canada</option>
+                  <option value="BR">Brazil</option>
+                  <option value="MX">Mexico</option>
+                  <option value="AR">Argentina</option>
+                </optgroup>
+                <optgroup label="Europe">
+                  <option value="GB">United Kingdom</option>
+                  <option value="DE">Germany</option>
+                  <option value="FR">France</option>
+                  <option value="IT">Italy</option>
+                  <option value="ES">Spain</option>
+                  <option value="NL">Netherlands</option>
+                </optgroup>
+                <optgroup label="Asia-Pacific">
+                  <option value="AU">Australia</option>
+                  <option value="NZ">New Zealand</option>
+                  <option value="JP">Japan</option>
+                  <option value="KR">South Korea</option>
+                  <option value="IN">India</option>
+                  <option value="SG">Singapore</option>
+                  <option value="PH">Philippines</option>
+                  <option value="TH">Thailand</option>
+                  <option value="VN">Vietnam</option>
+                </optgroup>
+              </select>
+            </div>
+
+            {issuingCountry && (
+              <div>
+                <label className={`block text-sm font-medium mb-2 ${t.text}`}>Document Type</label>
+                <select
+                  value={documentType}
+                  onChange={e => setDocumentType(e.target.value)}
+                  className={`w-full px-4 py-2.5 rounded-xl border ${t.input} focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all`}
+                >
+                  <option value="drivers_license">Driver's License</option>
+                  <option value="passport">Passport</option>
+                  {!['US', 'CA', 'AU', 'NZ'].includes(issuingCountry) && (
+                    <option value="national_id">National ID</option>
+                  )}
+                </select>
+              </div>
+            )}
+
+            {issuingCountry && (
+              <button onClick={() => setCurrentStep(2)} className="btn-primary">
+                Continue &rarr;
+              </button>
+            )}
+          </div>
+        );
+
+      // ── 2: Upload front document ───────────────────────────────────────
+      case 2:
         return (
           <div className="space-y-5 animate-fade-in">
             <div className="text-center">
@@ -454,17 +527,12 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
               <p className={`text-sm ${t.textSec}`}>Take a clear photo of the front of your government-issued ID</p>
             </div>
 
-            <div>
-              <label className={`block text-sm font-medium mb-2 ${t.text}`}>Document Type</label>
-              <select
-                value={documentType}
-                onChange={e => setDocumentType(e.target.value)}
-                className={`w-full px-4 py-2.5 rounded-xl border ${t.input} focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all`}
-              >
-                <option value="national_id">National ID</option>
-                <option value="passport">Passport</option>
-                <option value="drivers_license">Driver's License</option>
-              </select>
+            {/* Country/doc type badge */}
+            <div className={`flex items-center gap-3 px-4 py-2 rounded-xl border ${t.border} text-sm`}>
+              <span className={t.textSec}>Country: <span className={`font-medium ${t.text}`}>{issuingCountry}</span></span>
+              <span className={t.textSec}>|</span>
+              <span className={t.textSec}>Doc: <span className={`font-medium ${t.text}`}>{documentType.replace(/_/g, ' ')}</span></span>
+              <button onClick={() => setCurrentStep(1)} className="ml-auto text-cyan-400 text-xs hover:text-cyan-300">Change</button>
             </div>
 
             {renderFileArea('front', frontPreviewUrl, frontInputRef, handleFrontFileSelect, 'Upload Front of ID')}
@@ -485,8 +553,8 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
           </div>
         );
 
-      // ── 2: Processing front OCR ────────────────────────────────────────
-      case 2:
+      // ── 3: Processing front OCR ────────────────────────────────────────
+      case 3:
         return (
           <div className="text-center py-8 animate-fade-in">
             <Spinner />
@@ -496,8 +564,8 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
           </div>
         );
 
-      // ── 3: Upload back document ────────────────────────────────────────
-      case 3:
+      // ── 4: Upload back document ────────────────────────────────────────
+      case 4:
         return (
           <div className="space-y-5 animate-fade-in">
             <div className="text-center">
@@ -525,8 +593,8 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
           </div>
         );
 
-      // ── 4: Live capture ────────────────────────────────────────────────
-      case 4:
+      // ── 5: Live capture ────────────────────────────────────────────────
+      case 5:
         return (
           <div className="text-center py-4 animate-fade-in">
             <h2 className={`text-xl font-semibold mb-1 ${t.text}`}>Live Capture</h2>
@@ -559,8 +627,8 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
           </div>
         );
 
-      // ── 5: Final result ────────────────────────────────────────────────
-      case 5: {
+      // ── 6: Final result ────────────────────────────────────────────────
+      case 6: {
         if (!finalStatus) {
           return (
             <div className="text-center py-8 animate-fade-in">

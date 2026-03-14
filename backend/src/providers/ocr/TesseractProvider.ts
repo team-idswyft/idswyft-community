@@ -7,7 +7,7 @@ import { logger } from '@/utils/logger.js';
 export class TesseractProvider implements OCRProvider {
   readonly name = 'tesseract';
 
-  async processDocument(buffer: Buffer, documentType: string): Promise<OCRData> {
+  async processDocument(buffer: Buffer, documentType: string, _issuingCountry?: string): Promise<OCRData> {
     const preprocessed = await this.preprocessImage(buffer);
 
     const worker = await Tesseract.createWorker('eng', 1, {});

@@ -43,11 +43,11 @@ const css = `
 `;
 
 // ─── Step definitions ───────────────────────────────────────────────────────
-const STEP_LABELS = ['Front ID', 'Back ID', 'Checking', 'Live Capture', 'Complete'];
+const STEP_LABELS = ['Country', 'Front ID', 'Back ID', 'Checking', 'Live Capture', 'Complete'];
 
 // ─── Types ──────────────────────────────────────────────────────────────────
-type Screen = 'front' | 'back' | 'checking' | 'live' | 'done';
-const SCREENS: Screen[] = ['front', 'back', 'checking', 'live', 'done'];
+type Screen = 'country' | 'front' | 'back' | 'checking' | 'live' | 'done';
+const SCREENS: Screen[] = ['country', 'front', 'back', 'checking', 'live', 'done'];
 
 // ─── Sub-Components ─────────────────────────────────────────────────────────
 
@@ -385,6 +385,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
   const [screenIdx, setScreenIdx] = useState(0);
   const [verificationId, setVerificationId] = useState<string | null>(null);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [issuingCountry, setIssuingCountry] = useState<string | null>(null);
   const [documentType, setDocumentType] = useState('national_id');
 
   // File state
@@ -466,7 +467,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
   const startVerification = async (): Promise<string | null> => {
     if (!session) return null;
     try {
-      const vId = await verificationAPI.startVerification(session);
+      const vId = await verificationAPI.startVerification(session, issuingCountry || undefined);
       if (!mountedRef.current) return null;
       setVerificationId(vId);
       return vId;
@@ -561,9 +562,9 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
         if (!vId) return;
       }
 
-      await verificationAPI.uploadDocument(session, vId, frontFile, documentType);
+      await verificationAPI.uploadDocument(session, vId, frontFile, documentType, undefined, issuingCountry || undefined);
       if (!mountedRef.current) return;
-      setScreenIdx(1); // Move to back ID
+      setScreenIdx(2); // Move to back ID (shifted by country screen)
       pollOCR(vId, 0);
     } catch (err: any) {
       if (mountedRef.current) setStepError(err.message);
@@ -597,9 +598,9 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
     setIsProcessing(true);
     setStepError(null);
     try {
-      await verificationAPI.uploadBackOfId(session, verificationId, backFile, documentType);
+      await verificationAPI.uploadBackOfId(session, verificationId, backFile, documentType, undefined, issuingCountry || undefined);
       if (!mountedRef.current) return;
-      setScreenIdx(2); // Checking screen
+      setScreenIdx(3); // Checking screen (shifted by country screen)
       pollCrossValidation(verificationId, 0);
     } catch (err: any) {
       if (mountedRef.current) setStepError(err.message);
@@ -622,7 +623,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
           customerPortalAPI.reportResult(sessionToken, results).catch(() => {});
           showFinal(results);
         } else {
-          setScreenIdx(3); // Live capture
+          setScreenIdx(4); // Live capture (shifted by country screen)
         }
       } else {
         setTimeout(() => pollCrossValidation(vId, attempt + 1), 2000);
@@ -649,7 +650,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
     try {
       await verificationAPI.captureSelfie(session, verificationId, selfieFile);
       if (!mountedRef.current) return;
-      setScreenIdx(4); // Done screen
+      setScreenIdx(5); // Done screen (shifted by country screen)
 
       // Submit verification
       try {
@@ -690,7 +691,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
   const showFinal = (data: any) => {
     if (!mountedRef.current) return;
     setFinalResult(data);
-    setScreenIdx(4);
+    setScreenIdx(5); // Done screen (shifted by country screen)
   };
 
   // ─── Shared styles ────────────────────────────────────────────────────
@@ -811,7 +812,103 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
       {/* Screen content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', marginTop: 20 }}>
 
-        {/* ── Screen 0: Front ID ─────────────────────────────────── */}
+        {/* ── Screen 0: Country + Document Type ────────────────────── */}
+        {screen === 'country' && (
+          <div key="country" className="mv-fade-up" style={screenStyle}>
+            <AmbientGlow />
+
+            <span style={{
+              fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 400,
+              textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--teal)',
+              marginBottom: 8,
+            }}>Step 1 of 6 &mdash; Select Country</span>
+
+            <h1 style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.12, letterSpacing: '-0.025em', marginBottom: 8 }}>
+              Where was your<br />ID issued?
+            </h1>
+
+            <p style={{ fontSize: 13, fontWeight: 400, color: 'var(--muted)', lineHeight: 1.55, marginBottom: 16 }}>
+              Select the country that issued your identity document, then choose the document type.
+            </p>
+
+            {/* Country selector */}
+            <div style={{ marginBottom: 14 }}>
+              <select
+                value={issuingCountry || ''}
+                onChange={e => setIssuingCountry(e.target.value || null)}
+                style={{
+                  width: '100%', padding: '12px 14px', borderRadius: 10,
+                  border: '1px solid var(--border)', background: 'var(--navy2)',
+                  color: 'var(--white)', fontFamily: "'JetBrains Mono', monospace",
+                  fontSize: 12, outline: 'none',
+                }}
+              >
+                <option value="">Choose country...</option>
+                <optgroup label="Americas">
+                  <option value="US">{'\u{1F1FA}\u{1F1F8}'} United States</option>
+                  <option value="CA">{'\u{1F1E8}\u{1F1E6}'} Canada</option>
+                  <option value="BR">{'\u{1F1E7}\u{1F1F7}'} Brazil</option>
+                  <option value="MX">{'\u{1F1F2}\u{1F1FD}'} Mexico</option>
+                  <option value="AR">{'\u{1F1E6}\u{1F1F7}'} Argentina</option>
+                </optgroup>
+                <optgroup label="Europe">
+                  <option value="GB">{'\u{1F1EC}\u{1F1E7}'} United Kingdom</option>
+                  <option value="DE">{'\u{1F1E9}\u{1F1EA}'} Germany</option>
+                  <option value="FR">{'\u{1F1EB}\u{1F1F7}'} France</option>
+                  <option value="IT">{'\u{1F1EE}\u{1F1F9}'} Italy</option>
+                  <option value="ES">{'\u{1F1EA}\u{1F1F8}'} Spain</option>
+                  <option value="NL">{'\u{1F1F3}\u{1F1F1}'} Netherlands</option>
+                </optgroup>
+                <optgroup label="Asia-Pacific">
+                  <option value="AU">{'\u{1F1E6}\u{1F1FA}'} Australia</option>
+                  <option value="NZ">{'\u{1F1F3}\u{1F1FF}'} New Zealand</option>
+                  <option value="JP">{'\u{1F1EF}\u{1F1F5}'} Japan</option>
+                  <option value="KR">{'\u{1F1F0}\u{1F1F7}'} South Korea</option>
+                  <option value="IN">{'\u{1F1EE}\u{1F1F3}'} India</option>
+                  <option value="SG">{'\u{1F1F8}\u{1F1EC}'} Singapore</option>
+                  <option value="PH">{'\u{1F1F5}\u{1F1ED}'} Philippines</option>
+                  <option value="TH">{'\u{1F1F9}\u{1F1ED}'} Thailand</option>
+                  <option value="VN">{'\u{1F1FB}\u{1F1F3}'} Vietnam</option>
+                </optgroup>
+              </select>
+            </div>
+
+            {/* Document type selector — shown after country is selected */}
+            {issuingCountry && (
+              <div style={{ marginBottom: 14 }}>
+                <select
+                  value={documentType}
+                  onChange={e => setDocumentType(e.target.value)}
+                  style={{
+                    width: '100%', padding: '12px 14px', borderRadius: 10,
+                    border: '1px solid var(--border)', background: 'var(--navy2)',
+                    color: 'var(--white)', fontFamily: "'JetBrains Mono', monospace",
+                    fontSize: 12, outline: 'none',
+                  }}
+                >
+                  <option value="drivers_license">Driver's License</option>
+                  <option value="passport">Passport</option>
+                  {!['US', 'CA', 'AU', 'NZ'].includes(issuingCountry) && (
+                    <option value="national_id">National ID</option>
+                  )}
+                </select>
+              </div>
+            )}
+
+            <TipBar text="This helps us verify your document accurately" />
+
+            <div style={{ flex: 1 }} />
+
+            <PrimaryBtn
+              onClick={() => setScreenIdx(1)}
+              disabled={!issuingCountry}
+            >
+              Continue
+            </PrimaryBtn>
+          </div>
+        )}
+
+        {/* ── Screen 1: Front ID ─────────────────────────────────── */}
         {screen === 'front' && (
           <div key="front" className="mv-fade-up" style={screenStyle}>
             <AmbientGlow />
@@ -820,7 +917,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
               fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 400,
               textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--teal)',
               marginBottom: 8,
-            }}>Step 1 of 5 \u2014 Front of ID</span>
+            }}>Step 2 of 6 \u2014 Front of ID</span>
 
             <h1 style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.12, letterSpacing: '-0.025em', marginBottom: 8 }}>
               Scan the front<br />of your ID
@@ -830,22 +927,24 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
               Position your ID card and take a clear photo. Make sure all four corners are visible and the text is clear.
             </p>
 
-            <div style={{ marginBottom: 14 }}>
-              <select
-                value={documentType}
-                onChange={e => setDocumentType(e.target.value)}
-                style={{
-                  width: '100%', padding: '10px 14px', borderRadius: 10,
-                  border: '1px solid var(--border)', background: 'var(--navy2)',
-                  color: 'var(--white)', fontFamily: "'JetBrains Mono', monospace",
-                  fontSize: 12, outline: 'none',
-                }}
-              >
-                <option value="national_id">National ID</option>
-                <option value="passport">Passport</option>
-                <option value="drivers_license">Driver's License</option>
-              </select>
-            </div>
+            {/* Country/doc type badge */}
+            {issuingCountry && (
+              <div style={{
+                display: 'flex', alignItems: 'center', gap: 8,
+                background: 'var(--glass)', border: '1px solid var(--border)',
+                borderRadius: 10, padding: '7px 13px', marginBottom: 10,
+                fontSize: 11, fontFamily: "'JetBrains Mono', monospace",
+                color: 'rgba(232,244,248,0.55)',
+              }}>
+                <span>{issuingCountry}</span>
+                <span style={{ opacity: 0.3 }}>|</span>
+                <span>{documentType.replace(/_/g, ' ')}</span>
+                <span
+                  onClick={() => setScreenIdx(0)}
+                  style={{ marginLeft: 'auto', color: 'var(--teal)', cursor: 'pointer', fontSize: 10 }}
+                >change</span>
+              </div>
+            )}
 
             <TipBar text="Good lighting \u00B7 No glare \u00B7 Hold steady" />
 
@@ -885,7 +984,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
               fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
               textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--teal)',
               marginBottom: 8,
-            }}>Step 2 of 5 \u2014 Back of ID</span>
+            }}>Step 3 of 6 \u2014 Back of ID</span>
 
             <h1 style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.12, letterSpacing: '-0.025em', marginBottom: 8 }}>
               Now flip it over<br />and scan the back
@@ -935,7 +1034,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
               fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
               textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--teal)',
               marginBottom: 24,
-            }}>Step 3 of 5 \u2014 Verification</span>
+            }}>Step 4 of 6 \u2014 Verification</span>
 
             <div style={{
               width: 80, height: 80, border: '2.5px solid rgba(0,212,180,0.12)',
@@ -980,7 +1079,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
               fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
               textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--teal)',
               marginBottom: 8,
-            }}>Step 4 of 5 \u2014 Live Capture</span>
+            }}>Step 5 of 6 \u2014 Live Capture</span>
 
             <h1 style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.12, letterSpacing: '-0.025em', marginBottom: 8 }}>
               Take a quick<br />live capture

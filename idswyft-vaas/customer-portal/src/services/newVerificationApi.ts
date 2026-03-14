@@ -88,7 +88,7 @@ class NewVerificationAPI {
            window.location.hostname.includes('preview');
   }
 
-  async startVerification(session: VerificationSession): Promise<string> {
+  async startVerification(session: VerificationSession, issuingCountry?: string): Promise<string> {
     console.log('🚀 Starting verification session...');
 
     const apiKey = this.getApiKey(session);
@@ -96,6 +96,7 @@ class NewVerificationAPI {
 
     const requestBody = {
       user_id: session.id,
+      ...(issuingCountry && { issuing_country: issuingCountry }),
       ...(useSandbox && { sandbox: true })
     };
 
@@ -128,8 +129,8 @@ class NewVerificationAPI {
     }
   }
 
-  async uploadFrontDocument(session: VerificationSession, verificationId: string, file: File, documentType: string): Promise<void> {
-    console.log('📄 Uploading front document...', { verificationId, documentType, fileSize: file.size });
+  async uploadFrontDocument(session: VerificationSession, verificationId: string, file: File, documentType: string, issuingCountry?: string): Promise<void> {
+    console.log('📄 Uploading front document...', { verificationId, documentType, issuingCountry, fileSize: file.size });
 
     const apiKey = this.getApiKey(session);
     const useSandbox = this.shouldUseSandbox();
@@ -137,6 +138,9 @@ class NewVerificationAPI {
     const formData = new FormData();
     formData.append('document', file);
     formData.append('document_type', documentType);
+    if (issuingCountry) {
+      formData.append('issuing_country', issuingCountry);
+    }
     if (useSandbox) {
       formData.append('sandbox', 'true');
     }
@@ -159,14 +163,17 @@ class NewVerificationAPI {
     console.log('✅ Front document uploaded:', result);
   }
 
-  async uploadBackDocument(session: VerificationSession, verificationId: string, file: File, documentType: string): Promise<void> {
-    console.log('📄 Uploading back document...', { verificationId, documentType, fileSize: file.size });
+  async uploadBackDocument(session: VerificationSession, verificationId: string, file: File, documentType: string, issuingCountry?: string): Promise<void> {
+    console.log('📄 Uploading back document...', { verificationId, documentType, issuingCountry, fileSize: file.size });
 
     const apiKey = this.getApiKey(session);
     const useSandbox = this.shouldUseSandbox();
 
     const formData = new FormData();
     formData.append('document', file);
+    if (issuingCountry) {
+      formData.append('issuing_country', issuingCountry);
+    }
     if (useSandbox) {
       formData.append('sandbox', 'true');
     }

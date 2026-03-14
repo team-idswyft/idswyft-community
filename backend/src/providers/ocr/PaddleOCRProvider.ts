@@ -6,6 +6,8 @@ import {
 import { OCRProvider } from '../types.js';
 import { OCRData } from '../../types/index.js';
 import { logger } from '@/utils/logger.js';
+import { getCountryFormat, INTERNATIONAL_HEADER_NOISE } from './internationalIdFormats.js';
+import type { CountryDocFormat } from './internationalIdFormats.js';
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -27,6 +29,8 @@ const HEADER_NOISE = new Set([
   'not for federal identification', 'federal limits apply',
   'not for federal purposes', 'not for federal identification purposes',
   'commercial driver license', 'cdl',
+  // International header noise
+  ...INTERNATIONAL_HEADER_NOISE,
 ]);
 
 const US_STATES = new Set([
@@ -254,7 +258,7 @@ export class PaddleOCRProvider implements OCRProvider {
     return this.service!;
   }
 
-  async processDocument(buffer: Buffer, documentType: string): Promise<OCRData> {
+  async processDocument(buffer: Buffer, documentType: string, issuingCountry?: string): Promise<OCRData> {
     const svc         = await this.ensureInitialized();
     const arrayBuffer = new Uint8Array(buffer).buffer;
     const result: PaddleOcrResult = await svc.recognize(arrayBuffer);
@@ -264,22 +268,35 @@ export class PaddleOCRProvider implements OCRProvider {
       confidence_scores: {},
     };
 
-    switch (documentType) {
-      case 'passport':
-        this.extractPassportData(result.lines, ocrData);
-        break;
-      case 'drivers_license':
-        this.extractDriversLicenseData(result.lines, ocrData);
-        break;
-      case 'national_id':
-        this.extractNationalIdData(result.lines, ocrData);
-        break;
-      default:
-        this.extractGenericData(result.lines, ocrData);
+    // Country-aware routing: use international extraction for non-US countries
+    const country = issuingCountry?.toUpperCase();
+    const countryFormat = country ? getCountryFormat(country, documentType) : null;
+
+    if (country && country !== 'US' && countryFormat) {
+      this.extractInternationalDocument(result.lines, ocrData, countryFormat, country);
+    } else {
+      // Default extraction (US or unknown country)
+      switch (documentType) {
+        case 'passport':
+          this.extractPassportData(result.lines, ocrData);
+          break;
+        case 'drivers_license':
+          this.extractDriversLicenseData(result.lines, ocrData);
+          break;
+        case 'national_id':
+          this.extractNationalIdData(result.lines, ocrData);
+          break;
+        default:
+          this.extractGenericData(result.lines, ocrData);
+      }
     }
+
+    // Set issuing_country on OCR data if provided
+    if (country) ocrData.issuing_country = country;
 
     logger.info('PaddleOCRProvider: extraction result', {
       documentType,
+      issuingCountry: country,
       fields: Object.keys(ocrData).filter(k => k !== 'raw_text' && k !== 'confidence_scores'),
       ocrData,
     });
@@ -1115,6 +1132,105 @@ export class PaddleOCRProvider implements OCRProvider {
       ocrData.issuing_authority = value;
       ocrData.confidence_scores!.issuing_authority = conf;
     });
+  }
+
+  /**
+   * International document extraction using country-specific format registry.
+   * Uses localized field labels from the format definition.
+   */
+  private extractInternationalDocument(
+    lines: RecognitionResult[][],
+    ocrData: OCRData,
+    format: CountryDocFormat,
+    country: string,
+  ): void {
+    const flatLines = this.flattenLines(lines);
+    const labels = format.field_labels;
+
+    logger.info('PaddleOCR international extraction', {
+      country,
+      documentType: format.type,
+      dateFormat: format.date_format,
+      lineCount: flatLines.length,
+    });
+
+    // Extract name using country-specific labels
+    this.findField(flatLines, labels.name, (value, conf) => {
+      if (!isHeaderNoise(value)) {
+        ocrData.name = value;
+        ocrData.confidence_scores!.name = conf;
+      }
+    });
+
+    // Extract date of birth with country date format hint
+    this.findDateField(flatLines, labels.date_of_birth, (value, conf) => {
+      ocrData.date_of_birth = this.normalizeDateWithHint(value, format.date_format);
+      ocrData.confidence_scores!.date_of_birth = conf;
+    });
+
+    // Extract ID number
+    this.findField(flatLines, labels.id_number, (value, conf) => {
+      const cleaned = value.replace(/\s+/g, '');
+      if (/^[A-Z0-9\-]{4,25}$/i.test(cleaned)) {
+        ocrData.document_number = cleaned;
+        ocrData.confidence_scores!.document_number = conf;
+      }
+    });
+
+    // Extract expiry date
+    this.findDateField(flatLines, labels.expiry_date, (value, conf) => {
+      ocrData.expiration_date = this.normalizeDateWithHint(value, format.date_format);
+      ocrData.confidence_scores!.expiration_date = conf;
+    });
+
+    // Extract nationality
+    this.findField(flatLines, labels.nationality, (value, conf) => {
+      ocrData.nationality = value;
+      ocrData.confidence_scores!.nationality = conf;
+    });
+
+    // Extract address
+    this.findField(flatLines, labels.address, (value, conf) => {
+      ocrData.address = value;
+      ocrData.confidence_scores!.address = conf;
+    });
+
+    // Extract issuing authority
+    this.findField(flatLines, labels.issuing_authority, (value, conf) => {
+      ocrData.issuing_authority = value;
+      ocrData.confidence_scores!.issuing_authority = conf;
+    });
+
+    ocrData.issuing_country = country;
+  }
+
+  /**
+   * Normalize date with a format hint (DMY, MDY, YMD).
+   * Resolves ambiguous dates like 01/02/2020 using the country's convention.
+   */
+  private normalizeDateWithHint(dateStr: string, hint: 'DMY' | 'MDY' | 'YMD'): string {
+    const m = dateStr.match(/(\d{1,4})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
+    if (!m) return dateStr;
+
+    let [, p1, p2, p3] = m;
+
+    // If p1 is 4 digits, it's YYYY-MM-DD regardless of hint
+    if (p1.length === 4) return `${p1}-${p2.padStart(2, '0')}-${p3.padStart(2, '0')}`;
+
+    // Expand 2-digit year — position depends on hint
+    if (hint === 'YMD' && p1.length === 2) {
+      const yy = parseInt(p1);
+      p1 = String(yy > 30 ? 1900 + yy : 2000 + yy);
+    } else if (p3.length === 2) {
+      const yy = parseInt(p3);
+      p3 = String(yy > 30 ? 1900 + yy : 2000 + yy);
+    }
+
+    switch (hint) {
+      case 'DMY': return `${p3}-${p2.padStart(2, '0')}-${p1.padStart(2, '0')}`;
+      case 'MDY': return `${p3}-${p1.padStart(2, '0')}-${p2.padStart(2, '0')}`;
+      case 'YMD': return `${p1}-${p2.padStart(2, '0')}-${p3.padStart(2, '0')}`;
+    }
   }
 
   private extractGenericData(lines: RecognitionResult[][], ocrData: OCRData): void {

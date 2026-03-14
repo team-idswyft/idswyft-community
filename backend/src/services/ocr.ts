@@ -23,9 +23,10 @@ export class OCRService {
   async processDocument(
     documentId: string,
     filePath: string,
-    documentType: string
+    documentType: string,
+    issuingCountry?: string
   ): Promise<OCRData> {
-    logger.info('Starting OCR processing', { documentId, filePath, documentType });
+    logger.info('Starting OCR processing', { documentId, filePath, documentType, issuingCountry });
 
     try {
       const fileBuffer = await this.storageService.downloadFile(filePath);
@@ -33,7 +34,7 @@ export class OCRService {
       let ocrData: OCRData;
       const start = Date.now();
 
-      ocrData = await this.provider.processDocument(fileBuffer, documentType);
+      ocrData = await this.provider.processDocument(fileBuffer, documentType, issuingCountry);
       const scores = Object.values(ocrData.confidence_scores || {});
       const avgConfidence = scores.length > 0 ? scores.reduce((s, v) => s + v, 0) / scores.length : undefined;
 

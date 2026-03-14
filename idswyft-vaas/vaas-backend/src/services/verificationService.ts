@@ -52,6 +52,7 @@ export class VerificationService {
           status: 'pending',
           session_token: sessionToken,
           expires_at: expiresAt.toISOString(),
+          issuing_country: request.issuing_country?.toUpperCase() || null,
           results: {}
         })
         .select()

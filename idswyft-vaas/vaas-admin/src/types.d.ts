@@ -170,6 +170,7 @@ export interface VerificationSession {
   idswyft_user_id: string;
   status: 'pending' | 'document_uploaded' | 'processing' | 'completed' | 'verified' | 'failed' | 'expired' | 'manual_review';
   session_token?: string;
+  issuing_country?: string;
   expires_at?: string;
   results: VerificationResults;
   confidence_score?: number;

@@ -8,6 +8,7 @@ import { StorageService } from '@/services/storage.js';
 import { VerificationService } from '@/services/verification.js';
 import { OCRService } from '@/services/ocr.js';
 import { BarcodeService } from '@/services/barcode.js';
+import { extractMRZFromText, alpha3ToAlpha2 } from '@/services/mrz.js';
 import { FaceRecognitionService } from '@/services/faceRecognition.js';
 import { logger, logVerificationEvent } from '@/utils/logger.js';
 import { validateFileType } from '@/middleware/fileValidation.js';
@@ -91,6 +92,7 @@ async function hydrateSession(verificationId: string, isSandbox: boolean): Promi
   const hydration: SessionHydration = savedState ? {
     session_id: savedState.session_id,
     current_step: savedState.current_step,
+    issuing_country: savedState.issuing_country,
     rejection_reason: savedState.rejection_reason,
     rejection_detail: savedState.rejection_detail,
     front_extraction: savedState.front_extraction,
@@ -113,8 +115,9 @@ async function extractFrontDocument(
   documentPath: string,
   documentId: string,
   documentType: string,
+  issuingCountry?: string,
 ): Promise<FrontExtractionResult> {
-  const ocrData = await ocrService.processDocument(documentId, documentPath, documentType);
+  const ocrData = await ocrService.processDocument(documentId, documentPath, documentType, issuingCountry);
 
   // Calculate average confidence from per-field confidence scores
   const confidenceScores = ocrData?.confidence_scores || {};
@@ -132,6 +135,26 @@ async function extractFrontDocument(
     faceConfidence = 0;
   }
 
+  // Attempt MRZ detection on front document (passports, some ID cards)
+  let mrzFromFront: string[] | null = null;
+  let detectedCountry = issuingCountry || null;
+  if (ocrData?.raw_text) {
+    const mrzResult = extractMRZFromText(ocrData.raw_text);
+    if (mrzResult) {
+      mrzFromFront = mrzResult.raw_lines;
+      // Use MRZ fields as high-confidence overrides if OCR missed them
+      if (!ocrData.name && mrzResult.fields.full_name) ocrData.name = mrzResult.fields.full_name;
+      if (!ocrData.document_number && mrzResult.fields.document_number) ocrData.document_number = mrzResult.fields.document_number;
+      if (!ocrData.date_of_birth && mrzResult.fields.date_of_birth) ocrData.date_of_birth = mrzResult.fields.date_of_birth;
+      if (!ocrData.expiration_date && mrzResult.fields.expiry_date) ocrData.expiration_date = mrzResult.fields.expiry_date;
+      // Auto-detect issuing_country from MRZ if not provided
+      if (!detectedCountry && mrzResult.fields.issuing_country) {
+        detectedCountry = alpha3ToAlpha2(mrzResult.fields.issuing_country) || null;
+      }
+      if (detectedCountry) ocrData.issuing_country = detectedCountry;
+    }
+  }
+
   return {
     ocr: {
       full_name: ocrData?.name || '',
@@ -139,12 +162,13 @@ async function extractFrontDocument(
       id_number: ocrData?.document_number || '',
       expiry_date: ocrData?.expiration_date || '',
       nationality: ocrData?.nationality || '',
+      issuing_country: detectedCountry || undefined,
       ...ocrData, // preserve all raw fields
     },
     face_embedding: faceEmbedding,
     face_confidence: faceConfidence,
     ocr_confidence: avgConfidence,
-    mrz_from_front: null,
+    mrz_from_front: mrzFromFront,
   };
 }
 
@@ -177,15 +201,47 @@ async function extractBackDocument(
     nationality: '',
   } : null);
 
-  const hasMrz = barcodeData?.raw_text && /[A-Z<]{30,}/.test(barcodeData.raw_text);
+  // Attempt MRZ detection from raw OCR text (especially for non-US documents)
+  const rawText = barcodeData?.raw_text || '';
+  const mrzResult = extractMRZFromText(rawText);
+
+  // If barcode scan failed but MRZ was detected, build qr_payload from MRZ fields
+  let finalQrPayload = qrPayload;
+  let barcodeFormat: 'PDF417' | 'QR_CODE' | 'DATA_MATRIX' | 'CODE_128' | 'MRZ_TD1' | 'MRZ_TD2' | 'MRZ_TD3' | null = barcodeData?.pdf417_data ? 'PDF417' : (barcodeData?.barcode_data ? 'QR_CODE' : null);
+
+  if (!qrPayload && mrzResult && mrzResult.fields) {
+    // Populate cross-validation fields from MRZ data
+    finalQrPayload = {
+      first_name: mrzResult.fields.first_name || '',
+      last_name: mrzResult.fields.last_name || '',
+      full_name: mrzResult.fields.full_name || '',
+      date_of_birth: mrzResult.fields.date_of_birth || '',
+      id_number: mrzResult.fields.document_number || '',
+      expiry_date: mrzResult.fields.expiry_date || '',
+      nationality: mrzResult.fields.nationality || '',
+    };
+    // Tag the barcode_format as MRZ
+    const mrzFormatMap: Record<string, 'MRZ_TD1' | 'MRZ_TD2' | 'MRZ_TD3'> = {
+      TD1: 'MRZ_TD1', TD2: 'MRZ_TD2', TD3: 'MRZ_TD3',
+    };
+    barcodeFormat = mrzFormatMap[mrzResult.format] || null;
+  }
+
+  // Build MRZ result for Gate 2
+  const hasMrz = mrzResult !== null;
+  const mrzForGate = hasMrz ? {
+    raw_lines: mrzResult!.raw_lines,
+    fields: mrzResult!.fields as any,
+    checksums_valid: mrzResult!.check_digits_valid,
+  } : (rawText && /[A-Z<]{30,}/.test(rawText) ? {
+    raw_lines: rawText.split('\n').filter((l: string) => /^[A-Z0-9<]{30,}$/.test(l.trim())),
+    checksums_valid: true,
+  } : null);
 
   return {
-    qr_payload: qrPayload,
-    mrz_result: hasMrz ? {
-      raw_lines: (barcodeData?.raw_text || '').split('\n').filter((l: string) => /^[A-Z0-9<]{30,}$/.test(l.trim())),
-      checksums_valid: true, // Checksum validation happens in Gate 2
-    } : null,
-    barcode_format: barcodeData?.pdf417_data ? 'PDF417' : (barcodeData?.barcode_data ? 'QR_CODE' : null),
+    qr_payload: finalQrPayload,
+    mrz_result: mrzForGate,
+    barcode_format: barcodeFormat,
     raw_barcode_data: barcodeData?.pdf417_data?.raw_data || barcodeData?.barcode_data || null,
   };
 }
@@ -328,6 +384,7 @@ router.post('/initialize',
   [
     body('user_id').isUUID().withMessage('User ID must be a valid UUID'),
     body('document_type').optional().isIn(['passport', 'drivers_license', 'national_id']).withMessage('Invalid document type'),
+    body('issuing_country').optional().isLength({ min: 2, max: 2 }).isAlpha().withMessage('Issuing country must be a 2-letter ISO code'),
     body('sandbox').optional().isBoolean().withMessage('Sandbox must be a boolean'),
   ],
   catchAsync(async (req: Request, res: Response) => {
@@ -336,7 +393,7 @@ router.post('/initialize',
       throw new ValidationError('Validation failed', 'multiple', errors.array());
     }
 
-    const { user_id, document_type = 'drivers_license' } = req.body;
+    const { user_id, document_type = 'drivers_license', issuing_country } = req.body;
 
     req.body.user_id = user_id;
     await new Promise((resolve, reject) => {
@@ -357,7 +414,8 @@ router.post('/initialize',
     });
 
     // Create session and save initial state
-    const session = createSession(isSandbox, { session_id: verificationRecord.id });
+    const issuingCountryUpper = issuing_country?.toUpperCase() || null;
+    const session = createSession(isSandbox, { session_id: verificationRecord.id, issuing_country: issuingCountryUpper });
     await saveSessionState(verificationRecord.id, session.getState());
 
     logVerificationEvent('verification_initialized', verificationRecord.id, {
@@ -387,6 +445,7 @@ router.post('/:verification_id/front-document',
   [
     param('verification_id').isUUID().withMessage('Invalid verification ID'),
     body('document_type').optional().isIn(['passport', 'drivers_license', 'national_id', 'other']).withMessage('Invalid document type'),
+    body('issuing_country').optional().isLength({ min: 2, max: 2 }).isAlpha().withMessage('Issuing country must be a 2-letter ISO code'),
   ],
   catchAsync(async (req: Request, res: Response) => {
     const errors = validationResult(req);
@@ -404,7 +463,7 @@ router.post('/:verification_id/front-document',
     }
 
     const { verification_id } = req.params;
-    const { document_type = 'drivers_license' } = req.body;
+    const { document_type = 'drivers_license', issuing_country } = req.body;
     const verification = await requireOwnedVerification(req, verification_id);
     const isSandbox = (verification as any).is_sandbox || false;
 
@@ -429,8 +488,11 @@ router.post('/:verification_id/front-document',
       document_id: document.id,
     } as any);
 
+    // Resolve issuing_country: per-request override > session state
+    const resolvedCountry = issuing_country?.toUpperCase() || undefined;
+
     // Run front extraction
-    const frontResult = await extractFrontDocument(documentPath, document.id, document_type);
+    const frontResult = await extractFrontDocument(documentPath, document.id, document_type, resolvedCountry);
 
     // Hydrate session and run Gate 1 via session
     const session = await hydrateSession(verification_id, isSandbox);
@@ -484,6 +546,7 @@ router.post('/:verification_id/back-document',
   [
     param('verification_id').isUUID().withMessage('Invalid verification ID'),
     body('document_type').optional().isIn(['passport', 'drivers_license', 'national_id', 'other']).withMessage('Invalid document type'),
+    body('issuing_country').optional().isLength({ min: 2, max: 2 }).isAlpha().withMessage('Issuing country must be a 2-letter ISO code'),
   ],
   catchAsync(async (req: Request, res: Response) => {
     const errors = validationResult(req);
@@ -522,7 +585,7 @@ router.post('/:verification_id/back-document',
       document_type,
     });
 
-    // Run back extraction
+    // Run back extraction (country context flows to Gate 2 via session state)
     const backResult = await extractBackDocument(documentPath);
 
     // Hydrate session and run Gate 2 + auto cross-validation via session

@@ -55,6 +55,7 @@ const IDCardOCRSchema = z.object({
   id_number: z.string().min(1),
   expiry_date: z.string().min(1),
   nationality: z.string().optional(),
+  issuing_country: z.string().length(2).optional(), // ISO 3166-1 alpha-2
 }).passthrough(); // Allow additional OCR fields
 
 // ─── Front Extraction Result ───
@@ -90,7 +91,7 @@ const MRZResultSchema = z.object({
 export const BackExtractionResultSchema = z.object({
   qr_payload: QRPayloadSchema.nullable(),
   mrz_result: MRZResultSchema.nullable(),
-  barcode_format: z.enum(['PDF417', 'QR_CODE', 'DATA_MATRIX', 'CODE_128']).nullable(),
+  barcode_format: z.enum(['PDF417', 'QR_CODE', 'DATA_MATRIX', 'CODE_128', 'MRZ_TD1', 'MRZ_TD2', 'MRZ_TD3']).nullable(),
   raw_barcode_data: z.string().nullable(),
 });
 
@@ -147,6 +148,7 @@ export type GateResult = z.infer<typeof GateResultSchema>;
 export interface SessionState {
   session_id: string;
   current_step: VerificationStatusType;
+  issuing_country: string | null; // ISO 3166-1 alpha-2
   rejection_reason: RejectionReasonType | null;
   rejection_detail: string | null;
   front_extraction: FrontExtractionResult | null;

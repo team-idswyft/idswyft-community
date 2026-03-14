@@ -5,7 +5,7 @@ import { logger } from '@/utils/logger.js';
 export class OpenAIProvider implements OCRProvider {
   readonly name = 'openai';
 
-  async processDocument(buffer: Buffer, documentType: string): Promise<OCRData> {
+  async processDocument(buffer: Buffer, documentType: string, _issuingCountry?: string): Promise<OCRData> {
     const base64Image = buffer.toString('base64');
     const mimeType = this.detectMimeType(buffer);
     const prompt = this.buildPrompt(documentType);

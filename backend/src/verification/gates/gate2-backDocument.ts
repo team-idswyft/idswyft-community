@@ -2,24 +2,47 @@
  * Gate 2 — Back Document Integrity
  *
  * FAIL if:
- *   - No barcode found (qr_payload is null)
+ *   - US document: No barcode found (qr_payload is null) AND no MRZ
+ *   - Non-US document: Neither barcode NOR MRZ found
  *   - MRZ checksums failed (checksums_valid === false)
  *   - Front MRZ and back MRZ disagree (BACK_MRZ_BARCODE_MISMATCH)
  *
- * PASS if barcode decoded and all MRZ checks pass.
+ * PASS if:
+ *   - Barcode decoded and all MRZ checks pass, OR
+ *   - Non-US document with valid MRZ (barcode not required)
  */
 
 import type { BackExtractionResult, FrontExtractionResult, GateResult } from '../models/types.js';
 
-export function evaluateGate2(back: BackExtractionResult, front: FrontExtractionResult): GateResult {
-  // Check barcode presence
-  if (!back.qr_payload && !back.barcode_format) {
-    return {
-      passed: false,
-      rejection_reason: 'BACK_BARCODE_NOT_FOUND',
-      rejection_detail: 'No barcode (PDF417, QR, DataMatrix) detected on back of document',
-      user_message: 'We could not read the barcode on the back of your ID. Please retake the photo ensuring the barcode is clearly visible.',
-    };
+export function evaluateGate2(
+  back: BackExtractionResult,
+  front: FrontExtractionResult,
+  issuingCountry?: string | null,
+): GateResult {
+  const isUS = !issuingCountry || issuingCountry === 'US';
+  const hasBarcode = !!(back.qr_payload || back.barcode_format);
+  const hasMRZ = !!(back.mrz_result && back.mrz_result.raw_lines.length > 0);
+  const isMRZFormat = back.barcode_format?.startsWith('MRZ_');
+
+  // Check barcode/MRZ presence
+  if (!hasBarcode && !hasMRZ && !isMRZFormat) {
+    if (isUS) {
+      // US documents require a barcode (PDF417)
+      return {
+        passed: false,
+        rejection_reason: 'BACK_BARCODE_NOT_FOUND',
+        rejection_detail: 'No barcode (PDF417, QR, DataMatrix) detected on back of document',
+        user_message: 'We could not read the barcode on the back of your ID. Please retake the photo ensuring the barcode is clearly visible.',
+      };
+    } else {
+      // Non-US: accept MRZ as alternative, but fail if neither found
+      return {
+        passed: false,
+        rejection_reason: 'BACK_BARCODE_NOT_FOUND',
+        rejection_detail: 'No barcode or MRZ detected on back of document',
+        user_message: 'We could not read the barcode or machine-readable zone on the back of your ID. Please retake the photo ensuring the back is clearly visible.',
+      };
+    }
   }
 
   // Check MRZ checksums if present

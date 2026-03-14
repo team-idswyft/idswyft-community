@@ -25,7 +25,7 @@ const upload = multer({
 router.post('/sessions/:sessionToken/documents', upload.single('document') as any, async (req: Request, res: Response) => {
   try {
     const { sessionToken } = req.params;
-    const { type } = req.body; // 'front', 'back', or 'selfie'
+    const { type, issuing_country } = req.body; // type: 'front', 'back', or 'selfie'
     const file = req.file;
 
     if (!file) {
@@ -114,9 +114,17 @@ router.post('/sessions/:sessionToken/documents', upload.single('document') as an
 
     // Update session status to document_uploaded if this is the first document
     if (session.status === 'pending') {
+      const updatePayload: Record<string, any> = {
+        status: 'document_uploaded',
+        updated_at: new Date().toISOString(),
+      };
+      // Persist issuing_country on the VaaS session if provided
+      if (issuing_country && /^[A-Z]{2}$/i.test(issuing_country)) {
+        updatePayload.issuing_country = issuing_country.toUpperCase();
+      }
       await vaasSupabase
         .from('vaas_verification_sessions')
-        .update({ status: 'document_uploaded', updated_at: new Date().toISOString() })
+        .update(updatePayload)
         .eq('id', session.id);
     }
 
