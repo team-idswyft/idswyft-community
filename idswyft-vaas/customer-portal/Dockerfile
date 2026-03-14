@@ -4,6 +4,15 @@ FROM node:20-alpine
 # Set working directory
 WORKDIR /app
 
+# Vite embeds VITE_* vars at build time — must be declared as ARGs
+ARG VITE_VAAS_API_URL
+ARG VITE_API_URL
+ARG VITE_API_BASE_URL
+ARG VITE_NODE_ENV
+ARG VITE_SANDBOX_MODE
+ARG VITE_BRAND_NAME
+ARG VITE_SUPPORT_EMAIL
+
 # Copy package files
 COPY package*.json ./
 
@@ -13,7 +22,7 @@ RUN npm install
 # Copy source code
 COPY . .
 
-# Build the application
+# Build the application (VITE_* ARGs become env vars during build)
 RUN npm run build
 
 # Install serve to serve the built files

@@ -426,14 +426,16 @@ class ApiClient {
   }
 
   async getEndUserVerifications(id: string, params?: PaginationParams): Promise<{ verifications: VerificationSession[]; meta: any }> {
-    const response: AxiosResponse<ApiResponse<VerificationSession[]>> = await this.client.get(`/users/${id}/verifications`, { params });
-    
+    const response: AxiosResponse<ApiResponse<any>> = await this.client.get(`/users/${id}/verifications`, { params });
+
     if (!response.data.success) {
       throw new Error(response.data.error?.message || 'Failed to get user verifications');
     }
 
+    // Backend returns { user, verification_sessions: [...] } inside data
+    const responseData = response.data.data!;
     return {
-      verifications: response.data.data!,
+      verifications: Array.isArray(responseData) ? responseData : (responseData.verification_sessions || []),
       meta: response.data.meta || {}
     };
   }

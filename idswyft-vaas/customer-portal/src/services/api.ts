@@ -10,8 +10,9 @@ import {
 // Re-export ApiError so consumers can use it without importing from lib directly
 export type { ApiError };
 
-const BASE_URL = import.meta.env.VITE_VAAS_API_URL
-  ? `${import.meta.env.VITE_VAAS_API_URL}/api/v1`
+const API_ORIGIN = import.meta.env.VITE_VAAS_API_URL || import.meta.env.VITE_API_URL;
+const BASE_URL = API_ORIGIN
+  ? `${API_ORIGIN}/api/v1`
   : 'http://localhost:3002/api/v1';
 
 class CustomerPortalAPI {

@@ -139,10 +139,10 @@ export class EmailService {
 
   private darkHeader(accent: string, logo: string | null, title: string, subtitle: string): string {
     const logoHtml = logo ? `<img src="${logo}" alt="${subtitle}" style="max-width:120px;height:auto;margin-bottom:14px;">` : '';
-    return `<div style="background:${accent};padding:32px 30px;text-align:center;border-radius:12px 12px 0 0;">
+    return `<div style="border-top:3px solid ${accent};background:#0b0f19;padding:32px 30px;text-align:center;">
       ${logoHtml}
-      <h1 style="margin:0;color:#04212a;font-size:22px;font-weight:700;">${title}</h1>
-      <p style="margin:8px 0 0;color:rgba(4,33,42,0.72);font-size:14px;">${subtitle}</p>
+      <h1 style="margin:0;color:${TEXT};font-size:22px;font-weight:700;">${title}</h1>
+      <p style="margin:8px 0 0;color:${MUTED};font-size:14px;">${subtitle}</p>
     </div>`;
   }
 
@@ -153,7 +153,7 @@ export class EmailService {
   }
 
   private darkButton(accent: string, href: string, label: string): string {
-    return `<a href="${href}" style="display:inline-block;background:${accent};color:#04212a;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;box-shadow:0 4px 14px rgba(0,0,0,0.25);">${label}</a>`;
+    return `<a href="${href}" style="display:inline-block;background:${accent};color:#080c14;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;box-shadow:0 4px 14px rgba(0,0,0,0.25);letter-spacing:0.02em;">${label}</a>`;
   }
 
   private darkWrap(inner: string): string {
