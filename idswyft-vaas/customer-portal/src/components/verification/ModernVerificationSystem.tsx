@@ -1,3 +1,7 @@
+// Desktop verification flow — dark theme matching the main platform's EndUserVerification.
+// Single centered card, dark navy background, cyan accents.
+// All business logic preserved; only presentation changed.
+
 import React, { useState, useEffect, useRef } from 'react';
 import { VerificationSession } from '../../types';
 import customerPortalAPI, { type ApiError } from '../../services/api';
@@ -5,38 +9,29 @@ import verificationAPI from '../../services/verificationApi';
 import { useOrganization } from '../../contexts/OrganizationContext';
 import BrandedHeader from '../BrandedHeader';
 import LiveCaptureComponent from '../LiveCaptureComponent';
-import {
-  Shield,
-  Upload,
-  Camera,
-  CheckCircle,
-  AlertCircle,
-  FileText,
-  User,
-  Loader,
-  ArrowRight,
-  RefreshCw,
-  ChevronRight,
-  Clock,
-  Zap,
-  Star,
-  Eye,
-  ImageIcon,
-  Lock
-} from 'lucide-react';
 
 interface ModernVerificationSystemProps {
   sessionToken: string;
 }
 
-interface VerificationStep {
-  id: number;
-  title: string;
-  description: string;
-  icon: React.ReactNode;
-  status: 'upcoming' | 'current' | 'processing' | 'completed' | 'failed';
-  canInteract: boolean;
-}
+// ── Step definitions ─────────────────────────────────────────────────────────
+const STEPS = [
+  { step: 1, label: 'Front ID' },
+  { step: 2, label: 'Scanning' },
+  { step: 3, label: 'Back ID' },
+  { step: 4, label: 'Live Capture' },
+  { step: 5, label: 'Done' },
+];
+
+// ── Theme tokens ─────────────────────────────────────────────────────────────
+const t = {
+  bg: 'bg-[#080c14]',
+  cardBg: 'bg-[#0b0f19]',
+  text: 'text-[#dde2ec]',
+  textSec: 'text-[#8896aa]',
+  border: 'border-[rgba(255,255,255,0.07)]',
+  input: 'border-[rgba(255,255,255,0.13)] focus:border-cyan-400 bg-[#0f1420] text-[#dde2ec]',
+};
 
 export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> = ({ sessionToken }) => {
   const [session, setSession] = useState<VerificationSession | null>(null);
@@ -45,13 +40,9 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
-  const [dragOver, setDragOver] = useState<string | null>(null);
-  const [uploadProgress, setUploadProgress] = useState<{ [key: string]: number }>({});
-  const [documents, setDocuments] = useState<{
-    front?: File;
-    back?: File;
-    selfie?: File;
-  }>({});
+  const [documents, setDocuments] = useState<{ front?: File; back?: File }>({});
+  const [frontPreviewUrl, setFrontPreviewUrl] = useState<string | null>(null);
+  const [backPreviewUrl, setBackPreviewUrl] = useState<string | null>(null);
   const [documentType, setDocumentType] = useState<string>('drivers_license');
   const [ocrData, setOcrData] = useState<any>(null);
   const [backOfIdUploaded, setBackOfIdUploaded] = useState(false);
@@ -63,151 +54,124 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
 
   const frontInputRef = useRef<HTMLInputElement>(null);
   const backInputRef = useRef<HTMLInputElement>(null);
+  const mountedRef = useRef(true);
 
-  // Initialize session and verification engine
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+      if (frontPreviewUrl) URL.revokeObjectURL(frontPreviewUrl);
+      if (backPreviewUrl) URL.revokeObjectURL(backPreviewUrl);
+    };
+  }, []);
+
+  // ── Initialize session ─────────────────────────────────────────────────────
   useEffect(() => {
     const initializeSession = async () => {
       try {
-        console.log('🚀 Initializing verification session...');
         setLoading(true);
-
-        // Get session data
         const sessionData = await customerPortalAPI.getVerificationSession(sessionToken);
-        console.log('✅ Session data retrieved:', sessionData);
+        if (!mountedRef.current) return;
         setSession(sessionData);
 
-        // Apply organization branding
         if (sessionData.organization?.branding) {
           setBranding(sessionData.organization.branding);
         }
         if (sessionData.organization?.name) {
           setOrganizationName(sessionData.organization.name);
         }
-
-        // Ready to start verification
-        console.log('✅ Verification system ready');
-
         setLoading(false);
-      } catch (error) {
-        console.error('❌ Failed to initialize session:', error);
-        setError(`Failed to initialize verification: ${error instanceof Error ? error.message : 'Unknown error'}`);
+      } catch (err) {
+        if (!mountedRef.current) return;
+        setError(`Failed to initialize verification: ${err instanceof Error ? err.message : 'Unknown error'}`);
         setLoading(false);
       }
     };
 
-    if (sessionToken) {
-      initializeSession();
-    }
+    if (sessionToken) initializeSession();
   }, [sessionToken]);
 
-  const updateCurrentStep = (step: number) => {
-    setCurrentStep(step);
+  // ── File handlers ──────────────────────────────────────────────────────────
+  const handleFrontFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (frontPreviewUrl) URL.revokeObjectURL(frontPreviewUrl);
+    setDocuments(prev => ({ ...prev, front: file }));
+    setFrontPreviewUrl(URL.createObjectURL(file));
   };
 
-  const simulateUploadProgress = (key: string, duration: number = 2000) => {
-    const startTime = Date.now();
-    const interval = setInterval(() => {
-      const elapsed = Date.now() - startTime;
-      const progress = Math.min((elapsed / duration) * 100, 100);
-
-      setUploadProgress(prev => ({ ...prev, [key]: progress }));
-
-      if (progress >= 100) {
-        clearInterval(interval);
-        setTimeout(() => {
-          setUploadProgress(prev => ({ ...prev, [key]: 0 }));
-        }, 500);
-      }
-    }, 50);
+  const handleBackFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (backPreviewUrl) URL.revokeObjectURL(backPreviewUrl);
+    setDocuments(prev => ({ ...prev, back: file }));
+    setBackPreviewUrl(URL.createObjectURL(file));
   };
 
-  const handleFileUpload = async (file: File, type: 'front' | 'back') => {
-    if (!session) return;
-
+  // ── Upload front document ──────────────────────────────────────────────────
+  const uploadFrontDocument = async () => {
+    if (!documents.front || !session) return;
     setUploading(true);
     setError(null);
-    simulateUploadProgress(type, 3000);
 
     try {
-      console.log(`📄 Uploading ${type} document...`);
-      setDocuments(prev => ({ ...prev, [type]: file }));
-
-      if (type === 'front') {
-        // Start verification and upload front document
-        let currentVerificationId = verificationId;
-        if (!currentVerificationId) {
-          currentVerificationId = await verificationAPI.startVerification(session);
-          setVerificationId(currentVerificationId);
-        }
-
-        await verificationAPI.uploadDocument(session, currentVerificationId, file, documentType);
-        console.log('✅ Front document uploaded successfully');
-        setCurrentStep(2); // Move to processing step
-
-        // Poll for OCR completion
-        pollForOCRCompletion(currentVerificationId);
-      } else {
-        // Upload back document
-        if (!verificationId) throw new Error('Front document must be uploaded first');
-        await verificationAPI.uploadBackOfId(session, verificationId, file, documentType);
-        console.log('✅ Back document uploaded successfully');
-        setBackOfIdUploaded(true);
-        setCurrentStep(4); // Move to live capture
+      let currentVerificationId = verificationId;
+      if (!currentVerificationId) {
+        currentVerificationId = await verificationAPI.startVerification(session);
+        setVerificationId(currentVerificationId);
       }
-    } catch (error) {
-      console.error(`❌ ${type} document upload failed:`, error);
-      setError(`Failed to upload ${type} document: ${error instanceof Error ? error.message : 'Unknown error'}`);
+
+      await verificationAPI.uploadDocument(session, currentVerificationId, documents.front, documentType);
+      setCurrentStep(2);
+      pollForOCRCompletion(currentVerificationId);
+    } catch (err) {
+      setError(`Failed to upload front document: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setUploading(false);
     }
   };
 
-  const handleLiveCaptureSuccess = async (imageData: string) => {
-    if (!session || !verificationId) return;
-
+  // ── Upload back document ───────────────────────────────────────────────────
+  const uploadBackDocument = async () => {
+    if (!documents.back || !verificationId || !session) return;
     setUploading(true);
-    setShowLiveCapture(false); // Close the live capture modal
     setError(null);
-    simulateUploadProgress('live', 2000);
 
     try {
-      console.log('📸 Uploading live capture...');
+      await verificationAPI.uploadBackOfId(session, verificationId, documents.back, documentType);
+      setBackOfIdUploaded(true);
+      setCurrentStep(4);
+    } catch (err) {
+      setError(`Failed to upload back document: ${err instanceof Error ? err.message : 'Unknown error'}`);
+    } finally {
+      setUploading(false);
+    }
+  };
 
-      // Convert base64 data to File
-      const base64toBlob = (base64Data: string) => {
-        // If imageData is already just base64 data (no data URL prefix), use it directly
-        // If it's a full data URL, extract the base64 part
-        const base64String = base64Data.includes(',') ? base64Data.split(',')[1] : base64Data;
+  // ── Live capture handler ───────────────────────────────────────────────────
+  const handleLiveCaptureSuccess = async (imageData: string) => {
+    if (!session || !verificationId) return;
+    setUploading(true);
+    setShowLiveCapture(false);
+    setError(null);
 
-        try {
-          const byteString = atob(base64String);
-          const ab = new ArrayBuffer(byteString.length);
-          const ia = new Uint8Array(ab);
-          for (let i = 0; i < byteString.length; i++) {
-            ia[i] = byteString.charCodeAt(i);
-          }
-          return new Blob([ab], { type: 'image/jpeg' });
-        } catch (error) {
-          console.error('Base64 decoding error:', error);
-          throw new Error('The string contains invalid characters.');
-        }
-      };
-
-      const blob = base64toBlob(imageData);
+    try {
+      const base64String = imageData.includes(',') ? imageData.split(',')[1] : imageData;
+      const byteString = atob(base64String);
+      const ab = new ArrayBuffer(byteString.length);
+      const ia = new Uint8Array(ab);
+      for (let i = 0; i < byteString.length; i++) {
+        ia[i] = byteString.charCodeAt(i);
+      }
+      const blob = new Blob([ab], { type: 'image/jpeg' });
       const file = new File([blob], 'selfie.jpg', { type: 'image/jpeg' });
 
       await verificationAPI.captureSelfie(session, verificationId, file);
-      console.log('✅ Live capture uploaded successfully');
-      setCurrentStep(5); // Move to final step
-
-      // Submit verification with idempotency key
+      setCurrentStep(5);
       await handleSubmitVerification();
-
-      // Poll for final results
       pollForFinalResults(verificationId);
-    } catch (error) {
-      console.error('❌ Live capture upload failed:', error);
-      setError(`Failed to upload live capture: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } catch (err) {
+      setError(`Failed to upload live capture: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setUploading(false);
     }
@@ -226,211 +190,217 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
     }
   };
 
-  const handleLiveCaptureCancel = () => {
-    setShowLiveCapture(false);
-  };
+  // ── Polling ────────────────────────────────────────────────────────────────
+  const pollForOCRCompletion = async (vId: string, attempt = 0) => {
+    if (!session || !mountedRef.current) return;
+    if (attempt >= 30) { setError('Document processing timed out. Please try again.'); return; }
 
-  const pollForOCRCompletion = async (vId: string) => {
-    const maxAttempts = 30;
-    let attempts = 0;
+    try {
+      const results = await verificationAPI.getResults(session, vId);
+      if (!mountedRef.current) return;
 
-    const poll = async () => {
-      try {
-        attempts++;
-        console.log(`🔄 Polling OCR completion (attempt ${attempts}/${maxAttempts})`);
-
-        const results = await verificationAPI.getResults(session!, vId);
-
-        if (results.ocr_data && Object.keys(results.ocr_data).length > 0) {
-          console.log('✅ OCR completed successfully');
-          setOcrData(results.ocr_data);
-          setCurrentStep(3); // Move to back document upload
-          return;
-        }
-
-        if (results.status === 'failed') {
-          console.log('❌ Verification failed during OCR');
-          setFinalStatus('failed');
-          setVerificationResults(results);
-          setCurrentStep(5);
-          return;
-        }
-
-        if (attempts < maxAttempts) {
-          setTimeout(poll, 3000); // Poll every 3 seconds
-        } else {
-          setError('Document processing is taking longer than expected. Please try again.');
-        }
-      } catch (error) {
-        console.error('OCR polling error:', error);
-        if (attempts < 3) {
-          setTimeout(poll, 5000);
-        } else {
-          setError('Failed to check processing status. Please try again.');
-        }
+      if (results.ocr_data && Object.keys(results.ocr_data).length > 0) {
+        setOcrData(results.ocr_data);
+        setCurrentStep(3);
+        return;
       }
-    };
-
-    poll();
-  };
-
-  const pollForFinalResults = async (vId: string) => {
-    const maxAttempts = 24;
-    let attempts = 0;
-
-    const poll = async () => {
-      try {
-        attempts++;
-        console.log(`🔄 Polling final results (attempt ${attempts}/${maxAttempts})`);
-
-        const results = await verificationAPI.getResults(session!, vId);
-
-        if (results.status === 'verified' || results.status === 'failed' || results.status === 'manual_review') {
-          console.log(`✅ Final results received: ${results.status}`);
-          setFinalStatus(results.status);
-          setVerificationResults(results);
-          return;
-        }
-
-        if (attempts < maxAttempts) {
-          setTimeout(poll, 5000); // Poll every 5 seconds
-        } else {
-          setError('Verification is taking longer than expected. Please contact support.');
-        }
-      } catch (error) {
-        console.error('Final results polling error:', error);
-        if (attempts < 3) {
-          setTimeout(poll, 5000);
-        } else {
-          setError('Failed to get verification results. Please contact support.');
-        }
+      if (results.status === 'failed') {
+        setFinalStatus('failed');
+        setVerificationResults(results);
+        setCurrentStep(5);
+        return;
       }
-    };
-
-    poll();
+      setTimeout(() => pollForOCRCompletion(vId, attempt + 1), 3000);
+    } catch {
+      if (mountedRef.current && attempt < 3) setTimeout(() => pollForOCRCompletion(vId, attempt + 1), 5000);
+      else if (mountedRef.current) setError('Failed to check processing status.');
+    }
   };
 
-  const handleDragOver = (e: React.DragEvent, type: string) => {
-    e.preventDefault();
-    setDragOver(type);
+  const pollForFinalResults = async (vId: string, attempt = 0) => {
+    if (!session || !mountedRef.current) return;
+    if (attempt >= 24) { setError('Verification is taking longer than expected.'); return; }
+
+    try {
+      const results = await verificationAPI.getResults(session, vId);
+      if (!mountedRef.current) return;
+
+      if (results.status === 'verified' || results.status === 'failed' || results.status === 'manual_review') {
+        setFinalStatus(results.status);
+        setVerificationResults(results);
+        return;
+      }
+      setTimeout(() => pollForFinalResults(vId, attempt + 1), 5000);
+    } catch {
+      if (mountedRef.current && attempt < 3) setTimeout(() => pollForFinalResults(vId, attempt + 1), 5000);
+      else if (mountedRef.current) setError('Failed to get verification results.');
+    }
   };
 
-  const handleDragLeave = (e: React.DragEvent) => {
-    e.preventDefault();
-    setDragOver(null);
-  };
+  // ── Drag-and-drop helpers ──────────────────────────────────────────────────
+  const [dragOver, setDragOver] = useState<string | null>(null);
 
+  const handleDragOver = (e: React.DragEvent, type: string) => { e.preventDefault(); setDragOver(type); };
+  const handleDragLeave = (e: React.DragEvent) => { e.preventDefault(); setDragOver(null); };
   const handleDrop = (e: React.DragEvent, type: 'front' | 'back') => {
     e.preventDefault();
     setDragOver(null);
-
     const files = e.dataTransfer.files;
     if (files.length > 0) {
-      handleFileUpload(files[0], type);
-    }
-  };
-
-  const getSteps = (): VerificationStep[] => {
-    const canUploadFront = currentStep === 1;
-    const canUploadBack = currentStep === 3 && ocrData;
-    const canLiveCapture = currentStep === 4 && backOfIdUploaded;
-    const isComplete = currentStep === 5 && finalStatus;
-
-    return [
-      {
-        id: 1,
-        title: 'Upload Front ID',
-        description: 'Upload the front side of your government-issued ID',
-        icon: <FileText className="w-5 h-5" />,
-        status: currentStep > 1 ? 'completed' : (currentStep === 1 ? 'current' : 'upcoming'),
-        canInteract: canUploadFront
-      },
-      {
-        id: 2,
-        title: 'Upload Back ID',
-        description: 'Upload the back side of your ID document',
-        icon: <ImageIcon className="w-5 h-5" />,
-        status: currentStep > 2 ? 'completed' : (currentStep === 2 ? 'current' : 'upcoming'),
-        canInteract: canUploadBack
-      },
-      {
-        id: 3,
-        title: 'Document Validation',
-        description: 'We validate and cross-check your documents',
-        icon: <Shield className="w-5 h-5" />,
-        status: currentStep > 3 ? 'completed' : (currentStep === 3 ? 'processing' : 'upcoming'),
-        canInteract: false
-      },
-      {
-        id: 4,
-        title: 'Live Selfie',
-        description: 'Take a selfie to verify your identity',
-        icon: <Camera className="w-5 h-5" />,
-        status: currentStep > 4 ? 'completed' : (currentStep === 4 ? 'current' : 'upcoming'),
-        canInteract: canLiveCapture
-      },
-      {
-        id: 5,
-        title: 'Verification Complete',
-        description: 'Your identity has been successfully verified',
-        icon: <CheckCircle className="w-5 h-5" />,
-        status: isComplete ? 'completed' : 'upcoming',
-        canInteract: false
+      if (type === 'front') {
+        if (frontPreviewUrl) URL.revokeObjectURL(frontPreviewUrl);
+        setDocuments(prev => ({ ...prev, front: files[0] }));
+        setFrontPreviewUrl(URL.createObjectURL(files[0]));
+      } else {
+        if (backPreviewUrl) URL.revokeObjectURL(backPreviewUrl);
+        setDocuments(prev => ({ ...prev, back: files[0] }));
+        setBackPreviewUrl(URL.createObjectURL(files[0]));
       }
-    ];
-  };
-
-  const getStepStatusIcon = (step: VerificationStep) => {
-    switch (step.status) {
-      case 'completed':
-        return <CheckCircle className="w-5 h-5 text-green-500" />;
-      case 'current':
-        return <div className="w-5 h-5 bg-gradient-to-r from-blue-500 to-indigo-500 rounded-full flex items-center justify-center">
-          <div className="w-2 h-2 bg-white rounded-full"></div>
-        </div>;
-      case 'processing':
-        return <Loader className="w-5 h-5 text-blue-500 animate-spin" />;
-      case 'failed':
-        return <AlertCircle className="w-5 h-5 text-red-500" />;
-      default:
-        return <div className="w-5 h-5 bg-slate-300 rounded-full"></div>;
     }
   };
 
+  // ── Progress bar ───────────────────────────────────────────────────────────
+  const renderProgress = () => (
+    <div className="mb-8">
+      <div className="relative">
+        <div className="progress-bar">
+          <div
+            className="progress-bar-fill"
+            style={{ width: `${((currentStep - 1) / (STEPS.length - 1)) * 100}%` }}
+          />
+        </div>
+        <div className="flex justify-between absolute -top-1.5 w-full">
+          {STEPS.map(({ step }) => (
+            <div key={step} className="relative">
+              <div className={`step-dot ${
+                currentStep > step ? 'step-dot--done'
+                  : currentStep === step ? 'step-dot--active'
+                  : 'step-dot--pending'
+              }`}>
+                {currentStep > step && (
+                  <svg className="w-2.5 h-2.5 text-white absolute top-px left-px" fill="currentColor" viewBox="0 0 20 20">
+                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                  </svg>
+                )}
+                {currentStep === step && (
+                  <div className="w-1.5 h-1.5 bg-white rounded-full absolute top-px left-px animate-pulse" />
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </div>
+      <div className="text-center mt-8">
+        <span className="text-sm font-medium text-cyan-400">
+          {STEPS.find(s => s.step === currentStep)?.label}
+        </span>
+        <span className={`text-xs ml-2 ${t.textSec}`}>
+          ({currentStep}/{STEPS.length})
+        </span>
+      </div>
+    </div>
+  );
+
+  // ── File upload area ───────────────────────────────────────────────────────
+  const renderFileArea = (
+    type: 'front' | 'back',
+    previewUrl: string | null,
+    inputRef: React.RefObject<HTMLInputElement | null>,
+    onChange: (e: React.ChangeEvent<HTMLInputElement>) => void,
+    label: string,
+  ) => (
+    <div
+      className={`file-upload-zone ${dragOver === type ? 'dragover' : ''} ${uploading ? 'opacity-60 pointer-events-none' : ''}`}
+      onDragOver={e => handleDragOver(e, type)}
+      onDragLeave={handleDragLeave}
+      onDrop={e => handleDrop(e, type)}
+      onClick={() => inputRef.current?.click()}
+    >
+      <input
+        ref={inputRef}
+        type="file"
+        accept="image/*"
+        className="hidden"
+        onChange={onChange}
+        disabled={uploading}
+      />
+      {previewUrl ? (
+        <img src={previewUrl} alt="Preview" className="max-h-40 mx-auto rounded-xl shadow" />
+      ) : (
+        <div className="py-4">
+          <svg className="w-10 h-10 mx-auto mb-3 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+          </svg>
+          <p className={`font-medium ${t.text}`}>{label}</p>
+          <p className={`text-xs mt-1 ${t.textSec}`}>JPG, PNG up to 10MB — drag & drop or click</p>
+        </div>
+      )}
+    </div>
+  );
+
+  // ── OCR summary ────────────────────────────────────────────────────────────
+  const renderOCRSummary = () => {
+    if (!ocrData) return null;
+    const fields: [string, string | undefined][] = [
+      ['Name', ocrData.full_name],
+      ['Document #', ocrData.document_number],
+      ['Date of Birth', ocrData.date_of_birth],
+      ['Expiry', ocrData.expiry_date],
+      ['Nationality', ocrData.nationality],
+    ];
+    const visible = fields.filter(([, v]) => v);
+    if (!visible.length) return null;
+
+    return (
+      <div className={`rounded-xl border ${t.border} p-4 mb-5`}>
+        <p className={`text-xs font-semibold uppercase tracking-wide mb-3 ${t.textSec}`}>Front ID — Extracted Data</p>
+        <div className="space-y-1.5">
+          {visible.map(([label, value]) => (
+            <div key={label} className="flex justify-between text-sm">
+              <span className={t.textSec}>{label}</span>
+              <span className={`font-medium ${t.text}`}>{value}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  // ── Spinner helper ─────────────────────────────────────────────────────────
+  const Spinner = () => (
+    <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-cyan-400 mx-auto mb-5" />
+  );
+
+  // ── Loading state ──────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className="portal-bg">
-        <div className="min-h-screen flex items-center justify-center p-4">
-          <div className="verification-card-glass animate-fade-in max-w-md">
-            <div className="icon-container-primary mx-auto mb-6">
-              <Loader className="w-6 h-6 animate-spin" />
+      <div className={`min-h-screen ${t.bg} flex items-center justify-center p-4`}>
+        <div className="w-full max-w-lg">
+          <div className={`portal-card p-8 text-center animate-fade-in`}>
+            <div className="w-14 h-14 mx-auto mb-5 bg-gradient-to-br from-cyan-400 to-cyan-500 rounded-full flex items-center justify-center">
+              <svg className="w-7 h-7 text-white animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
+              </svg>
             </div>
-            <h3 className="text-2xl font-semibold gradient-text mb-3">Initializing Verification</h3>
-            <p className="text-slate-600 mb-4">Setting up your secure verification session...</p>
-            <div className="progress-bar">
-              <div className="progress-bar-fill w-1/3"></div>
-            </div>
+            <h2 className={`text-xl font-semibold mb-2 ${t.text}`}>Initializing Verification</h2>
+            <p className={`text-sm ${t.textSec}`}>Setting up your secure session...</p>
           </div>
         </div>
       </div>
     );
   }
 
-  if (error) {
+  // ── Error-only state ───────────────────────────────────────────────────────
+  if (error && !session) {
     return (
-      <div className="portal-bg">
-        <div className="min-h-screen flex items-center justify-center p-4">
-          <div className="verification-card-glass animate-fade-in max-w-md">
-            <div className="icon-container-error mx-auto mb-6">
-              <AlertCircle className="w-6 h-6" />
-            </div>
-            <h3 className="text-2xl font-semibold text-slate-800 mb-3">Verification Error</h3>
-            <p className="text-slate-600 mb-6">{error}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="btn btn-primary w-full"
-            >
-              <RefreshCw className="w-4 h-4 mr-2" />
+      <div className={`min-h-screen ${t.bg} flex items-center justify-center p-4`}>
+        <div className="w-full max-w-lg">
+          <div className="portal-card p-8 text-center animate-fade-in">
+            <div className="text-4xl mb-4">!</div>
+            <h2 className={`text-xl font-semibold mb-2 ${t.text}`}>Verification Error</h2>
+            <p className={`text-sm mb-6 ${t.textSec}`}>{error}</p>
+            <button onClick={() => window.location.reload()} className="btn-primary">
               Try Again
             </button>
           </div>
@@ -439,451 +409,242 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
     );
   }
 
-  const steps = getSteps();
-  const currentStepData = steps.find(s => s.id === currentStep);
+  // ── Step content renderer ──────────────────────────────────────────────────
+  const renderStepContent = () => {
+    switch (currentStep) {
+      // ── 1: Upload front document ───────────────────────────────────────
+      case 1:
+        return (
+          <div className="space-y-5 animate-fade-in">
+            <div className="text-center">
+              <h2 className={`text-xl font-semibold mb-1 ${t.text}`}>Upload Front of ID</h2>
+              <p className={`text-sm ${t.textSec}`}>Take a clear photo of the front of your government-issued ID</p>
+            </div>
 
-  return (
-    <div className="portal-bg min-h-screen">
-      <BrandedHeader />
+            <div>
+              <label className={`block text-sm font-medium mb-2 ${t.text}`}>Document Type</label>
+              <select
+                value={documentType}
+                onChange={e => setDocumentType(e.target.value)}
+                className={`w-full px-4 py-2.5 rounded-xl border ${t.input} focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all`}
+              >
+                <option value="national_id">National ID</option>
+                <option value="passport">Passport</option>
+                <option value="drivers_license">Driver's License</option>
+              </select>
+            </div>
 
-      <div className="container mx-auto px-4 py-8 max-w-6xl">
-        {/* Header Section */}
-        <div className="text-center mb-12 animate-fade-in">
-          <div className="icon-container-primary mx-auto mb-6">
-            <Shield className="w-8 h-8" />
+            {renderFileArea('front', frontPreviewUrl, frontInputRef, handleFrontFileSelect, 'Upload Front of ID')}
+
+            {documents.front && (
+              <button onClick={uploadFrontDocument} disabled={uploading} className="btn-primary">
+                {uploading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Uploading...
+                  </span>
+                ) : 'Continue \u2192'}
+              </button>
+            )}
           </div>
-          <h1 className="text-4xl font-bold gradient-text mb-4">Identity Verification</h1>
-          <p className="text-slate-600 text-lg max-w-2xl mx-auto">
-            Complete your secure identity verification in just a few simple steps.
-            Your privacy and security are our top priorities.
+        );
+
+      // ── 2: Processing front OCR ────────────────────────────────────────
+      case 2:
+        return (
+          <div className="text-center py-8 animate-fade-in">
+            <Spinner />
+            <h2 className={`text-xl font-semibold mb-2 ${t.text}`}>Reading Your ID</h2>
+            <p className={`text-sm ${t.textSec}`}>Extracting information from the front of your document...</p>
+            <p className={`text-xs mt-2 ${t.textSec}`}>Please don't close this window</p>
+          </div>
+        );
+
+      // ── 3: Upload back document ────────────────────────────────────────
+      case 3:
+        return (
+          <div className="space-y-5 animate-fade-in">
+            <div className="text-center">
+              <h2 className={`text-xl font-semibold mb-1 ${t.text}`}>Upload Back of ID</h2>
+              <p className={`text-sm ${t.textSec}`}>We need both sides to cross-validate your identity</p>
+            </div>
+
+            {renderOCRSummary()}
+
+            {renderFileArea('back', backPreviewUrl, backInputRef, handleBackFileSelect, 'Upload Back of ID')}
+
+            {documents.back && (
+              <button onClick={uploadBackDocument} disabled={uploading} className="btn-primary">
+                {uploading ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    Uploading...
+                  </span>
+                ) : 'Continue \u2192'}
+              </button>
+            )}
+          </div>
+        );
+
+      // ── 4: Live capture ────────────────────────────────────────────────
+      case 4:
+        return (
+          <div className="text-center py-4 animate-fade-in">
+            <h2 className={`text-xl font-semibold mb-1 ${t.text}`}>Live Capture</h2>
+            <p className={`text-sm mb-6 ${t.textSec}`}>
+              Position your face in the center and ensure good lighting
+            </p>
+
+            <button
+              onClick={() => setShowLiveCapture(true)}
+              disabled={uploading}
+              className="btn-primary"
+            >
+              {uploading ? (
+                <span className="flex items-center justify-center gap-2">
+                  <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                    <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                    <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                  </svg>
+                  Processing...
+                </span>
+              ) : 'Open Camera'}
+            </button>
+
+            <div className={`mt-6 rounded-xl border ${t.border} p-4 text-left`}>
+              <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${t.textSec}`}>Liveness Detection</p>
+              <p className={`text-sm ${t.textSec}`}>
+                Our system will automatically detect that you're a real person and capture your photo when optimal conditions are met.
+              </p>
+            </div>
+          </div>
+        );
+
+      // ── 5: Final result ────────────────────────────────────────────────
+      case 5: {
+        if (!finalStatus) {
+          return (
+            <div className="text-center py-8 animate-fade-in">
+              <Spinner />
+              <h2 className={`text-xl font-semibold mb-2 ${t.text}`}>Processing Verification</h2>
+              <p className={`text-sm ${t.textSec}`}>Analyzing your live photo...</p>
+            </div>
+          );
+        }
+
+        const isVerified = finalStatus === 'verified';
+        const isFailed = finalStatus === 'failed';
+
+        return (
+          <div className="text-center max-w-sm mx-auto space-y-5 animate-fade-in">
+            <div className="text-5xl">
+              {isVerified ? '\u2705' : isFailed ? '\u274C' : '\u23F3'}
+            </div>
+
+            <div>
+              <h2 className={`text-xl font-semibold ${t.text}`}>
+                {isVerified ? 'Identity Verified!' : isFailed ? 'Verification Failed' : 'Under Review'}
+              </h2>
+              <p className={`text-sm mt-1 ${t.textSec}`}>
+                {isVerified
+                  ? 'Your identity has been successfully verified.'
+                  : isFailed
+                  ? (verificationResults?.failure_reason || 'Verification could not be completed. Please try again.')
+                  : 'Your verification is under manual review. You will be notified of the result.'}
+              </p>
+            </div>
+
+            {/* Score details */}
+            {verificationResults && (
+              <div className={`rounded-xl border ${t.border} p-4 text-left text-sm space-y-2`}>
+                <div className="flex justify-between">
+                  <span className={t.textSec}>Status</span>
+                  <span className={`font-semibold capitalize ${isVerified ? 'text-green-400' : isFailed ? 'text-red-400' : 'text-yellow-400'}`}>
+                    {finalStatus}
+                  </span>
+                </div>
+                {verificationResults.confidence_score != null && (
+                  <div className="flex justify-between">
+                    <span className={t.textSec}>Confidence</span>
+                    <span className={`font-medium ${t.text}`}>{Math.round(verificationResults.confidence_score * 100)}%</span>
+                  </div>
+                )}
+                {(verificationResults.face_match_results?.score ?? verificationResults.face_match_score) != null && (
+                  <div className="flex justify-between">
+                    <span className={t.textSec}>Face Match</span>
+                    <span className={`font-medium ${t.text}`}>
+                      {Math.round((verificationResults.face_match_results?.score ?? verificationResults.face_match_score) * 100)}%
+                    </span>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {isFailed && (
+              <button onClick={() => window.location.reload()} className="btn-primary">
+                Try Again
+              </button>
+            )}
+          </div>
+        );
+      }
+
+      default:
+        return null;
+    }
+  };
+
+  // ── Root render ────────────────────────────────────────────────────────────
+  return (
+    <div className={`min-h-screen ${t.bg} flex items-center justify-center p-4`}>
+      <div className="w-full max-w-lg">
+        {/* Organization branding */}
+        <BrandedHeader className="mb-6" />
+
+        {/* Main card */}
+        <div className="portal-card">
+          <div className="p-8">
+            {renderProgress()}
+            {renderStepContent()}
+
+            {/* Inline error banner */}
+            {error && session && (
+              <div className="mt-6 rounded-xl border border-red-500/20 bg-red-500/10 p-4 animate-fade-in">
+                <p className="text-sm text-red-400">{error}</p>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Security footer */}
+        <div className="mt-6 text-center">
+          <p className={`text-xs ${t.textSec}`}>
+            256-bit SSL encryption \u00B7 GDPR compliant \u00B7 Auto-deleted after verification
           </p>
         </div>
-
-        {/* Progress Steps */}
-        <div className="mb-12">
-          <div className="verification-step-glass animate-slide-in-up">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-slate-800">
-                Step {currentStep} of {steps.length}
-              </h2>
-              <div className="flex items-center space-x-2 text-sm text-slate-600">
-                <Clock className="w-4 h-4" />
-                <span>~2 minutes remaining</span>
-              </div>
-            </div>
-
-            <div className="progress-bar mb-8">
-              <div
-                className="progress-bar-fill transition-all duration-1000"
-                style={{ width: `${(currentStep / steps.length) * 100}%` }}
-              ></div>
-            </div>
-
-            {/* Step List */}
-            <div className="space-y-4">
-              {steps.map((step, index) => (
-                <div
-                  key={step.id}
-                  className={`flex items-center p-4 rounded-2xl transition-all duration-300 ${
-                    step.status === 'current'
-                      ? 'bg-blue-50/80 border-2 border-blue-200/50'
-                      : step.status === 'completed'
-                      ? 'bg-green-50/80 border border-green-200/50'
-                      : 'bg-white/50 border border-slate-200/50'
-                  } ${step.status === 'current' ? 'animate-scale-in' : ''}`}
-                >
-                  <div className="flex-shrink-0 mr-4">
-                    {getStepStatusIcon(step)}
-                  </div>
-
-                  <div className="flex-grow">
-                    <h3 className={`font-semibold ${
-                      step.status === 'current' ? 'text-blue-800' :
-                      step.status === 'completed' ? 'text-green-800' : 'text-slate-700'
-                    }`}>
-                      {step.title}
-                    </h3>
-                    <p className="text-sm text-slate-600">{step.description}</p>
-                  </div>
-
-                  {step.status === 'current' && (
-                    <ChevronRight className="w-5 h-5 text-blue-500" />
-                  )}
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        {/* Current Step Content */}
-        <div className="grid lg:grid-cols-2 gap-8">
-          {/* Main Action Panel */}
-          <div className="space-y-6">
-            {currentStepData && (
-              <div className="card animate-slide-in-up">
-                <div className="flex items-center mb-6">
-                  <div className="icon-container-primary mr-4">
-                    {currentStepData.icon}
-                  </div>
-                  <div>
-                    <h3 className="text-xl font-semibold text-slate-800">{currentStepData.title}</h3>
-                    <p className="text-slate-600">{currentStepData.description}</p>
-                  </div>
-                </div>
-
-                {/* Front Document Upload */}
-                {currentStep === 1 && (
-                  <div>
-                    <div
-                      className={`file-upload-zone ${dragOver === 'front' ? 'dragover' : ''} ${uploading ? 'opacity-75' : ''}`}
-                      onDragOver={(e) => handleDragOver(e, 'front')}
-                      onDragLeave={handleDragLeave}
-                      onDrop={(e) => handleDrop(e, 'front')}
-                      onClick={() => frontInputRef.current?.click()}
-                    >
-                      <input
-                        ref={frontInputRef}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleFileUpload(file, 'front');
-                        }}
-                        disabled={uploading}
-                      />
-
-                      <div className="text-center">
-                        <Upload className="w-12 h-12 text-blue-500 mx-auto mb-4" />
-                        <h4 className="text-lg font-semibold text-slate-800 mb-2">
-                          Upload Front of ID
-                        </h4>
-                        <p className="text-slate-600 mb-4">
-                          Drag and drop your file here or click to browse
-                        </p>
-                        <p className="text-sm text-slate-500">
-                          Supports: JPEG, PNG (Max 10MB)
-                        </p>
-                      </div>
-
-                      {uploadProgress.front > 0 && (
-                        <div className="mt-4">
-                          <div className="progress-bar">
-                            <div
-                              className="progress-bar-fill"
-                              style={{ width: `${uploadProgress.front}%` }}
-                            ></div>
-                          </div>
-                          <p className="text-sm text-blue-600 mt-2 text-center">
-                            Uploading... {Math.round(uploadProgress.front)}%
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Back Document Upload */}
-                {currentStep === 2 && (
-                  <div>
-                    <div
-                      className={`file-upload-zone ${dragOver === 'back' ? 'dragover' : ''} ${uploading ? 'opacity-75' : ''}`}
-                      onDragOver={(e) => handleDragOver(e, 'back')}
-                      onDragLeave={handleDragLeave}
-                      onDrop={(e) => handleDrop(e, 'back')}
-                      onClick={() => backInputRef.current?.click()}
-                    >
-                      <input
-                        ref={backInputRef}
-                        type="file"
-                        accept="image/*"
-                        className="hidden"
-                        onChange={(e) => {
-                          const file = e.target.files?.[0];
-                          if (file) handleFileUpload(file, 'back');
-                        }}
-                        disabled={uploading}
-                      />
-
-                      <div className="text-center">
-                        <ImageIcon className="w-12 h-12 text-blue-500 mx-auto mb-4" />
-                        <h4 className="text-lg font-semibold text-slate-800 mb-2">
-                          Upload Back of ID
-                        </h4>
-                        <p className="text-slate-600 mb-4">
-                          Drag and drop your file here or click to browse
-                        </p>
-                        <p className="text-sm text-slate-500">
-                          Supports: JPEG, PNG (Max 10MB)
-                        </p>
-                      </div>
-
-                      {uploadProgress.back > 0 && (
-                        <div className="mt-4">
-                          <div className="progress-bar">
-                            <div
-                              className="progress-bar-fill"
-                              style={{ width: `${uploadProgress.back}%` }}
-                            ></div>
-                          </div>
-                          <p className="text-sm text-blue-600 mt-2 text-center">
-                            Uploading... {Math.round(uploadProgress.back)}%
-                          </p>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                )}
-
-                {/* Document Validation */}
-                {currentStep === 3 && (
-                  <div className="text-center py-8">
-                    <div className="icon-container-primary mx-auto mb-6">
-                      <Zap className="w-6 h-6 animate-pulse" />
-                    </div>
-                    <h4 className="text-xl font-semibold text-slate-800 mb-3">
-                      Validating Documents
-                    </h4>
-                    <p className="text-slate-600 mb-6">
-                      Our AI is analyzing and cross-validating your documents...
-                    </p>
-                    <div className="progress-bar">
-                      <div className="progress-bar-fill w-3/4"></div>
-                    </div>
-                  </div>
-                )}
-
-                {/* Live Capture */}
-                {currentStep === 4 && (
-                  <div className="text-center">
-                    <div className="icon-container-primary mx-auto mb-6">
-                      <Camera className="w-6 h-6" />
-                    </div>
-                    <h4 className="text-xl font-semibold text-slate-800 mb-3">
-                      Take a Live Selfie
-                    </h4>
-                    <p className="text-slate-600 mb-6">
-                      Position your face in the center and ensure good lighting for the best results
-                    </p>
-
-                    <button
-                      onClick={() => setShowLiveCapture(true)}
-                      disabled={uploading}
-                      className="btn btn-primary px-8 py-4 text-lg hover-lift"
-                    >
-                      {uploading ? (
-                        <>
-                          <Loader className="w-5 h-5 mr-2 animate-spin" />
-                          Processing...
-                        </>
-                      ) : (
-                        <>
-                          <Camera className="w-5 h-5 mr-2" />
-                          Open Camera
-                        </>
-                      )}
-                    </button>
-
-                    {uploadProgress.live > 0 && (
-                      <div className="mt-6">
-                        <div className="progress-bar">
-                          <div
-                            className="progress-bar-fill"
-                            style={{ width: `${uploadProgress.live}%` }}
-                          ></div>
-                        </div>
-                        <p className="text-sm text-blue-600 mt-2">
-                          Processing... {Math.round(uploadProgress.live)}%
-                        </p>
-                      </div>
-                    )}
-
-                    <div className="mt-6 bg-blue-50/80 rounded-xl p-4">
-                      <h5 className="font-semibold text-blue-800 mb-2">Liveness Detection</h5>
-                      <p className="text-sm text-blue-700">
-                        Our system will automatically detect that you're a real person and capture your photo when optimal conditions are met.
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {/* Completion */}
-                {currentStep === 5 && finalStatus && (
-                  <div className="text-center py-8">
-                    {finalStatus === 'verified' && (
-                      <>
-                        <div className="icon-container-success mx-auto mb-6">
-                          <CheckCircle className="w-8 h-8" />
-                        </div>
-                        <h4 className="text-2xl font-semibold text-green-800 mb-3">
-                          Verification Complete!
-                        </h4>
-                        <p className="text-green-700 mb-6">
-                          Your identity has been successfully verified.
-                        </p>
-                        <div className="flex items-center justify-center space-x-1 text-yellow-500">
-                          {[...Array(5)].map((_, i) => (
-                            <Star key={i} className="w-5 h-5 fill-current" />
-                          ))}
-                        </div>
-                      </>
-                    )}
-
-                    {finalStatus === 'failed' && (
-                      <>
-                        <div className="icon-container-error mx-auto mb-6">
-                          <AlertCircle className="w-8 h-8" />
-                        </div>
-                        <h4 className="text-2xl font-semibold text-red-800 mb-3">
-                          Verification Failed
-                        </h4>
-                        <p className="text-red-700 mb-6">
-                          {verificationResults?.failure_reason || 'Unable to verify your identity with the provided documents.'}
-                        </p>
-                        <button
-                          onClick={() => window.location.reload()}
-                          className="btn btn-primary"
-                        >
-                          <RefreshCw className="w-4 h-4 mr-2" />
-                          Try Again
-                        </button>
-                      </>
-                    )}
-
-                    {finalStatus === 'manual_review' && (
-                      <>
-                        <div className="icon-container-warning mx-auto mb-6">
-                          <Eye className="w-8 h-8" />
-                        </div>
-                        <h4 className="text-2xl font-semibold text-yellow-800 mb-3">
-                          Manual Review Required
-                        </h4>
-                        <p className="text-yellow-700 mb-6">
-                          Your documents are being reviewed by our team. You'll receive an update within 24 hours.
-                        </p>
-                        <div className="info-card-glass">
-                          <p className="text-sm text-blue-800">
-                            <Lock className="w-4 h-4 inline mr-2" />
-                            Your information is secure and will be handled with complete confidentiality.
-                          </p>
-                        </div>
-                      </>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Info Panel */}
-          <div className="space-y-6">
-            {/* Security Info */}
-            <div className="card-glass animate-slide-in-up">
-              <div className="flex items-center mb-4">
-                <Lock className="w-6 h-6 text-blue-600 mr-3" />
-                <h3 className="text-lg font-semibold text-slate-800">Secure & Private</h3>
-              </div>
-              <div className="space-y-3 text-sm text-slate-600">
-                <div className="flex items-center">
-                  <CheckCircle className="w-4 h-4 text-green-500 mr-2 flex-shrink-0" />
-                  <span>256-bit SSL encryption</span>
-                </div>
-                <div className="flex items-center">
-                  <CheckCircle className="w-4 h-4 text-green-500 mr-2 flex-shrink-0" />
-                  <span>GDPR compliant data handling</span>
-                </div>
-                <div className="flex items-center">
-                  <CheckCircle className="w-4 h-4 text-green-500 mr-2 flex-shrink-0" />
-                  <span>Automatic data deletion after verification</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Tips */}
-            <div className="card-glass animate-slide-in-up">
-              <div className="flex items-center mb-4">
-                <User className="w-6 h-6 text-blue-600 mr-3" />
-                <h3 className="text-lg font-semibold text-slate-800">Tips for Success</h3>
-              </div>
-              <div className="space-y-3 text-sm text-slate-600">
-                <div className="flex items-start">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-                  <span>Ensure your ID is clearly visible and not blurry</span>
-                </div>
-                <div className="flex items-start">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-                  <span>Use good lighting and avoid shadows</span>
-                </div>
-                <div className="flex items-start">
-                  <div className="w-2 h-2 bg-blue-500 rounded-full mt-2 mr-3 flex-shrink-0"></div>
-                  <span>Keep your documents flat and fully in frame</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Status Display */}
-            {session && (
-              <div className="card-glass animate-slide-in-up">
-                <div className="flex items-center mb-4">
-                  <Zap className="w-6 h-6 text-blue-600 mr-3" />
-                  <h3 className="text-lg font-semibold text-slate-800">Current Status</h3>
-                </div>
-                <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-slate-600">Session ID</span>
-                    <span className="text-sm font-mono text-slate-800">
-                      {verificationId?.slice(-8) || session.id?.slice(-8) || 'N/A'}
-                    </span>
-                  </div>
-                  <div className="flex items-center justify-between">
-                    <span className="text-sm text-slate-600">Status</span>
-                    <span className={`status-${finalStatus === 'verified' ? 'verified' :
-                      finalStatus === 'failed' ? 'failed' :
-                      finalStatus === 'manual_review' ? 'pending' : 'processing'}`}>
-                      {finalStatus ?
-                        (finalStatus === 'verified' ? 'Verification Complete' :
-                         finalStatus === 'failed' ? 'Verification Failed' :
-                         finalStatus === 'manual_review' ? 'Manual Review' : 'Processing') :
-                        'In Progress'}
-                    </span>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-
-        {/* Error Display */}
-        {error && (
-          <div className="mt-8">
-            <div className="card bg-red-50/80 border-red-200/50 animate-fade-in">
-              <div className="flex items-start">
-                <AlertCircle className="w-5 h-5 text-red-500 mr-3 mt-0.5 flex-shrink-0" />
-                <div>
-                  <h4 className="font-semibold text-red-800 mb-1">Verification Error</h4>
-                  <p className="text-red-700 text-sm">{error}</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Live Capture Modal */}
-        {showLiveCapture && (
-          <div className="fixed inset-0 z-50 overflow-y-auto">
-            <div className="flex items-center justify-center min-h-screen p-4">
-              <div className="fixed inset-0 bg-black/50 backdrop-blur-sm" onClick={handleLiveCaptureCancel}></div>
-              <div className="relative bg-white rounded-3xl shadow-2xl max-w-4xl w-full max-h-[90vh] overflow-hidden">
-                <LiveCaptureComponent
-                  onCapture={handleLiveCaptureSuccess}
-                  onCancel={handleLiveCaptureCancel}
-                  isLoading={uploading}
-                />
-              </div>
-            </div>
-          </div>
-        )}
       </div>
+
+      {/* Live Capture Modal */}
+      {showLiveCapture && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen p-4">
+            <div className="fixed inset-0 bg-black/70 backdrop-blur-sm" onClick={() => setShowLiveCapture(false)} />
+            <div className="relative bg-[#0b0f19] border border-[rgba(255,255,255,0.07)] rounded-3xl shadow-2xl max-w-2xl w-full max-h-[90vh] overflow-hidden">
+              <LiveCaptureComponent
+                onCapture={handleLiveCaptureSuccess}
+                onCancel={() => setShowLiveCapture(false)}
+                isLoading={uploading}
+              />
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

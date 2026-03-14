@@ -30,11 +30,9 @@ const BrandedHeader: React.FC<BrandedHeaderProps> = ({
             alt={companyName}
             className="h-12 max-w-full object-contain"
             onError={(e) => {
-              // Fallback to default shield icon if logo fails to load
               console.warn('Failed to load organization logo:', logoUrl);
               const target = e.target as HTMLImageElement;
               target.style.display = 'none';
-              // Show fallback icon
               const fallback = target.nextElementSibling as HTMLElement;
               if (fallback) {
                 fallback.style.display = 'flex';
@@ -42,10 +40,10 @@ const BrandedHeader: React.FC<BrandedHeaderProps> = ({
             }}
           />
         ) : null}
-        
-        {/* Fallback icon - shown if no logo or logo fails to load */}
-        <div 
-          className={`w-12 h-12 bg-primary-600 rounded-lg flex items-center justify-center ${logoUrl ? 'hidden' : 'flex'}`}
+
+        {/* Fallback icon */}
+        <div
+          className={`w-12 h-12 bg-gradient-to-br from-cyan-400 to-cyan-500 rounded-lg flex items-center justify-center ${logoUrl ? 'hidden' : 'flex'}`}
           style={{ display: logoUrl ? 'none' : 'flex' }}
         >
           <Shield className="w-6 h-6 text-white" />
@@ -53,13 +51,13 @@ const BrandedHeader: React.FC<BrandedHeaderProps> = ({
       </div>
 
       {/* Company Name */}
-      <h1 className="text-2xl font-bold text-gray-900 mb-2">
+      <h1 className="text-2xl font-bold text-[#dde2ec] mb-2">
         {companyName}
       </h1>
 
       {/* Subtitle */}
       {showSubtitle && (
-        <p className="text-gray-600 text-sm">
+        <p className="text-[#8896aa] text-sm">
           {subtitle}
         </p>
       )}

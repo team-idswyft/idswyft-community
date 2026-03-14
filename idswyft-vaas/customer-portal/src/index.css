@@ -1,22 +1,29 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=DM+Sans:wght@400;500;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600&display=swap');
 
 @theme {
   --font-sans: 'DM Sans', system-ui, sans-serif;
-  --font-mono: 'IBM Plex Mono', 'Fira Code', monospace;
-  
+
+  /* Dark theme palette — matches main platform */
+  --color-navy: #080c14;
+  --color-navy-card: #0b0f19;
+  --color-navy-input: #0f1420;
+  --color-cyan-400: #22d3ee;
+  --color-cyan-500: #06b6d4;
+  --color-cyan-600: #0891b2;
+
   /* Default primary colors - can be overridden by organization branding */
-  --color-primary-50: var(--org-primary-50, #eff6ff);
-  --color-primary-100: var(--org-primary-100, #dbeafe);
-  --color-primary-200: var(--org-primary-200, #bfdbfe);
-  --color-primary-300: var(--org-primary-300, #93c5fd);
-  --color-primary-400: var(--org-primary-400, #60a5fa);
-  --color-primary-500: var(--org-primary-500, #3b82f6);
-  --color-primary-600: var(--org-primary-600, #2563eb);
-  --color-primary-700: var(--org-primary-700, #1d4ed8);
-  --color-primary-800: var(--org-primary-800, #1e40af);
-  --color-primary-900: var(--org-primary-900, #1e3a8a);
-  
+  --color-primary-50: var(--org-primary-50, #ecfeff);
+  --color-primary-100: var(--org-primary-100, #cffafe);
+  --color-primary-200: var(--org-primary-200, #a5f3fc);
+  --color-primary-300: var(--org-primary-300, #67e8f9);
+  --color-primary-400: var(--org-primary-400, #22d3ee);
+  --color-primary-500: var(--org-primary-500, #06b6d4);
+  --color-primary-600: var(--org-primary-600, #0891b2);
+  --color-primary-700: var(--org-primary-700, #0e7490);
+  --color-primary-800: var(--org-primary-800, #155e75);
+  --color-primary-900: var(--org-primary-900, #164e63);
+
   /* Extended color palette */
   --color-slate-50: #f8fafc;
   --color-slate-100: #f1f5f9;
@@ -28,16 +35,7 @@
   --color-slate-700: #334155;
   --color-slate-800: #1e293b;
   --color-slate-900: #0f172a;
-  
-  --color-indigo-400: #818cf8;
-  --color-indigo-500: #6366f1;
-  --color-indigo-600: #4f46e5;
-  --color-indigo-700: #4338ca;
-  
-  /* Spacing scale */
-  --space-18: 4.5rem;
-  --space-22: 5.5rem;
-  
+
   /* Border radius scale */
   --radius-2xl: 1rem;
   --radius-3xl: 1.5rem;
@@ -49,209 +47,123 @@ body {
   font-feature-settings: "rlig" 1, "calt" 1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  background: #080c14;
+  color: #dde2ec;
 }
 
-/* Portal-specific backgrounds */
+/* Portal background — dark navy */
 .portal-bg {
-  @apply bg-gradient-to-br from-slate-50 via-blue-50/50 to-indigo-50/80 min-h-screen;
+  background: #080c14;
+  min-height: 100vh;
 }
 
-/* Glass morphism base utilities */
-.glass-panel {
-  @apply bg-white/10 backdrop-blur-xl border border-white/20 rounded-3xl shadow-2xl;
+/* Card on dark background */
+.portal-card {
+  background: #0b0f19;
+  border: 1px solid rgba(255,255,255,0.07);
+  border-radius: 1.5rem;
+  box-shadow: 0 25px 50px -12px rgba(0,0,0,0.5);
+  overflow: hidden;
 }
 
-.gradient-bg {
-  @apply bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50;
-}
-
-.gradient-text {
-  @apply bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent;
-}
-
-/* Enhanced button components */
-.btn {
-  @apply inline-flex items-center px-4 py-2 rounded-lg text-sm font-medium transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed;
-}
-
-.btn-primary {
-  @apply bg-gradient-to-r from-primary-600 to-indigo-600 text-white hover:shadow-lg focus:ring-primary-500/20 focus:ring-4 transform hover:scale-[1.02] transition-all duration-300;
-}
-
-.btn-secondary {
-  @apply bg-white/80 backdrop-blur-sm text-gray-700 border border-gray-200/50 hover:bg-white/90 hover:shadow-md focus:ring-primary-500/20 transition-all duration-200;
-}
-
-.btn-glass {
-  @apply bg-white/10 backdrop-blur-xl border border-white/20 text-slate-700 hover:bg-white/20 focus:ring-primary-500/20;
-}
-
-.btn-outline {
-  @apply border border-primary-600 text-primary-600 hover:bg-primary-50/80 backdrop-blur-sm focus:ring-primary-500/20;
-}
-
-/* Enhanced form components */
-.form-input {
-  @apply block w-full rounded-xl border-2 border-slate-200 bg-white/50 backdrop-blur-sm shadow-sm transition-all duration-200 focus:border-primary-500 focus:ring-4 focus:ring-primary-500/10 hover:border-slate-300 text-slate-900 placeholder-slate-400 px-4 py-3;
-}
-
-.form-label {
-  @apply block text-sm font-semibold text-slate-700 mb-2;
-}
-
-/* Enhanced card components */
-.card {
-  @apply bg-white/70 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 hover:shadow-2xl hover:bg-white/80 transition-all duration-300 hover:-translate-y-1 p-6;
-}
-
-.card-glass {
-  @apply bg-white/60 backdrop-blur-xl rounded-3xl shadow-xl border border-white/20 p-6;
-}
-
-.card-minimal {
-  @apply bg-white/90 backdrop-blur-sm rounded-2xl shadow-lg border border-slate-200/50 p-6;
-}
-
-/* Verification-specific components */
-.verification-card-glass {
-  @apply bg-white/70 backdrop-blur-xl rounded-3xl shadow-2xl border border-white/30 p-8 text-center;
-}
-
-.verification-step-glass {
-  @apply bg-white/50 backdrop-blur-xl rounded-2xl shadow-lg border border-white/20 p-4 mb-4;
-}
-
-.info-card-glass {
-  @apply bg-blue-50/80 backdrop-blur-xl rounded-2xl shadow-md border border-blue-200/30 p-4;
-}
-
-/* File upload with glass morphism */
-.file-upload-zone {
-  @apply border-2 border-dashed border-white/30 bg-white/20 backdrop-blur-xl rounded-3xl p-8 text-center hover:border-primary-400/50 hover:bg-white/30 transition-all duration-300 cursor-pointer shadow-xl;
-}
-
-.file-upload-zone.dragover {
-  @apply border-primary-500/70 bg-primary-50/30 backdrop-blur-xl shadow-2xl;
-}
-
-/* Enhanced progress bar */
+/* Progress bar (dark) */
 .progress-bar {
-  @apply w-full bg-white/40 backdrop-blur-sm rounded-full h-3 shadow-inner overflow-hidden;
+  @apply w-full rounded-full h-1.5 overflow-hidden;
+  background: rgba(255,255,255,0.07);
 }
 
 .progress-bar-fill {
-  @apply h-full bg-gradient-to-r from-primary-500 to-indigo-600 transition-all duration-700 ease-out shadow-sm;
+  @apply h-full rounded-full transition-all duration-700 ease-out;
+  background: linear-gradient(90deg, #22d3ee, #06b6d4);
 }
 
-/* Enhanced status indicators */
+/* Step dot */
+.step-dot {
+  @apply w-4 h-4 rounded-full border-2 transition-all duration-300;
+}
+
+.step-dot--done {
+  @apply bg-cyan-500 border-cyan-500;
+}
+
+.step-dot--active {
+  @apply bg-cyan-500 border-cyan-500;
+}
+
+.step-dot--pending {
+  background: #0f1420;
+  border-color: rgba(255,255,255,0.13);
+}
+
+/* File upload zone (dark) */
+.file-upload-zone {
+  @apply border-2 border-dashed rounded-2xl p-6 text-center cursor-pointer transition-all duration-300;
+  border-color: rgba(255,255,255,0.13);
+}
+
+.file-upload-zone:hover {
+  border-color: #22d3ee;
+}
+
+.file-upload-zone.dragover {
+  border-color: #22d3ee;
+  background: rgba(34,211,238,0.05);
+}
+
+/* Button — cyan gradient */
+.btn-primary {
+  @apply w-full py-3.5 px-6 font-medium rounded-xl disabled:opacity-50 transition-all text-white;
+  background: linear-gradient(135deg, #22d3ee, #06b6d4);
+}
+
+.btn-primary:hover:not(:disabled) {
+  background: linear-gradient(135deg, #06b6d4, #0891b2);
+}
+
+/* Status indicators (dark-friendly) */
 .status-pending {
-  @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-yellow-100/80 backdrop-blur-sm text-yellow-700 border border-yellow-200/50;
+  @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold;
+  background: rgba(245,158,11,0.15);
+  color: #fbbf24;
+  border: 1px solid rgba(245,158,11,0.25);
 }
 
 .status-processing {
-  @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-blue-100/80 backdrop-blur-sm text-blue-700 border border-blue-200/50;
+  @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold;
+  background: rgba(34,211,238,0.15);
+  color: #22d3ee;
+  border: 1px solid rgba(34,211,238,0.25);
 }
 
 .status-verified {
-  @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-green-100/80 backdrop-blur-sm text-green-700 border border-green-200/50;
+  @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold;
+  background: rgba(34,197,94,0.15);
+  color: #4ade80;
+  border: 1px solid rgba(34,197,94,0.25);
 }
 
 .status-failed {
-  @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-red-100/80 backdrop-blur-sm text-red-700 border border-red-200/50;
+  @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold;
+  background: rgba(239,68,68,0.15);
+  color: #f87171;
+  border: 1px solid rgba(239,68,68,0.25);
 }
 
-.status-expired {
-  @apply inline-flex items-center px-3 py-1 rounded-full text-xs font-semibold bg-gray-100/80 backdrop-blur-sm text-gray-700 border border-gray-200/50;
-}
-
-/* Icon containers */
-.icon-container-primary {
-  @apply w-12 h-12 bg-gradient-to-br from-primary-500 to-primary-600 rounded-2xl flex items-center justify-center shadow-lg text-white;
-}
-
-.icon-container-success {
-  @apply w-12 h-12 bg-gradient-to-br from-green-500 to-green-600 rounded-2xl flex items-center justify-center shadow-lg text-white;
-}
-
-.icon-container-warning {
-  @apply w-12 h-12 bg-gradient-to-br from-yellow-500 to-yellow-600 rounded-2xl flex items-center justify-center shadow-lg text-white;
-}
-
-.icon-container-error {
-  @apply w-12 h-12 bg-gradient-to-br from-red-500 to-red-600 rounded-2xl flex items-center justify-center shadow-lg text-white;
-}
-
-/* Utility classes */
-.hover-lift {
-  @apply transition-all duration-300 hover:shadow-xl hover:-translate-y-1;
-}
-
-.focus-ring {
-  @apply focus:ring-4 focus:ring-blue-500/20 focus:outline-none;
-}
-
-/* Enhanced animations */
+/* Animations */
 .animate-fade-in {
-  animation: fadeInGlass 0.6s ease-out forwards;
+  animation: fadeIn 0.5s ease-out forwards;
 }
 
 .animate-slide-in-up {
-  animation: slideInUpGlass 0.5s ease-out forwards;
+  animation: slideInUp 0.4s ease-out forwards;
 }
 
-.animate-scale-in {
-  animation: scaleInGlass 0.4s ease-out forwards;
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-@keyframes fadeInGlass {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes slideInUpGlass {
-  from {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes scaleInGlass {
-  from {
-    opacity: 0;
-    transform: scale(0.95);
-  }
-  to {
-    opacity: 1;
-    transform: scale(1);
-  }
-}
-
-/* Glass shimmer effect */
-.glass-shimmer {
-  @apply relative overflow-hidden;
-}
-
-.glass-shimmer::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
-  transition: left 0.5s ease;
-}
-
-.glass-shimmer:hover::before {
-  left: 100%;
+@keyframes slideInUp {
+  from { opacity: 0; transform: translateY(16px); }
+  to { opacity: 1; transform: translateY(0); }
 }
