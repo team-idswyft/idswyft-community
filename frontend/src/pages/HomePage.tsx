@@ -246,6 +246,7 @@ export function HomePage() {
             { value: '99.8%', label: 'Accuracy' },
             { value: '<200ms', label: 'Response' },
             { value: '200+', label: 'Doc Types' },
+            { value: '19+', label: 'Countries' },
             { value: 'MIT', label: 'License' },
           ].map(({ value, label }) => (
             <div className="landing-card" key={label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 20px', fontFamily: C.mono, fontSize: 13 }}>
@@ -320,7 +321,7 @@ export function HomePage() {
             <div style={{ display: 'flex', flexDirection: 'column', gap: 20, marginBottom: 36 }}>
               {[
                 { title: 'Smart document detection', desc: 'Automatic ID type recognition with guided capture overlay.' },
-                { title: 'Cross-validation engine', desc: 'Front-side OCR vs back-side barcode — inconsistencies flagged instantly.' },
+                { title: 'Cross-validation engine', desc: 'Front-side OCR vs back-side barcode or MRZ — inconsistencies flagged instantly across 19+ countries.' },
                 { title: 'Liveness + face match', desc: 'Anti-spoof live capture compared against the document photo in real time.' },
                 { title: 'Instant results', desc: 'Verified, failed, or flagged for review — webhook delivered within seconds.' },
               ].map(({ title, desc }) => (
@@ -385,8 +386,8 @@ export function HomePage() {
         </div>
         <div className="landing-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
           {[
-            { title: 'OCR Extraction',       desc: 'Name, DOB, document number, expiry — extracted and structured from any government ID.' },
-            { title: 'Back-of-ID / Barcode', desc: 'QR codes, PDF417 barcodes, and MRZ zones cross-validated against front-side data.' },
+            { title: 'OCR Extraction',       desc: 'Name, DOB, document number, expiry — extracted from passports, driver\'s licenses, and national IDs across 19+ countries.' },
+            { title: 'Back-of-ID / Barcode', desc: 'PDF417 barcodes (US), MRZ zones (international), and QR codes — all cross-validated against front-side data.' },
             { title: 'Liveness Detection',   desc: 'Challenge-response live capture to confirm a real person is present during verification.' },
             { title: 'Face Matching',         desc: 'Selfie matched against document photo with a configurable confidence threshold.' },
             { title: 'Webhooks',              desc: 'Real-time POST callbacks on status changes — verified, failed, or manual_review.' },

@@ -85,8 +85,8 @@ const FEATURES = [
   {
     icon: FileCheck,
     title: 'Document OCR',
-    desc: 'AI-powered extraction from passports, driver\'s licenses, and national IDs. 150+ document types, 50+ countries.',
-    tags: ['Tesseract', 'Computer Vision', '150+ Types'],
+    desc: 'AI-powered extraction from passports, driver\'s licenses, and national IDs. 200+ document types across 19+ countries with MRZ and localized field parsing.',
+    tags: ['PaddleOCR', 'MRZ Parsing', '19+ Countries'],
   },
   {
     icon: Fingerprint,
@@ -97,8 +97,8 @@ const FEATURES = [
   {
     icon: Shield,
     title: 'Fraud Detection',
-    desc: 'Barcode cross-validation, tamper detection, and authenticity scoring. Multi-layer checks, single result.',
-    tags: ['PDF417', 'Tamper Check', 'Scoring'],
+    desc: 'Barcode cross-validation (US PDF417), MRZ parsing (international TD1/TD2/TD3), tamper detection, and authenticity scoring.',
+    tags: ['PDF417', 'MRZ', 'Cross-Validation'],
   },
   {
     icon: Activity,
@@ -477,7 +477,7 @@ function App() {
                 {[
                   { value: '< 30 min', label: 'Integration time' },
                   { value: '99.9%', label: 'API uptime SLA' },
-                  { value: '150+', label: 'Document types' },
+                  { value: '200+', label: 'Document types' },
                 ].map(stat => (
                   <div key={stat.label}>
                     <div
