@@ -10,12 +10,15 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@remotion/google-fonts": "^4.0.435",
+    "@remotion/player": "^4.0.435",
     "@tailwindcss/forms": "^0.5.10",
     "@tailwindcss/postcss": "^4.1.12",
     "@tailwindcss/vite": "^4.1.12",
     "lucide-react": "^0.542.0",
     "react": "^19.1.1",
     "react-dom": "^19.1.1",
+    "remotion": "^4.0.435",
     "tailwindcss": "^4.0.0"
   },
   "devDependencies": {
