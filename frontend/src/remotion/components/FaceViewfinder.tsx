@@ -53,7 +53,7 @@ export const FaceViewfinder: React.FC = () => {
           }}
         >
           <img
-            src="/specimen/face.gif"
+            src="https://kcjugatpfhccjroyliku.supabase.co/storage/v1/object/public/specimen-assets/face.gif"
             alt=""
             style={{
               width: '130%',

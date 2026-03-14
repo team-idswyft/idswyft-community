@@ -177,7 +177,7 @@ const FrontCardContent: React.FC = () => {
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <img
-        src="/specimen/id-front.png"
+        src="https://kcjugatpfhccjroyliku.supabase.co/storage/v1/object/public/specimen-assets/id-front.png"
         alt="Specimen ID"
         style={{
           width: '100%',
@@ -197,7 +197,7 @@ const BackCardContent: React.FC = () => {
   return (
     <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <img
-        src="/specimen/id-back.png"
+        src="https://kcjugatpfhccjroyliku.supabase.co/storage/v1/object/public/specimen-assets/id-back.png"
         alt="Specimen ID Back"
         style={{
           width: '100%',
