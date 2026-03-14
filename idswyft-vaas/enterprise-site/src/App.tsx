@@ -6,6 +6,8 @@ import {
   BarChart2, Terminal, User, Mail, Briefcase, ArrowLeft,
   Sparkles, Rocket, Crown
 } from 'lucide-react'
+import { Player } from '@remotion/player'
+import { VaaSMarketing } from './remotion/VaaSMarketing'
 
 // ── Code preview content (3 language tabs) ────────────────────────────────
 type CodeTab = 'curl' | 'js' | 'python'
@@ -614,6 +616,42 @@ function App() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════
+          WHY VAAS — Marketing Video
+          ════════════════════════════════════════ */}
+      <section style={{ padding: '80px 0', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        <div className="max-w-7xl mx-auto px-6 lg:px-8">
+          <div className="text-center mb-10">
+            <p
+              className="uppercase tracking-widest font-semibold mb-4"
+              style={{ color: '#22d3ee', fontSize: '11px', letterSpacing: '0.15em', fontFamily: "'IBM Plex Mono', monospace" }}
+            >
+              Why Idswyft VaaS
+            </p>
+            <h2
+              className="font-display"
+              style={{ fontSize: 'clamp(2rem, 4vw, 3rem)', fontWeight: 700, fontFamily: "'Syne', sans-serif", lineHeight: 1.1 }}
+            >
+              Stop building.{' '}
+              <span style={{ color: '#22d3ee' }}>Start verifying.</span>
+            </h2>
+          </div>
+          <div style={{ display: 'flex', justifyContent: 'center' }}>
+            <Player
+              component={VaaSMarketing}
+              durationInFrames={720}
+              fps={30}
+              compositionWidth={1920}
+              compositionHeight={1080}
+              style={{ width: '100%', maxWidth: 900, aspectRatio: '16/9', borderRadius: 16, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.07)' }}
+              autoPlay
+              loop
+              controls={false}
+            />
           </div>
         </div>
       </section>
