@@ -208,6 +208,7 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
         setFinalStatus('failed');
         setVerificationResults(results);
         setCurrentStep(5);
+        customerPortalAPI.reportResult(sessionToken, results).catch(() => {});
         return;
       }
       setTimeout(() => pollForOCRCompletion(vId, attempt + 1), 3000);
@@ -228,6 +229,8 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
       if (results.final_result != null) {
         setFinalStatus(results.final_result);
         setVerificationResults(results);
+        // Report result back to VaaS backend (fire-and-forget)
+        customerPortalAPI.reportResult(sessionToken, results).catch(() => {});
         return;
       }
       setTimeout(() => pollForFinalResults(vId, attempt + 1), 5000);

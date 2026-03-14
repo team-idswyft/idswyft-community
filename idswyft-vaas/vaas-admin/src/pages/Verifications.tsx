@@ -32,11 +32,13 @@ interface VerificationFilters {
 function mapStatus(status: string): string {
   switch (status) {
     case 'completed': return 'verified';
+    case 'verified': return 'verified';
     case 'failed': return 'failed';
     case 'processing': return 'pending';
     case 'document_uploaded': return 'info';
     case 'pending': return 'pending';
     case 'expired': return 'expired';
+    case 'manual_review': return 'manual_review';
     default: return 'default';
   }
 }
@@ -100,7 +102,7 @@ export default function Verifications() {
 
   const handleStatusUpdate = async (verificationId: string, newStatus: VerificationSessionStatus, reason?: string) => {
     try {
-      if (newStatus === 'completed') {
+      if (newStatus === 'completed' || newStatus === 'verified') {
         await apiClient.approveVerification(verificationId, reason);
       } else if (newStatus === 'failed') {
         await apiClient.rejectVerification(verificationId, reason || 'Rejected', reason);
@@ -132,9 +134,12 @@ export default function Verifications() {
   const getStatusIcon = (status: VerificationSessionStatus) => {
     switch (status) {
       case 'completed':
+      case 'verified':
         return <CheckCircle className="w-4 h-4 text-green-500" />;
       case 'failed':
         return <XCircle className="w-4 h-4 text-red-500" />;
+      case 'manual_review':
+        return <AlertTriangle className="w-4 h-4 text-amber-500" />;
       case 'processing':
         return <AlertTriangle className="w-4 h-4 text-yellow-500" />;
       case 'document_uploaded':
@@ -226,8 +231,10 @@ export default function Verifications() {
               <option value="pending">Pending</option>
               <option value="document_uploaded">Document Uploaded</option>
               <option value="processing">Processing</option>
+              <option value="verified">Verified</option>
               <option value="completed">Completed</option>
               <option value="failed">Failed</option>
+              <option value="manual_review">Manual Review</option>
               <option value="expired">Expired</option>
             </select>
           </div>
@@ -365,12 +372,12 @@ export default function Verifications() {
                           <Eye className="w-4 h-4" />
                         </button>
 
-                        {verification.status === 'processing' && (
+                        {(verification.status === 'processing' || verification.status === 'manual_review') && (
                           <>
                             <button
-                              onClick={() => handleStatusUpdate(verification.id, 'completed')}
+                              onClick={() => handleStatusUpdate(verification.id, 'verified')}
                               className="text-green-600 hover:text-green-900"
-                              title="Complete"
+                              title="Approve"
                             >
                               <CheckCircle className="w-4 h-4" />
                             </button>

@@ -575,7 +575,11 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
       const results = await verificationAPI.getResults(session, vId);
       if (!mountedRef.current) return;
       if (results.ocr_data && Object.keys(results.ocr_data).length > 0) return; // OCR done
-      if (results.final_result === 'failed') { showFinal(results); return; }
+      if (results.final_result === 'failed') {
+        customerPortalAPI.reportResult(sessionToken, results).catch(() => {});
+        showFinal(results);
+        return;
+      }
       setTimeout(() => pollOCR(vId, attempt + 1), 2000);
     } catch {
       if (mountedRef.current) setTimeout(() => pollOCR(vId, attempt + 1), 2000);
@@ -609,8 +613,12 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
       if (!mountedRef.current) return;
       const isComplete = !!results.cross_validation_results || results.final_result !== null;
       if (isComplete) {
-        if (results.final_result === 'failed') showFinal(results);
-        else setScreenIdx(3); // Live capture
+        if (results.final_result === 'failed') {
+          customerPortalAPI.reportResult(sessionToken, results).catch(() => {});
+          showFinal(results);
+        } else {
+          setScreenIdx(3); // Live capture
+        }
       } else {
         setTimeout(() => pollCrossValidation(vId, attempt + 1), 2000);
       }
@@ -663,6 +671,8 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
       const results = await verificationAPI.getResults(session, vId);
       if (!mountedRef.current) return;
       if (results.final_result !== null && results.final_result !== undefined) {
+        // Report result back to VaaS backend (fire-and-forget)
+        customerPortalAPI.reportResult(sessionToken, results).catch(() => {});
         showFinal(results);
       } else {
         setTimeout(() => pollFinalResult(vId, attempt + 1), 3000);

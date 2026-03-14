@@ -100,6 +100,21 @@ class CustomerPortalAPI {
     await this.client.post(`/public/sessions/${sessionToken}/liveness`, livenessData);
   }
 
+  // Report verification result back to VaaS backend so the admin dashboard
+  // shows real status + scores instead of stuck "processing".
+  async reportResult(sessionToken: string, results: any): Promise<void> {
+    await this.client.post(`/public/sessions/${sessionToken}/result`, {
+      final_result: results.final_result,
+      confidence_score: results.face_match_results?.similarity_score ?? results.confidence_score,
+      face_match_results: results.face_match_results,
+      liveness_results: results.liveness_results,
+      ocr_data: results.ocr_data,
+      cross_validation_results: results.cross_validation_results,
+      failure_reason: results.failure_reason,
+      manual_review_reason: results.manual_review_reason,
+    });
+  }
+
   // Terminate verification session (make link inactive)
   async terminateVerificationSession(sessionToken: string): Promise<void> {
     await this.client.post(`/verifications/session/${sessionToken}/terminate`);

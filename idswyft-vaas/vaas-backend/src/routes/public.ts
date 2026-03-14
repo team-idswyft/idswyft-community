@@ -167,13 +167,19 @@ router.post('/sessions/:sessionToken/submit', async (req: Request, res: Response
       return res.status(404).json(response);
     }
 
-    // Check if session has documents uploaded
-    if (session.status !== 'document_uploaded') {
+    // Idempotency: if already processing or beyond, return success
+    if (['processing', 'completed', 'verified', 'failed', 'manual_review'].includes(session.status)) {
+      return res.json({ success: true, data: { message: 'Already submitted' } } as VaasApiResponse);
+    }
+
+    // Accept both pending and document_uploaded — documents may go
+    // directly to the main API without updating VaaS session status
+    if (!['pending', 'document_uploaded'].includes(session.status)) {
       const response: VaasApiResponse = {
         success: false,
         error: {
-          code: 'NO_DOCUMENTS_UPLOADED',
-          message: 'Please upload required documents before submitting'
+          code: 'INVALID_SESSION_STATUS',
+          message: 'Cannot submit this verification session'
         }
       };
       return res.status(400).json(response);
@@ -347,6 +353,124 @@ router.post('/sessions/:sessionToken/liveness', async (req: Request, res: Respon
       }
     };
     
+    res.status(500).json(response);
+  }
+});
+
+// Report verification result from customer portal
+// Called after the main API finishes processing — bridges the gap
+// between the main API results and the VaaS admin dashboard.
+router.post('/sessions/:sessionToken/result', async (req: Request, res: Response) => {
+  try {
+    const { sessionToken } = req.params;
+    const {
+      final_result,
+      confidence_score,
+      face_match_results,
+      liveness_results,
+      ocr_data,
+      cross_validation_results,
+      failure_reason,
+      manual_review_reason,
+    } = req.body;
+
+    if (!final_result || !['verified', 'failed', 'manual_review'].includes(final_result)) {
+      const response: VaasApiResponse = {
+        success: false,
+        error: {
+          code: 'INVALID_RESULT',
+          message: 'final_result must be one of: verified, failed, manual_review'
+        }
+      };
+      return res.status(400).json(response);
+    }
+
+    // Find session by token
+    const { data: session, error: sessionError } = await vaasSupabase
+      .from('vaas_verification_sessions')
+      .select('id, status, end_user_id')
+      .eq('session_token', sessionToken)
+      .single();
+
+    if (sessionError || !session) {
+      const response: VaasApiResponse = {
+        success: false,
+        error: {
+          code: 'SESSION_NOT_FOUND',
+          message: 'Invalid verification session'
+        }
+      };
+      return res.status(404).json(response);
+    }
+
+    // Idempotency: if already at a terminal status, return success
+    if (['verified', 'failed', 'completed'].includes(session.status)) {
+      return res.json({ success: true, data: { message: 'Result already recorded' } } as VaasApiResponse);
+    }
+
+    // Build the results JSONB matching what VaaS admin detail modal reads
+    const failureReasons: string[] = [];
+    if (failure_reason) failureReasons.push(failure_reason);
+    if (manual_review_reason) failureReasons.push(manual_review_reason);
+
+    const resultsJson = {
+      verification_status: final_result,
+      confidence_score: confidence_score ?? null,
+      face_match_score: face_match_results?.similarity_score ?? face_match_results?.score ?? null,
+      liveness_score: liveness_results?.confidence ?? null,
+      ocr_data: ocr_data ?? null,
+      cross_validation_results: cross_validation_results ?? null,
+      face_analysis: face_match_results ?? null,
+      liveness_analysis: liveness_results ?? null,
+      failure_reasons: failureReasons.length > 0 ? failureReasons : [],
+    };
+
+    const now = new Date().toISOString();
+
+    // Update session with results
+    const { error: updateError } = await vaasSupabase
+      .from('vaas_verification_sessions')
+      .update({
+        status: final_result as string,
+        results: resultsJson,
+        confidence_score: confidence_score ?? null,
+        completed_at: now,
+        updated_at: now,
+      })
+      .eq('id', session.id);
+
+    if (updateError) {
+      console.error('[PublicRoutes] Result update error:', updateError);
+      throw new Error('Failed to update session with results');
+    }
+
+    // Update end user verification status
+    if (session.end_user_id) {
+      await vaasSupabase
+        .from('vaas_end_users')
+        .update({
+          verification_status: final_result as string,
+          verification_completed_at: now,
+          updated_at: now,
+        })
+        .eq('id', session.end_user_id);
+    }
+
+    const response: VaasApiResponse = {
+      success: true,
+      data: { message: 'Result recorded' }
+    };
+    res.json(response);
+  } catch (error: any) {
+    console.error('[PublicRoutes] Report result failed:', error);
+
+    const response: VaasApiResponse = {
+      success: false,
+      error: {
+        code: 'REPORT_RESULT_FAILED',
+        message: error.message || 'Failed to report verification result'
+      }
+    };
     res.status(500).json(response);
   }
 });
