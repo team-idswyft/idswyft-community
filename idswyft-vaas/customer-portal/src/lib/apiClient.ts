@@ -17,30 +17,16 @@ export class RetryAfterError extends Error {
   }
 }
 
-const MUTATING = new Set(['post', 'put', 'delete', 'patch']);
-
 export function createApiClient(
   baseURL: string,
   options?: { sandbox?: boolean }
 ): AxiosInstance {
-  let csrfFetch: Promise<string> | null = null;
-
   const instance = axios.create({ baseURL, withCredentials: true });
 
-  // ── Request: CSRF + sandbox ──────────────────────────────────────
-  instance.interceptors.request.use(async (config) => {
-    if (MUTATING.has(config.method?.toLowerCase() ?? '')) {
-      if (!csrfFetch) {
-        csrfFetch = axios
-          .get(`${baseURL}/auth/csrf`, { withCredentials: true })
-          .then((r) => r.data.token as string)
-          .catch((err) => {
-            csrfFetch = null;
-            return Promise.reject(err);
-          });
-      }
-      config.headers['X-CSRF-Token'] = await csrfFetch;
-    }
+  // ── Request: sandbox header ──────────────────────────────────────
+  // No CSRF needed: the customer portal authenticates via session tokens
+  // in the URL path, not cookie sessions.
+  instance.interceptors.request.use((config) => {
     if (options?.sandbox) {
       config.headers['X-Sandbox-Mode'] = 'true';
     }
@@ -58,14 +44,6 @@ export function createApiClient(
         );
         const after = Number.isFinite(raw) ? raw : 60;
         return Promise.reject(new RetryAfterError(after));
-      }
-
-      // Clear cached CSRF promise on CSRF rejection so next request refetches
-      if (
-        error.response?.status === 403 &&
-        error.response.data?.code === 'CSRF_INVALID'
-      ) {
-        csrfFetch = null;
       }
 
       const body = error.response?.data;
