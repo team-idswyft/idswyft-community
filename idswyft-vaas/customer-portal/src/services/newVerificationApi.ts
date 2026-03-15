@@ -196,7 +196,7 @@ class NewVerificationAPI {
     console.log('✅ Back document uploaded:', result);
   }
 
-  async captureLiveSelfie(session: VerificationSession, verificationId: string, imageData: string): Promise<void> {
+  async captureLiveSelfie(session: VerificationSession, verificationId: string, imageData: string, livenessMetadata?: unknown): Promise<void> {
     console.log('📸 Capturing live selfie...', { verificationId, dataSize: imageData.length });
 
     const apiKey = this.getApiKey(session);
@@ -217,6 +217,9 @@ class NewVerificationAPI {
     formData.append('selfie', file);
     if (useSandbox) {
       formData.append('sandbox', 'true');
+    }
+    if (livenessMetadata) {
+      formData.append('liveness_metadata', JSON.stringify(livenessMetadata));
     }
 
     const response = await fetch(`${API_BASE_URL}/api/v2/verify/${verificationId}/live-capture`, {

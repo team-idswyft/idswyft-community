@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import {
   Camera,
   AlertTriangle,
@@ -6,6 +6,8 @@ import {
   Eye,
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
+import { ActiveLivenessCapture } from './ActiveLivenessCapture';
+import type { LivenessMetadata } from '../hooks/useActiveLiveness';
 
 // OpenCV types
 declare global {
@@ -15,7 +17,7 @@ declare global {
 }
 
 interface LiveCaptureComponentProps {
-  onCapture: (imageData: string) => void;
+  onCapture: (imageData: string, livenessMetadata?: LivenessMetadata) => void;
   onCancel: () => void;
   isLoading: boolean;
 }
@@ -30,6 +32,7 @@ const LiveCaptureComponent: React.FC<LiveCaptureComponentProps> = ({
   const [faceDetected, setFaceDetected] = useState(false);
   const [opencvReady, setOpencvReady] = useState(false);
   const [faceDetectionBuffer, setFaceDetectionBuffer] = useState<boolean[]>([]);
+  const [useLegacyCapture, setUseLegacyCapture] = useState(false);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
@@ -288,6 +291,39 @@ const LiveCaptureComponent: React.FC<LiveCaptureComponentProps> = ({
     }
   };
 
+  // Handle active liveness completion — convert blob to base64
+  const handleActiveLivenessComplete = useCallback(async (blob: Blob, metadata: LivenessMetadata) => {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const base64 = (reader.result as string).split(',')[1];
+      onCapture(base64, metadata);
+    };
+    reader.readAsDataURL(blob);
+  }, [onCapture]);
+
+  // Primary path: Active Liveness
+  if (!useLegacyCapture) {
+    return (
+      <div className="p-6">
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-lg font-semibold text-[#dde2ec]">{t('liveCapture.heading')}</h3>
+          <button
+            onClick={onCancel}
+            className="text-[#8896aa] hover:text-[#dde2ec] transition-colors"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+        <ActiveLivenessCapture
+          onComplete={handleActiveLivenessComplete}
+          onCancel={onCancel}
+          onFallback={() => setUseLegacyCapture(true)}
+        />
+      </div>
+    );
+  }
+
+  // Fallback: Legacy OpenCV camera
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-4">

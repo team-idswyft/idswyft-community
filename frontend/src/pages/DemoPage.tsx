@@ -10,6 +10,8 @@ import {
   EyeIcon,
 } from '@heroicons/react/24/outline';
 import { ContinueOnPhone } from '../components/ContinueOnPhone';
+import { ActiveLivenessCapture } from '../components/liveness/ActiveLivenessCapture';
+import type { LivenessMetadata } from '../hooks/useActiveLiveness';
 import { C, injectFonts } from '../theme';
 
 // OpenCV types
@@ -154,6 +156,7 @@ const DemoPage: React.FC = () => {
 
   // Live capture state
   const [showLiveCapture, setShowLiveCapture] = useState(false);
+  const [useFallbackCapture, setUseFallbackCapture] = useState(false);
   const [_sessionData, _setSessionData] = useState<LiveCaptureSession | null>(null);
   const [_captureResult, setCaptureResult] = useState<CaptureResult | null>(null);
   const [cameraState, setCameraState] = useState<'prompt' | 'initializing' | 'ready' | 'error'>('prompt');
@@ -1184,106 +1187,156 @@ const DemoPage: React.FC = () => {
     );
   };
 
+  // Handle active liveness completion — submit blob + metadata to API
+  const handleActiveLivenessComplete = async (blob: Blob, metadata: LivenessMetadata) => {
+    if (!apiKey || !verificationId) return;
+    setIsLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('selfie', blob, 'selfie.jpg');
+      formData.append('liveness_metadata', JSON.stringify(metadata));
+
+      const response = await fetch(`${API_BASE_URL}/api/v2/verify/${verificationId}/live-capture`, {
+        method: 'POST',
+        headers: { 'X-API-Key': apiKey },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || errorData.error || 'Live capture failed');
+      }
+
+      const result = await response.json();
+      setCaptureResult(result);
+      setChallengeState('completed');
+      toast.success('Liveness verified!');
+      setShowLiveCapture(false);
+      setTimeout(() => {
+        loadVerificationResults(verificationId);
+        setCurrentStep(5);
+      }, 1000);
+    } catch (error) {
+      console.error('Active liveness submission failed:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to verify liveness');
+      setShowLiveCapture(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Render embedded live capture
   const renderLiveCapture = () => (
     <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 24, marginBottom: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <h3 style={{ fontFamily: C.mono, fontSize: 14, fontWeight: 600, color: C.text, margin: 0 }}>Live Selfie Capture</h3>
+        <h3 style={{ fontFamily: C.mono, fontSize: 14, fontWeight: 600, color: C.text, margin: 0 }}>Live Capture</h3>
         <button
-          onClick={() => { cleanup(); setShowLiveCapture(false); }}
+          onClick={() => { cleanup(); setShowLiveCapture(false); setUseFallbackCapture(false); }}
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, padding: 4, display: 'flex' }}
         >
           <XMarkIcon style={{ width: 18, height: 18 }} />
         </button>
       </div>
 
-      {cameraState === 'prompt' && (
-        <div style={{ textAlign: 'center', padding: '32px 0' }}>
-          <CameraIcon style={{ width: 40, height: 40, margin: '0 auto 12px', color: C.cyan }} />
-          <h4 style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 8 }}>Ready for Live Capture</h4>
-          <p style={{ color: C.muted, fontSize: 13, marginBottom: 20 }}>We'll use your camera to take a selfie for identity verification.</p>
-          <button
-            onClick={initializeCamera}
-            style={{ background: C.cyan, color: C.bg, border: 'none', borderRadius: 8, padding: '10px 24px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
-          >
-            Start Camera
-          </button>
-        </div>
+      {/* Primary: Active liveness with MediaPipe */}
+      {!useFallbackCapture && (
+        <ActiveLivenessCapture
+          onComplete={handleActiveLivenessComplete}
+          onCancel={() => { cleanup(); setShowLiveCapture(false); setUseFallbackCapture(false); }}
+          onFallback={() => setUseFallbackCapture(true)}
+          theme="dark"
+        />
       )}
 
-      {cameraState === 'initializing' && (
-        <div style={{ textAlign: 'center', padding: '32px 0' }}>
-          <div className="animate-spin" style={{ width: 40, height: 40, borderRadius: '50%', border: `3px solid ${C.border}`, borderTopColor: C.cyan, margin: '0 auto 12px' }} />
-          <p style={{ color: C.muted, fontSize: 13 }}>Initializing camera...</p>
-        </div>
-      )}
+      {/* Fallback: legacy OpenCV-based camera capture */}
+      {useFallbackCapture && (
+        <>
+          {cameraState === 'prompt' && (
+            <div style={{ textAlign: 'center', padding: '32px 0' }}>
+              <CameraIcon style={{ width: 40, height: 40, margin: '0 auto 12px', color: C.cyan }} />
+              <h4 style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 8 }}>Ready for Live Capture</h4>
+              <p style={{ color: C.muted, fontSize: 13, marginBottom: 20 }}>We'll use your camera to take a selfie for identity verification.</p>
+              <button
+                onClick={initializeCamera}
+                style={{ background: C.cyan, color: C.bg, border: 'none', borderRadius: 8, padding: '10px 24px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
+              >
+                Start Camera
+              </button>
+            </div>
+          )}
 
-      {cameraState === 'ready' && (
-        <div>
-          <div style={{ position: 'relative', background: '#000', borderRadius: 8, overflow: 'hidden', minHeight: 240, height: 320, marginBottom: 16 }}>
-            <video
-              ref={videoElementRef}
-              autoPlay
-              playsInline
-              muted
-              controls={false}
-              style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover', backgroundColor: '#000', borderRadius: 8 }}
-              onLoadedMetadata={() => {
-                console.log('🎥 Video metadata loaded in UI');
-                if (videoElementRef.current) {
-                  videoElementRef.current.play().then(() => {
-                    console.log('🎥 Video playing in UI');
-                  }).catch(err => { console.error('🎥 Video play error:', err); });
-                }
-              }}
-              onError={(e) => { console.error('🎥 Video element error:', e); }}
-            />
-            <canvas
-              ref={canvasRef}
-              style={{ display: 'block', position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', backgroundColor: 'transparent', zIndex: 20 }}
-            />
-            <div style={{ position: 'absolute', top: 12, right: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: faceDetected ? 'rgba(52,211,153,0.85)' : 'rgba(248,113,113,0.85)', borderRadius: 20, padding: '4px 10px', fontSize: 12, color: '#fff', fontWeight: 500 }}>
-                <EyeIcon style={{ width: 14, height: 14 }} />
-                <span>{faceDetected ? 'Face Detected' : 'No Face'}</span>
+          {cameraState === 'initializing' && (
+            <div style={{ textAlign: 'center', padding: '32px 0' }}>
+              <div className="animate-spin" style={{ width: 40, height: 40, borderRadius: '50%', border: `3px solid ${C.border}`, borderTopColor: C.cyan, margin: '0 auto 12px' }} />
+              <p style={{ color: C.muted, fontSize: 13 }}>Initializing camera...</p>
+            </div>
+          )}
+
+          {cameraState === 'ready' && (
+            <div>
+              <div style={{ position: 'relative', background: '#000', borderRadius: 8, overflow: 'hidden', minHeight: 240, height: 320, marginBottom: 16 }}>
+                <video
+                  ref={videoElementRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  controls={false}
+                  style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover', backgroundColor: '#000', borderRadius: 8 }}
+                  onLoadedMetadata={() => {
+                    if (videoElementRef.current) {
+                      videoElementRef.current.play().catch(err => { console.error('Video play error:', err); });
+                    }
+                  }}
+                  onError={(e) => { console.error('Video element error:', e); }}
+                />
+                <canvas
+                  ref={canvasRef}
+                  style={{ display: 'block', position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', backgroundColor: 'transparent', zIndex: 20 }}
+                />
+                <div style={{ position: 'absolute', top: 12, right: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: faceDetected ? 'rgba(52,211,153,0.85)' : 'rgba(248,113,113,0.85)', borderRadius: 20, padding: '4px 10px', fontSize: 12, color: '#fff', fontWeight: 500 }}>
+                    <EyeIcon style={{ width: 14, height: 14 }} />
+                    <span>{faceDetected ? 'Face Detected' : 'No Face'}</span>
+                  </div>
+                </div>
+                <div style={{ position: 'absolute', bottom: 12, left: 12, right: 12 }}>
+                  <div style={{ background: 'rgba(0,0,0,0.7)', color: '#fff', padding: '8px 12px', borderRadius: 6, textAlign: 'center', fontSize: 12 }}>
+                    {!faceDetected ? 'Position your face within the circle' : 'Great! Click capture when ready'}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <button
+                  onClick={captureSelfie}
+                  disabled={!faceDetected || isLoading}
+                  style={{ flex: 1, padding: '10px 0', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: !faceDetected || isLoading ? 'not-allowed' : 'pointer', border: 'none', background: !faceDetected || isLoading ? C.surface : C.green, color: !faceDetected || isLoading ? C.dim : C.bg, transition: 'all 0.2s' }}
+                >
+                  {isLoading ? 'Capturing...' : 'Capture Selfie'}
+                </button>
+                <button
+                  onClick={() => { cleanup(); setShowLiveCapture(false); setUseFallbackCapture(false); }}
+                  style={{ padding: '10px 20px', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: 'pointer', border: `1px solid ${C.border}`, background: 'transparent', color: C.muted }}
+                >
+                  Cancel
+                </button>
               </div>
             </div>
-            <div style={{ position: 'absolute', bottom: 12, left: 12, right: 12 }}>
-              <div style={{ background: 'rgba(0,0,0,0.7)', color: '#fff', padding: '8px 12px', borderRadius: 6, textAlign: 'center', fontSize: 12 }}>
-                {!faceDetected ? 'Position your face within the circle' : 'Great! Click capture when ready'}
-              </div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 12 }}>
-            <button
-              onClick={captureSelfie}
-              disabled={!faceDetected || isLoading}
-              style={{ flex: 1, padding: '10px 0', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: !faceDetected || isLoading ? 'not-allowed' : 'pointer', border: 'none', background: !faceDetected || isLoading ? C.surface : C.green, color: !faceDetected || isLoading ? C.dim : C.bg, transition: 'all 0.2s' }}
-            >
-              {isLoading ? 'Capturing...' : 'Capture Selfie'}
-            </button>
-            <button
-              onClick={() => { cleanup(); setShowLiveCapture(false); }}
-              style={{ padding: '10px 20px', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: 'pointer', border: `1px solid ${C.border}`, background: 'transparent', color: C.muted }}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
+          )}
 
-      {cameraState === 'error' && (
-        <div style={{ textAlign: 'center', padding: '32px 0' }}>
-          <ExclamationTriangleIcon style={{ width: 40, height: 40, margin: '0 auto 12px', color: C.red }} />
-          <h4 style={{ fontSize: 15, fontWeight: 600, color: C.red, marginBottom: 8 }}>Camera Error</h4>
-          <p style={{ color: C.muted, fontSize: 13, marginBottom: 20 }}>Unable to access your camera. Please check permissions and try again.</p>
-          <button
-            onClick={initializeCamera}
-            style={{ background: C.cyan, color: C.bg, border: 'none', borderRadius: 8, padding: '10px 24px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
-          >
-            Try Again
-          </button>
-        </div>
+          {cameraState === 'error' && (
+            <div style={{ textAlign: 'center', padding: '32px 0' }}>
+              <ExclamationTriangleIcon style={{ width: 40, height: 40, margin: '0 auto 12px', color: C.red }} />
+              <h4 style={{ fontSize: 15, fontWeight: 600, color: C.red, marginBottom: 8 }}>Camera Error</h4>
+              <p style={{ color: C.muted, fontSize: 13, marginBottom: 20 }}>Unable to access your camera. Please check permissions and try again.</p>
+              <button
+                onClick={initializeCamera}
+                style={{ background: C.cyan, color: C.bg, border: 'none', borderRadius: 8, padding: '10px 24px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
+              >
+                Try Again
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );

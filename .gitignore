@@ -122,5 +122,8 @@ backend/temp/
 # Git worktrees
 .worktrees/
 
+# MediaPipe WASM assets (copied from node_modules at install time)
+**/public/mediapipe/
+
 # Internal docs — all markdown (except README.md / CLAUDE.md) lives in docs/
 docs/

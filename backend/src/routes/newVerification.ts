@@ -15,6 +15,9 @@ import { validateFileType } from '@/middleware/fileValidation.js';
 import { supabase } from '@/config/database.js';
 import { VERIFICATION_THRESHOLDS, getFaceMatchingThresholdSync, getLivenessThresholdSync } from '@/config/verificationThresholds.js';
 import { createLivenessProvider } from '@/providers/liveness/index.js';
+import { verifyActiveLivenessMetadata } from '@/providers/liveness/ActiveLivenessVerifier.js';
+import { ActiveLivenessMetadataSchema } from '@/verification/models/activeLivenessSchema.js';
+import type { ActiveLivenessMetadata } from '@/verification/models/activeLivenessSchema.js';
 import { createAMLProvider } from '@/providers/aml/index.js';
 import { computeRiskScore } from '@/services/riskScoring.js';
 import { broadcastStatusChange } from '@/services/realtime.js';
@@ -264,6 +267,7 @@ async function extractLiveCapture(
   frontDocPath: string | null,
   selfieBuffer: Buffer,
   isSandbox: boolean = false,
+  activeLivenessMetadata?: ActiveLivenessMetadata,
 ): Promise<LiveCaptureResult> {
   // Detect face and extract embedding from selfie
   let faceConfidence = 0;
@@ -276,27 +280,50 @@ async function extractLiveCapture(
     faceConfidence = 0;
   }
 
-  // Real liveness detection via configured provider
+  // Liveness detection: active (challenge-response) or passive (image heuristics)
   let livenessScore = 0;
   let livenessPassed = false;
-  try {
-    livenessScore = await livenessProvider.assessLiveness({
-      buffer: selfieBuffer,
-    });
-    const threshold = getLivenessThresholdSync(isSandbox);
-    livenessPassed = livenessScore >= threshold;
-    logger.info('Liveness assessment complete', {
-      provider: livenessProvider.name,
-      score: livenessScore.toFixed(3),
-      threshold,
-      passed: livenessPassed,
-      isSandbox,
-    });
-  } catch (err) {
-    logger.error('Liveness provider failed, defaulting to fail-safe', { error: err });
-    // Fail-safe: if the provider crashes, score 0 — do NOT auto-pass
-    livenessScore = 0;
-    livenessPassed = false;
+
+  if (activeLivenessMetadata) {
+    // Active liveness — verify temporal consistency of client-side head-pose data
+    try {
+      const activeResult = verifyActiveLivenessMetadata(activeLivenessMetadata);
+      livenessScore = activeResult.score;
+      livenessPassed = activeResult.passed;
+      logger.info('Active liveness verification complete', {
+        score: livenessScore.toFixed(3),
+        passed: livenessPassed,
+        reason: activeResult.reason,
+        challenge: activeLivenessMetadata.challenge_direction,
+        sampleCount: activeLivenessMetadata.samples.length,
+      });
+    } catch (err) {
+      logger.error('Active liveness verifier failed, falling back to passive', { error: err });
+      // Fall through to passive liveness below
+    }
+  }
+
+  if (!activeLivenessMetadata || (livenessScore === 0 && !livenessPassed)) {
+    // Passive liveness — image-based heuristics (original path)
+    try {
+      livenessScore = await livenessProvider.assessLiveness({
+        buffer: selfieBuffer,
+      });
+      const threshold = getLivenessThresholdSync(isSandbox);
+      livenessPassed = livenessScore >= threshold;
+      logger.info('Passive liveness assessment complete', {
+        provider: livenessProvider.name,
+        score: livenessScore.toFixed(3),
+        threshold,
+        passed: livenessPassed,
+        isSandbox,
+      });
+    } catch (err) {
+      logger.error('Liveness provider failed, defaulting to fail-safe', { error: err });
+      // Fail-safe: if the provider crashes, score 0 — do NOT auto-pass
+      livenessScore = 0;
+      livenessPassed = false;
+    }
   }
 
   return {
@@ -785,9 +812,27 @@ router.post('/:verification_id/live-capture',
       selfie_id: selfie.id,
     } as any);
 
+    // Parse optional active liveness metadata from client
+    let activeLivenessMetadata: ActiveLivenessMetadata | undefined;
+    if (req.body?.liveness_metadata) {
+      try {
+        const raw = typeof req.body.liveness_metadata === 'string'
+          ? JSON.parse(req.body.liveness_metadata)
+          : req.body.liveness_metadata;
+        activeLivenessMetadata = ActiveLivenessMetadataSchema.parse(raw);
+        logger.info('Active liveness metadata received', {
+          challenge: activeLivenessMetadata.challenge_direction,
+          samples: activeLivenessMetadata.samples.length,
+        });
+      } catch (err) {
+        // Invalid metadata → log warning, fall back to passive liveness
+        logger.warn('Invalid active liveness metadata, falling back to passive', { error: err });
+      }
+    }
+
     // Run live capture extraction with real liveness detection
     const savedState = await loadSessionState(verification_id);
-    const liveResult = await extractLiveCapture(selfiePath, null, req.file.buffer, isSandbox);
+    const liveResult = await extractLiveCapture(selfiePath, null, req.file.buffer, isSandbox, activeLivenessMetadata);
 
     // Hydrate session and run Gate 4 + auto face match via session
     const session = await hydrateSession(verification_id, isSandbox);
