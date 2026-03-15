@@ -12,7 +12,11 @@
     "contactSupport": "Contact support",
     "secureSession": "Secure Session",
     "verificationPortal": "Verification Portal",
-    "identityVerification": "Identity Verification"
+    "identityVerification": "Identity Verification",
+    "changeLanguage": "Change language",
+    "securityFooter": "256-bit SSL encryption \u00b7 GDPR compliant \u00b7 Auto-deleted after verification",
+    "change": "Change",
+    "document": "Doc"
   },
 
   "app": {
@@ -75,7 +79,8 @@
     "captureButton": "Take Photo of Front",
     "scanButton": "Scan Front of ID",
     "uploadHint": "JPG, PNG up to 10MB \u2014 drag & drop or click",
-    "extractedData": "Front ID \u2014 Extracted Data"
+    "extractedData": "Front ID \u2014 Extracted Data",
+    "readingLabel": "READING FRONT"
   },
 
   "backId": {
@@ -84,7 +89,8 @@
     "description": "Keep the same conditions \u2014 good lighting, flat surface. The barcode on the back must be fully visible.",
     "barcodeTip": "Barcode must be unobstructed",
     "captureButton": "Take Photo of Back",
-    "scanButton": "Scan Back of ID"
+    "scanButton": "Scan Back of ID",
+    "readingLabel": "READING BARCODE"
   },
 
   "verification": {
@@ -97,7 +103,8 @@
       "documentRead": "Document read",
       "detailsMatched": "Details matched",
       "securityChecks": "Security checks"
-    }
+    },
+    "dontClose": "Please don't close this window"
   },
 
   "liveCapture": {
@@ -106,7 +113,20 @@
     "description": "We need to confirm your identity matches your ID. Look directly at the camera in a well-lit area.",
     "tips": "Remove glasses \u00b7 Face well-lit \u00b7 No hat",
     "captureButton": "Take Live Capture",
-    "submitButton": "Submit Live Capture"
+    "submitButton": "Submit Live Capture",
+    "faceDetected": "Face Detected",
+    "noFace": "No Face",
+    "positionFace": "Position your face within the circle",
+    "readyToCapture": "Great! Click capture when ready",
+    "analyzing": "Analyzing your live capture",
+    "analyzingPhoto": "Analyzing your live photo...",
+    "livenessDetectionTitle": "Liveness Detection",
+    "livenessDetectionDesc": "Our system will automatically detect that you're a real person and capture your photo when optimal conditions are met.",
+    "cues": {
+      "lookAhead": "Look ahead",
+      "smile": "Smile",
+      "turnSlightly": "Turn slightly"
+    }
   },
 
   "success": {
@@ -196,7 +216,8 @@
     "unableToLoad": "Unable to Load",
     "somethingWrong": "Something went wrong",
     "somethingWrongMessage": "We're sorry, but something unexpected happened. Please try refreshing the page or contact support if the issue persists.",
-    "preparingSession": "Preparing your session..."
+    "preparingSession": "Preparing your session...",
+    "cameraAccessDenied": "Unable to access your camera. Please check permissions and try again."
   },
 
   "desktop": {

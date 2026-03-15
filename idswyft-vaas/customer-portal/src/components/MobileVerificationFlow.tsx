@@ -324,14 +324,12 @@ const OvalFaceViewfinder: React.FC<{
 };
 
 /* Liveness Cues */
-const LIVENESS_CUES = [
-  { emoji: '\u{1F610}', label: 'Look ahead' },
-  { emoji: '\u{1F60A}', label: 'Smile' },
-  { emoji: '\u2194', label: 'Turn slightly' },
-] as const;
+const LIVENESS_CUE_EMOJIS = ['\u{1F610}', '\u{1F60A}', '\u2194'] as const;
+const LIVENESS_CUE_KEYS = ['liveCapture.cues.lookAhead', 'liveCapture.cues.smile', 'liveCapture.cues.turnSlightly'] as const;
 
 const LivenessCues: React.FC<{ hidden?: boolean }> = ({ hidden }) => {
   const [activeIdx, setActiveIdx] = useState(0);
+  const { t: lt } = useTranslation();
 
   useEffect(() => {
     if (hidden) return;
@@ -343,7 +341,7 @@ const LivenessCues: React.FC<{ hidden?: boolean }> = ({ hidden }) => {
 
   return (
     <div style={{ display: 'flex', gap: 22, justifyContent: 'center', margin: '18px 0' }}>
-      {LIVENESS_CUES.map((cue, i) => {
+      {LIVENESS_CUE_EMOJIS.map((emoji, i) => {
         const isActive = i === activeIdx;
         return (
           <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
@@ -355,13 +353,13 @@ const LivenessCues: React.FC<{ hidden?: boolean }> = ({ hidden }) => {
               border: `1.5px solid ${isActive ? 'var(--teal)' : 'rgba(255,255,255,0.07)'}`,
               boxShadow: isActive ? '0 0 12px rgba(0,212,180,0.2)' : 'none',
               transition: 'all 0.3s ease',
-            }}>{cue.emoji}</div>
+            }}>{emoji}</div>
             <span style={{
               fontFamily: "'JetBrains Mono', monospace", fontSize: 9,
               letterSpacing: '0.06em',
               color: isActive ? 'var(--teal)' : 'var(--muted)',
               transition: 'color 0.3s ease',
-            }}>{cue.label}</span>
+            }}>{lt(LIVENESS_CUE_KEYS[i])}</span>
           </div>
         );
       })}
@@ -949,7 +947,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
             <TipBar text={t('frontId.tips')} />
 
             <div style={{ marginTop: 12 }} />
-            <IDViewfinder variant="front" processing={isProcessing} processingLabel="READING FRONT" previewUrl={frontPreviewUrl} />
+            <IDViewfinder variant="front" processing={isProcessing} processingLabel={t('frontId.readingLabel')} previewUrl={frontPreviewUrl} />
 
             <input type="file" accept="image/*" capture="environment" id="mv-front-upload" style={{ display: 'none' }}
               onChange={handleFrontSelect} />
@@ -997,7 +995,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
             <TipBar text={t('backId.barcodeTip')} />
 
             <div style={{ marginTop: 12 }} />
-            <IDViewfinder variant="back" processing={isProcessing} processingLabel="READING BARCODE" previewUrl={backPreviewUrl} />
+            <IDViewfinder variant="back" processing={isProcessing} processingLabel={t('backId.readingLabel')} previewUrl={backPreviewUrl} />
 
             <input type="file" accept="image/*" capture="environment" id="mv-back-upload" style={{ display: 'none' }}
               onChange={handleBackSelect} />
@@ -1156,7 +1154,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
                 <p style={{
                   fontFamily: "'JetBrains Mono', monospace", fontSize: 11,
                   color: 'var(--muted)', letterSpacing: '0.08em',
-                }}>Analyzing your live capture</p>
+                }}>{t('liveCapture.analyzing')}</p>
               </>
             ) : (() => {
               const status = finalResult.final_result ?? finalResult.status;

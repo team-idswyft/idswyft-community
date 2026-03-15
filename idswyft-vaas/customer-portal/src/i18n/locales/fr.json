@@ -2,7 +2,7 @@
   "common": {
     "loading": "Chargement...",
     "error": "Erreur",
-    "tryAgain": "Reessayer",
+    "tryAgain": "Réessayer",
     "refreshPage": "Actualiser la page",
     "close": "Fermer",
     "back": "Retour",
@@ -10,199 +10,220 @@
     "submit": "Soumettre",
     "processing": "Traitement en cours...",
     "contactSupport": "Contacter le support",
-    "secureSession": "Session securisee",
-    "verificationPortal": "Portail de verification",
-    "identityVerification": "Verification d'identite"
+    "secureSession": "Session sécurisée",
+    "verificationPortal": "Portail de vérification",
+    "identityVerification": "Vérification d'identité",
+    "changeLanguage": "Changer de langue",
+    "securityFooter": "Chiffrement SSL 256 bits · Conforme au RGPD · Supprimé automatiquement après la vérification",
+    "change": "Modifier",
+    "document": "Doc"
   },
 
   "app": {
-    "invalidLink": "Lien de verification invalide",
-    "invalidLinkMessage": "Le lien de verification semble invalide ou expire. Veuillez demander un nouveau lien a l'organisation.",
+    "invalidLink": "Lien de vérification invalide",
+    "invalidLinkMessage": "Le lien de vérification semble invalide ou expiré. Veuillez demander un nouveau lien à l'organisation.",
     "invalidStatusLink": "Lien de statut invalide",
-    "invalidStatusMessage": "Le lien de statut semble invalide. Verifiez votre e-mail de verification ou contactez le support.",
-    "portalTitle": "Portail de verification d'identite",
-    "portalMessage": "Ceci est un portail securise pour la verification d'identite. Pour commencer, vous aurez besoin d'un lien fourni par l'organisation demandeuse.",
+    "invalidStatusMessage": "Le lien de statut semble invalide. Vérifiez votre e-mail de vérification ou contactez le support.",
+    "portalTitle": "Portail de vérification d'identité",
+    "portalMessage": "Ceci est un portail sécurisé pour la vérification d'identité. Pour commencer, vous aurez besoin d'un lien fourni par l'organisation demandeuse.",
     "needHelp": "Besoin d'aide ?",
-    "needHelpMessage": "Si vous pensez devoir avoir acces a ce portail, contactez l'organisation qui a demande votre verification."
+    "needHelpMessage": "Si vous pensez devoir avoir accès à ce portail, contactez l'organisation qui a demandé votre vérification."
   },
 
   "steps": {
     "country": "Pays",
     "frontId": "Recto ID",
     "backId": "Verso ID",
-    "checking": "Verification",
-    "scanning": "Numerisation",
+    "checking": "Vérification",
+    "scanning": "Numérisation",
     "liveCapture": "Capture en direct",
-    "complete": "Termine",
+    "complete": "Terminé",
     "done": "Fini"
   },
 
   "country": {
-    "title": "Selectionnez votre pays",
-    "subtitle": "Choisissez le pays qui a delivre votre piece d'identite.",
-    "stepTitle": "Etape 1 sur 6 \u2014 Selectionner le pays",
-    "heading": "Ou votre piece d'identite a-t-elle ete delivree ?",
-    "description": "Selectionnez le pays emetteur de votre piece d'identite, puis choisissez le type de document.",
+    "title": "Sélectionnez votre pays",
+    "subtitle": "Choisissez le pays qui a délivré votre pièce d'identité.",
+    "stepTitle": "Étape 1 sur 6 \u2014 Sélectionner le pays",
+    "heading": "Où votre pièce d'identité a-t-elle été délivrée ?",
+    "description": "Sélectionnez le pays émetteur de votre pièce d'identité, puis choisissez le type de document.",
     "searchPlaceholder": "Rechercher des pays...",
     "choosePlaceholder": "Choisir un pays...",
-    "noResults": "Aucun pays ne correspond a votre recherche.",
-    "issuingCountry": "Pays emetteur",
+    "noResults": "Aucun pays ne correspond à votre recherche.",
+    "issuingCountry": "Pays émetteur",
     "regions": {
-      "americas": "Ameriques",
+      "americas": "Amériques",
       "europe": "Europe",
       "asiaPacific": "Asie-Pacifique"
     }
   },
 
   "documentType": {
-    "title": "Selectionner le type de document",
-    "subtitle": "Choisissez le type de piece d'identite que vous allez verifier.",
+    "title": "Sélectionner le type de document",
+    "subtitle": "Choisissez le type de pièce d'identité que vous allez vérifier.",
     "changeCountry": "\u2190 Changer de pays",
     "driversLicense": "Permis de conduire",
-    "driversLicenseDesc": "Permis de conduire delivre par le gouvernement",
+    "driversLicenseDesc": "Permis de conduire délivré par le gouvernement",
     "passport": "Passeport",
     "passportDesc": "Document de voyage international",
-    "nationalId": "Carte d'identite nationale",
-    "nationalIdDesc": "Carte d'identite delivree par le gouvernement"
+    "nationalId": "Carte d'identité nationale",
+    "nationalIdDesc": "Carte d'identité délivrée par le gouvernement"
   },
 
   "frontId": {
-    "stepTitle": "Etape 2 sur 6 \u2014 Recto de l'ID",
-    "heading": "Numerisez le recto de votre ID",
-    "description": "Positionnez votre carte d'identite et prenez une photo claire. Assurez-vous que les quatre coins sont visibles et le texte lisible.",
-    "tips": "Bon eclairage \u00b7 Pas de reflet \u00b7 Maintenez stable",
-    "helperText": "Cela nous aide a verifier votre document avec precision",
+    "stepTitle": "Étape 2 sur 6 \u2014 Recto de l'ID",
+    "heading": "Numérisez le recto de votre ID",
+    "description": "Positionnez votre carte d'identité et prenez une photo claire. Assurez-vous que les quatre coins sont visibles et le texte lisible.",
+    "tips": "Bon éclairage \u00b7 Pas de reflet \u00b7 Maintenez stable",
+    "helperText": "Cela nous aide à vérifier votre document avec précision",
     "captureButton": "Photographier le recto",
-    "scanButton": "Numeriser le recto de l'ID",
-    "uploadHint": "JPG, PNG jusqu'a 10 Mo \u2014 glisser-deposer ou cliquer",
-    "extractedData": "Recto ID \u2014 Donnees extraites"
+    "scanButton": "Numériser le recto de l'ID",
+    "uploadHint": "JPG, PNG jusqu'à 10 Mo \u2014 glisser-déposer ou cliquer",
+    "extractedData": "Recto ID \u2014 Données extraites",
+    "readingLabel": "LECTURE RECTO"
   },
 
   "backId": {
-    "stepTitle": "Etape 3 sur 6 \u2014 Verso de l'ID",
-    "heading": "Retournez et numerisez le verso",
-    "description": "Gardez les memes conditions \u2014 bon eclairage, surface plane. Le code-barres au verso doit etre entierement visible.",
-    "barcodeTip": "Le code-barres doit etre degage",
+    "stepTitle": "Étape 3 sur 6 \u2014 Verso de l'ID",
+    "heading": "Retournez et numérisez le verso",
+    "description": "Gardez les mêmes conditions \u2014 bon éclairage, surface plane. Le code-barres au verso doit être entièrement visible.",
+    "barcodeTip": "Le code-barres doit être dégagé",
     "captureButton": "Photographier le verso",
-    "scanButton": "Numeriser le verso de l'ID"
+    "scanButton": "Numériser le verso de l'ID",
+    "readingLabel": "LECTURE CODE-BARRES"
   },
 
   "verification": {
-    "stepTitle": "Etape 4 sur 6 \u2014 Verification",
-    "verifying": "Verification de votre document...",
+    "stepTitle": "Étape 4 sur 6 \u2014 Vérification",
+    "verifying": "Vérification de votre document...",
     "crossChecking": "Recoupement des informations...",
-    "almostThere": "Presque termine...",
+    "almostThere": "Presque terminé...",
     "onlyMoment": "Cela ne prend qu'un instant",
     "processTags": {
       "documentRead": "Document lu",
       "detailsMatched": "Informations concordantes",
-      "securityChecks": "Controles de securite"
-    }
+      "securityChecks": "Contrôles de sécurité"
+    },
+    "dontClose": "Veuillez ne pas fermer cette fenêtre"
   },
 
   "liveCapture": {
-    "stepTitle": "Etape 5 sur 6 \u2014 Capture en direct",
+    "stepTitle": "Étape 5 sur 6 \u2014 Capture en direct",
     "heading": "Prenez une capture en direct rapide",
-    "description": "Nous devons confirmer que votre identite correspond a votre ID. Regardez directement la camera dans un endroit bien eclaire.",
-    "tips": "Retirez les lunettes \u00b7 Visage eclaire \u00b7 Pas de chapeau",
+    "description": "Nous devons confirmer que votre identité correspond à votre ID. Regardez directement la caméra dans un endroit bien éclairé.",
+    "tips": "Retirez les lunettes \u00b7 Visage éclairé \u00b7 Pas de chapeau",
     "captureButton": "Prendre la capture en direct",
-    "submitButton": "Soumettre la capture en direct"
+    "submitButton": "Soumettre la capture en direct",
+    "faceDetected": "Visage détecté",
+    "noFace": "Aucun visage",
+    "positionFace": "Placez votre visage dans le cercle",
+    "readyToCapture": "Parfait ! Cliquez sur capturer quand vous êtes prêt",
+    "analyzing": "Analyse de votre capture en direct",
+    "analyzingPhoto": "Analyse de votre photo en direct...",
+    "livenessDetectionTitle": "Détection de vivacité",
+    "livenessDetectionDesc": "Notre système détectera automatiquement que vous êtes une personne réelle et capturera votre photo lorsque les conditions optimales seront remplies.",
+    "cues": {
+      "lookAhead": "Regardez devant",
+      "smile": "Souriez",
+      "turnSlightly": "Tournez légèrement"
+    }
   },
 
   "success": {
-    "heading": "Verification terminee",
+    "heading": "Vérification terminée",
     "subheading": "Tout est en ordre",
-    "message": "Votre identite a ete verifiee. Vous pouvez fermer cette page.",
+    "message": "Votre identité a été vérifiée. Vous pouvez fermer cette page.",
     "checklist": {
-      "documentVerified": "Document d'identite verifie",
-      "detailsConfirmed": "Details du document confirmes",
-      "livenessCheck": "Test de vivacite reussi",
-      "faceMatched": "Correspondance faciale reussie"
+      "documentVerified": "Document d'identité vérifié",
+      "detailsConfirmed": "Détails du document confirmés",
+      "livenessCheck": "Test de vivacité réussi",
+      "faceMatched": "Correspondance faciale réussie"
     }
   },
 
   "failure": {
-    "heading": "Verification echouee",
-    "message": "Votre verification n'a pas pu etre completee.",
-    "helpText": "Veuillez revoir les details et reessayer, ou contactez le support pour obtenir de l'aide.",
+    "heading": "Vérification échouée",
+    "message": "Votre vérification n'a pas pu être complétée.",
+    "helpText": "Veuillez revoir les détails et réessayer, ou contactez le support pour obtenir de l'aide.",
     "checklist": {
-      "documentNotRead": "Le document n'a pas pu etre lu",
+      "documentNotRead": "Le document n'a pas pu être lu",
       "detailsMismatch": "Les informations ne correspondent pas",
-      "securityFailed": "Le controle de securite a echoue"
+      "securityFailed": "Le contrôle de sécurité a échoué"
     }
   },
 
   "manualReview": {
-    "heading": "En cours de revision",
-    "message": "Votre verification est en cours de revision manuelle.",
-    "timeline": "Nous vous enverrons une mise a jour dans les 24 heures."
+    "heading": "En cours de révision",
+    "message": "Votre vérification est en cours de révision manuelle.",
+    "timeline": "Nous vous enverrons une mise à jour dans les 24 heures."
   },
 
   "staleLink": {
-    "heading": "Lien de verification utilise",
-    "message": "Si vous devez vous verifier a nouveau, demandez un nouveau lien a l'organisation."
+    "heading": "Lien de vérification utilisé",
+    "message": "Si vous devez vous vérifier à nouveau, demandez un nouveau lien à l'organisation."
   },
 
   "status": {
-    "loadingStatus": "Chargement du statut de verification...",
+    "loadingStatus": "Chargement du statut de vérification...",
     "errorLoading": "Erreur de chargement du statut",
-    "verified": "Votre identite a ete verifiee avec succes !",
-    "failed": "La verification d'identite a echoue. Veuillez contacter le support.",
-    "expired": "Cette session de verification a expire.",
-    "manualReview": "Vos documents sont en revision manuelle. Nous vous notifierons une fois termine.",
-    "processing": "Nous traitons actuellement votre verification.",
-    "pending": "Les documents de verification sont en attente de telechargement.",
-    "unknown": "Statut de verification inconnu.",
-    "details": "Details de la verification",
+    "verified": "Votre identité a été vérifiée avec succès !",
+    "failed": "La vérification d'identité a échoué. Veuillez contacter le support.",
+    "expired": "Cette session de vérification a expiré.",
+    "manualReview": "Vos documents sont en révision manuelle. Nous vous notifierons une fois terminé.",
+    "processing": "Nous traitons actuellement votre vérification.",
+    "pending": "Les documents de vérification sont en attente de téléchargement.",
+    "unknown": "Statut de vérification inconnu.",
+    "details": "Détails de la vérification",
     "submitted": "Soumis",
-    "completed": "Termine",
+    "completed": "Terminé",
     "expires": "Expire",
-    "documentsUploaded": "Documents telecharges",
-    "verificationId": "ID de verification",
-    "estimatedCompletion": "Estimation d'achevement",
+    "documentsUploaded": "Documents téléchargés",
+    "verificationId": "ID de vérification",
+    "estimatedCompletion": "Estimation d'achèvement",
     "refreshStatus": "Actualiser le statut",
     "refreshing": "Actualisation...",
     "autoRefresh": "Actualisation automatique toutes les 30 secondes",
-    "documentAuthenticity": "Authenticite du document",
+    "documentAuthenticity": "Authenticité du document",
     "authentic": "Authentique",
     "suspicious": "Suspect",
-    "noTamperFlags": "Aucun indicateur de falsification detecte.",
-    "questionsAbout": "Questions sur votre verification ?",
-    "manualReviewBadge": "Revision manuelle"
+    "noTamperFlags": "Aucun indicateur de falsification détecté.",
+    "questionsAbout": "Questions sur votre vérification ?",
+    "manualReviewBadge": "Révision manuelle"
   },
 
   "ocrFields": {
     "name": "Nom",
-    "documentNumber": "N. de document",
+    "documentNumber": "N° de document",
     "dateOfBirth": "Date de naissance",
     "expiry": "Expiration",
-    "nationality": "Nationalite"
+    "nationality": "Nationalité"
   },
 
   "errors": {
     "invalidLink": "Lien invalide \u2014 aucun jeton de session fourni.",
-    "failedToLoad": "Echec du chargement de la session de verification",
-    "failedToStart": "Echec du demarrage de la verification",
-    "processingTimeout": "Le traitement du document a expire. Veuillez reessayer.",
-    "statusCheckFailed": "Echec de la verification du statut.",
-    "validationTimeout": "La validation a expire.",
-    "ocrTimeout": "L'OCR a expire. Veuillez reessayer.",
-    "uploadFrontFailed": "Echec du telechargement du document recto",
-    "uploadBackFailed": "Echec du telechargement du document verso",
-    "uploadLiveCaptureFailed": "Echec du telechargement de la capture en direct",
-    "submissionFailed": "L'envoi a echoue. Veuillez reessayer.",
-    "takingLonger": "La verification prend plus de temps que prevu.",
-    "alreadySubmitted": "Cette verification a deja ete soumise. Verifiez votre statut.",
+    "failedToLoad": "Échec du chargement de la session de vérification",
+    "failedToStart": "Échec du démarrage de la vérification",
+    "processingTimeout": "Le traitement du document a expiré. Veuillez réessayer.",
+    "statusCheckFailed": "Échec de la vérification du statut.",
+    "validationTimeout": "La validation a expiré.",
+    "ocrTimeout": "L'OCR a expiré. Veuillez réessayer.",
+    "uploadFrontFailed": "Échec du téléchargement du document recto",
+    "uploadBackFailed": "Échec du téléchargement du document verso",
+    "uploadLiveCaptureFailed": "Échec du téléchargement de la capture en direct",
+    "submissionFailed": "L'envoi a échoué. Veuillez réessayer.",
+    "takingLonger": "La vérification prend plus de temps que prévu.",
+    "alreadySubmitted": "Cette vérification a déjà été soumise. Vérifiez votre statut.",
     "unableToLoad": "Impossible de charger",
-    "somethingWrong": "Quelque chose s'est mal passe",
-    "somethingWrongMessage": "Nous sommes desoles, mais quelque chose d'inattendu s'est produit. Veuillez actualiser la page ou contacter le support si le probleme persiste.",
-    "preparingSession": "Preparation de votre session..."
+    "somethingWrong": "Quelque chose s'est mal passé",
+    "somethingWrongMessage": "Nous sommes désolés, mais quelque chose d'inattendu s'est produit. Veuillez actualiser la page ou contacter le support si le problème persiste.",
+    "preparingSession": "Préparation de votre session...",
+    "cameraAccessDenied": "Impossible d'accéder à votre caméra. Vérifiez les autorisations et réessayez."
   },
 
   "desktop": {
-    "initTitle": "Initialisation de la verification",
-    "initSubtitle": "Configuration de votre session securisee...",
-    "selectCountryDoc": "Selectionner le pays et le type de document",
-    "selectCountryDocDesc": "Parlez-nous du document que vous allez verifier"
+    "initTitle": "Initialisation de la vérification",
+    "initSubtitle": "Configuration de votre session sécurisée...",
+    "selectCountryDoc": "Sélectionner le pays et le type de document",
+    "selectCountryDocDesc": "Parlez-nous du document que vous allez vérifier"
   }
 }

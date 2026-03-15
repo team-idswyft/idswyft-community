@@ -539,8 +539,8 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
             <div className={`flex items-center gap-3 px-4 py-2 rounded-xl border ${t.border} text-sm`}>
               <span className={t.textSec}>{tr('country.issuingCountry')}: <span className={`font-medium ${t.text}`}>{issuingCountry}</span></span>
               <span className={t.textSec}>|</span>
-              <span className={t.textSec}>Doc: <span className={`font-medium ${t.text}`}>{documentType.replace(/_/g, ' ')}</span></span>
-              <button onClick={() => setCurrentStep(1)} className="ml-auto text-cyan-400 text-xs hover:text-cyan-300">Change</button>
+              <span className={t.textSec}>{tr('common.document')}: <span className={`font-medium ${t.text}`}>{documentType.replace(/_/g, ' ')}</span></span>
+              <button onClick={() => setCurrentStep(1)} className="ml-auto text-cyan-400 text-xs hover:text-cyan-300">{tr('common.change')}</button>
             </div>
 
             {renderFileArea('front', frontPreviewUrl, frontInputRef, handleFrontFileSelect, tr('frontId.heading'))}
@@ -568,7 +568,7 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
             <Spinner />
             <h2 className={`text-xl font-semibold mb-2 ${t.text}`}>{tr('verification.verifying')}</h2>
             <p className={`text-sm ${t.textSec}`}>{tr('common.processing')}</p>
-            <p className={`text-xs mt-2 ${t.textSec}`}>Please don't close this window</p>
+            <p className={`text-xs mt-2 ${t.textSec}`}>{tr('verification.dontClose')}</p>
           </div>
         );
 
@@ -627,9 +627,9 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
             </button>
 
             <div className={`mt-6 rounded-xl border ${t.border} p-4 text-left`}>
-              <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${t.textSec}`}>Liveness Detection</p>
+              <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${t.textSec}`}>{tr('liveCapture.livenessDetectionTitle')}</p>
               <p className={`text-sm ${t.textSec}`}>
-                Our system will automatically detect that you're a real person and capture your photo when optimal conditions are met.
+                {tr('liveCapture.livenessDetectionDesc')}
               </p>
             </div>
           </div>
@@ -642,7 +642,7 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
             <div className="text-center py-8 animate-fade-in">
               <Spinner />
               <h2 className={`text-xl font-semibold mb-2 ${t.text}`}>{tr('common.processing')}</h2>
-              <p className={`text-sm ${t.textSec}`}>Analyzing your live photo...</p>
+              <p className={`text-sm ${t.textSec}`}>{tr('liveCapture.analyzingPhoto')}</p>
             </div>
           );
         }
@@ -739,7 +739,7 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
         {/* Security footer */}
         <div className="mt-6 text-center">
           <p className={`text-xs ${t.textSec}`}>
-            256-bit SSL encryption \u00B7 GDPR compliant \u00B7 Auto-deleted after verification
+            {tr('common.securityFooter')}
           </p>
         </div>
       </div>

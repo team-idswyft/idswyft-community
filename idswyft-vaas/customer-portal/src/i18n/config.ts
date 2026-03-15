@@ -18,11 +18,11 @@ import ja from './locales/ja.json';
 
 export const supportedLanguages = [
   { code: 'en', name: 'English', flag: 'US' },
-  { code: 'es', name: 'Espanol', flag: 'ES' },
-  { code: 'fr', name: 'Francais', flag: 'FR' },
-  { code: 'pt', name: 'Portugues', flag: 'BR' },
+  { code: 'es', name: 'Español', flag: 'ES' },
+  { code: 'fr', name: 'Français', flag: 'FR' },
+  { code: 'pt', name: 'Português', flag: 'BR' },
   { code: 'de', name: 'Deutsch', flag: 'DE' },
-  { code: 'ja', name: 'Japanese', flag: 'JP' },
+  { code: 'ja', name: '日本語', flag: 'JP' },
 ] as const;
 
 i18n

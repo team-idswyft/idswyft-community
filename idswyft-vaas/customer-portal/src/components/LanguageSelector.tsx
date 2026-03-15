@@ -17,7 +17,7 @@ interface LanguageSelectorProps {
 }
 
 const LanguageSelector: React.FC<LanguageSelectorProps> = ({ variant = 'dark' }) => {
-  const { i18n } = useTranslation();
+  const { i18n, t } = useTranslation();
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
@@ -45,7 +45,7 @@ const LanguageSelector: React.FC<LanguageSelectorProps> = ({ variant = 'dark' })
     <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
       <button
         onClick={() => setOpen(!open)}
-        aria-label="Change language"
+        aria-label={t('common.changeLanguage')}
         style={{
           display: 'flex', alignItems: 'center', gap: 6,
           padding: '5px 10px', borderRadius: 8,

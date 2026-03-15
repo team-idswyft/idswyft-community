@@ -188,7 +188,7 @@ const LiveCaptureComponent: React.FC<LiveCaptureComponentProps> = ({
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 14px Arial';
         ctx.textAlign = 'left';
-        ctx.fillText('Position your face in the circle', 15, 30);
+        ctx.fillText(t('liveCapture.positionFace'), 15, 30);
         ctx.restore();
 
         let faceCount = 0;
@@ -344,7 +344,7 @@ const LiveCaptureComponent: React.FC<LiveCaptureComponentProps> = ({
                   faceDetected ? 'bg-green-500/80 text-white' : 'bg-red-500/80 text-white'
                 }`}>
                   <Eye className="h-4 w-4" />
-                  <span>{faceDetected ? 'Face Detected' : 'No Face'}</span>
+                  <span>{faceDetected ? t('liveCapture.faceDetected') : t('liveCapture.noFace')}</span>
                 </div>
               </div>
 
@@ -352,8 +352,8 @@ const LiveCaptureComponent: React.FC<LiveCaptureComponentProps> = ({
                 <div className="bg-black/70 text-white p-3 rounded-lg text-center">
                   <p className="text-sm">
                     {!faceDetected
-                      ? 'Position your face within the circle'
-                      : 'Great! Click capture when ready'}
+                      ? t('liveCapture.positionFace')
+                      : t('liveCapture.readyToCapture')}
                   </p>
                 </div>
               </div>
@@ -386,7 +386,7 @@ const LiveCaptureComponent: React.FC<LiveCaptureComponentProps> = ({
             <AlertTriangle className="h-12 w-12 mx-auto text-red-400 mb-4" />
             <h4 className="text-lg font-semibold text-red-400 mb-2">{t('common.error')}</h4>
             <p className="text-[#8896aa] mb-6">
-              Unable to access your camera. Please check permissions and try again.
+              {t('errors.cameraAccessDenied')}
             </p>
             <button onClick={initializeCamera} className="btn-primary">
               {t('common.tryAgain')}

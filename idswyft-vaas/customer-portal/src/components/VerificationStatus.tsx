@@ -54,7 +54,7 @@ const VerificationStatus: React.FC<VerificationStatusProps> = ({ sessionToken })
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
-  const { t: tr } = useTranslation();
+  const { t: tr, i18n } = useTranslation();
 
   const { setBranding, setOrganizationName } = useOrganization();
 
@@ -150,7 +150,7 @@ const VerificationStatus: React.FC<VerificationStatusProps> = ({ sessionToken })
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    return new Date(dateString).toLocaleDateString(i18n.language, {
       year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
     });
   };
