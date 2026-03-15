@@ -108,6 +108,59 @@ export interface VerificationResult {
   updated_at?: string;
 }
 
+// ─── Batch Verification Types ───────────────────────────
+
+export interface BatchItemInput {
+  user_id: string;
+  document_type?: DocumentType;
+  front_document_url?: string;
+  back_document_url?: string;
+  selfie_url?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface BatchJobResponse {
+  success: boolean;
+  batch_id: string;
+  status: string;
+  total_items: number;
+  message: string;
+}
+
+export interface BatchStatusResponse {
+  batch_id: string;
+  status: 'pending' | 'processing' | 'completed' | 'cancelled' | 'failed';
+  total_items: number;
+  processed_items: number;
+  succeeded_items: number;
+  failed_items: number;
+  progress_percentage: number;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface BatchResultItem {
+  item_id: string;
+  user_id: string | null;
+  status: string;
+  verification_id: string | null;
+  error: string | null;
+}
+
+export interface BatchResultsResponse {
+  results: BatchResultItem[];
+}
+
+export interface BatchListResponse {
+  jobs: BatchStatusResponse[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
 // ─── Developer & Webhook Types ──────────────────────────
 
 export interface ApiKey {
@@ -483,6 +536,53 @@ export class IdswyftSDK {
         maxAttempts: options?.maxAttempts ?? 300,
       },
     );
+  }
+
+  // ─── Batch Verification ────────────────────────────────
+
+  /**
+   * Create a batch verification job for processing multiple users.
+   * Items are processed asynchronously with controlled concurrency.
+   */
+  async createBatch(items: BatchItemInput[]): Promise<BatchJobResponse> {
+    const response = await this.client.post('/api/v2/batch/upload', { items });
+    return response.data;
+  }
+
+  /**
+   * Get the status and progress of a batch job.
+   */
+  async getBatchStatus(batchId: string): Promise<BatchStatusResponse> {
+    const response = await this.client.get(`/api/v2/batch/${batchId}/status`);
+    return response.data;
+  }
+
+  /**
+   * Get individual item results for a completed batch job.
+   */
+  async getBatchResults(batchId: string): Promise<BatchResultsResponse> {
+    const response = await this.client.get(`/api/v2/batch/${batchId}/results`);
+    return response.data;
+  }
+
+  /**
+   * Cancel a batch job. Already-completed items are unaffected.
+   */
+  async cancelBatch(batchId: string): Promise<{ success: boolean; message: string }> {
+    const response = await this.client.post(`/api/v2/batch/${batchId}/cancel`);
+    return response.data;
+  }
+
+  /**
+   * List all batch jobs for the current developer.
+   */
+  async listBatches(options?: { page?: number; limit?: number }): Promise<BatchListResponse> {
+    const params = new URLSearchParams();
+    if (options?.page) params.append('page', options.page.toString());
+    if (options?.limit) params.append('limit', options.limit.toString());
+
+    const response = await this.client.get(`/api/v2/batch?${params.toString()}`);
+    return response.data;
   }
 
   // ─── Utilities ─────────────────────────────────────────
