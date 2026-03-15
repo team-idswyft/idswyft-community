@@ -6,6 +6,7 @@
   "scripts": {
     "dev": "vite --port 3003 --host",
     "build": "tsc -b && vite build",
+    "postinstall": "sh scripts/setup-mediapipe.sh",
     "lint": "eslint .",
     "preview": "vite preview"
   },

@@ -1,6 +1,9 @@
 # Use official Node.js LTS image
 FROM node:20-alpine
 
+# curl needed to download MediaPipe face_landmarker model during postinstall
+RUN apk add --no-cache curl
+
 # Set working directory
 WORKDIR /app
 
@@ -13,10 +16,11 @@ ARG VITE_SANDBOX_MODE
 ARG VITE_BRAND_NAME
 ARG VITE_SUPPORT_EMAIL
 
-# Copy package files
+# Copy package files and setup script
 COPY package*.json ./
+COPY scripts/ scripts/
 
-# Install dependencies
+# Install dependencies (postinstall copies WASM + downloads model)
 RUN npm install
 
 # Copy source code
