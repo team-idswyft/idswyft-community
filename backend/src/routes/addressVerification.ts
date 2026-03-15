@@ -136,6 +136,7 @@ router.post(
         verification_id,
         error: updateError.message,
       });
+      throw new Error(`Failed to store address verification results: ${updateError.message}`);
     }
 
     logger.info('Address document processed', {
@@ -234,12 +235,14 @@ async function getIdNameFromVerification(verificationId: string): Promise<string
     if (ocr?.name) return ocr.name;
   }
 
-  // Fallback: query front document's OCR data directly
+  // Fallback: query front document's OCR data directly.
+  // Exclude address document types so we only get identity documents.
   const { data: doc } = await supabase
     .from('documents')
     .select('ocr_data')
     .eq('verification_request_id', verificationId)
     .eq('is_back_of_id', false)
+    .not('document_type', 'in', '("utility_bill","bank_statement","tax_document")')
     .order('created_at', { ascending: false })
     .limit(1)
     .single();
