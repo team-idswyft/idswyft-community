@@ -198,8 +198,27 @@ function CodeStrip() {
   )
 }
 
+function useScrollReveal() {
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        entries.forEach(entry => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('revealed')
+            observer.unobserve(entry.target)
+          }
+        })
+      },
+      { threshold: 0.1, rootMargin: '0px 0px -60px 0px' }
+    )
+    document.querySelectorAll('.scroll-reveal').forEach(el => observer.observe(el))
+    return () => observer.disconnect()
+  }, [])
+}
+
 export function HomePage() {
   useEffect(() => { injectFonts() }, [])
+  useScrollReveal()
 
   return (
     <div style={{ background: C.bg, color: C.text, fontFamily: C.sans }}>
@@ -215,6 +234,12 @@ export function HomePage() {
           <div className="geo geo-square" />
           <div className="geo geo-diamond" />
           <div className="geo geo-circle" />
+          <div className="geo geo-dot" style={{ width: 5, height: 5, top: '38%', left: '28%', animationDelay: '-2s' }} />
+          <div className="geo geo-dot" style={{ width: 4, height: 4, bottom: '25%', left: '16%', animationDelay: '-4s' }} />
+          <div className="geo geo-dot" style={{ width: 6, height: 6, top: '20%', right: '35%', animationDelay: '-1s' }} />
+          <div className="geo geo-ring" style={{ width: 180, height: 180, top: '25%', left: '50%', marginLeft: -90 }} />
+          <div className="geo geo-cross" style={{ width: 22, height: 22, bottom: '32%', right: '28%', animationDelay: '-6s' }} />
+          <div className="geo geo-line" style={{ width: 80, top: '55%', left: '6%', animationDelay: '-3s' }} />
         </div>
         <div style={{ fontFamily: C.mono, fontSize: 12, color: C.muted, letterSpacing: '0.08em', marginBottom: 32 }}>
           idswyft / identity-verification
@@ -258,7 +283,11 @@ export function HomePage() {
       </section>
 
       {/* 2. PIPELINE */}
-      <section style={{ padding: '80px 24px', maxWidth: 960, margin: '0 auto' }}>
+      <section className="scroll-reveal" style={{ padding: '80px 24px', maxWidth: 960, margin: '0 auto', position: 'relative', overflow: 'hidden' }}>
+        <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+          <div className="geo-accent geo-accent--float" style={{ width: 36, height: 36, border: '1px solid rgba(34,211,238,0.06)', top: '12%', right: '5%', animationDelay: '-3s' }} />
+          <div className="geo-accent geo-accent--breath" style={{ width: 4, height: 4, borderRadius: '50%', background: 'rgba(34,211,238,0.15)', bottom: '18%', left: '6%', animationDelay: '-2s' }} />
+        </div>
         <div style={{ textAlign: 'center', marginBottom: 48 }}>
           <div style={{ fontFamily: C.mono, fontSize: 11, color: C.muted, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>
             The verification flow
@@ -292,7 +321,7 @@ export function HomePage() {
               </div>
               {/* Connector line — sits between steps, aligned to circle center */}
               {i < arr.length - 1 && (
-                <div style={{ flex: 1, minWidth: 16, height: 1, background: C.border, marginTop: 22, flexShrink: 1 }} />
+                <div className="pipeline-connector" style={{ flex: 1, minWidth: 16, height: 1, background: C.border, marginTop: 22, flexShrink: 1 }} />
               )}
             </React.Fragment>
           ))}
@@ -300,7 +329,7 @@ export function HomePage() {
       </section>
 
       {/* 2.5. VERIFICATION SHOWCASE VIDEO */}
-      <section style={{ background: C.bg, padding: '96px 24px', borderTop: `1px solid ${C.border}` }}>
+      <section className="scroll-reveal" style={{ background: C.bg, padding: '96px 24px', borderTop: `1px solid ${C.border}` }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 64, flexWrap: 'wrap', justifyContent: 'center' }}>
 
           {/* Left column: marketing copy */}
@@ -378,7 +407,12 @@ export function HomePage() {
       <CodeStrip />
 
       {/* 4. FEATURES */}
-      <section style={{ padding: '80px 24px', maxWidth: 960, margin: '0 auto' }}>
+      <section className="scroll-reveal" style={{ padding: '80px 24px', maxWidth: 960, margin: '0 auto', position: 'relative', overflow: 'hidden' }}>
+        <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+          <div className="geo-accent geo-accent--diamond" style={{ width: 28, height: 28, border: '1px solid rgba(34,211,238,0.05)', top: '10%', left: '4%', animationDelay: '-5s' }} />
+          <div className="geo-accent geo-accent--float-alt" style={{ width: 44, height: 44, border: '1px solid rgba(34,211,238,0.04)', borderRadius: '50%', bottom: '12%', right: '6%', animationDelay: '-8s' }} />
+          <div className="geo-accent geo-accent--breath" style={{ width: 5, height: 5, borderRadius: '50%', background: 'rgba(34,211,238,0.12)', top: '50%', right: '3%', animationDelay: '-1s' }} />
+        </div>
         <div style={{ textAlign: 'center', marginBottom: 48 }}>
           <h2 style={{ fontFamily: C.mono, fontSize: 28, fontWeight: 600, color: C.text }}>
             Built-in capabilities
@@ -402,7 +436,7 @@ export function HomePage() {
       </section>
 
       {/* 5. INTEGRATION OPTIONS */}
-      <section style={{ padding: '64px 24px', maxWidth: 800, margin: '0 auto' }}>
+      <section className="scroll-reveal" style={{ padding: '64px 24px', maxWidth: 800, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
           <h2 style={{ fontFamily: C.mono, fontSize: 24, fontWeight: 600, color: C.text }}>
             Two ways to integrate
@@ -429,7 +463,7 @@ export function HomePage() {
       </section>
 
       {/* 6. USE CASES */}
-      <section style={{ padding: '64px 24px', textAlign: 'center' }}>
+      <section className="scroll-reveal" style={{ padding: '64px 24px', textAlign: 'center' }}>
         <div style={{ fontFamily: C.mono, fontSize: 11, color: C.muted, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 24 }}>
           Use cases
         </div>
@@ -446,7 +480,11 @@ export function HomePage() {
       </section>
 
       {/* 7. CTA */}
-      <section style={{ padding: '80px 24px', textAlign: 'center', background: C.panel, borderTop: `1px solid ${C.border}` }}>
+      <section className="scroll-reveal" style={{ padding: '80px 24px', textAlign: 'center', background: C.panel, borderTop: `1px solid ${C.border}`, position: 'relative', overflow: 'hidden' }}>
+        <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
+          <div className="geo-accent geo-accent--float" style={{ width: 50, height: 50, border: '1px solid rgba(34,211,238,0.05)', borderRadius: '50%', top: '15%', left: '8%', animationDelay: '-7s' }} />
+          <div className="geo-accent geo-accent--breath" style={{ width: 4, height: 4, borderRadius: '50%', background: 'rgba(34,211,238,0.18)', bottom: '25%', right: '12%', animationDelay: '-3s' }} />
+        </div>
         <h2 style={{ fontFamily: C.mono, fontSize: 28, fontWeight: 600, color: C.text, marginBottom: 16 }}>
           Ready to integrate?
         </h2>
