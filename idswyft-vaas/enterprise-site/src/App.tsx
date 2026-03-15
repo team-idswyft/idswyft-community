@@ -156,6 +156,195 @@ const accentClasses: Record<string, { bg: string; border: string; icon: string }
   violet:  { bg: 'bg-violet-400/10', border: 'border-violet-400/20', icon: 'text-violet-400' },
 }
 
+// ── Hero verification illustration ────────────────────────────────────────
+function HeroIllustration() {
+  return (
+    <div className="relative" style={{ width: '100%', maxWidth: 440, aspectRatio: '1 / 1.15', margin: '0 auto' }}>
+      {/* Ambient glow */}
+      <div
+        className="absolute"
+        style={{
+          top: '15%', left: '20%', width: '60%', height: '55%',
+          borderRadius: '50%',
+          background: 'radial-gradient(ellipse, rgba(34,211,238,0.07) 0%, transparent 70%)',
+          filter: 'blur(30px)',
+          pointerEvents: 'none',
+        }}
+      />
+
+      {/* ── Portrait scan frame ── */}
+      <div
+        className="relative"
+        style={{
+          width: '62%', height: 0, paddingBottom: '78%',
+          borderRadius: 18,
+          background: 'linear-gradient(160deg, rgba(34,211,238,0.04) 0%, rgba(255,255,255,0.01) 100%)',
+          border: '1px solid rgba(255,255,255,0.08)',
+          overflow: 'hidden',
+          marginLeft: '6%',
+        }}
+      >
+        {/* Scan grid */}
+        <div
+          className="absolute inset-0"
+          style={{
+            backgroundImage: `
+              linear-gradient(rgba(34,211,238,0.025) 1px, transparent 1px),
+              linear-gradient(90deg, rgba(34,211,238,0.025) 1px, transparent 1px)
+            `,
+            backgroundSize: '22px 22px',
+          }}
+        />
+
+        {/* Abstract face silhouette */}
+        <svg
+          viewBox="0 0 200 260"
+          className="absolute"
+          style={{ top: '8%', left: '10%', width: '80%', height: '80%' }}
+        >
+          <defs>
+            <linearGradient id="faceGrad" x1="0" y1="0" x2="0" y2="1">
+              <stop offset="0%" stopColor="rgba(34,211,238,0.1)" />
+              <stop offset="100%" stopColor="rgba(34,211,238,0.03)" />
+            </linearGradient>
+          </defs>
+          <ellipse cx="100" cy="85" rx="40" ry="48" fill="url(#faceGrad)" stroke="rgba(34,211,238,0.08)" strokeWidth="0.5" />
+          <path
+            d="M15 260 C15 210 40 190 100 180 C160 190 185 210 185 260"
+            fill="url(#faceGrad)" stroke="rgba(34,211,238,0.06)" strokeWidth="0.5"
+          />
+        </svg>
+
+        {/* Animated scan line */}
+        <div
+          className="absolute hero-scan-line"
+          style={{
+            left: 0, right: 0, height: 2,
+            background: 'linear-gradient(90deg, transparent 5%, rgba(34,211,238,0.6) 50%, transparent 95%)',
+            boxShadow: '0 0 12px rgba(34,211,238,0.3)',
+          }}
+        />
+
+        {/* Corner viewfinder brackets */}
+        <div style={{ position: 'absolute', top: 14, left: 14, width: 22, height: 22, borderTop: '2px solid rgba(34,211,238,0.35)', borderLeft: '2px solid rgba(34,211,238,0.35)' }} />
+        <div style={{ position: 'absolute', top: 14, right: 14, width: 22, height: 22, borderTop: '2px solid rgba(34,211,238,0.35)', borderRight: '2px solid rgba(34,211,238,0.35)' }} />
+        <div style={{ position: 'absolute', bottom: 14, left: 14, width: 22, height: 22, borderBottom: '2px solid rgba(34,211,238,0.35)', borderLeft: '2px solid rgba(34,211,238,0.35)' }} />
+        <div style={{ position: 'absolute', bottom: 14, right: 14, width: 22, height: 22, borderBottom: '2px solid rgba(34,211,238,0.35)', borderRight: '2px solid rgba(34,211,238,0.35)' }} />
+      </div>
+
+      {/* ── Scanning arc ── */}
+      <svg
+        viewBox="0 0 200 200"
+        className="absolute hero-scan-arc-spin"
+        style={{ top: '2%', left: '15%', width: '45%', pointerEvents: 'none' }}
+      >
+        <circle cx="100" cy="100" r="92" fill="none" stroke="rgba(34,211,238,0.06)" strokeWidth="1" strokeDasharray="5 4" />
+        <circle cx="100" cy="100" r="92" fill="none" stroke="rgba(34,211,238,0.45)" strokeWidth="2" strokeDasharray="50 528" strokeLinecap="round" />
+      </svg>
+
+      {/* ── ID Card overlay ── */}
+      <div
+        className="absolute"
+        style={{
+          bottom: '2%', right: 0,
+          width: '54%',
+          borderRadius: 12,
+          background: 'rgba(255,255,255,0.03)',
+          border: '1px solid rgba(255,255,255,0.09)',
+          padding: '12px 14px',
+          backdropFilter: 'blur(12px)',
+        }}
+      >
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, paddingBottom: 6, borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+          <span style={{ fontSize: 8, fontWeight: 700, letterSpacing: '0.14em', color: '#475569', textTransform: 'uppercase' as const, fontFamily: "'IBM Plex Mono', monospace" }}>
+            Driver License
+          </span>
+          <div style={{ width: 12, height: 12, borderRadius: 3, background: 'rgba(34,211,238,0.12)', border: '1px solid rgba(34,211,238,0.25)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            <div style={{ width: 5, height: 5, background: '#22d3ee', borderRadius: 1 }} />
+          </div>
+        </div>
+
+        <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{
+            width: 32, height: 40, borderRadius: 4, flexShrink: 0,
+            background: 'linear-gradient(135deg, rgba(34,211,238,0.08), rgba(34,211,238,0.02))',
+            border: '1px solid rgba(255,255,255,0.06)',
+          }} />
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column' as const, gap: 4 }}>
+            {[
+              { label: 'DL', value: 'G12358149', hl: true },
+              { label: 'NAME', value: 'DOE, JANE A', hl: false },
+              { label: 'DOB', value: '03/12/1995', hl: false },
+              { label: 'EXP', value: '08/06/2031', hl: false },
+            ].map(({ label, value, hl }) => (
+              <div key={label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span style={{ fontSize: 7, color: '#334155', fontFamily: "'IBM Plex Mono', monospace", letterSpacing: '0.08em' }}>{label}</span>
+                <span style={{ fontSize: 7.5, color: hl ? '#22d3ee' : '#64748b', fontFamily: "'IBM Plex Mono', monospace", fontWeight: hl ? 600 : 400 }}>{value}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        <div style={{ marginTop: 8, background: 'rgba(34,211,238,0.03)', borderRadius: 3, padding: '3px 5px' }}>
+          <div style={{ fontSize: 5.5, fontFamily: "'IBM Plex Mono', monospace", color: '#334155', letterSpacing: '0.08em', lineHeight: 1.5, wordBreak: 'break-all' as const }}>
+            {'P<USADOE<<JANE<A<<<<<<<<<<<<<<<'}
+          </div>
+        </div>
+      </div>
+
+      {/* ── Floating badges ── */}
+      <div
+        className="absolute hero-illust-float"
+        style={{
+          top: '5%', left: '-2%',
+          background: 'rgba(16,185,129,0.1)',
+          border: '1px solid rgba(16,185,129,0.2)',
+          borderRadius: 999,
+          padding: '5px 12px',
+          display: 'flex', alignItems: 'center', gap: 5,
+        }}
+      >
+        <CheckCircle className="w-3 h-3" style={{ color: '#10b981' }} />
+        <span style={{ fontSize: 11, fontWeight: 600, color: '#10b981' }}>Verified</span>
+      </div>
+
+      <div
+        className="absolute hero-illust-float"
+        style={{
+          top: '38%', right: '-4%',
+          background: 'rgba(34,211,238,0.06)',
+          border: '1px solid rgba(34,211,238,0.15)',
+          borderRadius: 8,
+          padding: '4px 10px',
+          animationDelay: '-3s',
+        }}
+      >
+        <span style={{ fontSize: 10, fontWeight: 600, color: '#22d3ee', fontFamily: "'IBM Plex Mono', monospace" }}>99.8% match</span>
+      </div>
+
+      <div
+        className="absolute hero-illust-float"
+        style={{
+          bottom: '-2%', right: '15%',
+          background: 'rgba(16,185,129,0.08)',
+          border: '1px solid rgba(16,185,129,0.15)',
+          borderRadius: 6,
+          padding: '3px 8px',
+          display: 'flex', alignItems: 'center', gap: 4,
+          animationDelay: '-5s',
+        }}
+      >
+        <FileCheck className="w-2.5 h-2.5" style={{ color: '#10b981' }} />
+        <span style={{ fontSize: 9, fontWeight: 500, color: '#10b981' }}>Doc verified</span>
+      </div>
+
+      {/* ── Data flow dots ── */}
+      <div className="absolute hero-data-pulse" style={{ width: 4, height: 4, borderRadius: '50%', background: '#22d3ee', top: '55%', left: '52%' }} />
+      <div className="absolute hero-data-pulse" style={{ width: 3, height: 3, borderRadius: '50%', background: 'rgba(34,211,238,0.6)', top: '62%', left: '48%', animationDelay: '-1s' }} />
+    </div>
+  )
+}
+
 // ── Component ──────────────────────────────────────────────────────────────
 function App() {
   const vaasBackendUrl =
@@ -497,124 +686,9 @@ function App() {
               </div>
             </div>
 
-            {/* ── Right: API response card ── */}
+            {/* ── Right: Verification illustration ── */}
             <div className="hidden lg:block">
-              <div className="relative">
-                {/* Glow */}
-                <div
-                  className="absolute inset-0 rounded-3xl blur-3xl"
-                  style={{ background: 'rgba(34,211,238,0.06)' }}
-                />
-                {/* Card */}
-                <div
-                  className="relative rounded-2xl overflow-hidden"
-                  style={{
-                    background: 'rgba(255,255,255,0.025)',
-                    border: '1px solid rgba(255,255,255,0.07)',
-                  }}
-                >
-                  {/* Card header bar */}
-                  <div
-                    className="flex items-center gap-2 px-4 py-3"
-                    style={{
-                      borderBottom: '1px solid rgba(255,255,255,0.05)',
-                      background: 'rgba(255,255,255,0.02)',
-                    }}
-                  >
-                    <div className="flex gap-1.5">
-                      {['rgba(255,255,255,0.15)', 'rgba(255,255,255,0.15)', 'rgba(255,255,255,0.15)'].map(
-                        (bg, i) => (
-                          <div
-                            key={i}
-                            className="w-2.5 h-2.5 rounded-full"
-                            style={{ background: bg }}
-                          />
-                        )
-                      )}
-                    </div>
-                    <span
-                      className="ml-2"
-                      style={{ color: '#475569', fontSize: '12px', fontFamily: 'IBM Plex Mono, monospace' }}
-                    >
-                      POST /api/verify/start
-                    </span>
-                    <div className="ml-auto flex items-center gap-1.5">
-                      <span
-                        className="w-1.5 h-1.5 rounded-full"
-                        style={{ background: '#10b981' }}
-                      />
-                      <span
-                        style={{ color: '#10b981', fontSize: '11px', fontFamily: 'IBM Plex Mono, monospace' }}
-                      >
-                        200 OK
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* JSON response body */}
-                  <div className="p-5" style={{ fontFamily: 'IBM Plex Mono, monospace', fontSize: '12px', lineHeight: '1.75' }}>
-                    <span style={{ color: '#475569' }}>{'{'}</span>
-                    <br />
-                    <span style={{ paddingLeft: '16px', display: 'block' }}>
-                      <span style={{ color: '#67e8f9' }}>"verificationId"</span>
-                      <span style={{ color: '#64748b' }}>: </span>
-                      <span style={{ color: '#6ee7b7' }}>"vrf_9a2b3c4d"</span>
-                      <span style={{ color: '#475569' }}>,</span>
-                    </span>
-                    <span style={{ paddingLeft: '16px', display: 'block' }}>
-                      <span style={{ color: '#67e8f9' }}>"status"</span>
-                      <span style={{ color: '#64748b' }}>: </span>
-                      <span style={{ color: '#fcd34d' }}>"pending"</span>
-                      <span style={{ color: '#475569' }}>,</span>
-                    </span>
-                    <span style={{ paddingLeft: '16px', display: 'block' }}>
-                      <span style={{ color: '#67e8f9' }}>"sessionUrl"</span>
-                      <span style={{ color: '#64748b' }}>: </span>
-                      <span style={{ color: '#93c5fd' }}>"https://verify.idswyft.app/s/..."</span>
-                      <span style={{ color: '#475569' }}>,</span>
-                    </span>
-                    <span style={{ paddingLeft: '16px', display: 'block' }}>
-                      <span style={{ color: '#67e8f9' }}>"expiresAt"</span>
-                      <span style={{ color: '#64748b' }}>: </span>
-                      <span style={{ color: '#cbd5e1' }}>"2026-03-08T15:00:00Z"</span>
-                    </span>
-                    <span style={{ color: '#475569' }}>{'}'}</span>
-                  </div>
-
-                  {/* Verification step flow */}
-                  <div
-                    className="px-5 pb-4 pt-1"
-                    style={{ borderTop: '1px solid rgba(255,255,255,0.04)' }}
-                  >
-                    <div className="flex items-center flex-wrap gap-y-1">
-                      {['Upload ID', 'Scan Back', 'Live Capture', 'Verified ✓'].map((step, i) => (
-                        <div key={step} className="flex items-center">
-                          <span
-                            className="px-2.5 py-1 rounded-md text-xs font-medium"
-                            style={
-                              i === 3
-                                ? {
-                                    background: 'rgba(16,185,129,0.12)',
-                                    color: '#10b981',
-                                    border: '1px solid rgba(16,185,129,0.2)',
-                                  }
-                                : { color: '#475569' }
-                            }
-                          >
-                            {step}
-                          </span>
-                          {i < 3 && (
-                            <ChevronRight
-                              className="w-3 h-3 mx-0.5 flex-shrink-0"
-                              style={{ color: '#334155' }}
-                            />
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <HeroIllustration />
             </div>
           </div>
         </div>

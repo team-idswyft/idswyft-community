@@ -100,3 +100,52 @@ html {
   background: rgba(34, 211, 238, 0.2);
   color: #f1f5f9;
 }
+
+/* ── Hero verification illustration ── */
+@keyframes heroScanSweep {
+  0%, 5% { top: 8%; opacity: 0; }
+  15% { opacity: 1; }
+  85% { opacity: 0.8; }
+  95%, 100% { top: 88%; opacity: 0; }
+}
+
+.hero-scan-line {
+  animation: heroScanSweep 4s ease-in-out infinite;
+}
+
+@keyframes heroScanArcSpin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+.hero-scan-arc-spin {
+  animation: heroScanArcSpin 6s linear infinite;
+}
+
+@keyframes heroIllustFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-5px); }
+}
+
+.hero-illust-float {
+  animation: heroIllustFloat 6s ease-in-out infinite;
+}
+
+@keyframes heroDataPulse {
+  0%, 100% { transform: scale(1); opacity: 0.3; }
+  50% { transform: scale(1.8); opacity: 0.7; }
+}
+
+.hero-data-pulse {
+  animation: heroDataPulse 3s ease-in-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hero-scan-line,
+  .hero-scan-arc-spin,
+  .hero-illust-float,
+  .hero-data-pulse {
+    animation: none !important;
+    opacity: 1;
+  }
+}
