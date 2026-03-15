@@ -943,6 +943,21 @@ router.get('/:verification_id/status',
     const state = session.getState();
     const mapped = mapStatusForResponse(state);
 
+    // Fetch risk score from DB (computed after live capture)
+    let riskScore: { overall_score: number; risk_level: string; risk_factors: any[] } | null = null;
+    const { data: riskRow } = await supabase
+      .from('verification_risk_scores')
+      .select('overall_score, risk_level, risk_factors')
+      .eq('verification_request_id', verification_id)
+      .single();
+    if (riskRow) {
+      riskScore = {
+        overall_score: riskRow.overall_score,
+        risk_level: riskRow.risk_level,
+        risk_factors: riskRow.risk_factors ?? [],
+      };
+    }
+
     res.json({
       success: true,
       verification_id,
@@ -956,11 +971,13 @@ router.get('/:verification_id/status',
       barcode_data: state.back_extraction?.qr_payload ?? null,
       cross_validation_results: state.cross_validation ?? null,
       face_match_results: state.face_match ?? null,
-      liveness_results: null, // liveness is part of live capture step
+      liveness_results: state.liveness ?? null,
+      aml_screening: state.aml_screening ?? null,
+      risk_score: riskScore,
       barcode_extraction_failed: state.back_extraction ? !state.back_extraction.qr_payload : null,
       documents_match: state.cross_validation ? !state.cross_validation.has_critical_failure : null,
       face_match_passed: state.face_match?.passed ?? null,
-      liveness_passed: null,
+      liveness_passed: state.liveness?.passed ?? null,
       final_result: mapped.final_result,
       rejection_reason: state.rejection_reason,
       rejection_detail: state.rejection_detail,

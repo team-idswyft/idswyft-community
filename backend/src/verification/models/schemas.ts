@@ -168,6 +168,7 @@ export interface SessionState {
   back_extraction: BackExtractionResult | null;
   cross_validation: CrossValidationResult | null;
   face_match: FaceMatchResult | null;
+  liveness: { passed: boolean; score: number } | null;
   aml_screening: AMLScreeningSessionResult | null;
   created_at: string;
   updated_at: string;
