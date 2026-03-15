@@ -2,7 +2,7 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 // Type-only import — the actual module is loaded dynamically inside useEffect
 // to keep @mediapipe/tasks-vision out of the main bundle (prevents page crash
 // if WASM init fails at module level on mobile browsers)
-import type { FaceLandmarker as FaceLandmarkerType } from '@mediapipe/tasks-vision';
+import type { FaceDetector as FaceDetectorType } from '@mediapipe/tasks-vision';
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -58,20 +58,21 @@ export interface UseActiveLivenessReturn {
   retry: () => void;
 }
 
-// Key MediaPipe landmark indices used in detection loop:
-// nose tip (#1), chin (#152), left eye outer (#33),
-// right eye outer (#263), left mouth (#61), right mouth (#291)
+// FaceDetector keypoint indices:
+// right_eye (#0), left_eye (#1), nose_tip (#2),
+// mouth_center (#3), right_ear_tragion (#4), left_ear_tragion (#5)
 
 // ─── Thresholds ──────────────────────────────────────────────
 const CENTER_YAW_THRESHOLD = 5;       // ±5° for "centered"
 const CENTER_HOLD_MS = 500;           // Hold center for 500ms
 const TURN_YAW_THRESHOLD = 20;        // Must turn 20° from baseline
 const RETURN_YAW_THRESHOLD = 8;       // ±8° to be "back to center"
-const MEDIAPIPE_LOAD_TIMEOUT = 45000; // 45s — WASM compilation alone takes 30+ seconds on iOS WebKit
+const MEDIAPIPE_LOAD_TIMEOUT = 45000; // 45s — generous for slow mobile connections
 const DEFAULT_CHALLENGE_TIMEOUT = 10000;
 
-// Google's official CDN for MediaPipe model — eliminates silent fetch failures inside WASM context
-const MODEL_CDN_URL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
+// FaceDetector model — 224KB vs FaceLandmarker's 4.6MB.
+// Compiles in seconds on mobile WebKit vs hanging indefinitely.
+const MODEL_CDN_URL = 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite';
 const WASM_CDN_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm';
 
 function pickRandomDirection(): ChallengeDirection {
@@ -94,36 +95,22 @@ function getInstructionForPhase(phase: LivenessPhase, direction: ChallengeDirect
 }
 
 /**
- * Estimate yaw angle from 6 key face landmarks.
+ * Estimate yaw angle from nose tip and eye keypoints.
  * Uses nose-tip horizontal offset relative to eye midpoint,
  * normalized by inter-eye distance.
  */
 function estimateYaw(
-  noseTip: { x: number; y: number; z: number },
-  leftEyeOuter: { x: number; y: number; z: number },
-  rightEyeOuter: { x: number; y: number; z: number },
+  noseTip: { x: number; y: number },
+  leftEye: { x: number; y: number },
+  rightEye: { x: number; y: number },
 ): number {
-  const eyeMidX = (leftEyeOuter.x + rightEyeOuter.x) / 2;
-  const interEyeDist = Math.abs(rightEyeOuter.x - leftEyeOuter.x);
+  const eyeMidX = (leftEye.x + rightEye.x) / 2;
+  const interEyeDist = Math.abs(rightEye.x - leftEye.x);
   if (interEyeDist < 0.001) return 0;
 
   const offset = (noseTip.x - eyeMidX) / interEyeDist;
   // Map normalized offset to approximate degrees (-90 to +90)
   return Math.max(-90, Math.min(90, offset * 90));
-}
-
-function estimatePitch(
-  noseTip: { x: number; y: number; z: number },
-  chin: { x: number; y: number; z: number },
-  leftEyeOuter: { x: number; y: number; z: number },
-  rightEyeOuter: { x: number; y: number; z: number },
-): number {
-  const eyeMidY = (leftEyeOuter.y + rightEyeOuter.y) / 2;
-  const faceHeight = Math.abs(chin.y - eyeMidY);
-  if (faceHeight < 0.001) return 0;
-
-  const offset = (noseTip.y - eyeMidY) / faceHeight;
-  return Math.max(-90, Math.min(90, offset * 60));
 }
 
 // ─── Hook ────────────────────────────────────────────────────
@@ -146,7 +133,7 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
   const [error, setError] = useState<string | null>(null);
   const [loadingDetail, setLoadingDetail] = useState('Preparing face detection...');
 
-  const landmarkerRef = useRef<FaceLandmarkerType | null>(null);
+  const detectorRef = useRef<FaceDetectorType | null>(null);
   const samplesRef = useRef<HeadPoseSample[]>([]);
   const baselineYawRef = useRef(0);
   const centerStartRef = useRef(0);
@@ -158,7 +145,7 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
   // Keep phaseRef in sync
   useEffect(() => { phaseRef.current = phase; }, [phase]);
 
-  // ── Initialize FaceLandmarker ──
+  // ── Initialize FaceDetector ──
   useEffect(() => {
     if (!enabled) return;
 
@@ -177,7 +164,7 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
         // Step 1: Dynamic import — code-splits @mediapipe/tasks-vision into a separate chunk
         // so WASM init failures don't crash the entire page
         setLoadingDetail('Loading detection library...');
-        const { FaceLandmarker, FilesetResolver } = await import('@mediapipe/tasks-vision');
+        const { FaceDetector, FilesetResolver } = await import('@mediapipe/tasks-vision');
         if (cancelled) return;
 
         // Step 2: Pre-fetch model as ArrayBuffer — avoids silent fetch failure inside WASM context on mobile
@@ -192,25 +179,23 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
         const vision = await FilesetResolver.forVisionTasks(WASM_CDN_URL);
         if (cancelled) return;
 
-        // Step 4: Create FaceLandmarker with pre-fetched model buffer (not modelAssetPath)
+        // Step 4: Create FaceDetector with pre-fetched 224KB BlazeFace model
         setLoadingDetail('Initializing face detection...');
-        const landmarker = await FaceLandmarker.createFromOptions(vision, {
+        const detector = await FaceDetector.createFromOptions(vision, {
           baseOptions: {
             modelAssetBuffer: new Uint8Array(modelBuffer),
             delegate: 'CPU',
           },
           runningMode: 'VIDEO',
-          numFaces: 1,
-          outputFacialTransformationMatrixes: false,
-          outputFaceBlendshapes: false,
+          minDetectionConfidence: 0.5,
         });
 
         if (cancelled) {
-          landmarker.close();
+          detector.close();
           return;
         }
 
-        landmarkerRef.current = landmarker;
+        detectorRef.current = detector;
         clearTimeout(timeout);
         setPhase('ready');
       } catch (err) {
@@ -241,10 +226,10 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
 
   // ── Main detection loop ──
   useEffect(() => {
-    if (!enabled || !videoElement || !landmarkerRef.current) return;
+    if (!enabled || !videoElement || !detectorRef.current) return;
     if (phase !== 'center_face' && phase !== 'turn' && phase !== 'return_center') return;
 
-    const landmarker = landmarkerRef.current;
+    const detector = detectorRef.current;
     let running = true;
 
     const detect = () => {
@@ -256,36 +241,39 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
       const now = performance.now();
       let results;
       try {
-        results = landmarker.detectForVideo(videoElement, now);
+        results = detector.detectForVideo(videoElement, now);
       } catch {
         animFrameRef.current = requestAnimationFrame(detect);
         return;
       }
 
-      const hasLandmarks = results.faceLandmarks && results.faceLandmarks.length > 0;
-      setFaceDetected(hasLandmarks);
+      const hasDetections = results.detections && results.detections.length > 0
+        && results.detections[0].keypoints && results.detections[0].keypoints.length >= 3;
+      setFaceDetected(!!hasDetections);
 
-      if (!hasLandmarks) {
+      if (!hasDetections) {
         animFrameRef.current = requestAnimationFrame(detect);
         return;
       }
 
-      const landmarks = results.faceLandmarks[0];
-      const noseTip = landmarks[1];
-      const chin = landmarks[152];
-      const leftEyeOuter = landmarks[33];
-      const rightEyeOuter = landmarks[263];
-      const leftMouth = landmarks[61];
-      const rightMouth = landmarks[291];
+      // FaceDetector keypoints: right_eye(0), left_eye(1), nose_tip(2),
+      // mouth_center(3), right_ear_tragion(4), left_ear_tragion(5)
+      const keypoints = results.detections[0].keypoints!;
+      const rightEye = keypoints[0];
+      const leftEye = keypoints[1];
+      const noseTip = keypoints[2];
+      const mouthCenter = keypoints[3] || noseTip;
+      const rightEar = keypoints[4] || rightEye;
+      const leftEar = keypoints[5] || leftEye;
 
-      const yaw = estimateYaw(noseTip, leftEyeOuter, rightEyeOuter);
-      const pitch = estimatePitch(noseTip, chin, leftEyeOuter, rightEyeOuter);
-      const roll = 0; // Simplified — not critical for head-turn detection
+      const yaw = estimateYaw(noseTip, leftEye, rightEye);
+      const pitch = 0; // FaceDetector lacks chin keypoint — not needed for head-turn
+      const roll = 0;
       setCurrentYaw(yaw);
 
-      // Build landmark array (6 landmarks × 3 coords)
-      const landmarkArray = [noseTip, chin, leftEyeOuter, rightEyeOuter, leftMouth, rightMouth]
-        .flatMap(l => [l.x, l.y, l.z]);
+      // Build landmark array (6 keypoints × 3 coords, z=0 for backend compatibility)
+      const landmarkArray = [noseTip, mouthCenter, leftEye, rightEye, leftEar, rightEar]
+        .flatMap(kp => [kp.x, kp.y, 0]);
 
       const currentPhase = phaseRef.current;
 
@@ -437,9 +425,9 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
   useEffect(() => {
     return () => {
       cancelAnimationFrame(animFrameRef.current);
-      if (landmarkerRef.current) {
-        landmarkerRef.current.close();
-        landmarkerRef.current = null;
+      if (detectorRef.current) {
+        detectorRef.current.close();
+        detectorRef.current = null;
       }
     };
   }, []);
