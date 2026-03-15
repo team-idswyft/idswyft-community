@@ -63,6 +63,7 @@ export interface SessionHydration {
   back_extraction?: BackExtractionResult | null;
   cross_validation?: CrossValidationResult | null;
   face_match?: FaceMatchResult | null;
+  liveness?: { passed: boolean; score: number } | null;
   aml_screening?: { risk_level: string; match_found: boolean; match_count: number; lists_checked: string[]; screened_at: string } | null;
   created_at?: string;
   completed_at?: string | null;
@@ -85,6 +86,7 @@ export class VerificationSession {
       back_extraction: hydration?.back_extraction ?? null,
       cross_validation: hydration?.cross_validation ?? null,
       face_match: hydration?.face_match ?? null,
+      liveness: hydration?.liveness ?? null,
       aml_screening: (hydration?.aml_screening as any) ?? null,
       created_at: hydration?.created_at ?? now,
       updated_at: now,
@@ -195,6 +197,10 @@ export class VerificationSession {
       );
     }
     this.state.face_match = faceMatchResult;
+    this.state.liveness = {
+      passed: liveResult.liveness_passed,
+      score: liveResult.liveness_score,
+    };
 
     const gate5 = evaluateGate5(faceMatchResult);
     if (!gate5.passed) {

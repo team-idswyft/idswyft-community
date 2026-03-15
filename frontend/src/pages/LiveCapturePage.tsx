@@ -1,6 +1,8 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config/api';
+import { ActiveLivenessCapture } from '../components/liveness/ActiveLivenessCapture';
+import type { LivenessMetadata } from '../hooks/useActiveLiveness';
 import {
   CameraIcon,
   CheckCircleIcon,
@@ -70,6 +72,7 @@ export const LiveCapturePage: React.FC = () => {
   const [opencvReady, setOpencvReady] = useState(false);
   const [livenessScore, setLivenessScore] = useState(0);
   const [faceStability, setFaceStability] = useState(0);
+  const [useFallbackCapture, setUseFallbackCapture] = useState(false);
   
   // OpenCV refs
   const animationRef = useRef<number | null>(null);
@@ -1019,6 +1022,40 @@ export const LiveCapturePage: React.FC = () => {
     );
   }
 
+  // Handle active liveness completion
+  const handleActiveLivenessComplete = useCallback(async (blob: Blob, metadata: LivenessMetadata) => {
+    if (!sessionData || !apiKey) return;
+    setLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('selfie', blob, 'selfie.jpg');
+      formData.append('liveness_metadata', JSON.stringify(metadata));
+
+      const response = await fetch(`${API_BASE_URL}/api/v2/verify/${sessionData.verification_id}/live-capture`, {
+        method: 'POST',
+        headers: { 'X-API-Key': apiKey },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Live capture failed');
+      }
+
+      const result: CaptureResult = await response.json();
+      setCaptureResult(result);
+      setChallengeState('completed');
+      cleanup();
+      if (result.verification_id && result.status === 'processing') {
+        pollVerificationStatus(result.verification_id);
+      }
+    } catch (err: any) {
+      setError(err.message || 'Liveness verification failed');
+    } finally {
+      setLoading(false);
+    }
+  }, [sessionData, apiKey]); // eslint-disable-line react-hooks/exhaustive-deps
+
   // Main camera interface
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
@@ -1029,7 +1066,20 @@ export const LiveCapturePage: React.FC = () => {
           <p className="text-base sm:text-xl text-gray-600 px-4 sm:px-0">Complete your verification with live face capture</p>
         </div>
 
-        <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+        {/* Active Liveness — primary path */}
+        {!useFallbackCapture && !captureResult && (
+          <div className="mb-6">
+            <ActiveLivenessCapture
+              onComplete={handleActiveLivenessComplete}
+              onCancel={() => navigate('/verify')}
+              onFallback={() => setUseFallbackCapture(true)}
+              theme="light"
+            />
+          </div>
+        )}
+
+        {/* Fallback: legacy OpenCV camera interface */}
+        {useFallbackCapture && <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
           {/* Canvas for camera - always present but conditionally visible */}
           {cameraState === 'ready' && (
             <div className="relative bg-black">
@@ -1238,7 +1288,7 @@ export const LiveCapturePage: React.FC = () => {
               </div>
             </div>
           )}
-        </div>
+        </div>}
 
         {/* Instructions */}
         <div className="mt-4 sm:mt-8 bg-blue-50 rounded-xl p-4 sm:p-6">

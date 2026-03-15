@@ -84,10 +84,11 @@ class VerificationAPI {
     session: VerificationSession,
     verificationId: string,
     file: File,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    livenessMetadata?: unknown,
   ): Promise<void> {
     const imageData = await this.fileToDataUrl(file);
-    await newVerificationApi.captureLiveSelfie(session, verificationId, imageData);
+    await newVerificationApi.captureLiveSelfie(session, verificationId, imageData, livenessMetadata);
     const results = await this.getResults(session, verificationId);
     if (results.status === 'failed' || results.status === 'manual_review') {
       throw new Error(results.failure_reason || results.manual_review_reason || results.rejection_detail || 'Live capture verification failed');
@@ -99,9 +100,10 @@ class VerificationAPI {
     session: VerificationSession,
     verificationId: string,
     imageData: string,
-    onProgress?: (progress: number) => void
+    onProgress?: (progress: number) => void,
+    livenessMetadata?: unknown,
   ): Promise<void> {
-    await newVerificationApi.captureLiveSelfie(session, verificationId, imageData);
+    await newVerificationApi.captureLiveSelfie(session, verificationId, imageData, livenessMetadata);
     const results = await this.getResults(session, verificationId);
     if (results.status === 'failed' || results.status === 'manual_review') {
       throw new Error(results.failure_reason || results.manual_review_reason || results.rejection_detail || 'Live capture verification failed');

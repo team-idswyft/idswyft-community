@@ -10,6 +10,8 @@ import {
   EyeIcon,
 } from '@heroicons/react/24/outline';
 import { ContinueOnPhone } from '../components/ContinueOnPhone';
+import { ActiveLivenessCapture } from '../components/liveness/ActiveLivenessCapture';
+import type { LivenessMetadata } from '../hooks/useActiveLiveness';
 import { C, injectFonts } from '../theme';
 
 // OpenCV types
@@ -38,6 +40,8 @@ interface VerificationRequest {
   id: string;
   verification_id?: string;
   status: string;
+  current_step?: string;
+  total_steps?: number;
   final_result?: 'verified' | 'failed' | 'manual_review' | null;
   documents: Document[];
   selfie_id?: string;
@@ -50,10 +54,49 @@ interface VerificationRequest {
     expiry_date?: string;
     nationality?: string;
     place_of_birth?: string;
+    id_number?: string;
+    [key: string]: any;
   };
-  cross_validation_results?: { weighted_score?: number; [key: string]: any } | null;
-  face_match_results?: { score?: number; [key: string]: any } | null;
-  liveness_results?: { liveness_score?: number; [key: string]: any } | null;
+  cross_validation_results?: {
+    overall_score?: number;
+    field_scores?: Record<string, { score: number; passed: boolean; weight: number }>;
+    has_critical_failure?: boolean;
+    document_expired?: boolean;
+    verdict?: 'PASS' | 'REVIEW' | 'REJECT';
+  } | null;
+  face_match_results?: {
+    similarity_score?: number;
+    passed?: boolean;
+    threshold_used?: number;
+  } | null;
+  liveness_results?: {
+    passed?: boolean;
+    score?: number;
+  } | null;
+  aml_screening?: {
+    risk_level?: string;
+    match_found?: boolean;
+    match_count?: number;
+    lists_checked?: string[];
+    screened_at?: string;
+  } | null;
+  risk_score?: {
+    overall_score?: number;
+    risk_level?: string;
+    risk_factors?: Array<{ factor: string; score: number; weight: number }>;
+  } | null;
+  rejection_reason?: string | null;
+  rejection_detail?: string | null;
+  failure_reason?: string | null;
+  front_document_uploaded?: boolean;
+  back_document_uploaded?: boolean;
+  live_capture_uploaded?: boolean;
+  barcode_data?: any;
+  barcode_extraction_failed?: boolean | null;
+  documents_match?: boolean | null;
+  face_match_passed?: boolean | null;
+  liveness_passed?: boolean | null;
+  manual_review_reason?: string | null;
 }
 
 interface LiveCaptureSession {
@@ -113,8 +156,9 @@ const DemoPage: React.FC = () => {
 
   // Live capture state
   const [showLiveCapture, setShowLiveCapture] = useState(false);
+  const [useFallbackCapture, setUseFallbackCapture] = useState(false);
   const [_sessionData, _setSessionData] = useState<LiveCaptureSession | null>(null);
-  const [captureResult, setCaptureResult] = useState<CaptureResult | null>(null);
+  const [_captureResult, setCaptureResult] = useState<CaptureResult | null>(null);
   const [cameraState, setCameraState] = useState<'prompt' | 'initializing' | 'ready' | 'error'>('prompt');
   const [_challengeState, setChallengeState] = useState<'waiting' | 'active' | 'completed'>('waiting');
   const [_countdown, _setCountdown] = useState<number | null>(null);
@@ -1143,106 +1187,156 @@ const DemoPage: React.FC = () => {
     );
   };
 
+  // Handle active liveness completion — submit blob + metadata to API
+  const handleActiveLivenessComplete = async (blob: Blob, metadata: LivenessMetadata) => {
+    if (!apiKey || !verificationId) return;
+    setIsLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('selfie', blob, 'selfie.jpg');
+      formData.append('liveness_metadata', JSON.stringify(metadata));
+
+      const response = await fetch(`${API_BASE_URL}/api/v2/verify/${verificationId}/live-capture`, {
+        method: 'POST',
+        headers: { 'X-API-Key': apiKey },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || errorData.error || 'Live capture failed');
+      }
+
+      const result = await response.json();
+      setCaptureResult(result);
+      setChallengeState('completed');
+      toast.success('Liveness verified!');
+      setShowLiveCapture(false);
+      setTimeout(() => {
+        loadVerificationResults(verificationId);
+        setCurrentStep(5);
+      }, 1000);
+    } catch (error) {
+      console.error('Active liveness submission failed:', error);
+      toast.error(error instanceof Error ? error.message : 'Failed to verify liveness');
+      setShowLiveCapture(false);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   // Render embedded live capture
   const renderLiveCapture = () => (
     <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 24, marginBottom: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
-        <h3 style={{ fontFamily: C.mono, fontSize: 14, fontWeight: 600, color: C.text, margin: 0 }}>Live Selfie Capture</h3>
+        <h3 style={{ fontFamily: C.mono, fontSize: 14, fontWeight: 600, color: C.text, margin: 0 }}>Live Capture</h3>
         <button
-          onClick={() => { cleanup(); setShowLiveCapture(false); }}
+          onClick={() => { cleanup(); setShowLiveCapture(false); setUseFallbackCapture(false); }}
           style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, padding: 4, display: 'flex' }}
         >
           <XMarkIcon style={{ width: 18, height: 18 }} />
         </button>
       </div>
 
-      {cameraState === 'prompt' && (
-        <div style={{ textAlign: 'center', padding: '32px 0' }}>
-          <CameraIcon style={{ width: 40, height: 40, margin: '0 auto 12px', color: C.cyan }} />
-          <h4 style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 8 }}>Ready for Live Capture</h4>
-          <p style={{ color: C.muted, fontSize: 13, marginBottom: 20 }}>We'll use your camera to take a selfie for identity verification.</p>
-          <button
-            onClick={initializeCamera}
-            style={{ background: C.cyan, color: C.bg, border: 'none', borderRadius: 8, padding: '10px 24px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
-          >
-            Start Camera
-          </button>
-        </div>
+      {/* Primary: Active liveness with MediaPipe */}
+      {!useFallbackCapture && (
+        <ActiveLivenessCapture
+          onComplete={handleActiveLivenessComplete}
+          onCancel={() => { cleanup(); setShowLiveCapture(false); setUseFallbackCapture(false); }}
+          onFallback={() => setUseFallbackCapture(true)}
+          theme="dark"
+        />
       )}
 
-      {cameraState === 'initializing' && (
-        <div style={{ textAlign: 'center', padding: '32px 0' }}>
-          <div className="animate-spin" style={{ width: 40, height: 40, borderRadius: '50%', border: `3px solid ${C.border}`, borderTopColor: C.cyan, margin: '0 auto 12px' }} />
-          <p style={{ color: C.muted, fontSize: 13 }}>Initializing camera...</p>
-        </div>
-      )}
+      {/* Fallback: legacy OpenCV-based camera capture */}
+      {useFallbackCapture && (
+        <>
+          {cameraState === 'prompt' && (
+            <div style={{ textAlign: 'center', padding: '32px 0' }}>
+              <CameraIcon style={{ width: 40, height: 40, margin: '0 auto 12px', color: C.cyan }} />
+              <h4 style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 8 }}>Ready for Live Capture</h4>
+              <p style={{ color: C.muted, fontSize: 13, marginBottom: 20 }}>We'll use your camera to take a selfie for identity verification.</p>
+              <button
+                onClick={initializeCamera}
+                style={{ background: C.cyan, color: C.bg, border: 'none', borderRadius: 8, padding: '10px 24px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
+              >
+                Start Camera
+              </button>
+            </div>
+          )}
 
-      {cameraState === 'ready' && (
-        <div>
-          <div style={{ position: 'relative', background: '#000', borderRadius: 8, overflow: 'hidden', minHeight: 240, height: 320, marginBottom: 16 }}>
-            <video
-              ref={videoElementRef}
-              autoPlay
-              playsInline
-              muted
-              controls={false}
-              style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover', backgroundColor: '#000', borderRadius: 8 }}
-              onLoadedMetadata={() => {
-                console.log('🎥 Video metadata loaded in UI');
-                if (videoElementRef.current) {
-                  videoElementRef.current.play().then(() => {
-                    console.log('🎥 Video playing in UI');
-                  }).catch(err => { console.error('🎥 Video play error:', err); });
-                }
-              }}
-              onError={(e) => { console.error('🎥 Video element error:', e); }}
-            />
-            <canvas
-              ref={canvasRef}
-              style={{ display: 'block', position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', backgroundColor: 'transparent', zIndex: 20 }}
-            />
-            <div style={{ position: 'absolute', top: 12, right: 12 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: faceDetected ? 'rgba(52,211,153,0.85)' : 'rgba(248,113,113,0.85)', borderRadius: 20, padding: '4px 10px', fontSize: 12, color: '#fff', fontWeight: 500 }}>
-                <EyeIcon style={{ width: 14, height: 14 }} />
-                <span>{faceDetected ? 'Face Detected' : 'No Face'}</span>
+          {cameraState === 'initializing' && (
+            <div style={{ textAlign: 'center', padding: '32px 0' }}>
+              <div className="animate-spin" style={{ width: 40, height: 40, borderRadius: '50%', border: `3px solid ${C.border}`, borderTopColor: C.cyan, margin: '0 auto 12px' }} />
+              <p style={{ color: C.muted, fontSize: 13 }}>Initializing camera...</p>
+            </div>
+          )}
+
+          {cameraState === 'ready' && (
+            <div>
+              <div style={{ position: 'relative', background: '#000', borderRadius: 8, overflow: 'hidden', minHeight: 240, height: 320, marginBottom: 16 }}>
+                <video
+                  ref={videoElementRef}
+                  autoPlay
+                  playsInline
+                  muted
+                  controls={false}
+                  style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover', backgroundColor: '#000', borderRadius: 8 }}
+                  onLoadedMetadata={() => {
+                    if (videoElementRef.current) {
+                      videoElementRef.current.play().catch(err => { console.error('Video play error:', err); });
+                    }
+                  }}
+                  onError={(e) => { console.error('Video element error:', e); }}
+                />
+                <canvas
+                  ref={canvasRef}
+                  style={{ display: 'block', position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', backgroundColor: 'transparent', zIndex: 20 }}
+                />
+                <div style={{ position: 'absolute', top: 12, right: 12 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: faceDetected ? 'rgba(52,211,153,0.85)' : 'rgba(248,113,113,0.85)', borderRadius: 20, padding: '4px 10px', fontSize: 12, color: '#fff', fontWeight: 500 }}>
+                    <EyeIcon style={{ width: 14, height: 14 }} />
+                    <span>{faceDetected ? 'Face Detected' : 'No Face'}</span>
+                  </div>
+                </div>
+                <div style={{ position: 'absolute', bottom: 12, left: 12, right: 12 }}>
+                  <div style={{ background: 'rgba(0,0,0,0.7)', color: '#fff', padding: '8px 12px', borderRadius: 6, textAlign: 'center', fontSize: 12 }}>
+                    {!faceDetected ? 'Position your face within the circle' : 'Great! Click capture when ready'}
+                  </div>
+                </div>
+              </div>
+              <div style={{ display: 'flex', gap: 12 }}>
+                <button
+                  onClick={captureSelfie}
+                  disabled={!faceDetected || isLoading}
+                  style={{ flex: 1, padding: '10px 0', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: !faceDetected || isLoading ? 'not-allowed' : 'pointer', border: 'none', background: !faceDetected || isLoading ? C.surface : C.green, color: !faceDetected || isLoading ? C.dim : C.bg, transition: 'all 0.2s' }}
+                >
+                  {isLoading ? 'Capturing...' : 'Capture Selfie'}
+                </button>
+                <button
+                  onClick={() => { cleanup(); setShowLiveCapture(false); setUseFallbackCapture(false); }}
+                  style={{ padding: '10px 20px', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: 'pointer', border: `1px solid ${C.border}`, background: 'transparent', color: C.muted }}
+                >
+                  Cancel
+                </button>
               </div>
             </div>
-            <div style={{ position: 'absolute', bottom: 12, left: 12, right: 12 }}>
-              <div style={{ background: 'rgba(0,0,0,0.7)', color: '#fff', padding: '8px 12px', borderRadius: 6, textAlign: 'center', fontSize: 12 }}>
-                {!faceDetected ? 'Position your face within the circle' : 'Great! Click capture when ready'}
-              </div>
-            </div>
-          </div>
-          <div style={{ display: 'flex', gap: 12 }}>
-            <button
-              onClick={captureSelfie}
-              disabled={!faceDetected || isLoading}
-              style={{ flex: 1, padding: '10px 0', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: !faceDetected || isLoading ? 'not-allowed' : 'pointer', border: 'none', background: !faceDetected || isLoading ? C.surface : C.green, color: !faceDetected || isLoading ? C.dim : C.bg, transition: 'all 0.2s' }}
-            >
-              {isLoading ? 'Capturing...' : 'Capture Selfie'}
-            </button>
-            <button
-              onClick={() => { cleanup(); setShowLiveCapture(false); }}
-              style={{ padding: '10px 20px', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: 'pointer', border: `1px solid ${C.border}`, background: 'transparent', color: C.muted }}
-            >
-              Cancel
-            </button>
-          </div>
-        </div>
-      )}
+          )}
 
-      {cameraState === 'error' && (
-        <div style={{ textAlign: 'center', padding: '32px 0' }}>
-          <ExclamationTriangleIcon style={{ width: 40, height: 40, margin: '0 auto 12px', color: C.red }} />
-          <h4 style={{ fontSize: 15, fontWeight: 600, color: C.red, marginBottom: 8 }}>Camera Error</h4>
-          <p style={{ color: C.muted, fontSize: 13, marginBottom: 20 }}>Unable to access your camera. Please check permissions and try again.</p>
-          <button
-            onClick={initializeCamera}
-            style={{ background: C.cyan, color: C.bg, border: 'none', borderRadius: 8, padding: '10px 24px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
-          >
-            Try Again
-          </button>
-        </div>
+          {cameraState === 'error' && (
+            <div style={{ textAlign: 'center', padding: '32px 0' }}>
+              <ExclamationTriangleIcon style={{ width: 40, height: 40, margin: '0 auto 12px', color: C.red }} />
+              <h4 style={{ fontSize: 15, fontWeight: 600, color: C.red, marginBottom: 8 }}>Camera Error</h4>
+              <p style={{ color: C.muted, fontSize: 13, marginBottom: 20 }}>Unable to access your camera. Please check permissions and try again.</p>
+              <button
+                onClick={initializeCamera}
+                style={{ background: C.cyan, color: C.bg, border: 'none', borderRadius: 8, padding: '10px 24px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
+              >
+                Try Again
+              </button>
+            </div>
+          )}
+        </>
       )}
     </div>
   );
@@ -1529,7 +1623,7 @@ const DemoPage: React.FC = () => {
           </div>
         );
 
-      case 5:
+      case 5: {
         // v2: final_result has user-facing status, status has internal machine state
         const status = verificationRequest?.final_result ?? verificationRequest?.status;
         const isVerified = status === 'verified';
@@ -1538,54 +1632,245 @@ const DemoPage: React.FC = () => {
         const statusBg = isVerified ? C.greenDim : isFailed ? C.redDim : C.amberDim;
         const statusIcon = isVerified ? '✓' : isFailed ? '✗' : '⚠';
         const statusLabel = isVerified ? 'Verification Complete' : isFailed ? 'Verification Failed' : 'Under Review';
-        return (
-          <div style={{ padding: '8px 0', textAlign: 'center' }}>
-            <div style={{ width: 60, height: 60, borderRadius: '50%', background: statusBg, border: `1px solid ${statusTone}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 16px', fontSize: 24, color: statusTone }}>
-              {statusIcon}
+
+        // Helper: score bar for 0-1 or 0-100 values
+        const ScoreBar = ({ value, max = 1, color, label, detail }: { value: number | null | undefined; max?: number; color: string; label: string; detail?: string }) => {
+          if (value == null) return null;
+          const pct = max === 1 ? Math.round(value * 100) : Math.round(value);
+          return (
+            <div style={{ marginBottom: 10 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                <span style={{ color: C.muted }}>{label}</span>
+                <span style={{ color, fontWeight: 600, fontFamily: C.mono }}>{pct}%</span>
+              </div>
+              <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${pct}%`, borderRadius: 3, background: color, transition: 'width 0.6s ease' }} />
+              </div>
+              {detail && <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>{detail}</div>}
             </div>
-            <h2 style={{ fontSize: 20, fontWeight: 600, color: C.text, marginBottom: 8 }}>{statusLabel}</h2>
-            <p style={{ color: C.muted, fontSize: 13, marginBottom: 24 }}>
-              {isVerified && 'Successfully verified with live capture and PDF417 validation.'}
-              {isFailed && 'Verification failed. Please try again with clearer documents.'}
-              {!isVerified && !isFailed && 'Your verification is under manual review.'}
-            </p>
-            {verificationRequest?.verification_id && (
-              <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 20, textAlign: 'left', maxWidth: 400, margin: '0 auto 20px' }}>
-                <h3 style={{ fontFamily: C.mono, fontSize: 12, color: C.muted, marginBottom: 12, fontWeight: 600 }}>Verification Details</h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 8, fontSize: 13 }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: C.muted }}>ID</span>
-                    <span style={{ color: C.text, fontFamily: C.mono, fontSize: 11 }}>{verificationRequest.verification_id?.slice(0, 8)}…</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: C.muted }}>Status</span>
-                    <span style={{ color: statusTone, fontWeight: 600, textTransform: 'capitalize' }}>{verificationRequest.final_result ?? verificationRequest.status}</span>
-                  </div>
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: C.muted }}>Created</span>
-                    <span style={{ color: C.text }}>{verificationRequest.created_at ? new Date(verificationRequest.created_at).toLocaleDateString() : 'N/A'}</span>
-                  </div>
-                  {captureResult && (
-                    <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                      <span style={{ color: C.muted }}>Live Capture</span>
-                      <span style={{ color: C.green }}>✓ Complete</span>
-                    </div>
-                  )}
+          );
+        };
+
+        // Helper: pass/fail badge
+        const Badge = ({ passed, label }: { passed: boolean | null | undefined; label?: string }) => {
+          if (passed == null) return <span style={{ color: C.dim, fontSize: 11 }}>N/A</span>;
+          return (
+            <span style={{
+              display: 'inline-flex', alignItems: 'center', gap: 4,
+              fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
+              background: passed ? C.greenDim : C.redDim,
+              color: passed ? C.green : C.red,
+              border: `1px solid ${passed ? 'rgba(52,211,153,0.25)' : 'rgba(248,113,113,0.25)'}`,
+            }}>
+              {passed ? '✓' : '✗'} {label ?? (passed ? 'Passed' : 'Failed')}
+            </span>
+          );
+        };
+
+        const cv = verificationRequest?.cross_validation_results;
+        const fm = verificationRequest?.face_match_results;
+        const lv = verificationRequest?.liveness_results;
+        const aml = verificationRequest?.aml_screening;
+        const risk = verificationRequest?.risk_score;
+
+        // Card style
+        const cardStyle: React.CSSProperties = {
+          background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 16, marginBottom: 12, textAlign: 'left',
+        };
+        const cardTitle: React.CSSProperties = {
+          fontFamily: C.mono, fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 10, letterSpacing: '0.04em', textTransform: 'uppercase' as const,
+        };
+
+        return (
+          <div style={{ padding: '8px 0' }}>
+            {/* Status Header */}
+            <div style={{ textAlign: 'center', marginBottom: 24 }}>
+              <div style={{ width: 56, height: 56, borderRadius: '50%', background: statusBg, border: `1px solid ${statusTone}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 22, color: statusTone }}>
+                {statusIcon}
+              </div>
+              <h2 style={{ fontSize: 20, fontWeight: 600, color: C.text, marginBottom: 4 }}>{statusLabel}</h2>
+              <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>
+                {isVerified && 'All gates passed. Identity verified successfully.'}
+                {isFailed && (verificationRequest?.rejection_detail || 'Verification failed. Please try again with clearer documents.')}
+                {!isVerified && !isFailed && 'Your verification is under manual review.'}
+              </p>
+              {verificationRequest?.rejection_reason && (
+                <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8, padding: '4px 12px', borderRadius: 6, background: C.redDim, border: `1px solid rgba(248,113,113,0.2)` }}>
+                  <span style={{ color: C.red, fontSize: 11, fontFamily: C.mono, fontWeight: 600 }}>{verificationRequest.rejection_reason}</span>
                 </div>
-                <div style={{ marginTop: 16 }}>
-                  <div style={{ fontSize: 11, color: C.muted, marginBottom: 6, fontWeight: 600, fontFamily: C.mono }}>Raw API Response</div>
-                  <pre style={{ background: C.codeBg, color: C.code, padding: 12, borderRadius: 6, fontSize: 10, fontFamily: C.mono, overflowX: 'auto', maxHeight: 200, overflowY: 'auto', lineHeight: 1.5, margin: 0 }}>
-                    {JSON.stringify(verificationRequest, null, 2)}
-                  </pre>
+              )}
+            </div>
+
+            {/* Verification Overview Card */}
+            <div style={cardStyle}>
+              <div style={cardTitle}>Overview</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: C.muted }}>Verification ID</span>
+                  <span style={{ color: C.text, fontFamily: C.mono, fontSize: 11 }}>{verificationRequest?.verification_id?.slice(0, 12)}…</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: C.muted }}>Status</span>
+                  <span style={{ color: statusTone, fontWeight: 600, textTransform: 'capitalize' }}>{status}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: C.muted }}>Pipeline Step</span>
+                  <span style={{ color: C.text, fontFamily: C.mono, fontSize: 11 }}>{verificationRequest?.current_step ?? 'N/A'}</span>
+                </div>
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: C.muted }}>Created</span>
+                  <span style={{ color: C.text }}>{verificationRequest?.created_at ? new Date(verificationRequest.created_at).toLocaleString() : 'N/A'}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Result Cards Grid */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+              {/* Cross-Validation */}
+              <div style={cardStyle}>
+                <div style={cardTitle}>Cross-Validation</div>
+                {cv ? (
+                  <>
+                    <ScoreBar value={cv.overall_score} color={cv.verdict === 'PASS' ? C.green : cv.verdict === 'REJECT' ? C.red : C.amber} label="Overall Score" />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, marginBottom: 6 }}>
+                      <span style={{ color: C.muted }}>Verdict</span>
+                      <Badge passed={cv.verdict === 'PASS'} label={cv.verdict} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                      <span style={{ color: C.muted }}>Doc Expired</span>
+                      <span style={{ color: cv.document_expired ? C.red : C.green, fontSize: 11, fontWeight: 600 }}>{cv.document_expired ? 'Yes' : 'No'}</span>
+                    </div>
+                    {cv.field_scores && Object.keys(cv.field_scores).length > 0 && (
+                      <div style={{ marginTop: 8, borderTop: `1px solid ${C.border}`, paddingTop: 8 }}>
+                        <div style={{ fontSize: 10, color: C.dim, marginBottom: 4, fontFamily: C.mono }}>Field Scores</div>
+                        {Object.entries(cv.field_scores).map(([field, data]) => (
+                          <div key={field} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, marginBottom: 2 }}>
+                            <span style={{ color: C.dim }}>{field}</span>
+                            <span style={{ color: data.passed ? C.green : C.red, fontFamily: C.mono }}>{Math.round(data.score * 100)}%</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <span style={{ color: C.dim, fontSize: 12 }}>Not completed</span>
+                )}
+              </div>
+
+              {/* Face Match */}
+              <div style={cardStyle}>
+                <div style={cardTitle}>Face Match</div>
+                {fm ? (
+                  <>
+                    <ScoreBar value={fm.similarity_score} color={fm.passed ? C.green : C.red} label="Similarity" />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, marginBottom: 6 }}>
+                      <span style={{ color: C.muted }}>Result</span>
+                      <Badge passed={fm.passed} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12 }}>
+                      <span style={{ color: C.muted }}>Threshold</span>
+                      <span style={{ color: C.text, fontFamily: C.mono, fontSize: 11 }}>{fm.threshold_used != null ? `${Math.round(fm.threshold_used * 100)}%` : 'N/A'}</span>
+                    </div>
+                  </>
+                ) : (
+                  <span style={{ color: C.dim, fontSize: 12 }}>Not completed</span>
+                )}
+              </div>
+
+              {/* Liveness */}
+              <div style={cardStyle}>
+                <div style={cardTitle}>Liveness Detection</div>
+                {lv ? (
+                  <>
+                    <ScoreBar value={lv.score} color={lv.passed ? C.green : C.red} label="Liveness Score" />
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12 }}>
+                      <span style={{ color: C.muted }}>Result</span>
+                      <Badge passed={lv.passed} />
+                    </div>
+                  </>
+                ) : (
+                  <span style={{ color: C.dim, fontSize: 12 }}>Not completed</span>
+                )}
+              </div>
+
+              {/* AML Screening */}
+              <div style={cardStyle}>
+                <div style={cardTitle}>AML / Sanctions</div>
+                {aml ? (
+                  <>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 12, marginBottom: 6 }}>
+                      <span style={{ color: C.muted }}>Risk Level</span>
+                      <Badge passed={aml.risk_level === 'clear'} label={aml.risk_level?.replace('_', ' ')} />
+                    </div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 12, marginBottom: 4 }}>
+                      <span style={{ color: C.muted }}>Matches</span>
+                      <span style={{ color: aml.match_found ? C.red : C.green, fontWeight: 600, fontSize: 11 }}>{aml.match_count ?? 0} found</span>
+                    </div>
+                    {aml.lists_checked && aml.lists_checked.length > 0 && (
+                      <div style={{ fontSize: 10, color: C.dim, marginTop: 4 }}>
+                        Lists: {aml.lists_checked.join(', ')}
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <span style={{ color: C.dim, fontSize: 12 }}>Not available</span>
+                )}
+              </div>
+            </div>
+
+            {/* Risk Score — full width */}
+            {risk && (
+              <div style={cardStyle}>
+                <div style={cardTitle}>Risk Score</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                  <div style={{
+                    width: 52, height: 52, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+                    fontSize: 18, fontWeight: 700, fontFamily: C.mono,
+                    background: risk.risk_level === 'low' ? C.greenDim : risk.risk_level === 'medium' ? C.amberDim : C.redDim,
+                    border: `2px solid ${risk.risk_level === 'low' ? C.green : risk.risk_level === 'medium' ? C.amber : C.red}`,
+                    color: risk.risk_level === 'low' ? C.green : risk.risk_level === 'medium' ? C.amber : C.red,
+                  }}>
+                    {risk.overall_score}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 4 }}>
+                      <span style={{ color: C.text, fontSize: 13, fontWeight: 600, textTransform: 'capitalize' }}>{risk.risk_level} Risk</span>
+                      <span style={{ color: C.dim, fontSize: 11, fontFamily: C.mono }}>0–100 scale</span>
+                    </div>
+                    <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
+                      <div style={{ height: '100%', width: `${risk.overall_score}%`, borderRadius: 3, background: risk.risk_level === 'low' ? C.green : risk.risk_level === 'medium' ? C.amber : C.red, transition: 'width 0.6s ease' }} />
+                    </div>
+                    {risk.risk_factors && risk.risk_factors.length > 0 && (
+                      <div style={{ marginTop: 6, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
+                        {risk.risk_factors.map((f, i) => (
+                          <span key={i} style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.05)', color: C.dim, fontFamily: C.mono }}>
+                            {f.factor}
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
+
+            {/* Raw API Response — always shown */}
+            <div style={{ ...cardStyle, marginBottom: 20 }}>
+              <div style={cardTitle}>Raw API Response</div>
+              <p style={{ color: C.dim, fontSize: 11, margin: '0 0 8px' }}>
+                This is the exact JSON your server receives from <code style={{ color: C.cyan, background: C.codeBg, padding: '1px 4px', borderRadius: 3, fontSize: 10 }}>GET /api/v2/verify/:id/status</code>
+              </p>
+              <pre style={{ background: C.codeBg, color: C.code, padding: 12, borderRadius: 6, fontSize: 10, fontFamily: C.mono, overflowX: 'auto', maxHeight: 300, overflowY: 'auto', lineHeight: 1.5, margin: 0 }}>
+                {JSON.stringify(verificationRequest, null, 2)}
+              </pre>
+            </div>
+
+            {/* Action Buttons */}
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
               <button
                 onClick={() => setCurrentStep(6)}
                 style={{ background: C.purple, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 24px', fontWeight: 600, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
               >
-                <span style={{ fontSize: 16 }}>📄</span>
                 Try Address Verification
               </button>
               <button
@@ -1601,11 +1886,12 @@ const DemoPage: React.FC = () => {
                 Start New Demo
               </button>
             </div>
-            <p style={{ color: C.dim, fontSize: 11, marginTop: 12 }}>
-              Address verification is optional — it verifies proof-of-address documents (utility bills, bank statements) separately from identity.
+            <p style={{ color: C.dim, fontSize: 11, marginTop: 12, textAlign: 'center' }}>
+              Address verification is optional — it verifies proof-of-address documents separately from identity.
             </p>
           </div>
         );
+      }
 
       case 6:
         return (

@@ -200,21 +200,54 @@ export const ContinueOnPhone: React.FC<ContinueOnPhoneProps> = ({
       <div className={`text-5xl font-bold ${cfg.color}`}>{cfg.icon}</div>
       <h3 className={`font-semibold text-lg ${cfg.color}`}>{cfg.label}</h3>
       <p className="text-sm text-gray-500">Completed on mobile device</p>
-      {result?.confidence_score != null && (
-        <p className="text-sm text-gray-600 mt-1">
-          Confidence: {Math.round(result.confidence_score * 100)}%
-        </p>
-      )}
-      {result?.face_match_score != null && (
-        <p className="text-sm text-gray-600">
-          Face match: {Math.round(result.face_match_score * 100)}%
-        </p>
-      )}
-      {result?.liveness_score != null && (
-        <p className="text-sm text-gray-600">
-          Liveness: {Math.round(result.liveness_score * 100)}%
-        </p>
-      )}
+      <div className="w-full mt-2 text-left text-sm space-y-1.5">
+        {result?.confidence_score != null && (
+          <div className="flex justify-between">
+            <span className="text-gray-500">Confidence</span>
+            <span className="font-medium text-gray-700">{Math.round(result.confidence_score * 100)}%</span>
+          </div>
+        )}
+        {(result?.face_match_results?.similarity_score ?? result?.face_match_score) != null && (
+          <div className="flex justify-between">
+            <span className="text-gray-500">Face Match</span>
+            <span className="font-medium text-gray-700">{Math.round((result?.face_match_results?.similarity_score ?? result?.face_match_score ?? 0) * 100)}%</span>
+          </div>
+        )}
+        {(result?.liveness_results?.score ?? result?.liveness_score) != null && (
+          <div className="flex justify-between">
+            <span className="text-gray-500">Liveness</span>
+            <span className="font-medium text-gray-700">{Math.round((result?.liveness_results?.score ?? result?.liveness_score ?? 0) * 100)}%</span>
+          </div>
+        )}
+        {(result?.cross_validation_results?.overall_score) != null && (
+          <div className="flex justify-between">
+            <span className="text-gray-500">Cross-Validation</span>
+            <span className="font-medium text-gray-700">{Math.round(result.cross_validation_results.overall_score * 100)}%</span>
+          </div>
+        )}
+        {result?.aml_screening && (
+          <div className="flex justify-between">
+            <span className="text-gray-500">AML Screening</span>
+            <span className={`font-semibold ${result.aml_screening.risk_level === 'clear' ? 'text-green-600' : 'text-red-500'}`}>
+              {result.aml_screening.risk_level === 'clear' ? 'Clear' : result.aml_screening.risk_level?.replace('_', ' ')}
+            </span>
+          </div>
+        )}
+        {result?.risk_score && (
+          <div className="flex justify-between">
+            <span className="text-gray-500">Risk Score</span>
+            <span className={`font-semibold ${result.risk_score.risk_level === 'low' ? 'text-green-600' : result.risk_score.risk_level === 'medium' ? 'text-yellow-600' : 'text-red-500'}`}>
+              {result.risk_score.overall_score}/100
+            </span>
+          </div>
+        )}
+        {result?.rejection_reason && (
+          <div className="flex justify-between pt-1.5 border-t border-gray-200">
+            <span className="text-gray-500">Rejection</span>
+            <span className="font-mono text-xs text-red-500">{result.rejection_reason}</span>
+          </div>
+        )}
+      </div>
     </div>
   );
 };

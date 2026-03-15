@@ -313,8 +313,8 @@ const EndUserVerification: React.FC<VerificationProps> = ({
         status: data.final_result ?? data.status,
         user_id: data.user_id,
         confidence_score: data.confidence_score,
-        face_match_score: data.face_match_results?.score ?? data.face_match_score,
-        liveness_score: data.liveness_results?.liveness_score ?? data.liveness_score,
+        face_match_score: data.face_match_results?.similarity_score ?? data.face_match_results?.score ?? data.face_match_score,
+        liveness_score: data.liveness_results?.score ?? data.liveness_results?.liveness_score ?? data.liveness_score,
         isAuthentic: data.isAuthentic,
         authenticityScore: data.authenticityScore,
         tamperFlags: data.tamperFlags,
@@ -605,29 +605,74 @@ const EndUserVerification: React.FC<VerificationProps> = ({
                 <span className={styles.textSec}>Status</span>
                 <span className={`font-semibold capitalize ${isVerified ? 'text-green-600' : isFailed ? 'text-red-600' : 'text-yellow-600'}`}>{status}</span>
               </div>
-              {/* v2: scores are in nested objects; fall back to v1 flat fields */}
-              {(finalResult.cross_validation_results?.weighted_score ?? finalResult.cross_validation_score) != null && (
+              {/* Cross-validation: v2 uses overall_score, fall back to weighted_score / v1 flat field */}
+              {(finalResult.cross_validation_results?.overall_score ?? finalResult.cross_validation_results?.weighted_score ?? finalResult.cross_validation_score) != null && (
                 <div className="flex justify-between">
                   <span className={styles.textSec}>Doc Cross-Check</span>
-                  <span className={`font-medium ${styles.text}`}>{Math.round((finalResult.cross_validation_results?.weighted_score ?? finalResult.cross_validation_score) * 100)}%</span>
+                  <span className={`font-medium ${styles.text}`}>{Math.round((finalResult.cross_validation_results?.overall_score ?? finalResult.cross_validation_results?.weighted_score ?? finalResult.cross_validation_score) * 100)}%</span>
                 </div>
               )}
-              {(finalResult.face_match_results?.score ?? finalResult.face_match_score) != null && (
+              {finalResult.cross_validation_results?.verdict && (
+                <div className="flex justify-between">
+                  <span className={styles.textSec}>Verdict</span>
+                  <span className={`font-semibold ${finalResult.cross_validation_results.verdict === 'PASS' ? 'text-green-600' : finalResult.cross_validation_results.verdict === 'REJECT' ? 'text-red-500' : 'text-yellow-600'}`}>{finalResult.cross_validation_results.verdict}</span>
+                </div>
+              )}
+              {/* Face match: v2 uses similarity_score, fall back to score / v1 flat field */}
+              {(finalResult.face_match_results?.similarity_score ?? finalResult.face_match_results?.score ?? finalResult.face_match_score) != null && (
                 <div className="flex justify-between">
                   <span className={styles.textSec}>Face Match</span>
-                  <span className={`font-medium ${styles.text}`}>{Math.round((finalResult.face_match_results?.score ?? finalResult.face_match_score) * 100)}%</span>
+                  <span className={`font-medium ${styles.text}`}>{Math.round((finalResult.face_match_results?.similarity_score ?? finalResult.face_match_results?.score ?? finalResult.face_match_score) * 100)}%</span>
                 </div>
               )}
-              {(finalResult.liveness_results?.liveness_score ?? finalResult.liveness_score) != null && (
+              {/* Liveness: v2 uses liveness_results.score (not liveness_score), fall back to v1 fields */}
+              {(finalResult.liveness_results?.score ?? finalResult.liveness_results?.liveness_score ?? finalResult.liveness_score) != null && (
                 <div className="flex justify-between">
                   <span className={styles.textSec}>Liveness</span>
-                  <span className={`font-medium ${styles.text}`}>{Math.round((finalResult.liveness_results?.liveness_score ?? finalResult.liveness_score) * 100)}%</span>
+                  <span className={`font-medium ${styles.text}`}>
+                    {Math.round((finalResult.liveness_results?.score ?? finalResult.liveness_results?.liveness_score ?? finalResult.liveness_score) * 100)}%
+                    {finalResult.liveness_results?.passed != null && (
+                      <span className={`ml-2 text-xs ${finalResult.liveness_results.passed ? 'text-green-600' : 'text-red-500'}`}>
+                        {finalResult.liveness_results.passed ? '✓' : '✗'}
+                      </span>
+                    )}
+                  </span>
+                </div>
+              )}
+              {/* AML Screening */}
+              {finalResult.aml_screening && (
+                <div className="flex justify-between">
+                  <span className={styles.textSec}>AML Screening</span>
+                  <span className={`font-semibold ${finalResult.aml_screening.risk_level === 'clear' ? 'text-green-600' : finalResult.aml_screening.match_found ? 'text-red-500' : 'text-yellow-600'}`}>
+                    {finalResult.aml_screening.risk_level === 'clear' ? 'Clear' : finalResult.aml_screening.risk_level?.replace('_', ' ')}
+                  </span>
+                </div>
+              )}
+              {/* Risk Score */}
+              {finalResult.risk_score && (
+                <div className="flex justify-between">
+                  <span className={styles.textSec}>Risk Score</span>
+                  <span className={`font-semibold ${finalResult.risk_score.risk_level === 'low' ? 'text-green-600' : finalResult.risk_score.risk_level === 'medium' ? 'text-yellow-600' : 'text-red-500'}`}>
+                    {finalResult.risk_score.overall_score}/100 ({finalResult.risk_score.risk_level})
+                  </span>
                 </div>
               )}
               {finalResult.confidence_score != null && (
                 <div className="flex justify-between">
                   <span className={styles.textSec}>Confidence</span>
                   <span className={`font-medium ${styles.text}`}>{Math.round(finalResult.confidence_score * 100)}%</span>
+                </div>
+              )}
+              {/* Rejection details */}
+              {finalResult.rejection_reason && (
+                <div className={`mt-2 pt-2 border-t ${styles.border}`}>
+                  <div className="flex justify-between">
+                    <span className={styles.textSec}>Rejection</span>
+                    <span className="font-mono text-xs text-red-500">{finalResult.rejection_reason}</span>
+                  </div>
+                  {finalResult.rejection_detail && (
+                    <p className={`text-xs mt-1 ${styles.textSec}`}>{finalResult.rejection_detail}</p>
+                  )}
                 </div>
               )}
             </div>

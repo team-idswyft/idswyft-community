@@ -1,8 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { ActiveLivenessCapture } from './ActiveLivenessCapture';
+import type { LivenessMetadata } from '../hooks/useActiveLiveness';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface SelfieCameraCaptureProps {
-  onCapture: (file: File) => void;
+  onCapture: (file: File, livenessMetadata?: LivenessMetadata) => void;
   onClose: () => void;
   onFallback: () => void;
 }
@@ -157,6 +159,7 @@ const SelfieCameraCapture: React.FC<SelfieCameraCaptureProps> = ({
   const [capturedUrl, setCapturedUrl] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [warmingUp, setWarmingUp] = useState(true);
+  const [useLegacyCapture, setUseLegacyCapture] = useState(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const analysisCanvasRef = useRef<HTMLCanvasElement>(null);
@@ -381,6 +384,28 @@ const SelfieCameraCapture: React.FC<SelfieCameraCaptureProps> = ({
       if (mountedRef.current) setError('Could not restart camera.');
     });
   }, [capturedUrl]);
+
+  // ── Active liveness completion handler ────────────────────────────────────
+  const handleActiveLivenessComplete = useCallback((blob: Blob, metadata: LivenessMetadata) => {
+    const file = new File([blob], `selfie-${Date.now()}.jpg`, { type: 'image/jpeg' });
+    onCapture(file, metadata);
+  }, [onCapture]);
+
+  // ── Active Liveness (primary path) ────────────────────────────────────────
+  if (!useLegacyCapture) {
+    return (
+      <div style={overlayStyle}>
+        <style>{cameraCss}</style>
+        <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, padding: 24 }}>
+          <ActiveLivenessCapture
+            onComplete={handleActiveLivenessComplete}
+            onCancel={onClose}
+            onFallback={() => setUseLegacyCapture(true)}
+          />
+        </div>
+      </div>
+    );
+  }
 
   // ── Error state ──────────────────────────────────────────────────────────
   if (error) {

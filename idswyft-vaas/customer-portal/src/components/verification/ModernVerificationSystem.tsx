@@ -9,6 +9,7 @@ import verificationAPI from '../../services/verificationApi';
 import { useOrganization } from '../../contexts/OrganizationContext';
 import BrandedHeader from '../BrandedHeader';
 import LiveCaptureComponent from '../LiveCaptureComponent';
+import type { LivenessMetadata } from '../../hooks/useActiveLiveness';
 import LanguageSelector from '../LanguageSelector';
 import { useTranslation } from 'react-i18next';
 
@@ -164,7 +165,7 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
   };
 
   // ── Live capture handler ───────────────────────────────────────────────────
-  const handleLiveCaptureSuccess = async (imageData: string) => {
+  const handleLiveCaptureSuccess = async (imageData: string, metadata?: LivenessMetadata) => {
     if (!session || !verificationId) return;
     setUploading(true);
     setShowLiveCapture(false);
@@ -181,7 +182,7 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
       const blob = new Blob([ab], { type: 'image/jpeg' });
       const file = new File([blob], 'selfie.jpg', { type: 'image/jpeg' });
 
-      await verificationAPI.captureSelfie(session, verificationId, file);
+      await verificationAPI.captureSelfie(session, verificationId, file, undefined, metadata);
       setCurrentStep(6);
       await handleSubmitVerification();
       pollForFinalResults(verificationId);
