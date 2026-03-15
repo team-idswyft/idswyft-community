@@ -1141,7 +1141,6 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
                       onComplete={handleActiveLivenessComplete}
                       onCancel={() => setShowActiveLiveness(false)}
                       onFallback={handleActiveLivenessFallback}
-                      theme="dark"
                     />
                   </div>
                 )}
