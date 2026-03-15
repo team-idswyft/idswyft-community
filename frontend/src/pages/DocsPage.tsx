@@ -818,7 +818,7 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
                 emoji: '🚀', title: 'Ready-Made Page',
                 tag: { label: 'Fastest', color: C.green, bg: C.greenDim },
                 desc: 'Redirect users to our hosted verification page. Users choose between mobile (recommended) or desktop — we handle all steps, camera access, and result display.',
-                features: ['Mobile-first with QR handoff (recommended)', 'Complete UI, zero frontend work', 'Camera + liveness built-in', 'Webhook notifications on completion', 'Custom redirect on completion'],
+                features: ['Mobile-first with QR handoff (recommended)', 'Complete UI, zero frontend work', 'Camera + liveness built-in', 'Optional address verification (address_verif=true)', 'Webhook notifications on completion', 'Custom redirect on completion'],
                 href: '/user-verification',
                 cta: 'Try demo →',
               },
@@ -857,10 +857,12 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
               <FieldRow name="user_id" type="UUID string" req={true} desc="Unique identifier for the user being verified." />
               <FieldRow name="redirect_url" type="URL string" req={false} desc="Where to redirect after verification completes." />
               <FieldRow name="theme" type="'light' | 'dark'" req={false} desc="UI color theme. Defaults to dark." />
+              <FieldRow name="address_verif" type="'true'" req={false} desc="When set to 'true', adds an optional proof-of-address step after identity verification. Users can upload a utility bill, bank statement, or tax document. The name is cross-referenced against the verified ID." />
             </div>
           </div>
 
-          <Pre label="Example URL" code={`https://yourapp.com/user-verification?api_key=sk_live_xxx&user_id=user-123&redirect_url=https://yourapp.com/done&theme=dark`} />
+          <Pre label="Example URL (identity only)" code={`https://yourapp.com/user-verification?api_key=sk_live_xxx&user_id=user-123&redirect_url=https://yourapp.com/done&theme=dark`} />
+          <Pre label="Example URL (identity + address)" code={`https://yourapp.com/user-verification?api_key=sk_live_xxx&user_id=user-123&address_verif=true&redirect_url=https://yourapp.com/done`} />
 
           <Divider />
 
