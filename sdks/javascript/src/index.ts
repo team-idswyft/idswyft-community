@@ -188,6 +188,48 @@ export interface AddressStatusResponse {
   message?: string;
 }
 
+// ─── Monitoring Types ────────────────────────────────────
+
+export interface ReverificationSchedule {
+  id: string;
+  user_id: string;
+  interval_days: number;
+  next_verification_at: string;
+  last_verification_at: string | null;
+  status: 'active' | 'paused' | 'cancelled';
+  created_at: string;
+}
+
+export interface CreateScheduleRequest {
+  user_id: string;
+  interval_days: number;
+  verification_request_id?: string;
+}
+
+export interface ScheduleListResponse {
+  schedules: ReverificationSchedule[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface ExpiryAlert {
+  id: string;
+  verification_request_id: string;
+  user_id: string | null;
+  expiry_date: string;
+  alert_type: '90_day' | '60_day' | '30_day' | 'expired';
+  webhook_sent: boolean;
+  created_at: string;
+}
+
+export interface ExpiryAlertListResponse {
+  alerts: ExpiryAlert[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 // ─── Developer & Webhook Types ──────────────────────────
 
 export interface ApiKey {
@@ -643,6 +685,63 @@ export class IdswyftSDK {
     const response = await this.client.get(
       `/api/v2/verify/${verificationId}/address-status`,
     );
+    return response.data;
+  }
+
+  // ─── Monitoring & Re-verification ─────────────────────
+
+  /**
+   * Create a re-verification schedule for a user.
+   * Sends webhook notifications when re-verification is due.
+   *
+   * @param request - Schedule parameters (user_id, interval_days 30-730)
+   */
+  async createMonitoringSchedule(request: CreateScheduleRequest): Promise<{ success: boolean; schedule: ReverificationSchedule }> {
+    const response = await this.client.post('/api/v2/monitoring/schedules', request);
+    return response.data;
+  }
+
+  /**
+   * List re-verification schedules for the current developer.
+   */
+  async listMonitoringSchedules(options?: {
+    status?: 'active' | 'paused' | 'cancelled';
+    page?: number;
+    limit?: number;
+  }): Promise<ScheduleListResponse> {
+    const params = new URLSearchParams();
+    if (options?.status) params.append('status', options.status);
+    if (options?.page) params.append('page', options.page.toString());
+    if (options?.limit) params.append('limit', options.limit.toString());
+
+    const response = await this.client.get(`/api/v2/monitoring/schedules?${params.toString()}`);
+    return response.data;
+  }
+
+  /**
+   * Cancel a re-verification schedule.
+   */
+  async cancelMonitoringSchedule(scheduleId: string): Promise<{ success: boolean; message: string }> {
+    const response = await this.client.delete(`/api/v2/monitoring/schedules/${scheduleId}`);
+    return response.data;
+  }
+
+  /**
+   * Get documents approaching expiry for the current developer.
+   *
+   * @param options - Filter by days_ahead (default 90), pagination
+   */
+  async getExpiringDocuments(options?: {
+    days_ahead?: number;
+    page?: number;
+    limit?: number;
+  }): Promise<ExpiryAlertListResponse> {
+    const params = new URLSearchParams();
+    if (options?.days_ahead) params.append('days_ahead', options.days_ahead.toString());
+    if (options?.page) params.append('page', options.page.toString());
+    if (options?.limit) params.append('limit', options.limit.toString());
+
+    const response = await this.client.get(`/api/v2/monitoring/expiring-documents?${params.toString()}`);
     return response.data;
   }
 

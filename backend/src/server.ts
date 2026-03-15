@@ -25,6 +25,7 @@ import vaasRoutes from './routes/vaas.js';
 import handoffRoutes from './routes/handoff.js';
 import batchRoutes from './routes/batch.js';
 import addressVerificationRoutes from './routes/addressVerification.js';
+import monitoringRoutes from './routes/monitoring.js';
 
 const app = express();
 
@@ -104,6 +105,7 @@ app.use('/api/webhooks', webhookRoutes);
 app.use('/api/vaas', vaasRoutes);
 app.use('/api/v2/batch', batchRoutes);
 app.use('/api/v2/verify', addressVerificationRoutes);
+app.use('/api/v2/monitoring', monitoringRoutes);
 
 // Local file serving — authenticated with API key, path traversal blocked in serveLocalFile
 if (config.storage.provider === 'local') {
@@ -270,6 +272,37 @@ const startServer = async () => {
         logger.info('Data retention scheduler started', {
           retentionDays: config.compliance.dataRetentionDays,
           schedule: '0 2 * * * (daily at 2 AM UTC)',
+        });
+      }
+
+      // Monitoring cron — daily at 3 AM UTC: check expiring documents + process due re-verifications
+      if (config.nodeEnv === 'production') {
+        const cron = (await import('node-cron')).default ?? await import('node-cron');
+        const {
+          checkExpiringDocuments,
+          processScheduledReverifications,
+        } = await import('@/services/monitoringService.js');
+
+        cron.schedule('0 3 * * *', async () => {
+          logger.info('Running document expiry check');
+          try {
+            const expiryResult = await checkExpiringDocuments();
+            logger.info('Document expiry check complete', expiryResult);
+          } catch (err) {
+            logger.error('Document expiry check failed', { error: err });
+          }
+
+          logger.info('Running scheduled re-verification processing');
+          try {
+            const reVerResult = await processScheduledReverifications();
+            logger.info('Scheduled re-verification processing complete', reVerResult);
+          } catch (err) {
+            logger.error('Scheduled re-verification processing failed', { error: err });
+          }
+        });
+
+        logger.info('Monitoring scheduler started', {
+          schedule: '0 3 * * * (daily at 3 AM UTC)',
         });
       }
     });
