@@ -13,7 +13,8 @@ import { FaceRecognitionService } from '@/services/faceRecognition.js';
 import { logger, logVerificationEvent } from '@/utils/logger.js';
 import { validateFileType } from '@/middleware/fileValidation.js';
 import { supabase } from '@/config/database.js';
-import { VERIFICATION_THRESHOLDS, getFaceMatchingThresholdSync } from '@/config/verificationThresholds.js';
+import { VERIFICATION_THRESHOLDS, getFaceMatchingThresholdSync, getLivenessThresholdSync } from '@/config/verificationThresholds.js';
+import { createLivenessProvider } from '@/providers/liveness/index.js';
 
 import { VerificationSession } from '@/verification/session/VerificationSession.js';
 import type { SessionDeps, SessionHydration } from '@/verification/session/VerificationSession.js';
@@ -246,10 +247,15 @@ async function extractBackDocument(
   };
 }
 
+/** Liveness provider — instantiated once, reused across requests */
+const livenessProvider = createLivenessProvider();
+
 /** Run live capture processing and build LiveCaptureResult */
 async function extractLiveCapture(
   selfiePath: string,
   frontDocPath: string | null,
+  selfieBuffer: Buffer,
+  isSandbox: boolean = false,
 ): Promise<LiveCaptureResult> {
   // Detect face and extract embedding from selfie
   let faceConfidence = 0;
@@ -262,12 +268,28 @@ async function extractLiveCapture(
     faceConfidence = 0;
   }
 
-  // Liveness detection (stub — no real anti-spoofing implemented yet).
-  // Auto-pass liveness so the pipeline proceeds to face matching (Gate 5)
-  // which handles missing embeddings gracefully. Real liveness detection
-  // (blink/nod challenge, depth estimation) should replace this stub.
-  const livenessScore = 0.85;
-  const livenessPassed = true;
+  // Real liveness detection via configured provider
+  let livenessScore = 0;
+  let livenessPassed = false;
+  try {
+    livenessScore = await livenessProvider.assessLiveness({
+      buffer: selfieBuffer,
+    });
+    const threshold = getLivenessThresholdSync(isSandbox);
+    livenessPassed = livenessScore >= threshold;
+    logger.info('Liveness assessment complete', {
+      provider: livenessProvider.name,
+      score: livenessScore.toFixed(3),
+      threshold,
+      passed: livenessPassed,
+      isSandbox,
+    });
+  } catch (err) {
+    logger.error('Liveness provider failed, defaulting to fail-safe', { error: err });
+    // Fail-safe: if the provider crashes, score 0 — do NOT auto-pass
+    livenessScore = 0;
+    livenessPassed = false;
+  }
 
   return {
     face_embedding: faceEmbedding,
@@ -738,10 +760,9 @@ router.post('/:verification_id/live-capture',
       selfie_id: selfie.id,
     } as any);
 
-    // Run live capture extraction
+    // Run live capture extraction with real liveness detection
     const savedState = await loadSessionState(verification_id);
-    const frontDocPath = savedState?.front_extraction ? null : null; // embedding from session state
-    const liveResult = await extractLiveCapture(selfiePath, frontDocPath);
+    const liveResult = await extractLiveCapture(selfiePath, null, req.file.buffer, isSandbox);
 
     // Hydrate session and run Gate 4 + auto face match via session
     const session = await hydrateSession(verification_id, isSandbox);
