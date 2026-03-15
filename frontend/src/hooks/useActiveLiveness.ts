@@ -132,7 +132,7 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
   } = options;
 
   const [phase, setPhase] = useState<LivenessPhase>('loading');
-  const [direction] = useState<ChallengeDirection>(pickRandomDirection);
+  const [direction, setDirection] = useState<ChallengeDirection>(pickRandomDirection);
   const [faceDetected, setFaceDetected] = useState(false);
   const [currentYaw, setCurrentYaw] = useState(0);
   const [progress, setProgress] = useState(0);
@@ -401,6 +401,7 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
     samplesRef.current = [];
     centerStartRef.current = 0;
     challengeStartRef.current = 0;
+    setDirection(pickRandomDirection());
     setError(null);
     setProgress(0);
     setPhase('center_face');

@@ -12,6 +12,7 @@ import verificationAPI from '../services/verificationApi';
 import { useOrganization } from '../contexts/OrganizationContext';
 import IDCameraCapture from './IDCameraCapture';
 import SelfieCameraCapture from './SelfieCameraCapture';
+import type { LivenessMetadata } from '../hooks/useActiveLiveness';
 import { useTranslation } from 'react-i18next';
 import LanguageSelector from './LanguageSelector';
 
@@ -395,6 +396,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
   const [backFile, setBackFile] = useState<File | null>(null);
   const [backPreviewUrl, setBackPreviewUrl] = useState<string | null>(null);
   const [selfieFile, setSelfieFile] = useState<File | null>(null);
+  const [selfieMetadata, setSelfieMetadata] = useState<LivenessMetadata | null>(null);
   const [selfiePreviewUrl, setSelfiePreviewUrl] = useState<string | null>(null);
 
   // Camera state
@@ -507,10 +509,11 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
     setTimeout(() => document.getElementById(inputId)?.click(), 100);
   }, [cameraVariant]);
 
-  const handleSelfieCameraCapture = useCallback((file: File) => {
+  const handleSelfieCameraCapture = useCallback((file: File, metadata?: LivenessMetadata) => {
     setShowSelfieCamera(false);
     if (selfiePreviewUrl) URL.revokeObjectURL(selfiePreviewUrl);
     setSelfieFile(file);
+    setSelfieMetadata(metadata ?? null);
     setSelfiePreviewUrl(URL.createObjectURL(file));
     setStepError(null);
   }, [selfiePreviewUrl]);
@@ -650,7 +653,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
     setIsProcessing(true);
     setStepError(null);
     try {
-      await verificationAPI.captureSelfie(session, verificationId, selfieFile);
+      await verificationAPI.captureSelfie(session, verificationId, selfieFile, undefined, selfieMetadata ?? undefined);
       if (!mountedRef.current) return;
       setScreenIdx(5); // Done screen (shifted by country screen)
 

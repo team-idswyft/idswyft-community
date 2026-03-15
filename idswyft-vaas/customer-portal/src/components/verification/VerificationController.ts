@@ -300,7 +300,7 @@ export class VerificationController {
   }
 
   // Algorithm Step 7: Live Capture
-  async captureLiveSelfie(imageData: string): Promise<void> {
+  async captureLiveSelfie(imageData: string, livenessMetadata?: unknown): Promise<void> {
     console.log('📸 Step 7: Live capture...');
 
     const state = this.stateManager.getState();
@@ -315,7 +315,7 @@ export class VerificationController {
     this.stateManager.moveToStep(VerificationStep.LIVE_CAPTURE, VerificationStatus.PROCESSING);
 
     try {
-      await newVerificationApi.captureLiveSelfie(this.session, state.verificationId, imageData);
+      await newVerificationApi.captureLiveSelfie(this.session, state.verificationId, imageData, livenessMetadata);
       this.stateManager.setLiveCaptureCompleted();
       console.log('✅ Step 7 Complete: Live capture uploaded');
 
