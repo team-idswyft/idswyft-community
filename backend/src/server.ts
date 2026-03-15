@@ -24,6 +24,7 @@ import webhookRoutes from './routes/webhooks.js';
 import vaasRoutes from './routes/vaas.js';
 import handoffRoutes from './routes/handoff.js';
 import batchRoutes from './routes/batch.js';
+import addressVerificationRoutes from './routes/addressVerification.js';
 
 const app = express();
 
@@ -102,6 +103,7 @@ app.use('/api/health', healthRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/vaas', vaasRoutes);
 app.use('/api/v2/batch', batchRoutes);
+app.use('/api/v2/verify', addressVerificationRoutes);
 
 // Local file serving — authenticated with API key, path traversal blocked in serveLocalFile
 if (config.storage.provider === 'local') {

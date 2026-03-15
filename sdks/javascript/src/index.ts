@@ -14,7 +14,8 @@ export interface IdswyftConfig {
 
 // ─── Verification Types ─────────────────────────────────
 
-export type DocumentType = 'passport' | 'drivers_license' | 'national_id' | 'other';
+export type DocumentType = 'passport' | 'drivers_license' | 'national_id' | 'other'
+  | 'utility_bill' | 'bank_statement' | 'tax_document';
 
 export type VerificationStatus =
   | 'AWAITING_FRONT'
@@ -159,6 +160,32 @@ export interface BatchListResponse {
     total: number;
     pages: number;
   };
+}
+
+// ─── Address Verification Types ─────────────────────────
+
+export type AddressDocumentType = 'utility_bill' | 'bank_statement' | 'tax_document';
+
+export interface AddressVerificationResult {
+  status: 'pass' | 'review' | 'reject';
+  score: number;
+  name_match_score: number;
+  address: string | null;
+  document_type: AddressDocumentType | null;
+  document_fresh: boolean | null;
+  reasons: string[];
+}
+
+export interface AddressVerificationResponse {
+  success: boolean;
+  verification_id: string;
+  address_verification: AddressVerificationResult;
+}
+
+export interface AddressStatusResponse {
+  verification_id: string;
+  address_verification: AddressVerificationResult | null;
+  message?: string;
 }
 
 // ─── Developer & Webhook Types ──────────────────────────
@@ -582,6 +609,40 @@ export class IdswyftSDK {
     if (options?.limit) params.append('limit', options.limit.toString());
 
     const response = await this.client.get(`/api/v2/batch?${params.toString()}`);
+    return response.data;
+  }
+
+  // ─── Address Verification ──────────────────────────────
+
+  /**
+   * Upload a proof-of-address document for verification.
+   * Cross-references the name on the address document against the verified ID.
+   */
+  async uploadAddressDocument(
+    verificationId: string,
+    document: Buffer | Blob,
+    documentType: AddressDocumentType,
+    filename?: string,
+  ): Promise<AddressVerificationResponse> {
+    const formData = new FormData();
+    formData.append('document', document, { filename: filename || 'address-document' });
+    formData.append('document_type', documentType);
+
+    const response = await this.client.post(
+      `/api/v2/verify/${verificationId}/address-document`,
+      formData,
+      { headers: formData.getHeaders?.() || {} },
+    );
+    return response.data;
+  }
+
+  /**
+   * Get the address verification status for a verification.
+   */
+  async getAddressStatus(verificationId: string): Promise<AddressStatusResponse> {
+    const response = await this.client.get(
+      `/api/v2/verify/${verificationId}/address-status`,
+    );
     return response.data;
   }
 

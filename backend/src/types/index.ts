@@ -58,7 +58,8 @@ export interface Document {
   created_at: Date;
 }
 
-export type DocumentType = 'passport' | 'drivers_license' | 'national_id' | 'other';
+export type DocumentType = 'passport' | 'drivers_license' | 'national_id' | 'other'
+  | 'utility_bill' | 'bank_statement' | 'tax_document';
 
 export interface Selfie {
   id: string;
