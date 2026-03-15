@@ -12,6 +12,8 @@ import verificationAPI from '../services/verificationApi';
 import { useOrganization } from '../contexts/OrganizationContext';
 import IDCameraCapture from './IDCameraCapture';
 import SelfieCameraCapture from './SelfieCameraCapture';
+import { useTranslation } from 'react-i18next';
+import LanguageSelector from './LanguageSelector';
 
 // ─── Design system CSS ─────────────────────────────────────────────────────
 const css = `
@@ -52,10 +54,10 @@ const SCREENS: Screen[] = ['country', 'front', 'back', 'checking', 'live', 'done
 // ─── Sub-Components ─────────────────────────────────────────────────────────
 
 /* Step progress tracker */
-const StepTracker: React.FC<{ activeIdx: number }> = ({ activeIdx }) => (
+const StepTracker: React.FC<{ activeIdx: number; labels: string[] }> = ({ activeIdx, labels }) => (
   <div style={{ padding: '12px 24px 0' }}>
     <div style={{ display: 'flex', gap: 6 }}>
-      {STEP_LABELS.map((_, i) => {
+      {labels.map((_, i) => {
         const state = i < activeIdx ? 'done' : i === activeIdx ? 'active' : 'pending';
         return (
           <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, position: 'relative',
@@ -73,7 +75,7 @@ const StepTracker: React.FC<{ activeIdx: number }> = ({ activeIdx }) => (
       })}
     </div>
     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-      {STEP_LABELS.map((label, i) => {
+      {labels.map((label, i) => {
         const state = i < activeIdx ? 'done' : i === activeIdx ? 'active' : 'pending';
         return (
           <span key={i} style={{
@@ -251,8 +253,8 @@ const AmbientGlow: React.FC = () => (
 
 /* Oval Face Viewfinder */
 const OvalFaceViewfinder: React.FC<{
-  processing: boolean; previewUrl?: string | null;
-}> = ({ processing, previewUrl }) => {
+  processing: boolean; previewUrl?: string | null; checkingLabel?: string;
+}> = ({ processing, previewUrl, checkingLabel }) => {
   const ovalRadius = '114px 114px 94px 94px';
   return (
     <div style={{
@@ -314,7 +316,7 @@ const OvalFaceViewfinder: React.FC<{
             fontFamily: "'JetBrains Mono', monospace", fontSize: 11,
             color: 'var(--teal)', letterSpacing: '0.18em',
             animation: 'blink 1.4s ease infinite',
-          }}>CHECKING</span>
+          }}>{checkingLabel || 'CHECKING'}</span>
         </div>
       )}
     </div>
@@ -374,6 +376,7 @@ interface MobileVerificationFlowProps {
 
 const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ sessionToken }) => {
   const { setBranding, setOrganizationName } = useOrganization();
+  const { t } = useTranslation();
 
   // Session state
   const [session, setSession] = useState<VerificationSession | null>(null);
@@ -403,7 +406,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
   const [showSelfieCamera, setShowSelfieCamera] = useState(false);
 
   // Checking screen messages
-  const [checkingMsg, setCheckingMsg] = useState('Verifying your document\u2026');
+  const [checkingMsg, setCheckingMsg] = useState('');
 
   // Final result
   const [finalResult, setFinalResult] = useState<any>(null);
@@ -429,7 +432,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
   // ── Session initialization (VaaS context) ─────────────────────────────
   useEffect(() => {
     if (!sessionToken) {
-      setError('Invalid link \u2014 no session token provided.');
+      setError(t('errors.invalidLink'));
       setLoading(false);
       return;
     }
@@ -454,7 +457,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
         if (err?.status === 410) {
           setStaleMessage(err.message || 'This verification link is no longer active.');
         } else {
-          setError(err.message || 'Failed to load verification session');
+          setError(err.message || t('errors.failedToLoad'));
         }
         setLoading(false);
       }
@@ -472,7 +475,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
       setVerificationId(vId);
       return vId;
     } catch (err: any) {
-      if (mountedRef.current) setStepError(err.message || 'Failed to start verification');
+      if (mountedRef.current) setStepError(err.message || t('errors.failedToStart'));
       return null;
     }
   };
@@ -576,7 +579,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
   // ── Poll OCR completion ────────────────────────────────────────────────
   const pollOCR = async (vId: string, attempt: number) => {
     if (!session || !mountedRef.current) return;
-    if (attempt >= 60) { setStepError('OCR timed out. Please try again.'); return; }
+    if (attempt >= 60) { setStepError(t('errors.ocrTimeout')); return; }
     try {
       const results = await verificationAPI.getResults(session, vId);
       if (!mountedRef.current) return;
@@ -612,8 +615,8 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
   // ── Poll cross-validation ─────────────────────────────────────────────
   const pollCrossValidation = async (vId: string, attempt: number) => {
     if (!session || !mountedRef.current) return;
-    if (attempt >= 60) { setStepError('Validation timed out.'); return; }
-    if (attempt === 0) setCheckingMsg('Verifying your document\u2026');
+    if (attempt >= 60) { setStepError(t('errors.validationTimeout')); return; }
+    if (attempt === 0) setCheckingMsg(t('verification.verifying'));
     try {
       const results = await verificationAPI.getResults(session, vId);
       if (!mountedRef.current) return;
@@ -636,11 +639,12 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
   // Cycling check messages
   useEffect(() => {
     if (screen !== 'checking') return;
-    const msgs = ['Verifying your document\u2026', 'Cross-checking details\u2026', 'Almost there\u2026'];
+    const msgs = [t('verification.verifying'), t('verification.crossChecking'), t('verification.almostThere')];
     let idx = 0;
+    setCheckingMsg(msgs[0]);
     const iv = setInterval(() => { idx = (idx + 1) % msgs.length; setCheckingMsg(msgs[idx]); }, 1800);
     return () => clearInterval(iv);
-  }, [screen]);
+  }, [screen, t]);
 
   // ── Upload selfie ─────────────────────────────────────────────────────
   const uploadSelfie = async () => {
@@ -725,7 +729,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
           <span style={{
             fontFamily: "'JetBrains Mono', monospace", fontSize: 12,
             color: 'var(--muted)', letterSpacing: '0.08em',
-          }}>Preparing your session\u2026</span>
+          }}>{t('errors.preparingSession')}</span>
         </div>
       </div>
     );
@@ -745,13 +749,13 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
             fontSize: 36,
           }}>{'\u2713'}</div>
           <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800, letterSpacing: '-0.025em', lineHeight: 1.12 }}>
-            Verification Link Used
+            {t('staleLink.heading')}
           </h2>
           <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: 'var(--muted)', lineHeight: 1.55 }}>
             {staleMessage}
           </p>
           <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: 'var(--muted)', lineHeight: 1.55, marginTop: 8 }}>
-            If you need to verify again, please request a new link from the organization.
+            {t('staleLink.message')}
           </p>
         </div>
       </div>
@@ -772,7 +776,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
             fontSize: 32,
           }}>!</div>
           <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800, letterSpacing: '-0.025em', lineHeight: 1.12 }}>
-            Unable to Load
+            {t('errors.unableToLoad')}
           </h2>
           <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: 'var(--muted)', lineHeight: 1.55 }}>
             {error}
@@ -797,17 +801,13 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
           {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </span>
         <span style={{ color: 'var(--teal)', letterSpacing: '0.1em', fontSize: 10, textTransform: 'uppercase' }}>
-          Secure Session
+          {t('common.secureSession')}
         </span>
-        <span style={{ color: 'var(--muted)' }}>
-          <span style={{ opacity: 1 }}>\u25CF</span>
-          <span style={{ opacity: 0.7 }}>\u25CF</span>
-          <span style={{ opacity: 0.4 }}>\u25CF</span>
-        </span>
+        <LanguageSelector variant="dark" />
       </div>
 
       {/* Step progress */}
-      <StepTracker activeIdx={screenIdx} />
+      <StepTracker activeIdx={screenIdx} labels={[t('steps.country'), t('steps.frontId'), t('steps.backId'), t('steps.checking'), t('steps.liveCapture'), t('steps.complete')]} />
 
       {/* Screen content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', marginTop: 20 }}>
@@ -821,14 +821,14 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
               fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 400,
               textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--teal)',
               marginBottom: 8,
-            }}>Step 1 of 6 &mdash; Select Country</span>
+            }}>{t('country.stepTitle')}</span>
 
             <h1 style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.12, letterSpacing: '-0.025em', marginBottom: 8 }}>
-              Where was your<br />ID issued?
+              {t('country.heading')}
             </h1>
 
             <p style={{ fontSize: 13, fontWeight: 400, color: 'var(--muted)', lineHeight: 1.55, marginBottom: 16 }}>
-              Select the country that issued your identity document, then choose the document type.
+              {t('country.description')}
             </p>
 
             {/* Country selector */}
@@ -843,7 +843,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
                   fontSize: 12, outline: 'none',
                 }}
               >
-                <option value="">Choose country...</option>
+                <option value="">{t('country.choosePlaceholder')}</option>
                 <optgroup label="Americas">
                   <option value="US">{'\u{1F1FA}\u{1F1F8}'} United States</option>
                   <option value="CA">{'\u{1F1E8}\u{1F1E6}'} Canada</option>
@@ -886,16 +886,16 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
                     fontSize: 12, outline: 'none',
                   }}
                 >
-                  <option value="drivers_license">Driver's License</option>
-                  <option value="passport">Passport</option>
+                  <option value="drivers_license">{t('documentType.driversLicense')}</option>
+                  <option value="passport">{t('documentType.passport')}</option>
                   {!['US', 'CA', 'AU', 'NZ'].includes(issuingCountry) && (
-                    <option value="national_id">National ID</option>
+                    <option value="national_id">{t('documentType.nationalId')}</option>
                   )}
                 </select>
               </div>
             )}
 
-            <TipBar text="This helps us verify your document accurately" />
+            <TipBar text={t('frontId.helperText')} />
 
             <div style={{ flex: 1 }} />
 
@@ -903,7 +903,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
               onClick={() => setScreenIdx(1)}
               disabled={!issuingCountry}
             >
-              Continue
+              {t('common.next')}
             </PrimaryBtn>
           </div>
         )}
@@ -917,14 +917,14 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
               fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 400,
               textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--teal)',
               marginBottom: 8,
-            }}>Step 2 of 6 \u2014 Front of ID</span>
+            }}>{t('frontId.stepTitle')}</span>
 
             <h1 style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.12, letterSpacing: '-0.025em', marginBottom: 8 }}>
-              Scan the front<br />of your ID
+              {t('frontId.heading')}
             </h1>
 
             <p style={{ fontSize: 13, fontWeight: 400, color: 'var(--muted)', lineHeight: 1.55, marginBottom: 16 }}>
-              Position your ID card and take a clear photo. Make sure all four corners are visible and the text is clear.
+              {t('frontId.description')}
             </p>
 
             {/* Country/doc type badge */}
@@ -942,11 +942,11 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
                 <span
                   onClick={() => setScreenIdx(0)}
                   style={{ marginLeft: 'auto', color: 'var(--teal)', cursor: 'pointer', fontSize: 10 }}
-                >change</span>
+                >{t('documentType.changeCountry')}</span>
               </div>
             )}
 
-            <TipBar text="Good lighting \u00B7 No glare \u00B7 Hold steady" />
+            <TipBar text={t('frontId.tips')} />
 
             <div style={{ marginTop: 12 }} />
             <IDViewfinder variant="front" processing={isProcessing} processingLabel="READING FRONT" previewUrl={frontPreviewUrl} />
@@ -959,11 +959,11 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
                 onClick={() => cameraSupported ? openCamera('front') : document.getElementById('mv-front-upload')?.click()}
                 disabled={isProcessing}
               >
-                Take Photo of Front
+                {t('frontId.captureButton')}
               </PrimaryBtn>
             ) : (
               <PrimaryBtn onClick={uploadFront} disabled={isProcessing}>
-                {isProcessing ? 'Processing\u2026' : 'Scan Front of ID'}
+                {isProcessing ? t('common.processing') : t('frontId.scanButton')}
               </PrimaryBtn>
             )}
 
@@ -984,17 +984,17 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
               fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
               textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--teal)',
               marginBottom: 8,
-            }}>Step 3 of 6 \u2014 Back of ID</span>
+            }}>{t('backId.stepTitle')}</span>
 
             <h1 style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.12, letterSpacing: '-0.025em', marginBottom: 8 }}>
-              Now flip it over<br />and scan the back
+              {t('backId.heading')}
             </h1>
 
             <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.55, marginBottom: 16 }}>
-              Keep the same conditions \u2014 good lighting, flat surface. The barcode on the back must be fully visible.
+              {t('backId.description')}
             </p>
 
-            <TipBar text="Barcode must be unobstructed" />
+            <TipBar text={t('backId.barcodeTip')} />
 
             <div style={{ marginTop: 12 }} />
             <IDViewfinder variant="back" processing={isProcessing} processingLabel="READING BARCODE" previewUrl={backPreviewUrl} />
@@ -1007,11 +1007,11 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
                 onClick={() => cameraSupported ? openCamera('back') : document.getElementById('mv-back-upload')?.click()}
                 disabled={isProcessing}
               >
-                Take Photo of Back
+                {t('backId.captureButton')}
               </PrimaryBtn>
             ) : (
               <PrimaryBtn onClick={uploadBack} disabled={isProcessing}>
-                {isProcessing ? 'Processing\u2026' : 'Scan Back of ID'}
+                {isProcessing ? t('common.processing') : t('backId.scanButton')}
               </PrimaryBtn>
             )}
 
@@ -1034,7 +1034,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
               fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
               textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--teal)',
               marginBottom: 24,
-            }}>Step 4 of 6 \u2014 Verification</span>
+            }}>{t('verification.stepTitle')}</span>
 
             <div style={{
               width: 80, height: 80, border: '2.5px solid rgba(0,212,180,0.12)',
@@ -1049,10 +1049,10 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
             <p style={{
               fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: 'var(--muted)',
               letterSpacing: '0.08em',
-            }}>This only takes a moment</p>
+            }}>{t('verification.onlyMoment')}</p>
 
             <div style={{ display: 'flex', gap: 8, marginTop: 24, flexWrap: 'wrap', justifyContent: 'center' }}>
-              {['Document read', 'Details matched', 'Security checks'].map(tag => (
+              {[t('verification.processTags.documentRead'), t('verification.processTags.detailsMatched'), t('verification.processTags.securityChecks')].map(tag => (
                 <span key={tag} style={{
                   padding: '5px 10px', borderRadius: 20,
                   background: 'rgba(0,212,180,0.06)', border: '1px solid rgba(0,212,180,0.12)',
@@ -1079,20 +1079,20 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
               fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
               textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--teal)',
               marginBottom: 8,
-            }}>Step 5 of 6 \u2014 Live Capture</span>
+            }}>{t('liveCapture.stepTitle')}</span>
 
             <h1 style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.12, letterSpacing: '-0.025em', marginBottom: 8 }}>
-              Take a quick<br />live capture
+              {t('liveCapture.heading')}
             </h1>
 
             <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.55, marginBottom: 12 }}>
-              We need to confirm your identity matches your ID. Look directly at the camera in a well-lit area.
+              {t('liveCapture.description')}
             </p>
 
-            <OvalFaceViewfinder processing={isProcessing} previewUrl={selfiePreviewUrl} />
+            <OvalFaceViewfinder processing={isProcessing} previewUrl={selfiePreviewUrl} checkingLabel={t('steps.checking').toUpperCase()} />
             <LivenessCues hidden={isProcessing} />
 
-            <TipBar text="Remove glasses \u00B7 Face well-lit \u00B7 No hat" />
+            <TipBar text={t('liveCapture.tips')} />
 
             <div style={{ marginTop: 14 }} />
 
@@ -1104,11 +1104,11 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
                 onClick={() => cameraSupported ? setShowSelfieCamera(true) : document.getElementById('mv-selfie-upload')?.click()}
                 disabled={isProcessing}
               >
-                Take Live Capture
+                {t('liveCapture.captureButton')}
               </PrimaryBtn>
             ) : (
               <PrimaryBtn onClick={uploadSelfie} disabled={isProcessing}>
-                {isProcessing ? 'Processing\u2026' : 'Submit Live Capture'}
+                {isProcessing ? t('common.processing') : t('liveCapture.submitButton')}
               </PrimaryBtn>
             )}
 
@@ -1152,7 +1152,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
                   borderTopColor: 'var(--teal)', borderRadius: '50%',
                   animation: 'spin 1s linear infinite', marginBottom: 18,
                 }} />
-                <p style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>Processing your verification\u2026</p>
+                <p style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>{t('common.processing')}</p>
                 <p style={{
                   fontFamily: "'JetBrains Mono', monospace", fontSize: 11,
                   color: 'var(--muted)', letterSpacing: '0.08em',
@@ -1165,10 +1165,10 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
 
               if (isVerified) {
                 const checklist = [
-                  'Identity document verified',
-                  'Document details confirmed',
-                  'Liveness check passed',
-                  'Face matched successfully',
+                  t('success.checklist.documentVerified'),
+                  t('success.checklist.detailsConfirmed'),
+                  t('success.checklist.livenessCheck'),
+                  t('success.checklist.faceMatched'),
                 ];
                 return (
                   <>
@@ -1184,14 +1184,14 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
                       fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
                       textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--teal)',
                       marginBottom: 8,
-                    }}>Verification complete</span>
+                    }}>{t('success.heading')}</span>
 
                     <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.025em', marginBottom: 8 }}>
-                      You're all set
+                      {t('success.subheading')}
                     </h1>
 
                     <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.55, marginBottom: 24 }}>
-                      Your identity has been verified. You can close this page.
+                      {t('success.message')}
                     </p>
 
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 8, width: '100%', maxWidth: 320 }}>
@@ -1224,13 +1224,13 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
                   </div>
 
                   <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.025em', marginBottom: 8 }}>
-                    {isFailed ? 'Verification Failed' : 'Under Review'}
+                    {isFailed ? t('failure.heading') : t('manualReview.heading')}
                   </h1>
 
                   <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.55, marginBottom: 16 }}>
                     {isFailed
-                      ? (finalResult.failure_reason || 'We were unable to verify your identity with the provided documents.')
-                      : 'Your verification is being reviewed. You will be notified of the result.'}
+                      ? (finalResult.failure_reason || t('failure.message'))
+                      : t('manualReview.message')}
                   </p>
                 </>
               );

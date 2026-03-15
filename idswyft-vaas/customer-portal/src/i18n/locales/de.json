@@ -1,0 +1,208 @@
+{
+  "common": {
+    "loading": "Laden...",
+    "error": "Fehler",
+    "tryAgain": "Erneut versuchen",
+    "refreshPage": "Seite aktualisieren",
+    "close": "Schliessen",
+    "back": "Zuruck",
+    "next": "Weiter",
+    "submit": "Absenden",
+    "processing": "Verarbeitung...",
+    "contactSupport": "Support kontaktieren",
+    "secureSession": "Sichere Sitzung",
+    "verificationPortal": "Verifizierungsportal",
+    "identityVerification": "Identitatsverifizierung"
+  },
+
+  "app": {
+    "invalidLink": "Ungueltiger Verifizierungslink",
+    "invalidLinkMessage": "Der Verifizierungslink scheint ungueltig oder abgelaufen zu sein. Bitte fordern Sie einen neuen Link von der Organisation an.",
+    "invalidStatusLink": "Ungueltiger Statuslink",
+    "invalidStatusMessage": "Der Statuslink scheint ungueltig zu sein. Ueberpruefen Sie Ihre Verifizierungs-E-Mail oder kontaktieren Sie den Support.",
+    "portalTitle": "Portal zur Identitatsverifizierung",
+    "portalMessage": "Dies ist ein sicheres Portal zur Identitatsverifizierung. Um zu beginnen, benoetigen Sie einen Verifizierungslink der anfragenden Organisation.",
+    "needHelp": "Brauchen Sie Hilfe?",
+    "needHelpMessage": "Wenn Sie glauben, dass Sie Zugang zu diesem Portal haben sollten, kontaktieren Sie die Organisation, die Ihre Verifizierung angefordert hat."
+  },
+
+  "steps": {
+    "country": "Land",
+    "frontId": "Vorderseite",
+    "backId": "Rueckseite",
+    "checking": "Pruefung",
+    "scanning": "Scannen",
+    "liveCapture": "Live-Aufnahme",
+    "complete": "Fertig",
+    "done": "Erledigt"
+  },
+
+  "country": {
+    "title": "Waehlen Sie Ihr Land",
+    "subtitle": "Waehlen Sie das Land, das Ihr Identitaetsdokument ausgestellt hat.",
+    "stepTitle": "Schritt 1 von 6 \u2014 Land waehlen",
+    "heading": "Wo wurde Ihr Ausweis ausgestellt?",
+    "description": "Waehlen Sie das Ausstellungsland Ihres Identitaetsdokuments und dann den Dokumententyp.",
+    "searchPlaceholder": "Laender suchen...",
+    "choosePlaceholder": "Land waehlen...",
+    "noResults": "Keine Laender entsprechen Ihrer Suche.",
+    "issuingCountry": "Ausstellungsland",
+    "regions": {
+      "americas": "Amerika",
+      "europe": "Europa",
+      "asiaPacific": "Asien-Pazifik"
+    }
+  },
+
+  "documentType": {
+    "title": "Dokumententyp waehlen",
+    "subtitle": "Waehlen Sie den Typ des Identitaetsdokuments, das Sie verifizieren werden.",
+    "changeCountry": "\u2190 Land aendern",
+    "driversLicense": "Fuehrerschein",
+    "driversLicenseDesc": "Staatlich ausgestellte Fahrerlaubnis",
+    "passport": "Reisepass",
+    "passportDesc": "Internationales Reisedokument",
+    "nationalId": "Personalausweis",
+    "nationalIdDesc": "Staatlich ausgestellter Identitaetsausweis"
+  },
+
+  "frontId": {
+    "stepTitle": "Schritt 2 von 6 \u2014 Vorderseite des Ausweises",
+    "heading": "Scannen Sie die Vorderseite Ihres Ausweises",
+    "description": "Positionieren Sie Ihren Ausweis und machen Sie ein klares Foto. Stellen Sie sicher, dass alle vier Ecken sichtbar und der Text lesbar ist.",
+    "tips": "Gute Beleuchtung \u00b7 Keine Blendung \u00b7 Ruhig halten",
+    "helperText": "Dies hilft uns, Ihr Dokument praezise zu verifizieren",
+    "captureButton": "Vorderseite fotografieren",
+    "scanButton": "Vorderseite scannen",
+    "uploadHint": "JPG, PNG bis 10 MB \u2014 per Drag & Drop oder Klick",
+    "extractedData": "Vorderseite \u2014 Extrahierte Daten"
+  },
+
+  "backId": {
+    "stepTitle": "Schritt 3 von 6 \u2014 Rueckseite des Ausweises",
+    "heading": "Drehen Sie um und scannen Sie die Rueckseite",
+    "description": "Behalten Sie die gleichen Bedingungen bei \u2014 gute Beleuchtung, flache Oberflaeche. Der Barcode auf der Rueckseite muss vollstaendig sichtbar sein.",
+    "barcodeTip": "Der Barcode muss frei sichtbar sein",
+    "captureButton": "Rueckseite fotografieren",
+    "scanButton": "Rueckseite scannen"
+  },
+
+  "verification": {
+    "stepTitle": "Schritt 4 von 6 \u2014 Verifizierung",
+    "verifying": "Ihr Dokument wird verifiziert...",
+    "crossChecking": "Daten werden abgeglichen...",
+    "almostThere": "Fast fertig...",
+    "onlyMoment": "Das dauert nur einen Moment",
+    "processTags": {
+      "documentRead": "Dokument gelesen",
+      "detailsMatched": "Daten abgeglichen",
+      "securityChecks": "Sicherheitspruefungen"
+    }
+  },
+
+  "liveCapture": {
+    "stepTitle": "Schritt 5 von 6 \u2014 Live-Aufnahme",
+    "heading": "Machen Sie eine kurze Live-Aufnahme",
+    "description": "Wir muessen bestaetigen, dass Ihre Identitaet mit Ihrem Ausweis uebereinstimmt. Schauen Sie direkt in die Kamera in einem gut beleuchteten Bereich.",
+    "tips": "Brille abnehmen \u00b7 Gesicht beleuchtet \u00b7 Keine Kopfbedeckung",
+    "captureButton": "Live-Aufnahme machen",
+    "submitButton": "Live-Aufnahme absenden"
+  },
+
+  "success": {
+    "heading": "Verifizierung abgeschlossen",
+    "subheading": "Alles erledigt",
+    "message": "Ihre Identitaet wurde verifiziert. Sie koennen diese Seite schliessen.",
+    "checklist": {
+      "documentVerified": "Identitaetsdokument verifiziert",
+      "detailsConfirmed": "Dokumentendaten bestaetigt",
+      "livenessCheck": "Lebendigkeitspruefung bestanden",
+      "faceMatched": "Gesichtserkennung erfolgreich"
+    }
+  },
+
+  "failure": {
+    "heading": "Verifizierung fehlgeschlagen",
+    "message": "Ihre Verifizierung konnte nicht abgeschlossen werden.",
+    "helpText": "Bitte ueberpruefen Sie die Angaben und versuchen Sie es erneut, oder kontaktieren Sie den Support.",
+    "checklist": {
+      "documentNotRead": "Dokument konnte nicht gelesen werden",
+      "detailsMismatch": "Daten stimmen nicht ueberein",
+      "securityFailed": "Sicherheitspruefung fehlgeschlagen"
+    }
+  },
+
+  "manualReview": {
+    "heading": "In Pruefung",
+    "message": "Ihre Verifizierung wird manuell ueberprueft.",
+    "timeline": "Wir senden Ihnen innerhalb von 24 Stunden ein Update."
+  },
+
+  "staleLink": {
+    "heading": "Verifizierungslink bereits verwendet",
+    "message": "Wenn Sie sich erneut verifizieren muessen, fordern Sie einen neuen Link von der Organisation an."
+  },
+
+  "status": {
+    "loadingStatus": "Verifizierungsstatus wird geladen...",
+    "errorLoading": "Fehler beim Laden des Status",
+    "verified": "Ihre Identitaet wurde erfolgreich verifiziert!",
+    "failed": "Die Identitaetsverifizierung ist fehlgeschlagen. Bitte kontaktieren Sie den Support.",
+    "expired": "Diese Verifizierungssitzung ist abgelaufen.",
+    "manualReview": "Ihre Dokumente werden manuell ueberprueft. Wir benachrichtigen Sie nach Abschluss.",
+    "processing": "Wir verarbeiten derzeit Ihre Verifizierung.",
+    "pending": "Die Verifizierungsdokumente warten auf den Upload.",
+    "unknown": "Unbekannter Verifizierungsstatus.",
+    "details": "Verifizierungsdetails",
+    "submitted": "Eingereicht",
+    "completed": "Abgeschlossen",
+    "expires": "Laeuft ab",
+    "documentsUploaded": "Dokumente hochgeladen",
+    "verificationId": "Verifizierungs-ID",
+    "estimatedCompletion": "Geschaetzte Fertigstellung",
+    "refreshStatus": "Status aktualisieren",
+    "refreshing": "Aktualisierung...",
+    "autoRefresh": "Automatische Aktualisierung alle 30 Sekunden",
+    "documentAuthenticity": "Dokumentenauthentizitaet",
+    "authentic": "Authentisch",
+    "suspicious": "Verdaechtig",
+    "noTamperFlags": "Keine Manipulationshinweise erkannt.",
+    "questionsAbout": "Fragen zu Ihrer Verifizierung?",
+    "manualReviewBadge": "Manuelle Pruefung"
+  },
+
+  "ocrFields": {
+    "name": "Name",
+    "documentNumber": "Dokumentennr.",
+    "dateOfBirth": "Geburtsdatum",
+    "expiry": "Ablaufdatum",
+    "nationality": "Staatsangehoerigkeit"
+  },
+
+  "errors": {
+    "invalidLink": "Ungueltiger Link \u2014 kein Sitzungstoken angegeben.",
+    "failedToLoad": "Verifizierungssitzung konnte nicht geladen werden",
+    "failedToStart": "Verifizierung konnte nicht gestartet werden",
+    "processingTimeout": "Dokumentenverarbeitung abgelaufen. Bitte erneut versuchen.",
+    "statusCheckFailed": "Statusueberpruefung fehlgeschlagen.",
+    "validationTimeout": "Validierung abgelaufen.",
+    "ocrTimeout": "OCR abgelaufen. Bitte erneut versuchen.",
+    "uploadFrontFailed": "Upload des Vorderseitendokuments fehlgeschlagen",
+    "uploadBackFailed": "Upload des Rueckseitendokuments fehlgeschlagen",
+    "uploadLiveCaptureFailed": "Upload der Live-Aufnahme fehlgeschlagen",
+    "submissionFailed": "Einreichung fehlgeschlagen. Bitte erneut versuchen.",
+    "takingLonger": "Die Verifizierung dauert laenger als erwartet.",
+    "alreadySubmitted": "Diese Verifizierung wurde bereits eingereicht. Bitte ueberpruefen Sie Ihren Status.",
+    "unableToLoad": "Laden nicht moeglich",
+    "somethingWrong": "Etwas ist schiefgelaufen",
+    "somethingWrongMessage": "Es tut uns leid, aber etwas Unerwartetes ist passiert. Bitte aktualisieren Sie die Seite oder kontaktieren Sie den Support, wenn das Problem weiterhin besteht.",
+    "preparingSession": "Ihre Sitzung wird vorbereitet..."
+  },
+
+  "desktop": {
+    "initTitle": "Verifizierung wird initialisiert",
+    "initSubtitle": "Ihre sichere Sitzung wird eingerichtet...",
+    "selectCountryDoc": "Land und Dokumententyp waehlen",
+    "selectCountryDocDesc": "Erzaehlen Sie uns von dem Dokument, das Sie verifizieren werden"
+  }
+}

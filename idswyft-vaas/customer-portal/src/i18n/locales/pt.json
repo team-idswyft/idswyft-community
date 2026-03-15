@@ -1,0 +1,208 @@
+{
+  "common": {
+    "loading": "Carregando...",
+    "error": "Erro",
+    "tryAgain": "Tentar novamente",
+    "refreshPage": "Atualizar pagina",
+    "close": "Fechar",
+    "back": "Voltar",
+    "next": "Proximo",
+    "submit": "Enviar",
+    "processing": "Processando...",
+    "contactSupport": "Contatar suporte",
+    "secureSession": "Sessao segura",
+    "verificationPortal": "Portal de verificacao",
+    "identityVerification": "Verificacao de identidade"
+  },
+
+  "app": {
+    "invalidLink": "Link de verificacao invalido",
+    "invalidLinkMessage": "O link de verificacao parece ser invalido ou expirado. Solicite um novo link a organizacao.",
+    "invalidStatusLink": "Link de status invalido",
+    "invalidStatusMessage": "O link de status parece ser invalido. Verifique seu e-mail de verificacao ou entre em contato com o suporte.",
+    "portalTitle": "Portal de verificacao de identidade",
+    "portalMessage": "Este e um portal seguro para verificacao de identidade. Para comecar, voce precisara de um link de verificacao fornecido pela organizacao solicitante.",
+    "needHelp": "Precisa de ajuda?",
+    "needHelpMessage": "Se voce acredita que deveria ter acesso a este portal, entre em contato com a organizacao que solicitou sua verificacao."
+  },
+
+  "steps": {
+    "country": "Pais",
+    "frontId": "Frente ID",
+    "backId": "Verso ID",
+    "checking": "Verificando",
+    "scanning": "Escaneando",
+    "liveCapture": "Captura ao vivo",
+    "complete": "Concluido",
+    "done": "Pronto"
+  },
+
+  "country": {
+    "title": "Selecione seu pais",
+    "subtitle": "Escolha o pais que emitiu seu documento de identidade.",
+    "stepTitle": "Passo 1 de 6 \u2014 Selecionar pais",
+    "heading": "Onde seu ID foi emitido?",
+    "description": "Selecione o pais que emitiu seu documento de identidade e escolha o tipo de documento.",
+    "searchPlaceholder": "Pesquisar paises...",
+    "choosePlaceholder": "Escolher pais...",
+    "noResults": "Nenhum pais corresponde a sua pesquisa.",
+    "issuingCountry": "Pais emissor",
+    "regions": {
+      "americas": "Americas",
+      "europe": "Europa",
+      "asiaPacific": "Asia-Pacifico"
+    }
+  },
+
+  "documentType": {
+    "title": "Selecionar tipo de documento",
+    "subtitle": "Escolha o tipo de documento de identidade que voce ira verificar.",
+    "changeCountry": "\u2190 Mudar pais",
+    "driversLicense": "Carteira de motorista",
+    "driversLicenseDesc": "Habilitacao emitida pelo governo",
+    "passport": "Passaporte",
+    "passportDesc": "Documento de viagem internacional",
+    "nationalId": "Carteira de identidade",
+    "nationalIdDesc": "Documento de identidade emitido pelo governo"
+  },
+
+  "frontId": {
+    "stepTitle": "Passo 2 de 6 \u2014 Frente do ID",
+    "heading": "Escaneie a frente do seu ID",
+    "description": "Posicione seu documento de identidade e tire uma foto clara. Certifique-se de que os quatro cantos estejam visiveis e o texto legivel.",
+    "tips": "Boa iluminacao \u00b7 Sem reflexos \u00b7 Segure firme",
+    "helperText": "Isso nos ajuda a verificar seu documento com precisao",
+    "captureButton": "Tirar foto da frente",
+    "scanButton": "Escanear frente do ID",
+    "uploadHint": "JPG, PNG ate 10MB \u2014 arraste e solte ou clique",
+    "extractedData": "Frente do ID \u2014 Dados extraidos"
+  },
+
+  "backId": {
+    "stepTitle": "Passo 3 de 6 \u2014 Verso do ID",
+    "heading": "Agora vire e escaneie o verso",
+    "description": "Mantenha as mesmas condicoes \u2014 boa iluminacao, superficie plana. O codigo de barras no verso deve estar totalmente visivel.",
+    "barcodeTip": "O codigo de barras deve estar desobstruido",
+    "captureButton": "Tirar foto do verso",
+    "scanButton": "Escanear verso do ID"
+  },
+
+  "verification": {
+    "stepTitle": "Passo 4 de 6 \u2014 Verificacao",
+    "verifying": "Verificando seu documento...",
+    "crossChecking": "Cruzando dados...",
+    "almostThere": "Quase la...",
+    "onlyMoment": "Isso leva apenas um momento",
+    "processTags": {
+      "documentRead": "Documento lido",
+      "detailsMatched": "Dados conferidos",
+      "securityChecks": "Verificacoes de seguranca"
+    }
+  },
+
+  "liveCapture": {
+    "stepTitle": "Passo 5 de 6 \u2014 Captura ao vivo",
+    "heading": "Faca uma captura ao vivo rapida",
+    "description": "Precisamos confirmar que sua identidade corresponde ao seu ID. Olhe diretamente para a camera em um local bem iluminado.",
+    "tips": "Sem oculos \u00b7 Rosto iluminado \u00b7 Sem chapeu",
+    "captureButton": "Fazer captura ao vivo",
+    "submitButton": "Enviar captura ao vivo"
+  },
+
+  "success": {
+    "heading": "Verificacao concluida",
+    "subheading": "Tudo pronto",
+    "message": "Sua identidade foi verificada. Voce pode fechar esta pagina.",
+    "checklist": {
+      "documentVerified": "Documento de identidade verificado",
+      "detailsConfirmed": "Dados do documento confirmados",
+      "livenessCheck": "Teste de vivacidade aprovado",
+      "faceMatched": "Correspondencia facial bem-sucedida"
+    }
+  },
+
+  "failure": {
+    "heading": "Verificacao falhou",
+    "message": "Sua verificacao nao pode ser concluida.",
+    "helpText": "Revise os detalhes e tente novamente, ou entre em contato com o suporte para assistencia.",
+    "checklist": {
+      "documentNotRead": "O documento nao pode ser lido",
+      "detailsMismatch": "Os dados nao correspondem",
+      "securityFailed": "A verificacao de seguranca falhou"
+    }
+  },
+
+  "manualReview": {
+    "heading": "Em analise",
+    "message": "Sua verificacao esta sendo analisada manualmente.",
+    "timeline": "Enviaremos uma atualizacao dentro de 24 horas."
+  },
+
+  "staleLink": {
+    "heading": "Link de verificacao usado",
+    "message": "Se precisar verificar novamente, solicite um novo link a organizacao."
+  },
+
+  "status": {
+    "loadingStatus": "Carregando status da verificacao...",
+    "errorLoading": "Erro ao carregar status",
+    "verified": "Sua identidade foi verificada com sucesso!",
+    "failed": "A verificacao de identidade falhou. Entre em contato com o suporte.",
+    "expired": "Esta sessao de verificacao expirou.",
+    "manualReview": "Seus documentos estao em revisao manual. Notificaremos quando estiver concluido.",
+    "processing": "Estamos processando sua verificacao.",
+    "pending": "Os documentos de verificacao estao pendentes de envio.",
+    "unknown": "Status de verificacao desconhecido.",
+    "details": "Detalhes da verificacao",
+    "submitted": "Enviado",
+    "completed": "Concluido",
+    "expires": "Expira",
+    "documentsUploaded": "Documentos enviados",
+    "verificationId": "ID da verificacao",
+    "estimatedCompletion": "Conclusao estimada",
+    "refreshStatus": "Atualizar status",
+    "refreshing": "Atualizando...",
+    "autoRefresh": "Atualizacao automatica a cada 30 segundos",
+    "documentAuthenticity": "Autenticidade do documento",
+    "authentic": "Autentico",
+    "suspicious": "Suspeito",
+    "noTamperFlags": "Nenhum indicador de adulteracao detectado.",
+    "questionsAbout": "Duvidas sobre sua verificacao?",
+    "manualReviewBadge": "Revisao manual"
+  },
+
+  "ocrFields": {
+    "name": "Nome",
+    "documentNumber": "N. do documento",
+    "dateOfBirth": "Data de nascimento",
+    "expiry": "Validade",
+    "nationality": "Nacionalidade"
+  },
+
+  "errors": {
+    "invalidLink": "Link invalido \u2014 nenhum token de sessao fornecido.",
+    "failedToLoad": "Falha ao carregar a sessao de verificacao",
+    "failedToStart": "Falha ao iniciar a verificacao",
+    "processingTimeout": "O processamento do documento expirou. Tente novamente.",
+    "statusCheckFailed": "Falha ao verificar o status do processamento.",
+    "validationTimeout": "A validacao expirou.",
+    "ocrTimeout": "O OCR expirou. Tente novamente.",
+    "uploadFrontFailed": "Falha ao enviar o documento frontal",
+    "uploadBackFailed": "Falha ao enviar o documento posterior",
+    "uploadLiveCaptureFailed": "Falha ao enviar a captura ao vivo",
+    "submissionFailed": "O envio falhou. Tente novamente.",
+    "takingLonger": "A verificacao esta demorando mais do que o esperado.",
+    "alreadySubmitted": "Esta verificacao ja foi enviada. Verifique seu status.",
+    "unableToLoad": "Nao foi possivel carregar",
+    "somethingWrong": "Algo deu errado",
+    "somethingWrongMessage": "Desculpe, mas algo inesperado aconteceu. Tente atualizar a pagina ou entre em contato com o suporte se o problema persistir.",
+    "preparingSession": "Preparando sua sessao..."
+  },
+
+  "desktop": {
+    "initTitle": "Inicializando verificacao",
+    "initSubtitle": "Configurando sua sessao segura...",
+    "selectCountryDoc": "Selecionar pais e tipo de documento",
+    "selectCountryDocDesc": "Conte-nos sobre o documento que voce ira verificar"
+  }
+}

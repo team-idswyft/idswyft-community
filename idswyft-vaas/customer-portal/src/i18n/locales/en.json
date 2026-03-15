@@ -1,0 +1,208 @@
+{
+  "common": {
+    "loading": "Loading...",
+    "error": "Error",
+    "tryAgain": "Try Again",
+    "refreshPage": "Refresh Page",
+    "close": "Close",
+    "back": "Back",
+    "next": "Next",
+    "submit": "Submit",
+    "processing": "Processing...",
+    "contactSupport": "Contact support",
+    "secureSession": "Secure Session",
+    "verificationPortal": "Verification Portal",
+    "identityVerification": "Identity Verification"
+  },
+
+  "app": {
+    "invalidLink": "Invalid Verification Link",
+    "invalidLinkMessage": "The verification link appears to be invalid or expired. Please request a new verification link from the organization.",
+    "invalidStatusLink": "Invalid Status Link",
+    "invalidStatusMessage": "The status link appears to be invalid. Please check your verification email or contact support.",
+    "portalTitle": "Identity Verification Portal",
+    "portalMessage": "This is a secure portal for identity verification. To begin verification, you'll need a verification link provided by the requesting organization.",
+    "needHelp": "Need help?",
+    "needHelpMessage": "If you believe you should have access to this verification portal, please contact the organization that requested your verification."
+  },
+
+  "steps": {
+    "country": "Country",
+    "frontId": "Front ID",
+    "backId": "Back ID",
+    "checking": "Checking",
+    "scanning": "Scanning",
+    "liveCapture": "Live Capture",
+    "complete": "Complete",
+    "done": "Done"
+  },
+
+  "country": {
+    "title": "Select Your Country",
+    "subtitle": "Choose the country that issued your identity document.",
+    "stepTitle": "Step 1 of 6 \u2014 Select Country",
+    "heading": "Where was your ID issued?",
+    "description": "Select the country that issued your identity document, then choose the document type.",
+    "searchPlaceholder": "Search countries...",
+    "choosePlaceholder": "Choose country...",
+    "noResults": "No countries match your search.",
+    "issuingCountry": "Issuing Country",
+    "regions": {
+      "americas": "Americas",
+      "europe": "Europe",
+      "asiaPacific": "Asia-Pacific"
+    }
+  },
+
+  "documentType": {
+    "title": "Select Document Type",
+    "subtitle": "Choose the type of identity document you will be verifying.",
+    "changeCountry": "\u2190 Change country",
+    "driversLicense": "Driver's License",
+    "driversLicenseDesc": "Government-issued driving permit",
+    "passport": "Passport",
+    "passportDesc": "International travel document",
+    "nationalId": "National ID Card",
+    "nationalIdDesc": "Government-issued identity card"
+  },
+
+  "frontId": {
+    "stepTitle": "Step 2 of 6 \u2014 Front of ID",
+    "heading": "Scan the front of your ID",
+    "description": "Position your ID card and take a clear photo. Make sure all four corners are visible and the text is clear.",
+    "tips": "Good lighting \u00b7 No glare \u00b7 Hold steady",
+    "helperText": "This helps us verify your document accurately",
+    "captureButton": "Take Photo of Front",
+    "scanButton": "Scan Front of ID",
+    "uploadHint": "JPG, PNG up to 10MB \u2014 drag & drop or click",
+    "extractedData": "Front ID \u2014 Extracted Data"
+  },
+
+  "backId": {
+    "stepTitle": "Step 3 of 6 \u2014 Back of ID",
+    "heading": "Now flip it over and scan the back",
+    "description": "Keep the same conditions \u2014 good lighting, flat surface. The barcode on the back must be fully visible.",
+    "barcodeTip": "Barcode must be unobstructed",
+    "captureButton": "Take Photo of Back",
+    "scanButton": "Scan Back of ID"
+  },
+
+  "verification": {
+    "stepTitle": "Step 4 of 6 \u2014 Verification",
+    "verifying": "Verifying your document...",
+    "crossChecking": "Cross-checking details...",
+    "almostThere": "Almost there...",
+    "onlyMoment": "This only takes a moment",
+    "processTags": {
+      "documentRead": "Document read",
+      "detailsMatched": "Details matched",
+      "securityChecks": "Security checks"
+    }
+  },
+
+  "liveCapture": {
+    "stepTitle": "Step 5 of 6 \u2014 Live Capture",
+    "heading": "Take a quick live capture",
+    "description": "We need to confirm your identity matches your ID. Look directly at the camera in a well-lit area.",
+    "tips": "Remove glasses \u00b7 Face well-lit \u00b7 No hat",
+    "captureButton": "Take Live Capture",
+    "submitButton": "Submit Live Capture"
+  },
+
+  "success": {
+    "heading": "Verification complete",
+    "subheading": "You're all set",
+    "message": "Your identity has been verified. You can close this page.",
+    "checklist": {
+      "documentVerified": "Identity document verified",
+      "detailsConfirmed": "Document details confirmed",
+      "livenessCheck": "Liveness check passed",
+      "faceMatched": "Face matched successfully"
+    }
+  },
+
+  "failure": {
+    "heading": "Verification Failed",
+    "message": "Your verification could not be completed.",
+    "helpText": "Please review the details and try again, or contact support for assistance.",
+    "checklist": {
+      "documentNotRead": "Document could not be read",
+      "detailsMismatch": "Details do not match",
+      "securityFailed": "Security check failed"
+    }
+  },
+
+  "manualReview": {
+    "heading": "Under Review",
+    "message": "Your verification is being manually reviewed.",
+    "timeline": "We'll send you an update within 24 hours."
+  },
+
+  "staleLink": {
+    "heading": "Verification Link Used",
+    "message": "If you need to verify again, please request a new link from the organization."
+  },
+
+  "status": {
+    "loadingStatus": "Loading verification status...",
+    "errorLoading": "Error Loading Status",
+    "verified": "Your identity has been successfully verified!",
+    "failed": "Identity verification failed. Please contact support.",
+    "expired": "This verification session has expired.",
+    "manualReview": "Your documents are under manual review. We'll notify you once complete.",
+    "processing": "We're currently processing your verification.",
+    "pending": "Verification documents are pending upload.",
+    "unknown": "Unknown verification status.",
+    "details": "Verification Details",
+    "submitted": "Submitted",
+    "completed": "Completed",
+    "expires": "Expires",
+    "documentsUploaded": "Documents Uploaded",
+    "verificationId": "Verification ID",
+    "estimatedCompletion": "Estimated Completion",
+    "refreshStatus": "Refresh Status",
+    "refreshing": "Refreshing...",
+    "autoRefresh": "Auto-refreshing every 30 seconds",
+    "documentAuthenticity": "Document Authenticity",
+    "authentic": "Authentic",
+    "suspicious": "Suspicious",
+    "noTamperFlags": "No tamper flags detected.",
+    "questionsAbout": "Questions about your verification?",
+    "manualReviewBadge": "Manual Review"
+  },
+
+  "ocrFields": {
+    "name": "Name",
+    "documentNumber": "Document #",
+    "dateOfBirth": "Date of Birth",
+    "expiry": "Expiry",
+    "nationality": "Nationality"
+  },
+
+  "errors": {
+    "invalidLink": "Invalid link \u2014 no session token provided.",
+    "failedToLoad": "Failed to load verification session",
+    "failedToStart": "Failed to start verification",
+    "processingTimeout": "Document processing timed out. Please try again.",
+    "statusCheckFailed": "Failed to check processing status.",
+    "validationTimeout": "Validation timed out.",
+    "ocrTimeout": "OCR timed out. Please try again.",
+    "uploadFrontFailed": "Failed to upload front document",
+    "uploadBackFailed": "Failed to upload back document",
+    "uploadLiveCaptureFailed": "Failed to upload live capture",
+    "submissionFailed": "Submission failed. Please try again.",
+    "takingLonger": "Verification is taking longer than expected.",
+    "alreadySubmitted": "This verification was already submitted. Please check your status.",
+    "unableToLoad": "Unable to Load",
+    "somethingWrong": "Something went wrong",
+    "somethingWrongMessage": "We're sorry, but something unexpected happened. Please try refreshing the page or contact support if the issue persists.",
+    "preparingSession": "Preparing your session..."
+  },
+
+  "desktop": {
+    "initTitle": "Initializing Verification",
+    "initSubtitle": "Setting up your secure session...",
+    "selectCountryDoc": "Select Country & Document Type",
+    "selectCountryDocDesc": "Tell us about the document you'll be verifying"
+  }
+}

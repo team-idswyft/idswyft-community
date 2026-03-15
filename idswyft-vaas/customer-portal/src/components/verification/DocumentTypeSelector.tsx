@@ -1,5 +1,6 @@
 import React from 'react';
 import { CreditCard, BookOpen, IdCard, ChevronRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 // Document types available per country. US always has all three;
 // other countries show national_id only when supported in the format registry.
@@ -33,11 +34,19 @@ interface DocumentTypeSelectorProps {
   onBack: () => void;
 }
 
+const docTypeKeys: Record<string, { label: string; desc: string }> = {
+  drivers_license: { label: 'documentType.driversLicense', desc: 'documentType.driversLicenseDesc' },
+  passport: { label: 'documentType.passport', desc: 'documentType.passportDesc' },
+  national_id: { label: 'documentType.nationalId', desc: 'documentType.nationalIdDesc' },
+};
+
 const DocumentTypeSelector: React.FC<DocumentTypeSelectorProps> = ({
   countryCode,
   onSelect,
   onBack,
 }) => {
+  const { t } = useTranslation();
+
   const types = DOCUMENT_TYPES.filter(dt => {
     if (dt.type === 'national_id' && NO_NATIONAL_ID.has(countryCode)) return false;
     return true;
@@ -47,10 +56,10 @@ const DocumentTypeSelector: React.FC<DocumentTypeSelectorProps> = ({
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       <div className="flex items-center mb-4">
         <IdCard className="w-6 h-6 text-blue-600 mr-3" />
-        <h2 className="text-xl font-semibold text-gray-900">Select Document Type</h2>
+        <h2 className="text-xl font-semibold text-gray-900">{t('documentType.title')}</h2>
       </div>
       <p className="text-gray-600 mb-6">
-        Choose the type of identity document you will be verifying.
+        {t('documentType.subtitle')}
       </p>
 
       <div className="space-y-3">
@@ -67,8 +76,8 @@ const DocumentTypeSelector: React.FC<DocumentTypeSelectorProps> = ({
                   <Icon className="w-5 h-5 text-blue-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">{dt.label}</p>
-                  <p className="text-sm text-gray-500">{dt.description}</p>
+                  <p className="font-medium text-gray-900">{t(docTypeKeys[dt.type]?.label || dt.label)}</p>
+                  <p className="text-sm text-gray-500">{t(docTypeKeys[dt.type]?.desc || dt.description)}</p>
                 </div>
               </div>
               <ChevronRight className="w-5 h-5 text-gray-300 group-hover:text-blue-500 transition-colors" />
@@ -81,7 +90,7 @@ const DocumentTypeSelector: React.FC<DocumentTypeSelectorProps> = ({
         onClick={onBack}
         className="mt-6 text-sm text-gray-500 hover:text-gray-700 transition-colors"
       >
-        &larr; Change country
+        {t('documentType.changeCountry')}
       </button>
     </div>
   );
