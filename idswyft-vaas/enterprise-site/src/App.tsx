@@ -97,14 +97,14 @@ const FEATURES = [
   {
     icon: Shield,
     title: 'Fraud Detection',
-    desc: 'Barcode cross-validation (US PDF417), MRZ parsing (international TD1/TD2/TD3), tamper detection, and authenticity scoring.',
-    tags: ['PDF417', 'MRZ', 'Cross-Validation'],
+    desc: 'Barcode cross-validation, MRZ parsing, tamper detection, and **OFAC/EU/UN sanctions screening** with fuzzy name matching.',
+    tags: ['PDF417', 'MRZ', 'AML/Sanctions'],
   },
   {
     icon: Activity,
     title: 'Real-Time Webhooks',
-    desc: 'Instant event delivery on state changes. Built-in retry logic with exponential backoff. No polling needed.',
-    tags: ['Events', '3 Retries', 'Signed'],
+    desc: 'Instant event delivery via WebSocket or webhook. Built-in retry logic with exponential backoff. **Real-time push updates** — no polling needed.',
+    tags: ['WebSocket', 'Webhooks', 'Real-Time'],
   },
   {
     icon: Layers,
@@ -118,6 +118,18 @@ const FEATURES = [
     desc: 'Manage all organizations from one dashboard. Monitor queues, review flagged cases, export audit reports.',
     tags: ['Analytics', 'Audit Trail', 'RBAC'],
   },
+  {
+    icon: Globe,
+    title: 'Multi-Language Portal',
+    desc: 'Customer verification portal in 6 languages — English, Spanish, French, Portuguese, German, and Japanese. Auto-detects browser language.',
+    tags: ['i18n', '6 Languages', 'Auto-Detect'],
+  },
+  {
+    icon: Layers,
+    title: 'Batch Processing',
+    desc: 'Enterprise-scale onboarding with bulk verification API. Process hundreds of users with controlled concurrency, progress tracking, and per-batch webhooks.',
+    tags: ['Bulk API', 'Enterprise', 'Async'],
+  },
 ]
 
 // ── Industry solutions data ────────────────────────────────────────────────
@@ -126,7 +138,7 @@ const INDUSTRIES = [
     icon: Building2,
     title: 'Fintech & Banking',
     accent: 'cyan',
-    items: ['KYC/AML automation', 'CIP requirements', 'BSA compliance', 'Full audit trails'],
+    items: ['KYC/AML with sanctions screening', 'CIP requirements', 'BSA compliance', 'Full audit trails'],
   },
   {
     icon: Globe,
@@ -138,7 +150,7 @@ const INDUSTRIES = [
     icon: Shield,
     title: 'Healthcare',
     accent: 'emerald',
-    items: ['HIPAA-compliant', 'Patient verification', 'Claims fraud prevention', 'Provider credentialing'],
+    items: ['HIPAA-compliant', 'Patient verification', 'Address verification', 'Provider credentialing'],
   },
   {
     icon: Users,
@@ -1164,7 +1176,7 @@ function App() {
             </p>
           </div>
           <div className="flex flex-wrap justify-center gap-3">
-            {['SOC 2 Type II', 'GDPR Ready', 'CCPA Compliant', 'HIPAA Controls', 'PCI DSS', 'ISO 27001'].map(
+            {['SOC 2 Type II', 'GDPR Ready', 'CCPA Compliant', 'HIPAA Controls', 'PCI DSS', 'ISO 27001', 'AML/OFAC'].map(
               cert => (
                 <div
                   key={cert}
@@ -1241,7 +1253,7 @@ function App() {
                 + $2.00 per verification &middot; up to 500/mo
               </p>
               <ul className="space-y-3 mb-8">
-                {['Document verification', 'Biometric face matching', 'Webhook events', 'Sandbox environment', 'Email support'].map(f => (
+                {['Document verification', 'Biometric face matching', 'Webhook events', 'Address verification', 'Sandbox environment', 'Email support'].map(f => (
                   <li key={f} className="flex items-center gap-2.5 text-sm" style={{ color: '#64748b' }}>
                     <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#10b981' }} />
                     {f}
@@ -1303,7 +1315,7 @@ function App() {
                 + $1.50 per verification &middot; up to 2,000/mo
               </p>
               <ul className="space-y-3 mb-8">
-                {['Everything in Starter', 'Fraud detection + barcode scan', 'White-label UI', 'Priority support (4hr SLA)', 'Advanced analytics dashboard'].map(f => (
+                {['Everything in Starter', 'Fraud detection + barcode scan', 'AML/sanctions screening', 'White-label UI', 'Priority support (4hr SLA)', 'Risk scoring & analytics'].map(f => (
                   <li key={f} className="flex items-center gap-2.5 text-sm" style={{ color: '#94a3b8' }}>
                     <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#22d3ee' }} />
                     {f}
@@ -1339,7 +1351,7 @@ function App() {
                 + $1.00 per verification &middot; unlimited volume
               </p>
               <ul className="space-y-3 mb-8">
-                {['Everything in Professional', 'Dedicated account manager', '99.9% uptime SLA', 'Custom integrations', 'On-prem deployment option'].map(f => (
+                {['Everything in Professional', 'Dedicated account manager', '99.9% uptime SLA', 'SSO/SAML authentication', 'Batch verification API', 'Ongoing monitoring & alerts', 'On-prem deployment option'].map(f => (
                   <li key={f} className="flex items-center gap-2.5 text-sm" style={{ color: '#64748b' }}>
                     <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#10b981' }} />
                     {f}
