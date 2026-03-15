@@ -1,10 +1,11 @@
 {
   "name": "idswyft-sdk",
-  "version": "3.0.0",
+  "version": "4.0.0",
   "description": "Official JavaScript/Node.js SDK for the Idswyft identity verification platform",
   "main": "dist/index.cjs",
   "module": "dist/index.esm.js",
   "types": "dist/index.d.ts",
+  "browser": "dist/index.esm.js",
   "exports": {
     ".": {
       "import": "./dist/index.esm.js",
@@ -56,16 +57,17 @@
     "form-data": "^4.0.0"
   },
   "devDependencies": {
+    "@rollup/plugin-commonjs": "^25.0.0",
+    "@rollup/plugin-node-resolve": "^15.0.0",
+    "@rollup/plugin-typescript": "^11.0.0",
     "@types/jest": "^29.5.0",
     "@types/node": "^20.0.0",
     "@typescript-eslint/eslint-plugin": "^6.0.0",
     "@typescript-eslint/parser": "^6.0.0",
     "eslint": "^8.0.0",
     "jest": "^29.5.0",
+    "jest-environment-jsdom": "^30.3.0",
     "rollup": "^4.0.0",
-    "@rollup/plugin-typescript": "^11.0.0",
-    "@rollup/plugin-node-resolve": "^15.0.0",
-    "@rollup/plugin-commonjs": "^25.0.0",
     "rollup-plugin-dts": "^6.0.0",
     "ts-jest": "^29.1.0",
     "typescript": "^5.0.0"

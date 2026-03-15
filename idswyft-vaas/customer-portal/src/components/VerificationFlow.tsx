@@ -8,6 +8,14 @@ import MobileVerificationFlow from './MobileVerificationFlow';
 
 interface VerificationFlowProps {
   sessionToken: string;
+  /** When true, hide header/footer and communicate via postMessage */
+  embedMode?: boolean;
+  /** Callback for embed mode — verification completed successfully */
+  onEmbedComplete?: (result: { verificationId: string; status: string; finalResult: string }) => void;
+  /** Callback for embed mode — verification error */
+  onEmbedError?: (error: { code: string; message: string }) => void;
+  /** Callback for embed mode — step changed */
+  onEmbedStepChange?: (step: { current: number; total: number; status: string }) => void;
 }
 
 const MOBILE_BREAKPOINT = 768;
@@ -25,7 +33,13 @@ function useIsMobile(): boolean {
   return isMobile;
 }
 
-const VerificationFlow: React.FC<VerificationFlowProps> = ({ sessionToken }) => {
+const VerificationFlow: React.FC<VerificationFlowProps> = ({
+  sessionToken,
+  embedMode,
+  onEmbedComplete,
+  onEmbedError,
+  onEmbedStepChange,
+}) => {
   const isMobile = useIsMobile();
 
   if (isMobile) {

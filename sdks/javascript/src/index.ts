@@ -1,5 +1,7 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import FormData from 'form-data';
+import { VerificationEventEmitter } from './events';
+import type { WatchOptions } from './events';
 
 // ─── Configuration ──────────────────────────────────────
 
@@ -186,8 +188,8 @@ export class IdswyftSDK {
       timeout: this.config.timeout,
       headers: {
         'X-API-Key': this.config.apiKey,
-        'User-Agent': '@idswyft/sdk/3.0.0',
-        'X-SDK-Version': '3.0.0',
+        'User-Agent': '@idswyft/sdk/4.0.0',
+        'X-SDK-Version': '4.0.0',
         'X-SDK-Language': 'javascript',
       },
     });
@@ -452,6 +454,37 @@ export class IdswyftSDK {
     return response.data;
   }
 
+  // ─── Real-Time Status Watching ──────────────────────────
+
+  /**
+   * Watch a verification session for real-time status updates.
+   * Internally polls getVerificationStatus() at a configurable interval.
+   * Auto-stops on terminal states (COMPLETE, HARD_REJECTED).
+   *
+   * @example
+   * ```ts
+   * const watcher = sdk.watch(verificationId);
+   * watcher.on('verification_complete', (event) => {
+   *   console.log('Verified!', event.data.final_result);
+   * });
+   * watcher.on('verification_failed', (event) => {
+   *   console.log('Failed:', event.data.rejection_reason);
+   * });
+   * // Clean up when done
+   * watcher.destroy();
+   * ```
+   */
+  watch(verificationId: string, options?: WatchOptions): VerificationEventEmitter {
+    return new VerificationEventEmitter(
+      verificationId,
+      (id) => this.getVerificationStatus(id),
+      {
+        interval: options?.interval ?? 2000,
+        maxAttempts: options?.maxAttempts ?? 300,
+      },
+    );
+  }
+
   // ─── Utilities ─────────────────────────────────────────
 
   /**
@@ -495,3 +528,9 @@ export default function createIdswyftSDK(config: IdswyftConfig): IdswyftSDK {
 
 // Export alias for the main SDK class
 export { IdswyftSDK as Idswyft };
+
+// Re-export events and embed modules
+export { VerificationEventEmitter } from './events';
+export type { VerificationEventType, VerificationEvent, VerificationEventHandler, WatchOptions } from './events';
+export { IdswyftEmbed } from './embed';
+export type { EmbedOptions, EmbedCallbacks, EmbedResult, EmbedError, EmbedMode, EmbedTheme } from './embed';
