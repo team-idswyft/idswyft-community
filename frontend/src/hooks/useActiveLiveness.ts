@@ -242,13 +242,14 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
       let results;
       try {
         results = detector.detectForVideo(videoElement, now);
-      } catch {
+      } catch (e) {
+        console.warn('FaceDetector.detectForVideo error:', e);
         animFrameRef.current = requestAnimationFrame(detect);
         return;
       }
 
-      const hasDetections = results.detections && results.detections.length > 0
-        && results.detections[0].keypoints && results.detections[0].keypoints.length >= 3;
+      const det = results.detections?.[0];
+      const hasDetections = !!det?.keypoints && det.keypoints.length >= 3;
       setFaceDetected(!!hasDetections);
 
       if (!hasDetections) {

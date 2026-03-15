@@ -15,6 +15,7 @@ export function ActiveLivenessCapture({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [streamReady, setStreamReady] = useState(false);
+  const [videoDims, setVideoDims] = useState({ w: 480, h: 640 }); // portrait default for mobile
 
   // Start camera
   useEffect(() => {
@@ -24,7 +25,7 @@ export function ActiveLivenessCapture({
     (async () => {
       try {
         stream = await navigator.mediaDevices.getUserMedia({
-          video: { width: { ideal: 640 }, height: { ideal: 480 }, facingMode: 'user' },
+          video: { facingMode: 'user' },
           audio: false,
         });
         if (cancelled) {
@@ -33,6 +34,11 @@ export function ActiveLivenessCapture({
         }
         if (videoRef.current) {
           videoRef.current.srcObject = stream;
+          videoRef.current.addEventListener('loadedmetadata', () => {
+            const w = videoRef.current?.videoWidth || 480;
+            const h = videoRef.current?.videoHeight || 640;
+            setVideoDims({ w, h });
+          });
           await videoRef.current.play();
           setStreamReady(true);
         }
@@ -75,8 +81,8 @@ export function ActiveLivenessCapture({
 
   return (
     <div className="relative w-full max-w-md mx-auto bg-gray-950 rounded-2xl overflow-hidden border border-white/5">
-      {/* Video + Overlay */}
-      <div className="relative w-full" style={{ aspectRatio: '4/3' }}>
+      {/* Video + Overlay — aspect ratio matches actual camera stream to prevent zoom/crop */}
+      <div className="relative w-full" style={{ aspectRatio: `${videoDims.w}/${videoDims.h}`, maxHeight: '70vh' }}>
         <video
           ref={videoRef}
           playsInline
@@ -86,29 +92,29 @@ export function ActiveLivenessCapture({
         />
         <canvas ref={canvasRef} className="hidden" />
 
-        {/* Oval face guide */}
+        {/* Oval face guide — viewBox matches video dimensions for perfect alignment */}
         <svg
           className="absolute inset-0 w-full h-full pointer-events-none"
-          viewBox="0 0 640 480"
+          viewBox={`0 0 ${videoDims.w} ${videoDims.h}`}
           preserveAspectRatio="xMidYMid slice"
         >
           <defs>
             <mask id="cp-face-oval-mask">
-              <rect width="640" height="480" fill="white" />
-              <ellipse cx="320" cy="220" rx="130" ry="170" fill="black" />
+              <rect width={videoDims.w} height={videoDims.h} fill="white" />
+              <ellipse cx={videoDims.w / 2} cy={videoDims.h * 0.42} rx={videoDims.w * 0.27} ry={videoDims.h * 0.265} fill="black" />
             </mask>
           </defs>
           <rect
-            width="640"
-            height="480"
+            width={videoDims.w}
+            height={videoDims.h}
             fill="rgba(0,0,0,0.5)"
             mask="url(#cp-face-oval-mask)"
           />
           <ellipse
-            cx="320"
-            cy="220"
-            rx="130"
-            ry="170"
+            cx={videoDims.w / 2}
+            cy={videoDims.h * 0.42}
+            rx={videoDims.w * 0.27}
+            ry={videoDims.h * 0.265}
             fill="none"
             stroke={faceDetected ? accentColor : '#6b7280'}
             strokeWidth={3}
