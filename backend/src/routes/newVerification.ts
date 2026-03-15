@@ -15,6 +15,7 @@ import { validateFileType } from '@/middleware/fileValidation.js';
 import { supabase } from '@/config/database.js';
 import { VERIFICATION_THRESHOLDS, getFaceMatchingThresholdSync, getLivenessThresholdSync } from '@/config/verificationThresholds.js';
 import { createLivenessProvider } from '@/providers/liveness/index.js';
+import { createAMLProvider } from '@/providers/aml/index.js';
 
 import { VerificationSession } from '@/verification/session/VerificationSession.js';
 import type { SessionDeps, SessionHydration } from '@/verification/session/VerificationSession.js';
@@ -33,6 +34,7 @@ const ocrService = new OCRService();
 const barcodeService = new BarcodeService();
 const faceRecognitionService = new FaceRecognitionService();
 const webhookService = new WebhookService();
+const amlProvider = createAMLProvider();
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -82,6 +84,9 @@ function createSession(isSandbox: boolean, hydration?: SessionHydration): Verifi
     },
     computeFaceMatch,
     faceMatchThreshold: getFaceMatchingThresholdSync(isSandbox),
+    screenAML: amlProvider
+      ? async (fullName, dob, nationality) => amlProvider.screen({ full_name: fullName, date_of_birth: dob, nationality })
+      : undefined,
   };
 
   return new VerificationSession(deps, hydration);
@@ -100,6 +105,7 @@ async function hydrateSession(verificationId: string, isSandbox: boolean): Promi
     back_extraction: savedState.back_extraction,
     cross_validation: savedState.cross_validation,
     face_match: savedState.face_match,
+    aml_screening: (savedState as any).aml_screening ?? null,
     created_at: savedState.created_at,
     completed_at: savedState.completed_at,
   } : {
