@@ -64,7 +64,7 @@ const CENTER_YAW_THRESHOLD = 5;       // ±5° for "centered"
 const CENTER_HOLD_MS = 500;           // Hold center for 500ms
 const TURN_YAW_THRESHOLD = 20;        // Must turn 20° from baseline
 const RETURN_YAW_THRESHOLD = 8;       // ±8° to be "back to center"
-const MEDIAPIPE_LOAD_TIMEOUT = 8000;  // 8s to load, then fallback
+const MEDIAPIPE_LOAD_TIMEOUT = 15000; // 15s to load (WASM is ~10MB over mobile data)
 const DEFAULT_CHALLENGE_TIMEOUT = 10000;
 
 function pickRandomDirection(): ChallengeDirection {
@@ -165,13 +165,14 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
 
     (async () => {
       try {
-        const vision = await FilesetResolver.forVisionTasks('/mediapipe');
+        const vision = await FilesetResolver.forVisionTasks('/mediapipe/');
         if (cancelled) return;
 
+        // Use CPU delegate — GPU (WebGL) hangs silently on many mobile browsers
         const landmarker = await FaceLandmarker.createFromOptions(vision, {
           baseOptions: {
             modelAssetPath: '/mediapipe/face_landmarker.task',
-            delegate: 'GPU',
+            delegate: 'CPU',
           },
           runningMode: 'VIDEO',
           numFaces: 1,
