@@ -165,10 +165,11 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
 
     (async () => {
       try {
-        const vision = await FilesetResolver.forVisionTasks('/mediapipe/');
+        // Use official CDN for WASM runtime — self-hosted WASM hangs on mobile WebKit
+        const WASM_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm';
+        const vision = await FilesetResolver.forVisionTasks(WASM_CDN);
         if (cancelled) return;
 
-        // Use CPU delegate — GPU (WebGL) hangs silently on many mobile browsers
         const landmarker = await FaceLandmarker.createFromOptions(vision, {
           baseOptions: {
             modelAssetPath: '/mediapipe/face_landmarker.task',
