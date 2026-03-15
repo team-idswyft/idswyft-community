@@ -43,11 +43,22 @@ export interface VerificationEvent {
 
 export type VerificationEventHandler = (event: VerificationEvent) => void;
 
+export type WatchTransport = 'polling' | 'realtime';
+
 export interface WatchOptions {
   /** Polling interval in milliseconds (default: 2000) */
   interval?: number;
   /** Maximum number of poll attempts before auto-stopping (default: 300 = 10 min at 2s) */
   maxAttempts?: number;
+  /**
+   * Transport mode (default: 'polling').
+   * - 'polling' — HTTP polling at configurable interval
+   * - 'realtime' — Supabase Realtime subscription with polling fallback
+   *
+   * Note: 'realtime' requires @supabase/supabase-js as a peer dependency
+   * and SUPABASE_URL/SUPABASE_ANON_KEY to be provided in the SDK config.
+   */
+  transport?: WatchTransport;
 }
 
 // ─── Terminal states where polling should stop ──────────

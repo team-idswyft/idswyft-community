@@ -17,6 +17,7 @@ import { VERIFICATION_THRESHOLDS, getFaceMatchingThresholdSync, getLivenessThres
 import { createLivenessProvider } from '@/providers/liveness/index.js';
 import { createAMLProvider } from '@/providers/aml/index.js';
 import { computeRiskScore } from '@/services/riskScoring.js';
+import { broadcastStatusChange } from '@/services/realtime.js';
 
 import { VerificationSession } from '@/verification/session/VerificationSession.js';
 import type { SessionDeps, SessionHydration } from '@/verification/session/VerificationSession.js';
@@ -565,6 +566,12 @@ router.post('/:verification_id/front-document',
         : 'Front document processed successfully - ready to upload back document',
     });
 
+    // Broadcast status change via Supabase Realtime (after response is sent)
+    broadcastStatusChange(
+      verification_id, mapped.status, mapped.current_step,
+      mapped.final_result, state.rejection_reason,
+    ).catch(() => {});
+
     // Fire webhooks if Gate 1 hard-rejected (after response is sent)
     fireWebhooksIfTerminal(
       verification_id, (req as any).developer.id, verification.user_id,
@@ -678,6 +685,12 @@ router.post('/:verification_id/back-document',
         ? stepResult.user_message || 'Back document processing failed'
         : 'Back document processed and cross-validation passed - ready for live capture',
     });
+
+    // Broadcast status change via Supabase Realtime
+    broadcastStatusChange(
+      verification_id, mapped.status, mapped.current_step,
+      mapped.final_result, state.rejection_reason,
+    ).catch(() => {});
 
     // Fire webhooks if cross-validation hard-rejected (after response is sent)
     fireWebhooksIfTerminal(
@@ -866,6 +879,12 @@ router.post('/:verification_id/live-capture',
           ? stepResult.user_message || 'Verification failed'
           : 'Live capture processed',
     });
+
+    // Broadcast status change via Supabase Realtime
+    broadcastStatusChange(
+      verification_id, mapped.status, mapped.current_step,
+      mapped.final_result, state.rejection_reason,
+    ).catch(() => {});
 
     // Fire webhooks on COMPLETE or HARD_REJECTED (after response is sent)
     fireWebhooksIfTerminal(

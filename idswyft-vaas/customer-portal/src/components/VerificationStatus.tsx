@@ -13,6 +13,7 @@ import {
 import { useOrganization } from '../contexts/OrganizationContext';
 import BrandedHeader from './BrandedHeader';
 import customerPortalAPI from '../services/api';
+import { isRealtimeAvailable, subscribeToVerification } from '../services/realtimeSubscription';
 
 interface VerificationStatusData {
   id: string;
@@ -57,6 +58,23 @@ const VerificationStatus: React.FC<VerificationStatusProps> = ({ sessionToken })
   useEffect(() => {
     loadStatus();
 
+    // Try Supabase Realtime first, fall back to polling
+    if (isRealtimeAvailable()) {
+      const sub = subscribeToVerification(
+        sessionToken,
+        () => {
+          // Realtime push received — refresh data
+          loadStatus(true);
+        },
+        () => {
+          // Realtime failed — start polling fallback (below)
+        },
+      );
+
+      return () => sub.unsubscribe();
+    }
+
+    // Polling fallback (also used when Realtime unavailable)
     const interval = setInterval(() => {
       if (status?.status === 'pending' || status?.status === 'processing' || status?.status === 'manual_review') {
         loadStatus(true);
