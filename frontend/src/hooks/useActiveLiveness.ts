@@ -64,16 +64,20 @@ const CENTER_YAW_THRESHOLD = 5;       // ±5° for "centered"
 const CENTER_HOLD_MS = 500;           // Hold center for 500ms
 const TURN_YAW_THRESHOLD = 20;        // Must turn 20° from baseline
 const RETURN_YAW_THRESHOLD = 8;       // ±8° to be "back to center"
-const MEDIAPIPE_LOAD_TIMEOUT = 15000; // 15s to load (WASM is ~10MB over mobile data)
+const MEDIAPIPE_LOAD_TIMEOUT = 45000; // 45s — WASM compilation alone takes 30+ seconds on iOS WebKit
 const DEFAULT_CHALLENGE_TIMEOUT = 10000;
+
+// Google's official CDN for MediaPipe model — eliminates silent fetch failures inside WASM context
+const MODEL_CDN_URL = 'https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task';
+const WASM_CDN_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm';
 
 function pickRandomDirection(): ChallengeDirection {
   return Math.random() < 0.5 ? 'left' : 'right';
 }
 
-function getInstructionForPhase(phase: LivenessPhase, direction: ChallengeDirection): string {
+function getInstructionForPhase(phase: LivenessPhase, direction: ChallengeDirection, loadingDetail?: string): string {
   switch (phase) {
-    case 'loading': return 'Loading face detection...';
+    case 'loading': return loadingDetail || 'Preparing face detection...';
     case 'ready': return 'Camera ready. Position your face in the oval.';
     case 'center_face': return 'Look straight at the camera';
     case 'turn': return direction === 'left' ? 'Slowly turn your head left' : 'Slowly turn your head right';
@@ -137,6 +141,7 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
   const [currentYaw, setCurrentYaw] = useState(0);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [loadingDetail, setLoadingDetail] = useState('Preparing face detection...');
 
   const landmarkerRef = useRef<FaceLandmarker | null>(null);
   const samplesRef = useRef<HeadPoseSample[]>([]);
@@ -165,14 +170,23 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
 
     (async () => {
       try {
-        // Use official CDN for WASM runtime — self-hosted WASM hangs on mobile WebKit
-        const WASM_CDN = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm';
-        const vision = await FilesetResolver.forVisionTasks(WASM_CDN);
+        // Step 1: Pre-fetch model as ArrayBuffer — avoids silent fetch failure inside WASM context on mobile
+        setLoadingDetail('Downloading face model...');
+        const modelResponse = await fetch(MODEL_CDN_URL);
+        if (!modelResponse.ok) throw new Error(`Model download failed: ${modelResponse.status}`);
+        const modelBuffer = await modelResponse.arrayBuffer();
         if (cancelled) return;
 
+        // Step 2: Load WASM runtime from CDN
+        setLoadingDetail('Loading detection engine...');
+        const vision = await FilesetResolver.forVisionTasks(WASM_CDN_URL);
+        if (cancelled) return;
+
+        // Step 3: Create FaceLandmarker with pre-fetched model buffer (not modelAssetPath)
+        setLoadingDetail('Initializing face detection...');
         const landmarker = await FaceLandmarker.createFromOptions(vision, {
           baseOptions: {
-            modelAssetPath: '/mediapipe/face_landmarker.task',
+            modelAssetBuffer: new Uint8Array(modelBuffer),
             delegate: 'CPU',
           },
           runningMode: 'VIDEO',
@@ -423,7 +437,7 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
   return {
     phase,
     direction,
-    instruction: getInstructionForPhase(phase, direction),
+    instruction: getInstructionForPhase(phase, direction, loadingDetail),
     progress,
     faceDetected,
     currentYaw,
