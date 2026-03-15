@@ -702,6 +702,14 @@ export class IdswyftSDK {
   }
 
   /**
+   * Get a single re-verification schedule by ID.
+   */
+  async getMonitoringSchedule(scheduleId: string): Promise<{ schedule: ReverificationSchedule }> {
+    const response = await this.client.get(`/api/v2/monitoring/schedules/${scheduleId}`);
+    return response.data;
+  }
+
+  /**
    * List re-verification schedules for the current developer.
    */
   async listMonitoringSchedules(options?: {

@@ -10,7 +10,6 @@
 import express, { Request, Response } from 'express';
 import { param, body, query, validationResult } from 'express-validator';
 import { authenticateAPIKey } from '@/middleware/auth.js';
-import { verificationRateLimit } from '@/middleware/rateLimit.js';
 import { catchAsync, ValidationError, NotFoundError } from '@/middleware/errorHandler.js';
 import { logger } from '@/utils/logger.js';
 import {
@@ -32,7 +31,6 @@ const router = express.Router();
 router.post(
   '/schedules',
   authenticateAPIKey,
-  verificationRateLimit,
   [
     body('user_id').isUUID().withMessage('user_id must be a valid UUID'),
     body('interval_days')
@@ -114,6 +112,41 @@ router.get(
       total,
       page: req.query.page ? parseInt(req.query.page as string) : 1,
       limit: req.query.limit ? parseInt(req.query.limit as string) : 20,
+    });
+  }),
+);
+
+/**
+ * GET /api/v2/monitoring/schedules/:schedule_id
+ * Get a single re-verification schedule by ID.
+ */
+router.get(
+  '/schedules/:schedule_id',
+  authenticateAPIKey,
+  [param('schedule_id').isUUID()],
+  catchAsync(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw new ValidationError('Validation failed', 'multiple', errors.array());
+    }
+
+    const developer = (req as any).developer;
+    const schedule = await getSchedule(req.params.schedule_id, developer.id);
+
+    if (!schedule) {
+      throw new NotFoundError('Schedule');
+    }
+
+    res.json({
+      schedule: {
+        id: schedule.id,
+        user_id: schedule.user_id,
+        interval_days: schedule.interval_days,
+        next_verification_at: schedule.next_verification_at,
+        last_verification_at: schedule.last_verification_at,
+        status: schedule.status,
+        created_at: schedule.created_at,
+      },
     });
   }),
 );

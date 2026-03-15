@@ -277,7 +277,7 @@ const startServer = async () => {
 
       // Monitoring cron — daily at 3 AM UTC: check expiring documents + process due re-verifications
       if (config.nodeEnv === 'production') {
-        const cron = (await import('node-cron')).default ?? await import('node-cron');
+        const cron = await import('node-cron');
         const {
           checkExpiringDocuments,
           processScheduledReverifications,

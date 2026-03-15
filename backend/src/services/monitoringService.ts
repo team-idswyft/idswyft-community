@@ -207,86 +207,104 @@ export async function cancelSchedule(
 export async function checkExpiringDocuments(): Promise<MonitoringJobResult> {
   const result: MonitoringJobResult = { expiry_alerts_created: 0, webhooks_sent: 0, errors: 0 };
 
-  // Fetch verified verifications with document OCR data containing expiry dates
-  const { data: verifications, error } = await supabase
-    .from('verification_requests')
-    .select(`
-      id,
-      user_id,
-      developer_id,
-      status,
-      documents (
-        id,
-        ocr_data
-      )
-    `)
-    .eq('status', 'verified')
-    .not('documents', 'is', null);
-
-  if (error) {
-    logger.error('Failed to fetch verifications for expiry check', { error: error.message });
-    return result;
-  }
-
   const now = new Date();
+  const BATCH_SIZE = 100;
+  let offset = 0;
 
-  for (const v of verifications ?? []) {
-    const docs = (v as any).documents ?? [];
+  // Process in batches to avoid unbounded memory usage
+  while (true) {
+    const { data: verifications, error } = await supabase
+      .from('verification_requests')
+      .select(`
+        id,
+        user_id,
+        developer_id,
+        status,
+        documents (
+          id,
+          ocr_data
+        )
+      `)
+      .eq('status', 'verified')
+      .not('documents', 'is', null)
+      .range(offset, offset + BATCH_SIZE - 1);
 
-    for (const doc of docs) {
-      const ocrData = doc.ocr_data;
-      if (!ocrData) continue;
+    if (error) {
+      logger.error('Failed to fetch verifications for expiry check', { error: error.message });
+      return result;
+    }
 
-      // Look for expiry date in OCR data
-      const expiryStr = ocrData.expiry_date || ocrData.expiration_date;
-      if (!expiryStr) continue;
+    if (!verifications?.length) break;
 
-      const expiryDate = parseExpiryDate(expiryStr);
-      if (!expiryDate) continue;
+    for (const v of verifications) {
+      const docs = (v as any).documents ?? [];
 
-      const daysUntilExpiry = Math.floor(
-        (expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
-      );
+      for (const doc of docs) {
+        const ocrData = doc.ocr_data;
+        if (!ocrData) continue;
 
-      // Check each threshold
-      for (const threshold of ALERT_THRESHOLDS) {
-        if (daysUntilExpiry <= threshold.days) {
-          try {
-            const created = await createExpiryAlert({
-              verification_request_id: v.id,
-              developer_id: v.developer_id,
-              user_id: v.user_id,
-              document_id: doc.id,
-              expiry_date: expiryDate.toISOString().split('T')[0],
-              alert_type: threshold.type,
-            });
+        // Look for expiry date in OCR data
+        const expiryStr = ocrData.expiry_date || ocrData.expiration_date;
+        if (!expiryStr) continue;
 
-            if (created) {
-              result.expiry_alerts_created++;
+        const expiryDate = parseExpiryDate(expiryStr);
+        if (!expiryDate) continue;
 
-              // Fire webhook
-              const sent = await fireExpiryWebhook(
-                v.developer_id,
-                v.id,
-                v.user_id,
-                threshold.type,
-                expiryDate,
-              );
-              if (sent) result.webhooks_sent++;
+        const daysUntilExpiry = Math.floor(
+          (expiryDate.getTime() - now.getTime()) / (1000 * 60 * 60 * 24),
+        );
+
+        // Check all applicable thresholds — the unique constraint on
+        // (verification_request_id, alert_type) deduplicates naturally,
+        // so late-starting crons fill in missed alerts.
+        for (const threshold of ALERT_THRESHOLDS) {
+          if (daysUntilExpiry <= threshold.days) {
+            try {
+              const created = await createExpiryAlert({
+                verification_request_id: v.id,
+                developer_id: v.developer_id,
+                user_id: v.user_id,
+                document_id: doc.id,
+                expiry_date: expiryDate.toISOString().split('T')[0],
+                alert_type: threshold.type,
+              });
+
+              if (created) {
+                result.expiry_alerts_created++;
+
+                // Fire webhook
+                const sent = await fireExpiryWebhook(
+                  v.developer_id,
+                  v.id,
+                  v.user_id,
+                  threshold.type,
+                  expiryDate,
+                );
+                if (sent) {
+                  result.webhooks_sent++;
+                  // Mark alert as webhook-sent
+                  await supabase
+                    .from('expiry_alerts')
+                    .update({ webhook_sent: true })
+                    .eq('verification_request_id', v.id)
+                    .eq('alert_type', threshold.type);
+                }
+              }
+            } catch (err) {
+              result.errors++;
+              logger.error('Error processing expiry alert', {
+                verification_id: v.id,
+                alert_type: threshold.type,
+                error: err instanceof Error ? err.message : String(err),
+              });
             }
-          } catch (err) {
-            result.errors++;
-            logger.error('Error processing expiry alert', {
-              verification_id: v.id,
-              alert_type: threshold.type,
-              error: err instanceof Error ? err.message : String(err),
-            });
           }
-          // Once we match the tightest threshold, stop checking looser ones
-          break;
         }
       }
     }
+
+    if (verifications.length < BATCH_SIZE) break;
+    offset += BATCH_SIZE;
   }
 
   return result;
@@ -337,48 +355,56 @@ export async function getExpiringDocuments(
 export async function processScheduledReverifications(): Promise<ReverificationJobResult> {
   const result: ReverificationJobResult = { due_schedules: 0, webhooks_sent: 0, errors: 0 };
 
-  const now = new Date().toISOString();
+  const BATCH_SIZE = 100;
 
-  // Fetch active schedules that are due
-  const { data: dueSchedules, error } = await supabase
-    .from('reverification_schedules')
-    .select('*')
-    .eq('status', 'active')
-    .lte('next_verification_at', now)
-    .limit(100); // Process in batches
+  // Process in batches until no more due schedules remain
+  while (true) {
+    const now = new Date().toISOString();
 
-  if (error) {
-    logger.error('Failed to fetch due reverification schedules', { error: error.message });
-    return result;
-  }
+    const { data: dueSchedules, error } = await supabase
+      .from('reverification_schedules')
+      .select('*')
+      .eq('status', 'active')
+      .lte('next_verification_at', now)
+      .limit(BATCH_SIZE);
 
-  result.due_schedules = dueSchedules?.length ?? 0;
-
-  for (const schedule of dueSchedules ?? []) {
-    try {
-      // Fire webhook to notify developer
-      const sent = await fireReverificationWebhook(schedule as ReverificationSchedule);
-      if (sent) result.webhooks_sent++;
-
-      // Advance schedule to next cycle
-      const nextDate = new Date();
-      nextDate.setDate(nextDate.getDate() + schedule.interval_days);
-
-      await supabase
-        .from('reverification_schedules')
-        .update({
-          next_verification_at: nextDate.toISOString(),
-          last_verification_at: now,
-          updated_at: now,
-        })
-        .eq('id', schedule.id);
-    } catch (err) {
-      result.errors++;
-      logger.error('Error processing reverification schedule', {
-        schedule_id: schedule.id,
-        error: err instanceof Error ? err.message : String(err),
-      });
+    if (error) {
+      logger.error('Failed to fetch due reverification schedules', { error: error.message });
+      return result;
     }
+
+    if (!dueSchedules?.length) break;
+
+    result.due_schedules += dueSchedules.length;
+
+    for (const schedule of dueSchedules) {
+      try {
+        // Fire webhook to notify developer
+        const sent = await fireReverificationWebhook(schedule as ReverificationSchedule);
+        if (sent) result.webhooks_sent++;
+
+        // Advance schedule to next cycle
+        const nextDate = new Date();
+        nextDate.setDate(nextDate.getDate() + schedule.interval_days);
+
+        await supabase
+          .from('reverification_schedules')
+          .update({
+            next_verification_at: nextDate.toISOString(),
+            last_verification_at: now,
+            updated_at: now,
+          })
+          .eq('id', schedule.id);
+      } catch (err) {
+        result.errors++;
+        logger.error('Error processing reverification schedule', {
+          schedule_id: schedule.id,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      }
+    }
+
+    if (dueSchedules.length < BATCH_SIZE) break;
   }
 
   return result;
@@ -396,20 +422,19 @@ function parseExpiryDate(dateStr: string): Date | null {
   const iso = Date.parse(dateStr);
   if (!isNaN(iso)) return new Date(iso);
 
-  // Try "01/15/2025" or "01-15-2025"
-  const mdyMatch = dateStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-  if (mdyMatch) {
-    return new Date(parseInt(mdyMatch[3]), parseInt(mdyMatch[1]) - 1, parseInt(mdyMatch[2]));
-  }
-
-  // Try "15/01/2025" (day first, common in EU)
-  const dmyMatch = dateStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
-  if (dmyMatch) {
-    const day = parseInt(dmyMatch[1]);
-    const month = parseInt(dmyMatch[2]);
-    if (day > 12) {
-      return new Date(parseInt(dmyMatch[3]), month - 1, day);
+  // Try slash/dash separated dates: "01/15/2025", "15-01-2025", etc.
+  // Disambiguate MDY vs DMY: if first number > 12, it must be a day (DMY format)
+  const slashMatch = dateStr.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (slashMatch) {
+    const a = parseInt(slashMatch[1]);
+    const b = parseInt(slashMatch[2]);
+    const year = parseInt(slashMatch[3]);
+    if (a > 12) {
+      // DMY: day > 12, so first field must be day
+      return new Date(year, b - 1, a);
     }
+    // MDY (or ambiguous — default to MDY)
+    return new Date(year, a - 1, b);
   }
 
   return null;

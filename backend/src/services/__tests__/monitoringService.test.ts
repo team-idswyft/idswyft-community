@@ -175,7 +175,7 @@ describe('cancelSchedule', () => {
 // ─── Document Expiry Detection ───────────────────────────
 
 describe('checkExpiringDocuments', () => {
-  it('should create alerts for documents expiring within 30 days', async () => {
+  it('should create all applicable alerts for documents expiring within 30 days', async () => {
     const expiryDate = new Date();
     expiryDate.setDate(expiryDate.getDate() + 15); // 15 days from now
 
@@ -198,7 +198,8 @@ describe('checkExpiringDocuments', () => {
 
     const result = await checkExpiringDocuments();
 
-    expect(result.expiry_alerts_created).toBe(1);
+    // 15 days out matches 90_day, 60_day, and 30_day thresholds
+    expect(result.expiry_alerts_created).toBe(3);
     expect(result.errors).toBe(0);
   });
 
@@ -297,8 +298,9 @@ describe('checkExpiringDocuments', () => {
 
     const result = await checkExpiringDocuments();
 
-    expect(result.expiry_alerts_created).toBe(1);
-    expect(result.webhooks_sent).toBe(1);
+    // 10 days out matches 90_day, 60_day, 30_day thresholds (3 alerts)
+    expect(result.expiry_alerts_created).toBe(3);
+    expect(result.webhooks_sent).toBe(3);
     expect(mockSendWebhook).toHaveBeenCalled();
   });
 
@@ -324,7 +326,8 @@ describe('checkExpiringDocuments', () => {
 
     const result = await checkExpiringDocuments();
 
-    expect(result.expiry_alerts_created).toBe(1);
+    // 20 days out matches 90_day, 60_day, 30_day thresholds
+    expect(result.expiry_alerts_created).toBe(3);
   });
 
   it('should handle already-expired documents', async () => {
@@ -349,8 +352,8 @@ describe('checkExpiringDocuments', () => {
 
     const result = await checkExpiringDocuments();
 
-    // Should create an 'expired' alert
-    expect(result.expiry_alerts_created).toBe(1);
+    // Expired document matches all 4 thresholds: 90_day, 60_day, 30_day, expired
+    expect(result.expiry_alerts_created).toBe(4);
   });
 });
 
