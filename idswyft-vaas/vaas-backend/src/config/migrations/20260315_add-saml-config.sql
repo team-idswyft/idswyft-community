@@ -9,9 +9,6 @@ CREATE TABLE IF NOT EXISTS organization_sso_configs (
   idp_certificate TEXT NOT NULL,
   attribute_mapping JSONB DEFAULT '{}',
   is_enabled BOOLEAN DEFAULT false,
-  created_at TIMESTAMPTZ DEFAULT NOW()
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
 );
-
--- Fast lookup by organization (UNIQUE constraint already creates an index,
--- but this makes the intent explicit for readers)
-CREATE INDEX IF NOT EXISTS idx_sso_configs_org ON organization_sso_configs(organization_id);

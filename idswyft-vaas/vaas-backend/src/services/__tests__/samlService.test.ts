@@ -144,7 +144,6 @@ describe('samlService', () => {
       const result = await generateAuthRequest('acme');
       expect(result).not.toBeNull();
       expect(result!.redirectUrl).toContain('https://idp.example.com');
-      expect(result!.requestId).toMatch(/^saml_\d+$/);
     });
 
     it('returns null when org has no SSO config', async () => {

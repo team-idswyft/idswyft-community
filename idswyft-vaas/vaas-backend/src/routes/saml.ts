@@ -43,14 +43,8 @@ router.get('/login/:org_slug', async (req: Request, res: Response) => {
       });
     }
 
-    // Store org_slug in a short-lived cookie for the callback
-    res.cookie('saml_org_slug', org_slug, {
-      httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      maxAge: 300000, // 5 minutes
-      sameSite: 'lax',
-    });
-
+    // org_slug is passed via SAML RelayState (echoed back by IdP in the ACS POST),
+    // avoiding cookies which fail on cross-origin POST due to SameSite restrictions.
     res.redirect(result.redirectUrl);
   } catch (err: any) {
     console.error('SAML login error:', err);
@@ -69,7 +63,7 @@ router.get('/login/:org_slug', async (req: Request, res: Response) => {
 router.post('/callback', express.urlencoded({ extended: false }), async (req: Request, res: Response) => {
   try {
     const samlResponse = req.body.SAMLResponse;
-    const orgSlug = req.cookies?.saml_org_slug;
+    const orgSlug = req.body.RelayState;
 
     if (!samlResponse) {
       return res.status(400).json({ error: 'Missing SAML response' });
@@ -133,9 +127,6 @@ router.post('/callback', express.urlencoded({ extended: false }), async (req: Re
       config.jwtSecret,
       { expiresIn: '24h' },
     );
-
-    // Clear the org cookie
-    res.clearCookie('saml_org_slug');
 
     // Redirect to frontend with token
     const frontendUrl = config.frontendUrl || 'https://app.idswyft.app';
@@ -278,7 +269,7 @@ async function jitProvisionAdmin(
     .insert({
       organization_id: orgId,
       email: email.toLowerCase(),
-      password_hash: '', // No password for SSO users
+      password_hash: '!SSO_USER!', // Sentinel — not a valid bcrypt hash, prevents password login
       first_name: firstName || 'SSO',
       last_name: lastName || 'User',
       role: 'viewer',

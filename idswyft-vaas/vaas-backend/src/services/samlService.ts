@@ -110,17 +110,16 @@ function createSAMLInstance(ssoConfig: SAMLConfig): SAML {
  */
 export async function generateAuthRequest(
   orgSlug: string,
-): Promise<{ redirectUrl: string; requestId: string } | null> {
+): Promise<{ redirectUrl: string } | null> {
   const result = await getOrganizationSAMLConfig(orgSlug);
   if (!result) return null;
 
   const saml = createSAMLInstance(result.config);
-  const url = await saml.getAuthorizeUrlAsync('', undefined, {});
+  // Pass orgSlug as RelayState — the IdP echoes it back in the ACS POST,
+  // avoiding cookies entirely (which fail on cross-origin POST due to SameSite).
+  const url = await saml.getAuthorizeUrlAsync(orgSlug, undefined, {});
 
-  return {
-    redirectUrl: url,
-    requestId: `saml_${Date.now()}`,
-  };
+  return { redirectUrl: url };
 }
 
 /**
@@ -161,6 +160,10 @@ export async function processCallback(
       name_id: (profile as any).nameID || email,
     };
   } catch (err) {
+    console.error('SAML assertion validation failed:', {
+      orgId,
+      error: err instanceof Error ? err.message : String(err),
+    });
     return null;
   }
 }
