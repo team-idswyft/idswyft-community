@@ -30,6 +30,10 @@ export interface VerificationRequest {
   cross_validation_score?: number;
   photo_consistency_score?: number;
   enhanced_verification_completed?: boolean;
+  // Address verification fields
+  address_verification_status?: 'pass' | 'review' | 'reject';
+  address_data?: Record<string, any>;
+  address_match_score?: number;
   created_at: Date;
   updated_at: Date;
 }

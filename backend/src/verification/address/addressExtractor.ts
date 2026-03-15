@@ -102,7 +102,13 @@ function extractAddressFromText(rawText: string): string | null {
 
 // ─── Main extraction function ────────────────────────────
 
-const ocrService = new OCRService();
+// Lazy-initialized to avoid module-load side effects (OCRService constructor
+// creates providers and connects to storage, which fails in test contexts).
+let _ocrService: OCRService | undefined;
+function getOCRService(): OCRService {
+  if (!_ocrService) _ocrService = new OCRService();
+  return _ocrService;
+}
 
 /**
  * Extract address verification data from a proof-of-address document.
@@ -117,7 +123,7 @@ export async function extractAddressDocument(
   documentType: AddressDocumentType,
 ): Promise<AddressExtractionResult> {
   // Run OCR on the document (reuses existing pipeline)
-  const ocrData = await ocrService.processDocument(documentId, documentPath, documentType);
+  const ocrData = await getOCRService().processDocument(documentId, documentPath, documentType);
 
   const rawText = ocrData.raw_text || '';
 

@@ -63,7 +63,10 @@ router.post(
     }
 
     // Validate file type (magic bytes)
-    validateFileType(file.buffer);
+    const fileTypeCheck = await validateFileType(file.buffer);
+    if (!fileTypeCheck.valid) {
+      throw new FileUploadError(fileTypeCheck.reason || 'Invalid file type');
+    }
 
     // Look up the verification request
     const { data: verification, error: verError } = await supabase
@@ -108,7 +111,7 @@ router.post(
     const validation = validateAddressDocument(extraction, idName || '');
 
     // Store results
-    await supabase
+    const { error: updateError } = await supabase
       .from('verification_requests')
       .update({
         address_verification_status: validation.verdict,
@@ -127,6 +130,13 @@ router.post(
         address_match_score: validation.overall_score,
       })
       .eq('id', verification_id);
+
+    if (updateError) {
+      logger.error('Failed to store address verification results', {
+        verification_id,
+        error: updateError.message,
+      });
+    }
 
     logger.info('Address document processed', {
       verification_id,
