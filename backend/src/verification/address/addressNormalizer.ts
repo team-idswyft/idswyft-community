@@ -95,7 +95,7 @@ export function parseAddress(address: string): AddressComponents {
   // Extract postal/zip code (US 5-digit or 5+4, UK, CA, etc.)
   const postalMatch = address.match(/\b(\d{5}(?:-\d{4})?)\b/) // US ZIP
     || address.match(/\b([A-Z]\d[A-Z]\s?\d[A-Z]\d)\b/i)      // Canadian
-    || address.match(/\b([A-Z]{1,2}\d{1,2}\s?\d[A-Z]{2})\b/i); // UK
+    || address.match(/\b([A-Z]{1,2}\d[A-Z\d]?\s?\d[A-Z]{2})\b/i); // UK
   if (postalMatch) {
     result.postalCode = postalMatch[1].replace(/\s/g, '');
   }
