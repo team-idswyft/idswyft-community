@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { FaceLandmarker, FilesetResolver } from '@mediapipe/tasks-vision';
+// Type-only import — the actual module is loaded dynamically inside useEffect
+// to keep @mediapipe/tasks-vision out of the main bundle (prevents page crash
+// if WASM init fails at module level on mobile browsers)
+import type { FaceLandmarker as FaceLandmarkerType } from '@mediapipe/tasks-vision';
 
 // ─── Types ──────────────────────────────────────────────────
 
@@ -143,7 +146,7 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
   const [error, setError] = useState<string | null>(null);
   const [loadingDetail, setLoadingDetail] = useState('Preparing face detection...');
 
-  const landmarkerRef = useRef<FaceLandmarker | null>(null);
+  const landmarkerRef = useRef<FaceLandmarkerType | null>(null);
   const samplesRef = useRef<HeadPoseSample[]>([]);
   const baselineYawRef = useRef(0);
   const centerStartRef = useRef(0);
@@ -162,6 +165,7 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
     let cancelled = false;
     const timeout = setTimeout(() => {
       if (!cancelled && phaseRef.current === 'loading') {
+        cancelled = true; // Prevent late-resolving createFromOptions from overriding fallback
         console.warn('MediaPipe load timeout — falling back');
         setPhase('fallback');
         onFallback();
@@ -170,19 +174,25 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
 
     (async () => {
       try {
-        // Step 1: Pre-fetch model as ArrayBuffer — avoids silent fetch failure inside WASM context on mobile
+        // Step 1: Dynamic import — code-splits @mediapipe/tasks-vision into a separate chunk
+        // so WASM init failures don't crash the entire page
+        setLoadingDetail('Loading detection library...');
+        const { FaceLandmarker, FilesetResolver } = await import('@mediapipe/tasks-vision');
+        if (cancelled) return;
+
+        // Step 2: Pre-fetch model as ArrayBuffer — avoids silent fetch failure inside WASM context on mobile
         setLoadingDetail('Downloading face model...');
         const modelResponse = await fetch(MODEL_CDN_URL);
         if (!modelResponse.ok) throw new Error(`Model download failed: ${modelResponse.status}`);
         const modelBuffer = await modelResponse.arrayBuffer();
         if (cancelled) return;
 
-        // Step 2: Load WASM runtime from CDN
+        // Step 3: Load WASM runtime from CDN
         setLoadingDetail('Loading detection engine...');
         const vision = await FilesetResolver.forVisionTasks(WASM_CDN_URL);
         if (cancelled) return;
 
-        // Step 3: Create FaceLandmarker with pre-fetched model buffer (not modelAssetPath)
+        // Step 4: Create FaceLandmarker with pre-fetched model buffer (not modelAssetPath)
         setLoadingDetail('Initializing face detection...');
         const landmarker = await FaceLandmarker.createFromOptions(vision, {
           baseOptions: {
