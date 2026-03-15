@@ -128,9 +128,11 @@ router.post('/callback', express.urlencoded({ extended: false }), async (req: Re
       { expiresIn: '24h' },
     );
 
-    // Redirect to frontend with token
+    // Redirect to frontend with token in URL fragment (#) instead of query
+    // parameter (?). Fragments are never sent to the server in subsequent
+    // requests and are not logged in access logs or Referer headers.
     const frontendUrl = config.frontendUrl || 'https://app.idswyft.app';
-    res.redirect(`${frontendUrl}/sso/callback?token=${encodeURIComponent(token)}`);
+    res.redirect(`${frontendUrl}/sso/callback#token=${encodeURIComponent(token)}`);
   } catch (err: any) {
     console.error('SAML callback error:', err);
     res.status(500).json({
