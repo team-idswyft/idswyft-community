@@ -272,6 +272,7 @@ export function HomePage() {
             { value: '<200ms', label: 'Response' },
             { value: '200+', label: 'Doc Types' },
             { value: '19+', label: 'Countries' },
+            { value: '6', label: 'Languages' },
             { value: 'MIT', label: 'License' },
           ].map(({ value, label }) => (
             <div className="landing-card" key={label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 20px', fontFamily: C.mono, fontSize: 13 }}>
@@ -420,29 +421,39 @@ export function HomePage() {
         </div>
         <div className="landing-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
           {[
-            { title: 'OCR Extraction',       desc: 'Name, DOB, document number, expiry — extracted from passports, driver\'s licenses, and national IDs across 19+ countries.' },
-            { title: 'Back-of-ID / Barcode', desc: 'PDF417 barcodes (US), MRZ zones (international), and QR codes — all cross-validated against front-side data.' },
-            { title: 'Liveness Detection',   desc: 'Challenge-response live capture to confirm a real person is present during verification.' },
-            { title: 'Face Matching',         desc: 'Selfie matched against document photo with a configurable confidence threshold.' },
-            { title: 'Webhooks',              desc: 'Real-time POST callbacks on status changes — verified, failed, or manual_review.' },
-            { title: 'GDPR Compliant',        desc: 'Configurable data retention, deletion endpoints, and encrypted storage at rest.' },
-          ].map(({ title, desc }) => (
+            { title: 'OCR Extraction',       desc: 'Name, DOB, document number, expiry — extracted from passports, driver\'s licenses, and national IDs across 19+ countries.', tags: [] as string[] },
+            { title: 'Back-of-ID / Barcode', desc: 'PDF417 barcodes (US), MRZ zones (international), and QR codes — all cross-validated against front-side data.', tags: [] as string[] },
+            { title: 'Liveness Detection',   desc: 'Anti-spoof scoring with live capture to confirm a real person is present. Detects printed photos, screen replays, and 3D masks.', tags: [] as string[] },
+            { title: 'Face Matching',         desc: 'Selfie matched against document photo with a configurable confidence threshold.', tags: [] as string[] },
+            { title: 'Webhooks',              desc: 'Real-time POST callbacks on status changes — verified, failed, or manual_review.', tags: [] as string[] },
+            { title: 'GDPR Compliant',        desc: 'Configurable data retention, deletion endpoints, and encrypted storage at rest.', tags: [] as string[] },
+            { title: 'JavaScript SDK',        desc: 'Drop-in TypeScript SDK with IdswyftEmbed component, real-time event watcher, and automatic error handling.', tags: ['npm install', 'TypeScript', 'watch()'] },
+            { title: 'Batch API',             desc: 'Process hundreds of verifications in a single API call. Controlled concurrency, progress tracking, and webhook on completion.', tags: ['Enterprise', 'Bulk Import', 'Async'] },
+            { title: 'Monitoring',            desc: 'Document expiry alerts at 90/60/30 days and scheduled re-verification reminders via webhook.', tags: ['Expiry Alerts', 'Re-verify', 'Cron'] },
+          ].map(({ title, desc, tags }) => (
             <div className="landing-card" key={title} style={{ background: C.panel, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.cyan}`, borderRadius: 8, padding: '24px 20px' }}>
               <div style={{ fontFamily: C.mono, fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 8 }}>{title}</div>
               <div style={{ fontSize: 14, color: C.muted, lineHeight: 1.6 }}>{desc}</div>
+              {tags.length > 0 && (
+                <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginTop: 12 }}>
+                  {tags.map(tag => (
+                    <span key={tag} style={{ fontFamily: C.mono, fontSize: 11, color: C.cyan, background: C.cyanDim, border: `1px solid ${C.cyanBorder}`, borderRadius: 4, padding: '2px 8px' }}>{tag}</span>
+                  ))}
+                </div>
+              )}
             </div>
           ))}
         </div>
       </section>
 
       {/* 5. INTEGRATION OPTIONS */}
-      <section className="scroll-reveal" style={{ padding: '64px 24px', maxWidth: 800, margin: '0 auto' }}>
+      <section className="scroll-reveal" style={{ padding: '64px 24px', maxWidth: 960, margin: '0 auto' }}>
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
           <h2 style={{ fontFamily: C.mono, fontSize: 24, fontWeight: 600, color: C.text }}>
-            Two ways to integrate
+            Three ways to integrate
           </h2>
         </div>
-        <div className="landing-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 20 }}>
+        <div className="landing-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))', gap: 20 }}>
           <div className="landing-card" style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 10, padding: 28 }}>
             <div style={{ fontFamily: C.mono, fontSize: 13, color: C.cyan, marginBottom: 12 }}>Option A</div>
             <div style={{ fontWeight: 600, fontSize: 16, color: C.text, marginBottom: 10 }}>Ready-Made Verification Page</div>
@@ -459,6 +470,14 @@ export function HomePage() {
             </div>
             <Link to="/docs" style={{ color: C.cyan, fontSize: 13, textDecoration: 'none' }}>Read the API reference →</Link>
           </div>
+          <div className="landing-card" style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 10, padding: 28 }}>
+            <div style={{ fontFamily: C.mono, fontSize: 13, color: C.cyan, marginBottom: 12 }}>Option C</div>
+            <div style={{ fontWeight: 600, fontSize: 16, color: C.text, marginBottom: 10 }}>SDK Embed</div>
+            <div style={{ fontSize: 14, color: C.muted, lineHeight: 1.6, marginBottom: 16 }}>
+              Drop-in iframe component. Modal or inline mode. <span style={{ fontFamily: C.mono, fontSize: 12 }}>npm install @idswyft/sdk</span> — 3 lines of code.
+            </div>
+            <Link to="/docs" style={{ color: C.cyan, fontSize: 13, textDecoration: 'none' }}>See SDK docs →</Link>
+          </div>
         </div>
       </section>
 
@@ -471,6 +490,7 @@ export function HomePage() {
           {[
             'Fintech KYC', 'Marketplace Trust', 'Age Verification',
             'Account Recovery', 'Remote Onboarding', 'Healthcare',
+            'AML Compliance', 'Batch Onboarding', 'Document Monitoring',
           ].map(label => (
             <span key={label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 20, padding: '8px 16px', fontSize: 13, color: C.muted }}>
               {label}
