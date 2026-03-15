@@ -18,6 +18,7 @@
     "migrate:run": "tsx src/scripts/run-migration.ts"
   },
   "dependencies": {
+    "@node-saml/node-saml": "^5.1.0",
     "@supabase/supabase-js": "^2.39.0",
     "@types/bcrypt": "^6.0.0",
     "@types/pg": "^8.15.5",
