@@ -29,6 +29,7 @@ import platformAuthRoutes from './routes/platformAuth.js';
 import platformOrgRoutes from './routes/platformOrganizations.js';
 import platformEmailRoutes from './routes/platformEmail.js';
 import platformBrandingRoutes from './routes/platformBranding.js';
+import samlRoutes from './routes/saml.js';
 
 console.log('📧 Importing email routes...');
 import emailUtilRoutes from './routes/email-utils.js';
@@ -319,6 +320,9 @@ try {
 } catch (error) {
   console.error('❌ Failed to mount email routes:', error);
 }
+
+// Mount SAML SSO routes (public + protected)
+app.use('/api/auth/saml', samlRoutes);
 
 // Mount platform admin routes (separate auth domain)
 console.log('🏗️ Mounting platform admin routes...');

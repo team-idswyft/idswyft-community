@@ -9,6 +9,13 @@ import { supabase } from '@/config/database.js';
 import { logger } from '@/utils/logger.js';
 import { DataRetentionService } from '@/services/dataRetention.js';
 import { ProviderMetricsService } from '@/services/providerMetrics.js';
+import {
+  getConversionFunnel,
+  getGateRejectionBreakdown,
+  getFraudPatterns,
+  getRiskDistribution,
+  type PeriodFilter,
+} from '@/services/analyticsService.js';
 
 const router = express.Router();
 const verificationService = new VerificationService();
@@ -429,6 +436,97 @@ async function getAnalytics(period: string, developerId?: string): Promise<any> 
     }
   };
 }
+
+// ─── Advanced Analytics Endpoints ──────────────────────────────
+
+/** Parse period query params into PeriodFilter */
+function parsePeriodFilter(req: Request): PeriodFilter | undefined {
+  const period = req.query.period as string;
+  if (!period) return undefined;
+  const days = period === '7d' ? 7 : period === '90d' ? 90 : 30;
+  const end = new Date();
+  const start = new Date();
+  start.setDate(start.getDate() - days);
+  return { start_date: start.toISOString(), end_date: end.toISOString() };
+}
+
+// GET /api/admin/analytics/funnel — Conversion funnel metrics
+router.get('/analytics/funnel',
+  authenticateJWT,
+  requireAdminRole(['admin']),
+  [
+    query('period').optional().isIn(['7d', '30d', '90d']).withMessage('Period must be 7d, 30d, or 90d'),
+    query('developer_id').optional().isUUID().withMessage('Developer ID must be a valid UUID'),
+  ],
+  catchAsync(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw new ValidationError('Validation failed', 'multiple', errors.array());
+    }
+
+    const period = parsePeriodFilter(req);
+    const developerId = req.query.developer_id as string | undefined;
+    const funnel = await getConversionFunnel(period, developerId);
+    res.json({ funnel });
+  })
+);
+
+// GET /api/admin/analytics/rejections — Rejection breakdown by reason
+router.get('/analytics/rejections',
+  authenticateJWT,
+  requireAdminRole(['admin']),
+  [
+    query('period').optional().isIn(['7d', '30d', '90d']).withMessage('Period must be 7d, 30d, or 90d'),
+  ],
+  catchAsync(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw new ValidationError('Validation failed', 'multiple', errors.array());
+    }
+
+    const period = parsePeriodFilter(req);
+    const rejections = await getGateRejectionBreakdown(period);
+    res.json({ rejections });
+  })
+);
+
+// GET /api/admin/analytics/fraud-patterns — Fraud pattern indicators
+router.get('/analytics/fraud-patterns',
+  authenticateJWT,
+  requireAdminRole(['admin']),
+  [
+    query('period').optional().isIn(['7d', '30d', '90d']).withMessage('Period must be 7d, 30d, or 90d'),
+  ],
+  catchAsync(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw new ValidationError('Validation failed', 'multiple', errors.array());
+    }
+
+    const period = parsePeriodFilter(req);
+    const patterns = await getFraudPatterns(period);
+    res.json({ patterns });
+  })
+);
+
+// GET /api/admin/analytics/risk-distribution — Risk score distribution
+router.get('/analytics/risk-distribution',
+  authenticateJWT,
+  requireAdminRole(['admin']),
+  [
+    query('period').optional().isIn(['7d', '30d', '90d']).withMessage('Period must be 7d, 30d, or 90d'),
+  ],
+  catchAsync(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw new ValidationError('Validation failed', 'multiple', errors.array());
+    }
+
+    const period = parsePeriodFilter(req);
+    const distribution = await getRiskDistribution(period);
+    res.json({ distribution });
+  })
+);
 
 // GET /api/admin/provider-metrics?provider=tesseract&days=30
 router.get('/provider-metrics',

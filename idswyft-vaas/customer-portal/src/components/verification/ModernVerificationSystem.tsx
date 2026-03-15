@@ -9,6 +9,8 @@ import verificationAPI from '../../services/verificationApi';
 import { useOrganization } from '../../contexts/OrganizationContext';
 import BrandedHeader from '../BrandedHeader';
 import LiveCaptureComponent from '../LiveCaptureComponent';
+import LanguageSelector from '../LanguageSelector';
+import { useTranslation } from 'react-i18next';
 
 interface ModernVerificationSystemProps {
   sessionToken: string;
@@ -54,6 +56,12 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
   const [verificationResults, setVerificationResults] = useState<any>(null);
   const [idempotencyKey] = useState(() => crypto.randomUUID());
   const { branding, organizationName, setBranding, setOrganizationName } = useOrganization();
+  const { t: tr } = useTranslation();
+
+  const stepLabel = (step: number) => {
+    const keys = ['steps.country', 'steps.frontId', 'steps.scanning', 'steps.backId', 'steps.liveCapture', 'steps.done'];
+    return tr(keys[step - 1] || 'steps.done');
+  };
 
   const frontInputRef = useRef<HTMLInputElement>(null);
   const backInputRef = useRef<HTMLInputElement>(null);
@@ -132,7 +140,7 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
       setCurrentStep(3);
       pollForOCRCompletion(currentVerificationId);
     } catch (err) {
-      setError(`Failed to upload front document: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setError(`${tr('errors.uploadFrontFailed')}: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setUploading(false);
     }
@@ -149,7 +157,7 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
       setBackOfIdUploaded(true);
       setCurrentStep(5);
     } catch (err) {
-      setError(`Failed to upload back document: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setError(`${tr('errors.uploadBackFailed')}: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setUploading(false);
     }
@@ -178,7 +186,7 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
       await handleSubmitVerification();
       pollForFinalResults(verificationId);
     } catch (err) {
-      setError(`Failed to upload live capture: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setError(`${tr('errors.uploadLiveCaptureFailed')}: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setUploading(false);
     }
@@ -190,9 +198,9 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
       await customerPortalAPI.submitVerification(sessionToken, idempotencyKey);
     } catch (err: any) {
       if (err?.status === 409) {
-        setError('This verification was already submitted. Please check your status.');
+        setError(tr('errors.alreadySubmitted'));
       } else {
-        setError((err as ApiError)?.message ?? 'Submission failed. Please try again.');
+        setError((err as ApiError)?.message ?? tr('errors.submissionFailed'));
       }
     }
   };
@@ -200,7 +208,7 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
   // ── Polling ────────────────────────────────────────────────────────────────
   const pollForOCRCompletion = async (vId: string, attempt = 0) => {
     if (!session || !mountedRef.current) return;
-    if (attempt >= 30) { setError('Document processing timed out. Please try again.'); return; }
+    if (attempt >= 30) { setError(tr('errors.processingTimeout')); return; }
 
     try {
       const results = await verificationAPI.getResults(session, vId);
@@ -221,13 +229,13 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
       setTimeout(() => pollForOCRCompletion(vId, attempt + 1), 3000);
     } catch {
       if (mountedRef.current && attempt < 3) setTimeout(() => pollForOCRCompletion(vId, attempt + 1), 5000);
-      else if (mountedRef.current) setError('Failed to check processing status.');
+      else if (mountedRef.current) setError(tr('errors.statusCheckFailed'));
     }
   };
 
   const pollForFinalResults = async (vId: string, attempt = 0) => {
     if (!session || !mountedRef.current) return;
-    if (attempt >= 24) { setError('Verification is taking longer than expected.'); return; }
+    if (attempt >= 24) { setError(tr('errors.takingLonger')); return; }
 
     try {
       const results = await verificationAPI.getResults(session, vId);
@@ -243,7 +251,7 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
       setTimeout(() => pollForFinalResults(vId, attempt + 1), 5000);
     } catch {
       if (mountedRef.current && attempt < 3) setTimeout(() => pollForFinalResults(vId, attempt + 1), 5000);
-      else if (mountedRef.current) setError('Failed to get verification results.');
+      else if (mountedRef.current) setError(tr('errors.statusCheckFailed'));
     }
   };
 
@@ -302,7 +310,7 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
       </div>
       <div className="text-center mt-8">
         <span className="text-sm font-medium text-cyan-400">
-          {STEPS.find(s => s.step === currentStep)?.label}
+          {stepLabel(currentStep)}
         </span>
         <span className={`text-xs ml-2 ${t.textSec}`}>
           ({currentStep}/{STEPS.length})
@@ -342,7 +350,7 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
           <p className={`font-medium ${t.text}`}>{label}</p>
-          <p className={`text-xs mt-1 ${t.textSec}`}>JPG, PNG up to 10MB — drag & drop or click</p>
+          <p className={`text-xs mt-1 ${t.textSec}`}>{tr('frontId.uploadHint')}</p>
         </div>
       )}
     </div>
@@ -352,18 +360,18 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
   const renderOCRSummary = () => {
     if (!ocrData) return null;
     const fields: [string, string | undefined][] = [
-      ['Name', ocrData.full_name],
-      ['Document #', ocrData.document_number],
-      ['Date of Birth', ocrData.date_of_birth],
-      ['Expiry', ocrData.expiry_date],
-      ['Nationality', ocrData.nationality],
+      [tr('ocrFields.name'), ocrData.full_name],
+      [tr('ocrFields.documentNumber'), ocrData.document_number],
+      [tr('ocrFields.dateOfBirth'), ocrData.date_of_birth],
+      [tr('ocrFields.expiry'), ocrData.expiry_date],
+      [tr('ocrFields.nationality'), ocrData.nationality],
     ];
     const visible = fields.filter(([, v]) => v);
     if (!visible.length) return null;
 
     return (
       <div className={`rounded-xl border ${t.border} p-4 mb-5`}>
-        <p className={`text-xs font-semibold uppercase tracking-wide mb-3 ${t.textSec}`}>Front ID — Extracted Data</p>
+        <p className={`text-xs font-semibold uppercase tracking-wide mb-3 ${t.textSec}`}>{tr('frontId.extractedData')}</p>
         <div className="space-y-1.5">
           {visible.map(([label, value]) => (
             <div key={label} className="flex justify-between text-sm">
@@ -393,8 +401,8 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
                 <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
               </svg>
             </div>
-            <h2 className={`text-xl font-semibold mb-2 ${t.text}`}>Initializing Verification</h2>
-            <p className={`text-sm ${t.textSec}`}>Setting up your secure session...</p>
+            <h2 className={`text-xl font-semibold mb-2 ${t.text}`}>{tr('desktop.initTitle')}</h2>
+            <p className={`text-sm ${t.textSec}`}>{tr('desktop.initSubtitle')}</p>
           </div>
         </div>
       </div>
@@ -413,12 +421,12 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
                 <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <h2 className={`text-xl font-semibold mb-2 ${t.text}`}>Verification Link Used</h2>
+            <h2 className={`text-xl font-semibold mb-2 ${t.text}`}>{tr('staleLink.heading')}</h2>
             <p className={`text-sm ${t.textSec}`}>{staleMessage}</p>
           </div>
           <div className="mt-6 text-center">
             <p className={`text-xs ${t.textSec}`}>
-              If you need to verify again, please request a new link from the organization.
+              {tr('staleLink.message')}
             </p>
           </div>
         </div>
@@ -433,10 +441,10 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
         <div className="w-full max-w-lg">
           <div className="portal-card p-8 text-center animate-fade-in">
             <div className="text-4xl mb-4">!</div>
-            <h2 className={`text-xl font-semibold mb-2 ${t.text}`}>Verification Error</h2>
+            <h2 className={`text-xl font-semibold mb-2 ${t.text}`}>{tr('common.error')}</h2>
             <p className={`text-sm mb-6 ${t.textSec}`}>{error}</p>
             <button onClick={() => window.location.reload()} className="btn-primary">
-              Try Again
+              {tr('common.tryAgain')}
             </button>
           </div>
         </div>
@@ -452,26 +460,26 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
         return (
           <div className="space-y-5 animate-fade-in">
             <div className="text-center">
-              <h2 className={`text-xl font-semibold mb-1 ${t.text}`}>Select Country & Document Type</h2>
-              <p className={`text-sm ${t.textSec}`}>Tell us about the document you'll be verifying</p>
+              <h2 className={`text-xl font-semibold mb-1 ${t.text}`}>{tr('desktop.selectCountryDoc')}</h2>
+              <p className={`text-sm ${t.textSec}`}>{tr('desktop.selectCountryDocDesc')}</p>
             </div>
 
             <div>
-              <label className={`block text-sm font-medium mb-2 ${t.text}`}>Issuing Country</label>
+              <label className={`block text-sm font-medium mb-2 ${t.text}`}>{tr('country.issuingCountry')}</label>
               <select
                 value={issuingCountry || ''}
                 onChange={e => setIssuingCountry(e.target.value || null)}
                 className={`w-full px-4 py-2.5 rounded-xl border ${t.input} focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all`}
               >
-                <option value="">Choose country...</option>
-                <optgroup label="Americas">
+                <option value="">{tr('country.choosePlaceholder')}</option>
+                <optgroup label={tr('country.regions.americas')}>
                   <option value="US">United States</option>
                   <option value="CA">Canada</option>
                   <option value="BR">Brazil</option>
                   <option value="MX">Mexico</option>
                   <option value="AR">Argentina</option>
                 </optgroup>
-                <optgroup label="Europe">
+                <optgroup label={tr('country.regions.europe')}>
                   <option value="GB">United Kingdom</option>
                   <option value="DE">Germany</option>
                   <option value="FR">France</option>
@@ -479,7 +487,7 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
                   <option value="ES">Spain</option>
                   <option value="NL">Netherlands</option>
                 </optgroup>
-                <optgroup label="Asia-Pacific">
+                <optgroup label={tr('country.regions.asiaPacific')}>
                   <option value="AU">Australia</option>
                   <option value="NZ">New Zealand</option>
                   <option value="JP">Japan</option>
@@ -495,16 +503,16 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
 
             {issuingCountry && (
               <div>
-                <label className={`block text-sm font-medium mb-2 ${t.text}`}>Document Type</label>
+                <label className={`block text-sm font-medium mb-2 ${t.text}`}>{tr('documentType.title')}</label>
                 <select
                   value={documentType}
                   onChange={e => setDocumentType(e.target.value)}
                   className={`w-full px-4 py-2.5 rounded-xl border ${t.input} focus:ring-2 focus:ring-cyan-500 focus:border-transparent transition-all`}
                 >
-                  <option value="drivers_license">Driver's License</option>
-                  <option value="passport">Passport</option>
+                  <option value="drivers_license">{tr('documentType.driversLicense')}</option>
+                  <option value="passport">{tr('documentType.passport')}</option>
                   {!['US', 'CA', 'AU', 'NZ'].includes(issuingCountry) && (
-                    <option value="national_id">National ID</option>
+                    <option value="national_id">{tr('documentType.nationalId')}</option>
                   )}
                 </select>
               </div>
@@ -512,7 +520,7 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
 
             {issuingCountry && (
               <button onClick={() => setCurrentStep(2)} className="btn-primary">
-                Continue &rarr;
+                {tr('common.next')} &rarr;
               </button>
             )}
           </div>
@@ -523,19 +531,19 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
         return (
           <div className="space-y-5 animate-fade-in">
             <div className="text-center">
-              <h2 className={`text-xl font-semibold mb-1 ${t.text}`}>Upload Front of ID</h2>
-              <p className={`text-sm ${t.textSec}`}>Take a clear photo of the front of your government-issued ID</p>
+              <h2 className={`text-xl font-semibold mb-1 ${t.text}`}>{tr('frontId.heading')}</h2>
+              <p className={`text-sm ${t.textSec}`}>{tr('frontId.description')}</p>
             </div>
 
             {/* Country/doc type badge */}
             <div className={`flex items-center gap-3 px-4 py-2 rounded-xl border ${t.border} text-sm`}>
-              <span className={t.textSec}>Country: <span className={`font-medium ${t.text}`}>{issuingCountry}</span></span>
+              <span className={t.textSec}>{tr('country.issuingCountry')}: <span className={`font-medium ${t.text}`}>{issuingCountry}</span></span>
               <span className={t.textSec}>|</span>
-              <span className={t.textSec}>Doc: <span className={`font-medium ${t.text}`}>{documentType.replace(/_/g, ' ')}</span></span>
-              <button onClick={() => setCurrentStep(1)} className="ml-auto text-cyan-400 text-xs hover:text-cyan-300">Change</button>
+              <span className={t.textSec}>{tr('common.document')}: <span className={`font-medium ${t.text}`}>{documentType.replace(/_/g, ' ')}</span></span>
+              <button onClick={() => setCurrentStep(1)} className="ml-auto text-cyan-400 text-xs hover:text-cyan-300">{tr('common.change')}</button>
             </div>
 
-            {renderFileArea('front', frontPreviewUrl, frontInputRef, handleFrontFileSelect, 'Upload Front of ID')}
+            {renderFileArea('front', frontPreviewUrl, frontInputRef, handleFrontFileSelect, tr('frontId.heading'))}
 
             {documents.front && (
               <button onClick={uploadFrontDocument} disabled={uploading} className="btn-primary">
@@ -545,9 +553,9 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                     </svg>
-                    Uploading...
+                    {tr('common.processing')}
                   </span>
-                ) : 'Continue \u2192'}
+                ) : `${tr('common.next')} \u2192`}
               </button>
             )}
           </div>
@@ -558,9 +566,9 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
         return (
           <div className="text-center py-8 animate-fade-in">
             <Spinner />
-            <h2 className={`text-xl font-semibold mb-2 ${t.text}`}>Reading Your ID</h2>
-            <p className={`text-sm ${t.textSec}`}>Extracting information from the front of your document...</p>
-            <p className={`text-xs mt-2 ${t.textSec}`}>Please don't close this window</p>
+            <h2 className={`text-xl font-semibold mb-2 ${t.text}`}>{tr('verification.verifying')}</h2>
+            <p className={`text-sm ${t.textSec}`}>{tr('common.processing')}</p>
+            <p className={`text-xs mt-2 ${t.textSec}`}>{tr('verification.dontClose')}</p>
           </div>
         );
 
@@ -569,13 +577,13 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
         return (
           <div className="space-y-5 animate-fade-in">
             <div className="text-center">
-              <h2 className={`text-xl font-semibold mb-1 ${t.text}`}>Upload Back of ID</h2>
-              <p className={`text-sm ${t.textSec}`}>We need both sides to cross-validate your identity</p>
+              <h2 className={`text-xl font-semibold mb-1 ${t.text}`}>{tr('backId.heading')}</h2>
+              <p className={`text-sm ${t.textSec}`}>{tr('backId.description')}</p>
             </div>
 
             {renderOCRSummary()}
 
-            {renderFileArea('back', backPreviewUrl, backInputRef, handleBackFileSelect, 'Upload Back of ID')}
+            {renderFileArea('back', backPreviewUrl, backInputRef, handleBackFileSelect, tr('backId.heading'))}
 
             {documents.back && (
               <button onClick={uploadBackDocument} disabled={uploading} className="btn-primary">
@@ -585,9 +593,9 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                     </svg>
-                    Uploading...
+                    {tr('common.processing')}
                   </span>
-                ) : 'Continue \u2192'}
+                ) : `${tr('common.next')} \u2192`}
               </button>
             )}
           </div>
@@ -597,9 +605,9 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
       case 5:
         return (
           <div className="text-center py-4 animate-fade-in">
-            <h2 className={`text-xl font-semibold mb-1 ${t.text}`}>Live Capture</h2>
+            <h2 className={`text-xl font-semibold mb-1 ${t.text}`}>{tr('liveCapture.heading')}</h2>
             <p className={`text-sm mb-6 ${t.textSec}`}>
-              Position your face in the center and ensure good lighting
+              {tr('liveCapture.description')}
             </p>
 
             <button
@@ -613,15 +621,15 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
                   </svg>
-                  Processing...
+                  {tr('common.processing')}
                 </span>
-              ) : 'Open Camera'}
+              ) : tr('liveCapture.captureButton')}
             </button>
 
             <div className={`mt-6 rounded-xl border ${t.border} p-4 text-left`}>
-              <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${t.textSec}`}>Liveness Detection</p>
+              <p className={`text-xs font-semibold uppercase tracking-wide mb-2 ${t.textSec}`}>{tr('liveCapture.livenessDetectionTitle')}</p>
               <p className={`text-sm ${t.textSec}`}>
-                Our system will automatically detect that you're a real person and capture your photo when optimal conditions are met.
+                {tr('liveCapture.livenessDetectionDesc')}
               </p>
             </div>
           </div>
@@ -633,8 +641,8 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
           return (
             <div className="text-center py-8 animate-fade-in">
               <Spinner />
-              <h2 className={`text-xl font-semibold mb-2 ${t.text}`}>Processing Verification</h2>
-              <p className={`text-sm ${t.textSec}`}>Analyzing your live photo...</p>
+              <h2 className={`text-xl font-semibold mb-2 ${t.text}`}>{tr('common.processing')}</h2>
+              <p className={`text-sm ${t.textSec}`}>{tr('liveCapture.analyzingPhoto')}</p>
             </div>
           );
         }
@@ -650,14 +658,14 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
 
             <div>
               <h2 className={`text-xl font-semibold ${t.text}`}>
-                {isVerified ? 'Identity Verified!' : isFailed ? 'Verification Failed' : 'Under Review'}
+                {isVerified ? tr('success.heading') : isFailed ? tr('failure.heading') : tr('manualReview.heading')}
               </h2>
               <p className={`text-sm mt-1 ${t.textSec}`}>
                 {isVerified
-                  ? 'Your identity has been successfully verified.'
+                  ? tr('success.message')
                   : isFailed
-                  ? (verificationResults?.failure_reason || 'Verification could not be completed. Please try again.')
-                  : 'Your verification is under manual review. You will be notified of the result.'}
+                  ? (verificationResults?.failure_reason || tr('failure.message'))
+                  : tr('manualReview.message')}
               </p>
             </div>
 
@@ -689,7 +697,7 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
 
             {isFailed && (
               <button onClick={() => window.location.reload()} className="btn-primary">
-                Try Again
+                {tr('common.tryAgain')}
               </button>
             )}
           </div>
@@ -705,6 +713,11 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
   return (
     <div className={`min-h-screen ${t.bg} flex items-center justify-center p-4`}>
       <div className="w-full max-w-lg">
+        {/* Language selector */}
+        <div className="flex justify-end mb-3">
+          <LanguageSelector variant="dark" />
+        </div>
+
         {/* Organization branding */}
         <BrandedHeader className="mb-6" />
 
@@ -726,7 +739,7 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
         {/* Security footer */}
         <div className="mt-6 text-center">
           <p className={`text-xs ${t.textSec}`}>
-            256-bit SSL encryption \u00B7 GDPR compliant \u00B7 Auto-deleted after verification
+            {tr('common.securityFooter')}
           </p>
         </div>
       </div>

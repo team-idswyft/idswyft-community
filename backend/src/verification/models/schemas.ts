@@ -15,6 +15,8 @@ export const RejectionReason = {
   LIVENESS_FAILED: 'LIVENESS_FAILED',
   FACE_NOT_DETECTED: 'FACE_NOT_DETECTED',
   FACE_MATCH_FAILED: 'FACE_MATCH_FAILED',
+  AML_MATCH_FOUND: 'AML_MATCH_FOUND',
+  AML_POTENTIAL_MATCH: 'AML_POTENTIAL_MATCH',
 } as const;
 
 export type RejectionReasonType = typeof RejectionReason[keyof typeof RejectionReason];
@@ -30,6 +32,8 @@ const RejectionReasonEnum = z.enum([
   'LIVENESS_FAILED',
   'FACE_NOT_DETECTED',
   'FACE_MATCH_FAILED',
+  'AML_MATCH_FOUND',
+  'AML_POTENTIAL_MATCH',
 ]);
 
 // ─── Verification Status (10 states per spec) ───
@@ -144,6 +148,15 @@ export const GateResultSchema = z.object({
 
 export type GateResult = z.infer<typeof GateResultSchema>;
 
+// ─── AML Screening Result (stored in session state) ───
+export interface AMLScreeningSessionResult {
+  risk_level: 'clear' | 'potential_match' | 'confirmed_match';
+  match_found: boolean;
+  match_count: number;
+  lists_checked: string[];
+  screened_at: string;
+}
+
 // ─── Session State ───
 export interface SessionState {
   session_id: string;
@@ -155,6 +168,7 @@ export interface SessionState {
   back_extraction: BackExtractionResult | null;
   cross_validation: CrossValidationResult | null;
   face_match: FaceMatchResult | null;
+  aml_screening: AMLScreeningSessionResult | null;
   created_at: string;
   updated_at: string;
   completed_at: string | null;

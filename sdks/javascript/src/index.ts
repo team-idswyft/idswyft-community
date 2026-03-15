@@ -1,5 +1,7 @@
 import axios, { AxiosInstance, AxiosError } from 'axios';
 import FormData from 'form-data';
+import { VerificationEventEmitter } from './events';
+import type { WatchOptions } from './events';
 
 // ─── Configuration ──────────────────────────────────────
 
@@ -12,7 +14,8 @@ export interface IdswyftConfig {
 
 // ─── Verification Types ─────────────────────────────────
 
-export type DocumentType = 'passport' | 'drivers_license' | 'national_id' | 'other';
+export type DocumentType = 'passport' | 'drivers_license' | 'national_id' | 'other'
+  | 'utility_bill' | 'bank_statement' | 'tax_document';
 
 export type VerificationStatus =
   | 'AWAITING_FRONT'
@@ -106,6 +109,127 @@ export interface VerificationResult {
   updated_at?: string;
 }
 
+// ─── Batch Verification Types ───────────────────────────
+
+export interface BatchItemInput {
+  user_id: string;
+  document_type?: DocumentType;
+  front_document_url?: string;
+  back_document_url?: string;
+  selfie_url?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface BatchJobResponse {
+  success: boolean;
+  batch_id: string;
+  status: string;
+  total_items: number;
+  message: string;
+}
+
+export interface BatchStatusResponse {
+  batch_id: string;
+  status: 'pending' | 'processing' | 'completed' | 'cancelled' | 'failed';
+  total_items: number;
+  processed_items: number;
+  succeeded_items: number;
+  failed_items: number;
+  progress_percentage: number;
+  created_at: string;
+  completed_at: string | null;
+}
+
+export interface BatchResultItem {
+  item_id: string;
+  user_id: string | null;
+  status: string;
+  verification_id: string | null;
+  error: string | null;
+}
+
+export interface BatchResultsResponse {
+  results: BatchResultItem[];
+}
+
+export interface BatchListResponse {
+  jobs: BatchStatusResponse[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    pages: number;
+  };
+}
+
+// ─── Address Verification Types ─────────────────────────
+
+export type AddressDocumentType = 'utility_bill' | 'bank_statement' | 'tax_document';
+
+export interface AddressVerificationResult {
+  status: 'pass' | 'review' | 'reject';
+  score: number;
+  name_match_score: number;
+  address: string | null;
+  document_type: AddressDocumentType | null;
+  document_fresh: boolean | null;
+  reasons: string[];
+}
+
+export interface AddressVerificationResponse {
+  success: boolean;
+  verification_id: string;
+  address_verification: AddressVerificationResult;
+}
+
+export interface AddressStatusResponse {
+  verification_id: string;
+  address_verification: AddressVerificationResult | null;
+  message?: string;
+}
+
+// ─── Monitoring Types ────────────────────────────────────
+
+export interface ReverificationSchedule {
+  id: string;
+  user_id: string;
+  interval_days: number;
+  next_verification_at: string;
+  last_verification_at: string | null;
+  status: 'active' | 'paused' | 'cancelled';
+  created_at: string;
+}
+
+export interface CreateScheduleRequest {
+  user_id: string;
+  interval_days: number;
+  verification_request_id?: string;
+}
+
+export interface ScheduleListResponse {
+  schedules: ReverificationSchedule[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
+export interface ExpiryAlert {
+  id: string;
+  verification_request_id: string;
+  user_id: string | null;
+  expiry_date: string;
+  alert_type: '90_day' | '60_day' | '30_day' | 'expired';
+  webhook_sent: boolean;
+  created_at: string;
+}
+
+export interface ExpiryAlertListResponse {
+  alerts: ExpiryAlert[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 // ─── Developer & Webhook Types ──────────────────────────
 
 export interface ApiKey {
@@ -186,8 +310,8 @@ export class IdswyftSDK {
       timeout: this.config.timeout,
       headers: {
         'X-API-Key': this.config.apiKey,
-        'User-Agent': '@idswyft/sdk/3.0.0',
-        'X-SDK-Version': '3.0.0',
+        'User-Agent': '@idswyft/sdk/4.0.0',
+        'X-SDK-Version': '4.0.0',
         'X-SDK-Language': 'javascript',
       },
     });
@@ -452,6 +576,183 @@ export class IdswyftSDK {
     return response.data;
   }
 
+  // ─── Real-Time Status Watching ──────────────────────────
+
+  /**
+   * Watch a verification session for real-time status updates.
+   * Internally polls getVerificationStatus() at a configurable interval.
+   * Auto-stops on terminal states (COMPLETE, HARD_REJECTED).
+   *
+   * @example
+   * ```ts
+   * const watcher = sdk.watch(verificationId);
+   * watcher.on('verification_complete', (event) => {
+   *   console.log('Verified!', event.data.final_result);
+   * });
+   * watcher.on('verification_failed', (event) => {
+   *   console.log('Failed:', event.data.rejection_reason);
+   * });
+   * // Clean up when done
+   * watcher.destroy();
+   * ```
+   */
+  watch(verificationId: string, options?: WatchOptions): VerificationEventEmitter {
+    return new VerificationEventEmitter(
+      verificationId,
+      (id) => this.getVerificationStatus(id),
+      {
+        interval: options?.interval ?? 2000,
+        maxAttempts: options?.maxAttempts ?? 300,
+      },
+    );
+  }
+
+  // ─── Batch Verification ────────────────────────────────
+
+  /**
+   * Create a batch verification job for processing multiple users.
+   * Items are processed asynchronously with controlled concurrency.
+   */
+  async createBatch(items: BatchItemInput[]): Promise<BatchJobResponse> {
+    const response = await this.client.post('/api/v2/batch/upload', { items });
+    return response.data;
+  }
+
+  /**
+   * Get the status and progress of a batch job.
+   */
+  async getBatchStatus(batchId: string): Promise<BatchStatusResponse> {
+    const response = await this.client.get(`/api/v2/batch/${batchId}/status`);
+    return response.data;
+  }
+
+  /**
+   * Get individual item results for a completed batch job.
+   */
+  async getBatchResults(batchId: string): Promise<BatchResultsResponse> {
+    const response = await this.client.get(`/api/v2/batch/${batchId}/results`);
+    return response.data;
+  }
+
+  /**
+   * Cancel a batch job. Already-completed items are unaffected.
+   */
+  async cancelBatch(batchId: string): Promise<{ success: boolean; message: string }> {
+    const response = await this.client.post(`/api/v2/batch/${batchId}/cancel`);
+    return response.data;
+  }
+
+  /**
+   * List all batch jobs for the current developer.
+   */
+  async listBatches(options?: { page?: number; limit?: number }): Promise<BatchListResponse> {
+    const params = new URLSearchParams();
+    if (options?.page) params.append('page', options.page.toString());
+    if (options?.limit) params.append('limit', options.limit.toString());
+
+    const response = await this.client.get(`/api/v2/batch?${params.toString()}`);
+    return response.data;
+  }
+
+  // ─── Address Verification ──────────────────────────────
+
+  /**
+   * Upload a proof-of-address document for verification.
+   * Cross-references the name on the address document against the verified ID.
+   */
+  async uploadAddressDocument(
+    verificationId: string,
+    document: Buffer | Blob,
+    documentType: AddressDocumentType,
+    filename?: string,
+  ): Promise<AddressVerificationResponse> {
+    const formData = new FormData();
+    formData.append('document', document, { filename: filename || 'address-document' });
+    formData.append('document_type', documentType);
+
+    const response = await this.client.post(
+      `/api/v2/verify/${verificationId}/address-document`,
+      formData,
+      { headers: formData.getHeaders?.() || {} },
+    );
+    return response.data;
+  }
+
+  /**
+   * Get the address verification status for a verification.
+   */
+  async getAddressStatus(verificationId: string): Promise<AddressStatusResponse> {
+    const response = await this.client.get(
+      `/api/v2/verify/${verificationId}/address-status`,
+    );
+    return response.data;
+  }
+
+  // ─── Monitoring & Re-verification ─────────────────────
+
+  /**
+   * Create a re-verification schedule for a user.
+   * Sends webhook notifications when re-verification is due.
+   *
+   * @param request - Schedule parameters (user_id, interval_days 30-730)
+   */
+  async createMonitoringSchedule(request: CreateScheduleRequest): Promise<{ success: boolean; schedule: ReverificationSchedule }> {
+    const response = await this.client.post('/api/v2/monitoring/schedules', request);
+    return response.data;
+  }
+
+  /**
+   * Get a single re-verification schedule by ID.
+   */
+  async getMonitoringSchedule(scheduleId: string): Promise<{ schedule: ReverificationSchedule }> {
+    const response = await this.client.get(`/api/v2/monitoring/schedules/${scheduleId}`);
+    return response.data;
+  }
+
+  /**
+   * List re-verification schedules for the current developer.
+   */
+  async listMonitoringSchedules(options?: {
+    status?: 'active' | 'paused' | 'cancelled';
+    page?: number;
+    limit?: number;
+  }): Promise<ScheduleListResponse> {
+    const params = new URLSearchParams();
+    if (options?.status) params.append('status', options.status);
+    if (options?.page) params.append('page', options.page.toString());
+    if (options?.limit) params.append('limit', options.limit.toString());
+
+    const response = await this.client.get(`/api/v2/monitoring/schedules?${params.toString()}`);
+    return response.data;
+  }
+
+  /**
+   * Cancel a re-verification schedule.
+   */
+  async cancelMonitoringSchedule(scheduleId: string): Promise<{ success: boolean; message: string }> {
+    const response = await this.client.delete(`/api/v2/monitoring/schedules/${scheduleId}`);
+    return response.data;
+  }
+
+  /**
+   * Get documents approaching expiry for the current developer.
+   *
+   * @param options - Filter by days_ahead (default 90), pagination
+   */
+  async getExpiringDocuments(options?: {
+    days_ahead?: number;
+    page?: number;
+    limit?: number;
+  }): Promise<ExpiryAlertListResponse> {
+    const params = new URLSearchParams();
+    if (options?.days_ahead) params.append('days_ahead', options.days_ahead.toString());
+    if (options?.page) params.append('page', options.page.toString());
+    if (options?.limit) params.append('limit', options.limit.toString());
+
+    const response = await this.client.get(`/api/v2/monitoring/expiring-documents?${params.toString()}`);
+    return response.data;
+  }
+
   // ─── Utilities ─────────────────────────────────────────
 
   /**
@@ -495,3 +796,9 @@ export default function createIdswyftSDK(config: IdswyftConfig): IdswyftSDK {
 
 // Export alias for the main SDK class
 export { IdswyftSDK as Idswyft };
+
+// Re-export events and embed modules
+export { VerificationEventEmitter } from './events';
+export type { VerificationEventType, VerificationEvent, VerificationEventHandler, WatchOptions } from './events';
+export { IdswyftEmbed } from './embed';
+export type { EmbedOptions, EmbedCallbacks, EmbedResult, EmbedError, EmbedMode, EmbedTheme } from './embed';

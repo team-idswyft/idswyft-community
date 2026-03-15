@@ -1,5 +1,6 @@
 import React, { useState, useMemo } from 'react';
 import { Globe, Search, ChevronRight } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 // Priority countries grouped by region with flag emoji
 const COUNTRY_LIST = [
@@ -35,7 +36,14 @@ interface CountrySelectorProps {
   onSelect: (countryCode: string) => void;
 }
 
+const regionKey: Record<string, string> = {
+  'Americas': 'country.regions.americas',
+  'Europe': 'country.regions.europe',
+  'Asia-Pacific': 'country.regions.asiaPacific',
+};
+
 const CountrySelector: React.FC<CountrySelectorProps> = ({ onSelect }) => {
+  const { t } = useTranslation();
   const [search, setSearch] = useState('');
 
   const filtered = useMemo(() => {
@@ -59,10 +67,10 @@ const CountrySelector: React.FC<CountrySelectorProps> = ({ onSelect }) => {
     <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-6">
       <div className="flex items-center mb-4">
         <Globe className="w-6 h-6 text-blue-600 mr-3" />
-        <h2 className="text-xl font-semibold text-gray-900">Select Your Country</h2>
+        <h2 className="text-xl font-semibold text-gray-900">{t('country.title')}</h2>
       </div>
       <p className="text-gray-600 mb-6">
-        Choose the country that issued your identity document.
+        {t('country.subtitle')}
       </p>
 
       {/* Search */}
@@ -70,7 +78,7 @@ const CountrySelector: React.FC<CountrySelectorProps> = ({ onSelect }) => {
         <Search className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
         <input
           type="text"
-          placeholder="Search countries..."
+          placeholder={t('country.searchPlaceholder')}
           value={search}
           onChange={e => setSearch(e.target.value)}
           className="w-full pl-9 pr-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
@@ -86,7 +94,7 @@ const CountrySelector: React.FC<CountrySelectorProps> = ({ onSelect }) => {
           return (
             <div key={region}>
               <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider mb-2">
-                {region}
+                {t(regionKey[region] || region)}
               </h3>
               <div className="space-y-1">
                 {countries.map(c => (
@@ -109,7 +117,7 @@ const CountrySelector: React.FC<CountrySelectorProps> = ({ onSelect }) => {
         })}
 
         {filtered.length === 0 && (
-          <p className="text-gray-500 text-center py-4">No countries match your search.</p>
+          <p className="text-gray-500 text-center py-4">{t('country.noResults')}</p>
         )}
       </div>
     </div>

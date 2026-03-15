@@ -29,7 +29,9 @@ import { evaluateGate2 } from '../gates/gate2-backDocument.js';
 import { evaluateGate3 } from '../gates/gate3-crossValidation.js';
 import { evaluateGate4 } from '../gates/gate4-liveCapture.js';
 import { evaluateGate5 } from '../gates/gate5-faceMatch.js';
+import { evaluateGate6 } from '../gates/gate6-amlScreening.js';
 import { crossValidate } from '../cross-validator/engine.js';
+import type { AMLScreeningResult } from '@/providers/aml/types.js';
 
 /** Step result returned to the caller after each step */
 export interface StepResult {
@@ -46,6 +48,8 @@ export interface SessionDeps {
   processLiveCapture: (buffer: Buffer) => Promise<LiveCaptureResult>;
   computeFaceMatch: (idEmbedding: number[], liveEmbedding: number[], threshold: number) => FaceMatchResult;
   faceMatchThreshold?: number;
+  /** Optional AML screening — returns null if disabled */
+  screenAML?: (fullName: string, dob?: string | null, nationality?: string | null) => Promise<AMLScreeningResult | null>;
 }
 
 /** Optional initial state for hydrating a session from DB */
@@ -59,6 +63,7 @@ export interface SessionHydration {
   back_extraction?: BackExtractionResult | null;
   cross_validation?: CrossValidationResult | null;
   face_match?: FaceMatchResult | null;
+  aml_screening?: { risk_level: string; match_found: boolean; match_count: number; lists_checked: string[]; screened_at: string } | null;
   created_at?: string;
   completed_at?: string | null;
 }
@@ -80,6 +85,7 @@ export class VerificationSession {
       back_extraction: hydration?.back_extraction ?? null,
       cross_validation: hydration?.cross_validation ?? null,
       face_match: hydration?.face_match ?? null,
+      aml_screening: (hydration?.aml_screening as any) ?? null,
       created_at: hydration?.created_at ?? now,
       updated_at: now,
       completed_at: hydration?.completed_at ?? null,
@@ -193,6 +199,36 @@ export class VerificationSession {
     const gate5 = evaluateGate5(faceMatchResult);
     if (!gate5.passed) {
       return this.hardReject(gate5);
+    }
+
+    // Auto-trigger Gate 6: AML/Sanctions Screening (optional)
+    if (this.deps.screenAML && this.state.front_extraction?.ocr) {
+      try {
+        const ocr = this.state.front_extraction.ocr;
+        const amlResult = await this.deps.screenAML(
+          ocr.full_name,
+          ocr.date_of_birth || null,
+          ocr.nationality || null,
+        );
+
+        if (amlResult) {
+          this.state.aml_screening = {
+            risk_level: amlResult.risk_level,
+            match_found: amlResult.match_found,
+            match_count: amlResult.matches.length,
+            lists_checked: amlResult.lists_checked,
+            screened_at: amlResult.screened_at,
+          };
+
+          const gate6 = evaluateGate6(amlResult);
+          if (!gate6.passed) {
+            return this.hardReject(gate6);
+          }
+        }
+      } catch {
+        // AML failure should not block verification — log and continue
+        this.state.aml_screening = null;
+      }
     }
 
     this.transition(VerificationStatus.COMPLETE);

@@ -1,0 +1,123 @@
+/**
+ * Risk Scoring Service
+ *
+ * Computes a composite 0-100 risk score from verification signals.
+ * Higher score = higher risk.
+ */
+
+import type { SessionState } from '@/verification/models/types.js';
+
+export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
+
+export interface RiskFactor {
+  signal: string;
+  score: number;
+  weight: number;
+  detail: string;
+}
+
+export interface RiskScore {
+  overall_score: number;
+  risk_level: RiskLevel;
+  risk_factors: RiskFactor[];
+}
+
+/**
+ * Compute a composite risk score from session state.
+ * Score 0-100 where higher = more risk.
+ */
+export function computeRiskScore(state: SessionState): RiskScore {
+  const factors: RiskFactor[] = [];
+
+  // ── OCR Confidence (weight: 0.20) ────────────────────────
+  const ocrConf = state.front_extraction?.ocr_confidence ?? 0;
+  const ocrRisk = Math.round((1 - ocrConf) * 100);
+  factors.push({
+    signal: 'ocr_confidence',
+    score: ocrRisk,
+    weight: 0.20,
+    detail: `OCR confidence: ${(ocrConf * 100).toFixed(0)}%`,
+  });
+
+  // ── Face Match Score (weight: 0.25) ──────────────────────
+  const faceScore = state.face_match?.similarity_score ?? 0;
+  const faceRisk = Math.round((1 - faceScore) * 100);
+  factors.push({
+    signal: 'face_match',
+    score: faceRisk,
+    weight: 0.25,
+    detail: `Face match similarity: ${(faceScore * 100).toFixed(0)}%`,
+  });
+
+  // ── Cross-Validation Score (weight: 0.20) ────────────────
+  const crossScore = state.cross_validation?.overall_score ?? 0;
+  const crossRisk = Math.round((1 - crossScore) * 100);
+  factors.push({
+    signal: 'cross_validation',
+    score: crossRisk,
+    weight: 0.20,
+    detail: `Cross-validation score: ${(crossScore * 100).toFixed(0)}%`,
+  });
+
+  // ── Liveness Score (weight: 0.20) ────────────────────────
+  // The actual liveness score (from EnhancedHeuristicProvider) is computed in
+  // extractLiveCapture() but only returned in LiveCaptureResult — it's not
+  // persisted on SessionState. Using front_extraction.face_confidence as a
+  // proxy until SessionState is extended to store liveness_score directly.
+  const faceConf = state.front_extraction?.face_confidence ?? 0;
+  const livenessRisk = Math.round((1 - faceConf) * 100);
+  factors.push({
+    signal: 'liveness_proxy',
+    score: livenessRisk,
+    weight: 0.20,
+    detail: `Face detection confidence: ${(faceConf * 100).toFixed(0)}%`,
+  });
+
+  // ── Document Expiry (weight: 0.15) ──────────────────────
+  const expiryDate = state.front_extraction?.ocr?.expiry_date;
+  let expiryRisk = 0;
+  if (expiryDate) {
+    const expiry = new Date(expiryDate);
+    const now = new Date();
+    const daysUntilExpiry = (expiry.getTime() - now.getTime()) / (1000 * 60 * 60 * 24);
+    if (daysUntilExpiry < 0) {
+      expiryRisk = 100; // Expired
+    } else if (daysUntilExpiry < 30) {
+      expiryRisk = 70; // Expiring very soon
+    } else if (daysUntilExpiry < 90) {
+      expiryRisk = 40; // Expiring soon
+    } else {
+      expiryRisk = 0; // Plenty of time
+    }
+  } else {
+    expiryRisk = 30; // No expiry data — mild concern
+  }
+  factors.push({
+    signal: 'document_expiry',
+    score: expiryRisk,
+    weight: 0.15,
+    detail: expiryDate ? `Expires: ${expiryDate}` : 'No expiry date detected',
+  });
+
+  // ── Weighted average ─────────────────────────────────────
+  let weightedSum = 0;
+  let totalWeight = 0;
+  for (const f of factors) {
+    weightedSum += f.score * f.weight;
+    totalWeight += f.weight;
+  }
+  const overall = Math.round(weightedSum / totalWeight);
+
+  // ── Determine risk level ─────────────────────────────────
+  let risk_level: RiskLevel;
+  if (overall <= 20) risk_level = 'low';
+  else if (overall <= 45) risk_level = 'medium';
+  else if (overall <= 70) risk_level = 'high';
+  else risk_level = 'critical';
+
+  return {
+    overall_score: Math.max(0, Math.min(100, overall)),
+    risk_level,
+    risk_factors: factors,
+  };
+}

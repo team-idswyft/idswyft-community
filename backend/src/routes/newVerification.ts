@@ -13,7 +13,11 @@ import { FaceRecognitionService } from '@/services/faceRecognition.js';
 import { logger, logVerificationEvent } from '@/utils/logger.js';
 import { validateFileType } from '@/middleware/fileValidation.js';
 import { supabase } from '@/config/database.js';
-import { VERIFICATION_THRESHOLDS, getFaceMatchingThresholdSync } from '@/config/verificationThresholds.js';
+import { VERIFICATION_THRESHOLDS, getFaceMatchingThresholdSync, getLivenessThresholdSync } from '@/config/verificationThresholds.js';
+import { createLivenessProvider } from '@/providers/liveness/index.js';
+import { createAMLProvider } from '@/providers/aml/index.js';
+import { computeRiskScore } from '@/services/riskScoring.js';
+import { broadcastStatusChange } from '@/services/realtime.js';
 
 import { VerificationSession } from '@/verification/session/VerificationSession.js';
 import type { SessionDeps, SessionHydration } from '@/verification/session/VerificationSession.js';
@@ -32,6 +36,7 @@ const ocrService = new OCRService();
 const barcodeService = new BarcodeService();
 const faceRecognitionService = new FaceRecognitionService();
 const webhookService = new WebhookService();
+const amlProvider = createAMLProvider();
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -81,6 +86,9 @@ function createSession(isSandbox: boolean, hydration?: SessionHydration): Verifi
     },
     computeFaceMatch,
     faceMatchThreshold: getFaceMatchingThresholdSync(isSandbox),
+    screenAML: amlProvider
+      ? async (fullName, dob, nationality) => amlProvider.screen({ full_name: fullName, date_of_birth: dob, nationality })
+      : undefined,
   };
 
   return new VerificationSession(deps, hydration);
@@ -99,6 +107,7 @@ async function hydrateSession(verificationId: string, isSandbox: boolean): Promi
     back_extraction: savedState.back_extraction,
     cross_validation: savedState.cross_validation,
     face_match: savedState.face_match,
+    aml_screening: (savedState as any).aml_screening ?? null,
     created_at: savedState.created_at,
     completed_at: savedState.completed_at,
   } : {
@@ -246,10 +255,15 @@ async function extractBackDocument(
   };
 }
 
+/** Liveness provider — instantiated once, reused across requests */
+const livenessProvider = createLivenessProvider();
+
 /** Run live capture processing and build LiveCaptureResult */
 async function extractLiveCapture(
   selfiePath: string,
   frontDocPath: string | null,
+  selfieBuffer: Buffer,
+  isSandbox: boolean = false,
 ): Promise<LiveCaptureResult> {
   // Detect face and extract embedding from selfie
   let faceConfidence = 0;
@@ -262,12 +276,28 @@ async function extractLiveCapture(
     faceConfidence = 0;
   }
 
-  // Liveness detection (stub — no real anti-spoofing implemented yet).
-  // Auto-pass liveness so the pipeline proceeds to face matching (Gate 5)
-  // which handles missing embeddings gracefully. Real liveness detection
-  // (blink/nod challenge, depth estimation) should replace this stub.
-  const livenessScore = 0.85;
-  const livenessPassed = true;
+  // Real liveness detection via configured provider
+  let livenessScore = 0;
+  let livenessPassed = false;
+  try {
+    livenessScore = await livenessProvider.assessLiveness({
+      buffer: selfieBuffer,
+    });
+    const threshold = getLivenessThresholdSync(isSandbox);
+    livenessPassed = livenessScore >= threshold;
+    logger.info('Liveness assessment complete', {
+      provider: livenessProvider.name,
+      score: livenessScore.toFixed(3),
+      threshold,
+      passed: livenessPassed,
+      isSandbox,
+    });
+  } catch (err) {
+    logger.error('Liveness provider failed, defaulting to fail-safe', { error: err });
+    // Fail-safe: if the provider crashes, score 0 — do NOT auto-pass
+    livenessScore = 0;
+    livenessPassed = false;
+  }
 
   return {
     face_embedding: faceEmbedding,
@@ -413,6 +443,11 @@ router.post('/initialize',
       is_sandbox: isSandbox,
     });
 
+    // Set session start timestamp for processing-time analytics
+    await supabase.from('verification_requests').update({
+      session_started_at: new Date().toISOString(),
+    }).eq('id', verificationRecord.id);
+
     // Create session and save initial state
     const issuingCountryUpper = issuing_country?.toUpperCase() || null;
     const session = createSession(isSandbox, { session_id: verificationRecord.id, issuing_country: issuingCountryUpper });
@@ -531,6 +566,12 @@ router.post('/:verification_id/front-document',
         : 'Front document processed successfully - ready to upload back document',
     });
 
+    // Broadcast status change via Supabase Realtime (after response is sent)
+    broadcastStatusChange(
+      verification_id, mapped.status, mapped.current_step,
+      mapped.final_result, state.rejection_reason,
+    ).catch(() => {});
+
     // Fire webhooks if Gate 1 hard-rejected (after response is sent)
     fireWebhooksIfTerminal(
       verification_id, (req as any).developer.id, verification.user_id,
@@ -645,6 +686,12 @@ router.post('/:verification_id/back-document',
         : 'Back document processed and cross-validation passed - ready for live capture',
     });
 
+    // Broadcast status change via Supabase Realtime
+    broadcastStatusChange(
+      verification_id, mapped.status, mapped.current_step,
+      mapped.final_result, state.rejection_reason,
+    ).catch(() => {});
+
     // Fire webhooks if cross-validation hard-rejected (after response is sent)
     fireWebhooksIfTerminal(
       verification_id, (req as any).developer.id, verification.user_id,
@@ -738,10 +785,9 @@ router.post('/:verification_id/live-capture',
       selfie_id: selfie.id,
     } as any);
 
-    // Run live capture extraction
+    // Run live capture extraction with real liveness detection
     const savedState = await loadSessionState(verification_id);
-    const frontDocPath = savedState?.front_extraction ? null : null; // embedding from session state
-    const liveResult = await extractLiveCapture(selfiePath, frontDocPath);
+    const liveResult = await extractLiveCapture(selfiePath, null, req.file.buffer, isSandbox);
 
     // Hydrate session and run Gate 4 + auto face match via session
     const session = await hydrateSession(verification_id, isSandbox);
@@ -781,6 +827,26 @@ router.post('/:verification_id/live-capture',
       status: dbStatus,
     } as any);
 
+    // Compute and persist risk score on terminal states
+    if (state.current_step === VerificationStatus.COMPLETE || state.current_step === VerificationStatus.HARD_REJECTED) {
+      try {
+        const riskScore = computeRiskScore(state);
+        await supabase.from('verification_risk_scores').upsert({
+          verification_request_id: verification_id,
+          overall_score: riskScore.overall_score,
+          risk_level: riskScore.risk_level,
+          risk_factors: riskScore.risk_factors,
+          computed_at: new Date().toISOString(),
+        }, { onConflict: 'verification_request_id' });
+
+        await supabase.from('verification_requests').update({
+          processing_completed_at: new Date().toISOString(),
+        }).eq('id', verification_id);
+      } catch (err) {
+        logger.warn('Failed to compute/store risk score (non-blocking):', err);
+      }
+    }
+
     logVerificationEvent('live_capture_processed', verification_id, {
       selfieId: selfie.id,
       selfiePath,
@@ -813,6 +879,12 @@ router.post('/:verification_id/live-capture',
           ? stepResult.user_message || 'Verification failed'
           : 'Live capture processed',
     });
+
+    // Broadcast status change via Supabase Realtime
+    broadcastStatusChange(
+      verification_id, mapped.status, mapped.current_step,
+      mapped.final_result, state.rejection_reason,
+    ).catch(() => {});
 
     // Fire webhooks on COMPLETE or HARD_REJECTED (after response is sent)
     fireWebhooksIfTerminal(

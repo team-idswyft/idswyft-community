@@ -31,7 +31,7 @@ export interface LivenessProvider {
 export interface ProviderConfig {
   ocr: 'paddle' | 'tesseract' | 'openai' | 'azure' | 'aws-textract' | 'custom';
   face: 'tensorflow' | 'aws-rekognition' | 'custom';
-  liveness: 'heuristic' | 'custom';
+  liveness: 'heuristic' | 'enhanced-heuristic' | 'custom';
   // For custom providers: URL to HTTP endpoint implementing the interface
   customOcrEndpoint?: string;
   customFaceEndpoint?: string;
