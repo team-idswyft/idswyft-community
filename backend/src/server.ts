@@ -10,6 +10,7 @@ import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import config from './config/index.js';
 import { connectDB, supabase } from './config/database.js';
+import { verifyApiKeySecretStability } from './config/apiKeySecretGuard.js';
 import { generateAPIKey, authenticateAPIKey } from './middleware/auth.js';
 import { apiActivityLogger } from './middleware/apiLogger.js';
 import { errorHandler } from './middleware/errorHandler.js';
@@ -223,6 +224,9 @@ const startServer = async () => {
   try {
     // Test database connection
     await connectDB();
+
+    // Verify API_KEY_SECRET hasn't changed (would break all existing API keys)
+    await verifyApiKeySecretStability(config.apiKeySecret);
 
     // Start HTTP server
     const server = app.listen(config.port, async () => {
