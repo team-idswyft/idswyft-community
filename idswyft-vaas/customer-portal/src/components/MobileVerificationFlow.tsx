@@ -12,6 +12,7 @@ import verificationAPI from '../services/verificationApi';
 import { useOrganization } from '../contexts/OrganizationContext';
 import IDCameraCapture from './IDCameraCapture';
 import SelfieCameraCapture from './SelfieCameraCapture';
+import { ActiveLivenessCapture } from './ActiveLivenessCapture';
 import type { LivenessMetadata } from '../hooks/useActiveLiveness';
 import { useTranslation } from 'react-i18next';
 import LanguageSelector from './LanguageSelector';
@@ -404,6 +405,8 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
   const [cameraVariant, setCameraVariant] = useState<'front' | 'back'>('front');
   const [cameraSupported, setCameraSupported] = useState(true);
   const [showSelfieCamera, setShowSelfieCamera] = useState(false);
+  const [showActiveLiveness, setShowActiveLiveness] = useState(false);
+  const [useFallbackSelfie, setUseFallbackSelfie] = useState(false);
 
   // Checking screen messages
   const [checkingMsg, setCheckingMsg] = useState('');
@@ -646,6 +649,37 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
     const iv = setInterval(() => { idx = (idx + 1) % msgs.length; setCheckingMsg(msgs[idx]); }, 1800);
     return () => clearInterval(iv);
   }, [screen, t]);
+
+  // ── Active liveness complete — submit blob + metadata directly ─────────
+  const handleActiveLivenessComplete = useCallback(async (blob: Blob, metadata: LivenessMetadata) => {
+    if (!verificationId || !session) return;
+    setShowActiveLiveness(false);
+    setIsProcessing(true);
+    setStepError(null);
+    try {
+      const file = new File([blob], 'selfie.jpg', { type: 'image/jpeg' });
+      await verificationAPI.captureSelfie(session, verificationId, file, undefined, metadata);
+      if (!mountedRef.current) return;
+      setScreenIdx(5);
+      try {
+        await customerPortalAPI.submitVerification(sessionToken, idempotencyKey);
+      } catch (submitErr: any) {
+        if (submitErr?.status !== 409) {
+          console.warn('[MobileFlow] Submit verification warning:', submitErr.message);
+        }
+      }
+      pollFinalResult(verificationId, 0);
+    } catch (err: any) {
+      if (mountedRef.current) setStepError(err.message);
+    } finally {
+      if (mountedRef.current) setIsProcessing(false);
+    }
+  }, [verificationId, session, sessionToken, idempotencyKey]);
+
+  const handleActiveLivenessFallback = useCallback(() => {
+    setShowActiveLiveness(false);
+    setUseFallbackSelfie(true);
+  }, []);
 
   // ── Upload selfie ─────────────────────────────────────────────────────
   const uploadSelfie = async () => {
@@ -1082,35 +1116,70 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
               marginBottom: 8,
             }}>{t('liveCapture.stepTitle')}</span>
 
-            <h1 style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.12, letterSpacing: '-0.025em', marginBottom: 8 }}>
-              {t('liveCapture.heading')}
-            </h1>
+            {/* Active liveness (primary path) */}
+            {!useFallbackSelfie && !selfieFile && !showSelfieCamera ? (
+              <>
+                <h1 style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.12, letterSpacing: '-0.025em', marginBottom: 8 }}>
+                  {t('liveCapture.heading')}
+                </h1>
 
-            <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.55, marginBottom: 12 }}>
-              {t('liveCapture.description')}
-            </p>
+                <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.55, marginBottom: 12 }}>
+                  {t('liveCapture.description')}
+                </p>
 
-            <OvalFaceViewfinder processing={isProcessing} previewUrl={selfiePreviewUrl} checkingLabel={t('steps.checking').toUpperCase()} />
-            <LivenessCues hidden={isProcessing} />
-
-            <TipBar text={t('liveCapture.tips')} />
-
-            <div style={{ marginTop: 14 }} />
-
-            <input type="file" accept="image/*" capture="user" id="mv-selfie-upload" style={{ display: 'none' }}
-              onChange={handleSelfieSelect} />
-
-            {!selfieFile ? (
-              <PrimaryBtn
-                onClick={() => cameraSupported ? setShowSelfieCamera(true) : document.getElementById('mv-selfie-upload')?.click()}
-                disabled={isProcessing}
-              >
-                {t('liveCapture.captureButton')}
-              </PrimaryBtn>
+                {!showActiveLiveness ? (
+                  <>
+                    <TipBar text={t('liveCapture.tips')} />
+                    <div style={{ marginTop: 14 }} />
+                    <PrimaryBtn onClick={() => setShowActiveLiveness(true)} disabled={isProcessing}>
+                      {t('liveCapture.captureButton')}
+                    </PrimaryBtn>
+                  </>
+                ) : (
+                  <div style={{ flex: 1, display: 'flex', flexDirection: 'column', minHeight: 0 }}>
+                    <ActiveLivenessCapture
+                      onComplete={handleActiveLivenessComplete}
+                      onCancel={() => setShowActiveLiveness(false)}
+                      onFallback={handleActiveLivenessFallback}
+                      theme="dark"
+                    />
+                  </div>
+                )}
+              </>
             ) : (
-              <PrimaryBtn onClick={uploadSelfie} disabled={isProcessing}>
-                {isProcessing ? t('common.processing') : t('liveCapture.submitButton')}
-              </PrimaryBtn>
+              /* Fallback: legacy selfie capture */
+              <>
+                <h1 style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.12, letterSpacing: '-0.025em', marginBottom: 8 }}>
+                  {t('liveCapture.heading')}
+                </h1>
+
+                <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.55, marginBottom: 12 }}>
+                  {t('liveCapture.description')}
+                </p>
+
+                <OvalFaceViewfinder processing={isProcessing} previewUrl={selfiePreviewUrl} checkingLabel={t('steps.checking').toUpperCase()} />
+                <LivenessCues hidden={isProcessing} />
+
+                <TipBar text={t('liveCapture.tips')} />
+
+                <div style={{ marginTop: 14 }} />
+
+                <input type="file" accept="image/*" capture="user" id="mv-selfie-upload" style={{ display: 'none' }}
+                  onChange={handleSelfieSelect} />
+
+                {!selfieFile ? (
+                  <PrimaryBtn
+                    onClick={() => cameraSupported ? setShowSelfieCamera(true) : document.getElementById('mv-selfie-upload')?.click()}
+                    disabled={isProcessing}
+                  >
+                    {t('liveCapture.captureButton')}
+                  </PrimaryBtn>
+                ) : (
+                  <PrimaryBtn onClick={uploadSelfie} disabled={isProcessing}>
+                    {isProcessing ? t('common.processing') : t('liveCapture.submitButton')}
+                  </PrimaryBtn>
+                )}
+              </>
             )}
 
             {stepError && (
