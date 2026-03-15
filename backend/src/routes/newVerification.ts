@@ -16,6 +16,7 @@ import { supabase } from '@/config/database.js';
 import { VERIFICATION_THRESHOLDS, getFaceMatchingThresholdSync, getLivenessThresholdSync } from '@/config/verificationThresholds.js';
 import { createLivenessProvider } from '@/providers/liveness/index.js';
 import { createAMLProvider } from '@/providers/aml/index.js';
+import { computeRiskScore } from '@/services/riskScoring.js';
 
 import { VerificationSession } from '@/verification/session/VerificationSession.js';
 import type { SessionDeps, SessionHydration } from '@/verification/session/VerificationSession.js';
@@ -441,6 +442,11 @@ router.post('/initialize',
       is_sandbox: isSandbox,
     });
 
+    // Set session start timestamp for processing-time analytics
+    await supabase.from('verification_requests').update({
+      session_started_at: new Date().toISOString(),
+    }).eq('id', verificationRecord.id);
+
     // Create session and save initial state
     const issuingCountryUpper = issuing_country?.toUpperCase() || null;
     const session = createSession(isSandbox, { session_id: verificationRecord.id, issuing_country: issuingCountryUpper });
@@ -807,6 +813,26 @@ router.post('/:verification_id/live-capture',
     await verificationService.updateVerificationRequest(verification_id, {
       status: dbStatus,
     } as any);
+
+    // Compute and persist risk score on terminal states
+    if (state.current_step === VerificationStatus.COMPLETE || state.current_step === VerificationStatus.HARD_REJECTED) {
+      try {
+        const riskScore = computeRiskScore(state);
+        await supabase.from('verification_risk_scores').upsert({
+          verification_request_id: verification_id,
+          overall_score: riskScore.overall_score,
+          risk_level: riskScore.risk_level,
+          risk_factors: riskScore.risk_factors,
+          computed_at: new Date().toISOString(),
+        }, { onConflict: 'verification_request_id' });
+
+        await supabase.from('verification_requests').update({
+          processing_completed_at: new Date().toISOString(),
+        }).eq('id', verification_id);
+      } catch (err) {
+        logger.warn('Failed to compute/store risk score (non-blocking):', err);
+      }
+    }
 
     logVerificationEvent('live_capture_processed', verification_id, {
       selfieId: selfie.id,
