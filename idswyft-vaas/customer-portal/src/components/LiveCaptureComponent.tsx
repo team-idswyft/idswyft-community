@@ -5,6 +5,7 @@ import {
   X,
   Eye,
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 
 // OpenCV types
 declare global {
@@ -24,6 +25,7 @@ const LiveCaptureComponent: React.FC<LiveCaptureComponentProps> = ({
   onCancel,
   isLoading
 }) => {
+  const { t } = useTranslation();
   const [cameraState, setCameraState] = useState<'prompt' | 'initializing' | 'ready' | 'error'>('prompt');
   const [faceDetected, setFaceDetected] = useState(false);
   const [opencvReady, setOpencvReady] = useState(false);
@@ -186,7 +188,7 @@ const LiveCaptureComponent: React.FC<LiveCaptureComponentProps> = ({
         ctx.fillStyle = '#ffffff';
         ctx.font = 'bold 14px Arial';
         ctx.textAlign = 'left';
-        ctx.fillText('Position your face in the circle', 15, 30);
+        ctx.fillText(t('liveCapture.positionFace'), 15, 30);
         ctx.restore();
 
         let faceCount = 0;
@@ -289,7 +291,7 @@ const LiveCaptureComponent: React.FC<LiveCaptureComponentProps> = ({
   return (
     <div className="p-6">
       <div className="flex items-center justify-between mb-4">
-        <h3 className="text-lg font-semibold text-[#dde2ec]">Live Capture</h3>
+        <h3 className="text-lg font-semibold text-[#dde2ec]">{t('liveCapture.heading')}</h3>
         <button
           onClick={() => { cleanup(); onCancel(); }}
           className="text-[#8896aa] hover:text-[#dde2ec] transition-colors"
@@ -302,12 +304,12 @@ const LiveCaptureComponent: React.FC<LiveCaptureComponentProps> = ({
         {cameraState === 'prompt' && (
           <div className="text-center py-8">
             <Camera className="h-12 w-12 mx-auto text-cyan-400 mb-4" />
-            <h4 className="text-lg font-semibold text-[#dde2ec] mb-2">Ready for Live Capture</h4>
+            <h4 className="text-lg font-semibold text-[#dde2ec] mb-2">{t('liveCapture.heading')}</h4>
             <p className="text-[#8896aa] text-sm mb-6">
-              We'll use your camera to take a photo for identity verification with liveness detection.
+              {t('liveCapture.description')}
             </p>
             <button onClick={initializeCamera} className="btn-primary">
-              Start Camera
+              {t('liveCapture.captureButton')}
             </button>
           </div>
         )}
@@ -315,7 +317,7 @@ const LiveCaptureComponent: React.FC<LiveCaptureComponentProps> = ({
         {cameraState === 'initializing' && (
           <div className="text-center py-8">
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-cyan-400 mx-auto mb-4" />
-            <p className="text-[#8896aa]">Initializing camera...</p>
+            <p className="text-[#8896aa]">{t('common.loading')}</p>
           </div>
         )}
 
@@ -342,7 +344,7 @@ const LiveCaptureComponent: React.FC<LiveCaptureComponentProps> = ({
                   faceDetected ? 'bg-green-500/80 text-white' : 'bg-red-500/80 text-white'
                 }`}>
                   <Eye className="h-4 w-4" />
-                  <span>{faceDetected ? 'Face Detected' : 'No Face'}</span>
+                  <span>{faceDetected ? t('liveCapture.faceDetected') : t('liveCapture.noFace')}</span>
                 </div>
               </div>
 
@@ -350,8 +352,8 @@ const LiveCaptureComponent: React.FC<LiveCaptureComponentProps> = ({
                 <div className="bg-black/70 text-white p-3 rounded-lg text-center">
                   <p className="text-sm">
                     {!faceDetected
-                      ? 'Position your face within the circle'
-                      : 'Great! Click capture when ready'}
+                      ? t('liveCapture.positionFace')
+                      : t('liveCapture.readyToCapture')}
                   </p>
                 </div>
               </div>
@@ -367,13 +369,13 @@ const LiveCaptureComponent: React.FC<LiveCaptureComponentProps> = ({
                     : 'bg-[rgba(255,255,255,0.07)] text-[#8896aa] cursor-not-allowed'
                 }`}
               >
-                {isLoading ? 'Capturing...' : 'Capture'}
+                {isLoading ? t('common.processing') : t('liveCapture.captureButton')}
               </button>
               <button
                 onClick={() => { cleanup(); onCancel(); }}
                 className="px-6 py-3 bg-[rgba(255,255,255,0.07)] text-[#8896aa] rounded-xl font-semibold hover:bg-[rgba(255,255,255,0.12)] transition-colors"
               >
-                Cancel
+                {t('common.close')}
               </button>
             </div>
           </div>
@@ -382,12 +384,12 @@ const LiveCaptureComponent: React.FC<LiveCaptureComponentProps> = ({
         {cameraState === 'error' && (
           <div className="text-center py-8">
             <AlertTriangle className="h-12 w-12 mx-auto text-red-400 mb-4" />
-            <h4 className="text-lg font-semibold text-red-400 mb-2">Camera Error</h4>
+            <h4 className="text-lg font-semibold text-red-400 mb-2">{t('common.error')}</h4>
             <p className="text-[#8896aa] mb-6">
-              Unable to access your camera. Please check permissions and try again.
+              {t('errors.cameraAccessDenied')}
             </p>
             <button onClick={initializeCamera} className="btn-primary">
-              Try Again
+              {t('common.tryAgain')}
             </button>
           </div>
         )}

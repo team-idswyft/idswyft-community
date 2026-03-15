@@ -10,8 +10,10 @@ import {
   FileText,
   User
 } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { useOrganization } from '../contexts/OrganizationContext';
 import BrandedHeader from './BrandedHeader';
+import LanguageSelector from './LanguageSelector';
 import customerPortalAPI from '../services/api';
 import { isRealtimeAvailable, subscribeToVerification } from '../services/realtimeSubscription';
 
@@ -52,6 +54,7 @@ const VerificationStatus: React.FC<VerificationStatusProps> = ({ sessionToken })
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
+  const { t: tr, i18n } = useTranslation();
 
   const { setBranding, setOrganizationName } = useOrganization();
 
@@ -136,25 +139,25 @@ const VerificationStatus: React.FC<VerificationStatusProps> = ({ sessionToken })
 
   const getStatusMessage = (s: string) => {
     switch (s) {
-      case 'verified': return 'Your identity has been successfully verified!';
-      case 'failed': return 'Identity verification failed. Please contact support.';
-      case 'expired': return 'This verification session has expired.';
-      case 'manual_review': return 'Your documents are under manual review. We\'ll notify you once complete.';
-      case 'processing': return 'We\'re currently processing your verification.';
-      case 'pending': return 'Verification documents are pending upload.';
-      default: return 'Unknown verification status.';
+      case 'verified': return tr('status.verified');
+      case 'failed': return tr('status.failed');
+      case 'expired': return tr('status.expired');
+      case 'manual_review': return tr('status.manualReview');
+      case 'processing': return tr('status.processing');
+      case 'pending': return tr('status.pending');
+      default: return tr('status.unknown');
     }
   };
 
   const formatDate = (dateString: string) => {
-    return new Date(dateString).toLocaleDateString('en-US', {
+    return new Date(dateString).toLocaleDateString(i18n.language, {
       year: 'numeric', month: 'long', day: 'numeric', hour: '2-digit', minute: '2-digit',
     });
   };
 
   const formatStatusText = (s: string) => {
     switch (s) {
-      case 'manual_review': return 'Manual Review';
+      case 'manual_review': return tr('status.manualReviewBadge');
       default: return s.charAt(0).toUpperCase() + s.slice(1);
     }
   };
@@ -164,7 +167,7 @@ const VerificationStatus: React.FC<VerificationStatusProps> = ({ sessionToken })
       <div className={`min-h-screen ${t.bg} flex items-center justify-center`}>
         <div className="text-center">
           <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-cyan-400 mx-auto mb-4" />
-          <p className={t.textSec}>Loading verification status...</p>
+          <p className={t.textSec}>{tr('status.loadingStatus')}</p>
         </div>
       </div>
     );
@@ -178,10 +181,10 @@ const VerificationStatus: React.FC<VerificationStatusProps> = ({ sessionToken })
             <div className="w-12 h-12 bg-red-500/10 border border-red-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
               <AlertTriangle className="w-6 h-6 text-red-400" />
             </div>
-            <h1 className={`text-xl font-semibold ${t.text} mb-2`}>Error Loading Status</h1>
+            <h1 className={`text-xl font-semibold ${t.text} mb-2`}>{tr('status.errorLoading')}</h1>
             <p className={`${t.textSec} mb-6`}>{error}</p>
             <button onClick={() => loadStatus()} className="btn-primary">
-              Try Again
+              {tr('common.tryAgain')}
             </button>
           </div>
         </div>
@@ -194,7 +197,10 @@ const VerificationStatus: React.FC<VerificationStatusProps> = ({ sessionToken })
   return (
     <div className={`min-h-screen ${t.bg} py-8 px-4`}>
       <div className="max-w-lg mx-auto">
-        <BrandedHeader subtitle="Verification Status" className="mb-8" />
+        <div className="flex justify-end mb-3">
+          <LanguageSelector variant="dark" />
+        </div>
+        <BrandedHeader className="mb-8" />
 
         {/* Status Card */}
         <div className="portal-card p-8 mb-6">
@@ -225,14 +231,14 @@ const VerificationStatus: React.FC<VerificationStatusProps> = ({ sessionToken })
               <div className={`portal-card p-4 mb-4 text-left`}>
                 <div className="flex items-center mb-3">
                   <Shield className="w-5 h-5 text-[#8896aa] mr-2" />
-                  <p className={`text-sm font-medium ${t.text}`}>Document Authenticity</p>
+                  <p className={`text-sm font-medium ${t.text}`}>{tr('status.documentAuthenticity')}</p>
                 </div>
                 <div className="space-y-2">
                   <div className="flex items-center">
                     {status.isAuthentic ? (
-                      <span className="status-verified">Authentic</span>
+                      <span className="status-verified">{tr('status.authentic')}</span>
                     ) : (
-                      <span className="status-failed">Suspicious</span>
+                      <span className="status-failed">{tr('status.suspicious')}</span>
                     )}
                   </div>
                   {status.authenticityScore !== undefined && (
@@ -243,7 +249,7 @@ const VerificationStatus: React.FC<VerificationStatusProps> = ({ sessionToken })
                   <p className={`text-sm ${t.textSec}`}>
                     {status.tamperFlags && status.tamperFlags.length > 0
                       ? status.tamperFlags.join(', ')
-                      : 'No tamper flags detected.'}
+                      : tr('status.noTamperFlags')}
                   </p>
                 </div>
               </div>
@@ -252,7 +258,7 @@ const VerificationStatus: React.FC<VerificationStatusProps> = ({ sessionToken })
             {(status.status === 'pending' || status.status === 'processing' || status.status === 'manual_review') && (
               <div className={`flex items-center justify-center text-xs ${t.textSec} mb-4`}>
                 <RefreshCw className={`w-3 h-3 mr-1 ${refreshing ? 'animate-spin' : ''}`} />
-                Auto-refreshing every 30 seconds
+                {tr('status.autoRefresh')}
               </div>
             )}
 
@@ -262,20 +268,20 @@ const VerificationStatus: React.FC<VerificationStatusProps> = ({ sessionToken })
               className={`inline-flex items-center px-4 py-2 rounded-xl text-sm font-medium border ${t.border} ${t.textSec} hover:text-cyan-400 hover:border-cyan-400/30 transition-all disabled:opacity-50`}
             >
               <RefreshCw className={`w-4 h-4 mr-2 ${refreshing ? 'animate-spin' : ''}`} />
-              {refreshing ? 'Refreshing...' : 'Refresh Status'}
+              {refreshing ? tr('status.refreshing') : tr('status.refreshStatus')}
             </button>
           </div>
         </div>
 
         {/* Details Card */}
         <div className="portal-card p-6">
-          <h3 className={`text-lg font-semibold ${t.text} mb-4`}>Verification Details</h3>
+          <h3 className={`text-lg font-semibold ${t.text} mb-4`}>{tr('status.details')}</h3>
 
           <div className="space-y-4">
             <div className="flex items-start">
               <Calendar className="w-5 h-5 text-[#8896aa] mr-3 mt-0.5" />
               <div>
-                <p className={`text-sm font-medium ${t.text}`}>Submitted</p>
+                <p className={`text-sm font-medium ${t.text}`}>{tr('status.submitted')}</p>
                 <p className={`text-sm ${t.textSec}`}>{formatDate(status.created_at)}</p>
               </div>
             </div>
@@ -284,7 +290,7 @@ const VerificationStatus: React.FC<VerificationStatusProps> = ({ sessionToken })
               <div className="flex items-start">
                 <CheckCircle className="w-5 h-5 text-[#8896aa] mr-3 mt-0.5" />
                 <div>
-                  <p className={`text-sm font-medium ${t.text}`}>Completed</p>
+                  <p className={`text-sm font-medium ${t.text}`}>{tr('status.completed')}</p>
                   <p className={`text-sm ${t.textSec}`}>{formatDate(status.completed_at)}</p>
                 </div>
               </div>
@@ -294,7 +300,7 @@ const VerificationStatus: React.FC<VerificationStatusProps> = ({ sessionToken })
               <div className="flex items-start">
                 <Clock className="w-5 h-5 text-[#8896aa] mr-3 mt-0.5" />
                 <div>
-                  <p className={`text-sm font-medium ${t.text}`}>Expires</p>
+                  <p className={`text-sm font-medium ${t.text}`}>{tr('status.expires')}</p>
                   <p className={`text-sm ${t.textSec}`}>{formatDate(status.expires_at)}</p>
                 </div>
               </div>
@@ -303,7 +309,7 @@ const VerificationStatus: React.FC<VerificationStatusProps> = ({ sessionToken })
             <div className="flex items-start">
               <FileText className="w-5 h-5 text-[#8896aa] mr-3 mt-0.5" />
               <div>
-                <p className={`text-sm font-medium ${t.text}`}>Documents Uploaded</p>
+                <p className={`text-sm font-medium ${t.text}`}>{tr('status.documentsUploaded')}</p>
                 <p className={`text-sm ${t.textSec}`}>{status.documents_uploaded} document(s)</p>
               </div>
             </div>
@@ -311,7 +317,7 @@ const VerificationStatus: React.FC<VerificationStatusProps> = ({ sessionToken })
             <div className="flex items-start">
               <User className="w-5 h-5 text-[#8896aa] mr-3 mt-0.5" />
               <div>
-                <p className={`text-sm font-medium ${t.text}`}>Verification ID</p>
+                <p className={`text-sm font-medium ${t.text}`}>{tr('status.verificationId')}</p>
                 <p className={`text-sm ${t.textSec} font-mono`}>{status.id.substring(0, 8)}...</p>
               </div>
             </div>
@@ -320,7 +326,7 @@ const VerificationStatus: React.FC<VerificationStatusProps> = ({ sessionToken })
               <div className="flex items-start">
                 <Clock className="w-5 h-5 text-[#8896aa] mr-3 mt-0.5" />
                 <div>
-                  <p className={`text-sm font-medium ${t.text}`}>Estimated Completion</p>
+                  <p className={`text-sm font-medium ${t.text}`}>{tr('status.estimatedCompletion')}</p>
                   <p className={`text-sm ${t.textSec}`}>{status.estimated_completion}</p>
                 </div>
               </div>
@@ -331,9 +337,9 @@ const VerificationStatus: React.FC<VerificationStatusProps> = ({ sessionToken })
         {/* Help Section */}
         <div className="mt-6 text-center">
           <p className={`text-sm ${t.textSec}`}>
-            Questions about your verification?{' '}
+            {tr('status.questionsAbout')}{' '}
             <a href="mailto:support@idswyft.app" className="text-cyan-400 hover:text-cyan-300">
-              Contact support
+              {tr('common.contactSupport')}
             </a>
           </p>
         </div>

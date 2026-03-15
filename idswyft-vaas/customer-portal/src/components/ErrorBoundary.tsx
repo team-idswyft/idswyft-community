@@ -1,5 +1,6 @@
 import React, { Component, ReactNode } from 'react';
 import { AlertTriangle, RefreshCw } from 'lucide-react';
+import i18n from '../i18n/config';
 
 interface Props {
   children: ReactNode;
@@ -56,19 +57,19 @@ class ErrorBoundary extends Component<Props, State> {
               </div>
               
               <h1 className="text-xl font-semibold text-gray-900 mb-2">
-                Something went wrong
+                {i18n.t('errors.somethingWrong')}
               </h1>
-              
+
               <p className="text-gray-600 mb-6">
-                We're sorry, but something unexpected happened. Please try refreshing the page or contact support if the issue persists.
+                {i18n.t('errors.somethingWrongMessage')}
               </p>
-              
+
               <button
                 onClick={this.handleReload}
                 className="btn btn-primary"
               >
                 <RefreshCw className="w-4 h-4 mr-2" />
-                Refresh Page
+                {i18n.t('common.refreshPage')}
               </button>
 
               {/* Development error details */}
