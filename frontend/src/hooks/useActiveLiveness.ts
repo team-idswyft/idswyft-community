@@ -152,7 +152,7 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
   const returnStartRef = useRef(0);
   const virtualCameraRef = useRef<{ label: string; suspected_virtual: boolean } | undefined>(undefined);
   const animFrameRef = useRef(0);
-  const turnDelayRef = useRef<ReturnType<typeof setTimeout>>();
+  const turnDelayRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   // Keep phaseRef in sync
   useEffect(() => { phaseRef.current = phase; }, [phase]);
