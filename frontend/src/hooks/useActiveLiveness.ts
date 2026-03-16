@@ -265,7 +265,12 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
       running = false;
       clearTimeout(captureTimer);
       clearTimeout(advanceTimer);
-      clearTimeout(turnDelayRef.current);
+      // NOTE: Do NOT clear turnDelayRef here. When the last color finishes,
+      // advanceToNext sets colorIndexRef.current which triggers this effect to
+      // re-run. Clearing turnDelayRef in cleanup would kill the 1.2s transition
+      // timeout before it fires, permanently stalling the challenge after colors.
+      // The turnDelay callback has its own phase guard, and the component-level
+      // cleanup effect handles unmount.
     };
   }, [phase, videoElement, canvasElement, colorIndexRef.current]); // eslint-disable-line react-hooks/exhaustive-deps
 
