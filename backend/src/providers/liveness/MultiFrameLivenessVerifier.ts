@@ -23,7 +23,8 @@ const WEIGHTS = {
   head_turn_detected: 0.25,
   correct_direction: 0.20,
   return_to_center: 0.15,
-  color_reflection_match: 0.15,
+  temporal_plausibility: 0.08,
+  face_bbox_consistency: 0.07,
   virtual_camera_not_detected: 0.10,
 } as const;
 
@@ -31,8 +32,9 @@ const PASS_THRESHOLD = 0.70;
 const MIN_YAW_DELTA = 12;        // degrees
 const RETURN_YAW_TOLERANCE = 8;  // degrees
 const MIN_FACE_CONFIDENCE = 0.3;
-const MIN_COLOR_MATCHES = 3;     // out of 4 color frames
-const COLOR_SHIFT_THRESHOLD = 3; // minimum RGB delta in expected channel vs baseline
+const MIN_CHALLENGE_DURATION = 8000;   // 8s minimum for full challenge
+const MAX_CHALLENGE_DURATION = 90000;  // 90s maximum (generous for slow users)
+const MAX_BBOX_CV = 0.35;             // max coefficient of variation for face bbox areas
 
 // ─── Helpers ────────────────────────────────────────────
 
@@ -60,92 +62,21 @@ function decodeFrame(base64: string): Buffer {
   return Buffer.from(raw, 'base64');
 }
 
-/**
- * Compute average RGB in a face bounding box region of an image buffer.
- * Uses the canvas module to read pixel data.
- */
-async function computeFaceRegionAvgRGB(
-  buffer: Buffer,
-  bbox: { x: number; y: number; width: number; height: number },
-): Promise<[number, number, number]> {
-  let canvasModule: any;
-  try {
-    canvasModule = await import('canvas');
-  } catch {
-    return [128, 128, 128]; // neutral fallback
-  }
+/** Compute coefficient of variation of face bounding box areas across frames. */
+function computeBboxCV(
+  detections: Array<{ detection: FaceBufferDetectionResult | null }>,
+): { cv: number; count: number } {
+  const areas = detections
+    .filter((fd) => fd.detection !== null)
+    .map((fd) => fd.detection!.boundingBox.width * fd.detection!.boundingBox.height);
 
-  const img = await canvasModule.loadImage(buffer);
-  const canvas = canvasModule.createCanvas(img.width, img.height);
-  const ctx = canvas.getContext('2d');
-  ctx.drawImage(img, 0, 0);
+  if (areas.length < 2) return { cv: 0, count: areas.length };
 
-  // Clamp bbox to image bounds
-  const x = Math.max(0, Math.round(bbox.x));
-  const y = Math.max(0, Math.round(bbox.y));
-  const w = Math.min(Math.round(bbox.width), img.width - x);
-  const h = Math.min(Math.round(bbox.height), img.height - y);
+  const mean = areas.reduce((a, b) => a + b, 0) / areas.length;
+  if (mean === 0) return { cv: 0, count: areas.length };
 
-  if (w <= 0 || h <= 0) return [128, 128, 128];
-
-  const imageData = ctx.getImageData(x, y, w, h);
-  const data = imageData.data;
-  let rSum = 0, gSum = 0, bSum = 0;
-  const pixelCount = w * h;
-
-  for (let i = 0; i < data.length; i += 4) {
-    rSum += data[i];
-    gSum += data[i + 1];
-    bSum += data[i + 2];
-  }
-
-  return [rSum / pixelCount, gSum / pixelCount, bSum / pixelCount];
-}
-
-/**
- * Check if the RELATIVE color shift between a color frame and a baseline frame
- * matches the expected flash color. This works in ambient light because it
- * measures the *change* caused by the screen flash, not absolute channel values.
- *
- * For colored flashes (R/G/B): the delta in the expected channel should be
- * positive and the largest delta among all three channels.
- * For white flash: overall brightness should increase vs baseline.
- *
- * A printed photo or screen replay cannot reflect randomized colors from the
- * device screen, so the deltas will be near-zero → check fails.
- */
-function colorShiftMatches(
-  frameRGB: [number, number, number],
-  baselineRGB: [number, number, number],
-  expectedRGB: [number, number, number],
-): boolean {
-  const [dr, dg, db] = [
-    frameRGB[0] - baselineRGB[0],
-    frameRGB[1] - baselineRGB[1],
-    frameRGB[2] - baselineRGB[2],
-  ];
-  const [er, eg, eb] = expectedRGB;
-
-  // White flash: all channels should increase (overall brightness up)
-  if (er >= 200 && eg >= 200 && eb >= 200) {
-    const avgDelta = (dr + dg + db) / 3;
-    return avgDelta > COLOR_SHIFT_THRESHOLD;
-  }
-
-  // Red flash: R delta should be positive and largest
-  if (er > eg && er > eb) {
-    return dr > COLOR_SHIFT_THRESHOLD && dr > dg && dr > db;
-  }
-  // Green flash: G delta should be positive and largest
-  if (eg > er && eg > eb) {
-    return dg > COLOR_SHIFT_THRESHOLD && dg > dr && dg > db;
-  }
-  // Blue flash: B delta should be positive and largest
-  if (eb > er && eb > eg) {
-    return db > COLOR_SHIFT_THRESHOLD && db > dr && db > dg;
-  }
-
-  return false;
+  const variance = areas.reduce((sum, a) => sum + (a - mean) ** 2, 0) / areas.length;
+  return { cv: Math.sqrt(variance) / mean, count: areas.length };
 }
 
 // ─── Main Verifier ──────────────────────────────────────
@@ -180,12 +111,9 @@ export async function verifyMultiFrameLiveness(
     detail: `${facesPresentCount}/${frameDetections.length} frames have faces`,
   };
 
-  // Separate motion and color frames
+  // Separate motion frames for turn checks
   const motionFrames = frameDetections.filter(
     (fd) => ['turn_start', 'turn_peak', 'turn_return'].includes(fd.frame.phase),
-  );
-  const colorFrames = frameDetections.filter(
-    (fd) => fd.frame.phase.startsWith('color_'),
   );
 
   // ── Check 2: Head turn detected ──
@@ -233,42 +161,32 @@ export async function verifyMultiFrameLiveness(
     detail: `return delta: ${returnDelta.toFixed(1)} degrees (need <= ${RETURN_YAW_TOLERANCE})`,
   };
 
-  // ── Check 5: Color reflection match (relative shift vs baseline) ──
-  // Use turn_start frame as baseline — it has no color flash overlay.
-  // C1 fix: compare RELATIVE RGB shift, not absolute channel dominance.
-  let baselineRGB: [number, number, number] = [128, 128, 128];
-  if (turnStart?.detection) {
-    baselineRGB = await computeFaceRegionAvgRGB(turnStart.buffer, turnStart.detection.boundingBox);
-  }
-
-  let colorMatches = 0;
-  const colorDetails: string[] = [];
-
-  for (const fd of colorFrames) {
-    if (!fd.detection || !fd.frame.color_rgb) {
-      colorDetails.push(`${fd.frame.phase}: no face/no color`);
-      continue;
-    }
-
-    // C2 fix: reuse cached buffer instead of re-decoding
-    const avgRGB = await computeFaceRegionAvgRGB(fd.buffer, fd.detection.boundingBox);
-    const matches = colorShiftMatches(avgRGB, baselineRGB, fd.frame.color_rgb as [number, number, number]);
-
-    if (matches) colorMatches++;
-    colorDetails.push(
-      `${fd.frame.phase}: avg=[${avgRGB.map((v) => v.toFixed(0)).join(',')}] ` +
-      `baseline=[${baselineRGB.map((v) => v.toFixed(0)).join(',')}] ` +
-      `expected=[${fd.frame.color_rgb.join(',')}] → ${matches ? 'MATCH' : 'MISS'}`,
-    );
-  }
-
-  checks.color_reflection_match = {
-    passed: colorMatches >= MIN_COLOR_MATCHES,
-    weight: WEIGHTS.color_reflection_match,
-    detail: `${colorMatches}/${colorFrames.length} colors matched (need >= ${MIN_COLOR_MATCHES}). ${colorDetails.join('; ')}`,
+  // ── Check 5: Temporal plausibility ──
+  // Frame timestamps must span a realistic challenge duration and be in order.
+  const challengeDuration = metadata.end_timestamp - metadata.start_timestamp;
+  const chronological = metadata.frames.every(
+    (f, i) => i === 0 || f.timestamp >= metadata.frames[i - 1].timestamp,
+  );
+  const durationOk =
+    challengeDuration >= MIN_CHALLENGE_DURATION &&
+    challengeDuration <= MAX_CHALLENGE_DURATION;
+  checks.temporal_plausibility = {
+    passed: durationOk && chronological,
+    weight: WEIGHTS.temporal_plausibility,
+    detail: `duration: ${(challengeDuration / 1000).toFixed(1)}s (need ${MIN_CHALLENGE_DURATION / 1000}-${MAX_CHALLENGE_DURATION / 1000}s), chronological: ${chronological}`,
   };
 
-  // ── Check 6: Virtual camera not detected ──
+  // ── Check 6: Face bounding box consistency ──
+  // A real person at roughly the same distance will have consistent face size.
+  // Spliced frames from different sources will have wildly different bbox areas.
+  const { cv: bboxCV, count: bboxCount } = computeBboxCV(frameDetections);
+  checks.face_bbox_consistency = {
+    passed: bboxCount >= 2 ? bboxCV < MAX_BBOX_CV : true,
+    weight: WEIGHTS.face_bbox_consistency,
+    detail: `bbox area CV: ${bboxCV.toFixed(3)} (need < ${MAX_BBOX_CV}), ${bboxCount} faces measured`,
+  };
+
+  // ── Check 7: Virtual camera not detected ──
   const virtualCheck = metadata.virtual_camera_check;
   const virtualCameraOk = !virtualCheck?.suspected_virtual;
   checks.virtual_camera_not_detected = {

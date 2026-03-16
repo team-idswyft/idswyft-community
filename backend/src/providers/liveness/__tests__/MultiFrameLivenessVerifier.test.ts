@@ -4,43 +4,6 @@ import type { FaceDetectionService } from '../MultiFrameLivenessVerifier.js';
 import type { MultiFrameLivenessMetadata, AnalysisFrame } from '../../../verification/models/multiFrameLivenessSchema.js';
 import type { FaceBufferDetectionResult } from '../../../services/faceRecognition.js';
 
-// ─── Mock canvas module for computeFaceRegionAvgRGB ──────
-// The verifier dynamically imports 'canvas'. We return different pixel data
-// per call to simulate color reflection shifts between frames.
-let getImageDataCallIndex = 0;
-let getImageDataResponses: Uint8ClampedArray[] = [];
-
-/** Set the pixel data sequence that getImageData will return. */
-function setPixelDataSequence(responses: Array<[number, number, number]>) {
-  getImageDataCallIndex = 0;
-  getImageDataResponses = responses.map(([r, g, b]) => {
-    // Build RGBA pixel data for a 640x480 image
-    const data = new Uint8ClampedArray(640 * 480 * 4);
-    for (let i = 0; i < data.length; i += 4) {
-      data[i] = r;
-      data[i + 1] = g;
-      data[i + 2] = b;
-      data[i + 3] = 255;
-    }
-    return data;
-  });
-}
-
-vi.mock('canvas', () => ({
-  loadImage: vi.fn().mockResolvedValue({ width: 640, height: 480 }),
-  createCanvas: vi.fn().mockReturnValue({
-    getContext: vi.fn().mockReturnValue({
-      drawImage: vi.fn(),
-      getImageData: vi.fn().mockImplementation(() => {
-        const idx = getImageDataCallIndex;
-        getImageDataCallIndex++;
-        const data = getImageDataResponses[idx] ?? new Uint8ClampedArray(640 * 480 * 4).fill(128);
-        return { data, width: 640, height: 480 };
-      }),
-    }),
-  }),
-}));
-
 // ─── Helpers ─────────────────────────────────────────────
 
 /** Fake base64 string (doesn't need to be valid JPEG for mocked detection). */
@@ -50,8 +13,9 @@ const FAKE_FRAME_BASE64 = 'AAAA'; // Small valid base64
 function makeFaceDetection(opts: {
   yaw?: number;
   confidence?: number;
+  bboxSize?: number;
 }): FaceBufferDetectionResult {
-  const { yaw = 0, confidence = 0.95 } = opts;
+  const { yaw = 0, confidence = 0.95, bboxSize = 240 } = opts;
 
   // Build 68 landmarks. face-api indices: nose=30, leftEyeOuter=36, rightEyeOuter=45
   const landmarks: Array<{ x: number; y: number }> = Array.from({ length: 68 }, () => ({
@@ -75,13 +39,13 @@ function makeFaceDetection(opts: {
     confidence,
     embedding: new Float32Array(128),
     landmarks,
-    boundingBox: { x: 200, y: 150, width: 240, height: 300 },
+    boundingBox: { x: 200, y: 150, width: bboxSize, height: bboxSize * 1.25 },
   };
 }
 
 /**
  * Create a mock face detection service.
- * Called once per frame in the detection loop (7 calls for 7 frames).
+ * Called once per frame in the detection loop.
  */
 function createMockFaceService(
   detections: (FaceBufferDetectionResult | null)[],
@@ -102,12 +66,12 @@ function makeMetadata(
 ): MultiFrameLivenessMetadata {
   const frames: AnalysisFrame[] = [
     { frame_base64: FAKE_FRAME_BASE64, timestamp: 1000, phase: 'color_red', color_rgb: [255, 0, 0] },
-    { frame_base64: FAKE_FRAME_BASE64, timestamp: 2000, phase: 'color_green', color_rgb: [0, 255, 0] },
-    { frame_base64: FAKE_FRAME_BASE64, timestamp: 3000, phase: 'color_blue', color_rgb: [0, 0, 255] },
-    { frame_base64: FAKE_FRAME_BASE64, timestamp: 4000, phase: 'color_white', color_rgb: [255, 255, 255] },
-    { frame_base64: FAKE_FRAME_BASE64, timestamp: 5000, phase: 'turn_start' },
-    { frame_base64: FAKE_FRAME_BASE64, timestamp: 6000, phase: 'turn_peak' },
-    { frame_base64: FAKE_FRAME_BASE64, timestamp: 7000, phase: 'turn_return' },
+    { frame_base64: FAKE_FRAME_BASE64, timestamp: 2500, phase: 'color_green', color_rgb: [0, 255, 0] },
+    { frame_base64: FAKE_FRAME_BASE64, timestamp: 4000, phase: 'color_blue', color_rgb: [0, 0, 255] },
+    { frame_base64: FAKE_FRAME_BASE64, timestamp: 5500, phase: 'color_white', color_rgb: [255, 255, 255] },
+    { frame_base64: FAKE_FRAME_BASE64, timestamp: 7000, phase: 'turn_start' },
+    { frame_base64: FAKE_FRAME_BASE64, timestamp: 10000, phase: 'turn_peak' },
+    { frame_base64: FAKE_FRAME_BASE64, timestamp: 13000, phase: 'turn_return' },
   ];
 
   return {
@@ -115,48 +79,17 @@ function makeMetadata(
     challenge_direction: 'left',
     frames: overrides.frames ?? frames,
     color_sequence: [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 255]],
-    start_timestamp: 1000,
-    end_timestamp: 8000,
+    start_timestamp: 0,
+    end_timestamp: 15000,
     ...overrides,
   };
-}
-
-/**
- * Set up pixel data for a successful color reflection test.
- * computeFaceRegionAvgRGB is called in this order:
- *   1. baseline (turn_start frame)
- *   2-5. color frames (red, green, blue, white — order matches metadata.frames)
- *
- * Baseline = neutral gray (128,128,128).
- * Color frames show a shift in the expected channel relative to baseline.
- */
-function setupPassingColorPixels() {
-  setPixelDataSequence([
-    [128, 128, 128], // baseline (turn_start)
-    [140, 125, 125], // color_red — R shifted up
-    [125, 140, 125], // color_green — G shifted up
-    [125, 125, 140], // color_blue — B shifted up
-    [140, 140, 140], // color_white — all channels up
-  ]);
-}
-
-/** Set up pixel data where color reflection FAILS (all frames identical). */
-function setupFailingColorPixels() {
-  setPixelDataSequence([
-    [128, 128, 128], // baseline
-    [128, 128, 128], // color_red — no shift (photo attack)
-    [128, 128, 128], // color_green — no shift
-    [128, 128, 128], // color_blue — no shift
-    [128, 128, 128], // color_white — no shift
-  ]);
 }
 
 // ─── Tests ──────────────────────────────────────────────
 
 describe('MultiFrameLivenessVerifier', () => {
   describe('valid multi-frame sequence', () => {
-    it('passes with correct head turn and color reflection', async () => {
-      setupPassingColorPixels();
+    it('passes with correct head turn and consistent face', async () => {
       // 4 color frames (neutral face) + turn_start (yaw=0), turn_peak (yaw=20), turn_return (yaw=0)
       // Front camera: physical left turn = positive yaw in raw image
       const detections = [
@@ -176,13 +109,13 @@ describe('MultiFrameLivenessVerifier', () => {
       expect(result.checks.head_turn_detected.passed).toBe(true);
       expect(result.checks.correct_direction.passed).toBe(true);
       expect(result.checks.return_to_center.passed).toBe(true);
-      expect(result.checks.color_reflection_match.passed).toBe(true);
+      expect(result.checks.temporal_plausibility.passed).toBe(true);
+      expect(result.checks.face_bbox_consistency.passed).toBe(true);
       expect(result.checks.virtual_camera_not_detected.passed).toBe(true);
       expect(result.passed).toBe(true);
     });
 
     it('passes for right direction turn', async () => {
-      setupPassingColorPixels();
       // Front camera: physical right turn = negative yaw in raw image
       const detections = [
         makeFaceDetection({ yaw: 0 }),   // color_red
@@ -206,7 +139,6 @@ describe('MultiFrameLivenessVerifier', () => {
 
   describe('face presence check', () => {
     it('fails when face missing in 2+ frames', async () => {
-      setupPassingColorPixels();
       const detections = [
         null,                            // color_red — no face
         null,                            // color_green — no face
@@ -225,7 +157,6 @@ describe('MultiFrameLivenessVerifier', () => {
     });
 
     it('fails with low confidence face detection', async () => {
-      setupPassingColorPixels();
       const detections = Array(7).fill(null).map(() =>
         makeFaceDetection({ yaw: 0, confidence: 0.1 }),
       );
@@ -239,7 +170,6 @@ describe('MultiFrameLivenessVerifier', () => {
 
   describe('head turn detection', () => {
     it('fails when yaw delta is insufficient', async () => {
-      setupPassingColorPixels();
       const detections = [
         makeFaceDetection({ yaw: 0 }), // color frames...
         makeFaceDetection({ yaw: 0 }),
@@ -260,7 +190,6 @@ describe('MultiFrameLivenessVerifier', () => {
 
   describe('direction validation', () => {
     it('fails when head turns in wrong direction', async () => {
-      setupPassingColorPixels();
       // Asked to turn left but turned right (front camera: right = negative yaw)
       const detections = [
         makeFaceDetection({ yaw: 0 }),
@@ -282,7 +211,6 @@ describe('MultiFrameLivenessVerifier', () => {
 
   describe('return to center', () => {
     it('fails when head does not return to center', async () => {
-      setupPassingColorPixels();
       const detections = [
         makeFaceDetection({ yaw: 0 }),
         makeFaceDetection({ yaw: 0 }),
@@ -300,38 +228,104 @@ describe('MultiFrameLivenessVerifier', () => {
     });
   });
 
-  describe('color reflection match', () => {
-    it('fails when no color shift detected (photo attack)', async () => {
-      setupFailingColorPixels();
-      const detections = Array(7).fill(null).map((_, i) => {
-        if (i === 5) return makeFaceDetection({ yaw: 20 }); // left = positive in front camera
-        return makeFaceDetection({ yaw: 0 });
-      });
-
+  describe('temporal plausibility', () => {
+    it('passes with realistic challenge duration', async () => {
+      const detections = Array(7).fill(null).map(() => makeFaceDetection({ yaw: 0 }));
       const faceService = createMockFaceService(detections);
-      const result = await verifyMultiFrameLiveness(makeMetadata(), faceService);
+      const metadata = makeMetadata({
+        start_timestamp: 0,
+        end_timestamp: 15000, // 15s — realistic
+      });
+      const result = await verifyMultiFrameLiveness(metadata, faceService);
 
-      expect(result.checks.color_reflection_match.passed).toBe(false);
-      expect(result.checks.color_reflection_match.detail).toContain('0/4');
+      expect(result.checks.temporal_plausibility.passed).toBe(true);
     });
 
-    it('passes when correct color shifts detected', async () => {
-      setupPassingColorPixels();
-      const detections = Array(7).fill(null).map((_, i) => {
-        if (i === 5) return makeFaceDetection({ yaw: 20 }); // left = positive in front camera
-        return makeFaceDetection({ yaw: 0 });
+    it('fails when challenge is too short', async () => {
+      const detections = Array(7).fill(null).map(() => makeFaceDetection({ yaw: 0 }));
+      const faceService = createMockFaceService(detections);
+      const metadata = makeMetadata({
+        start_timestamp: 0,
+        end_timestamp: 2000, // 2s — too fast (replay or manipulation)
       });
+      const result = await verifyMultiFrameLiveness(metadata, faceService);
+
+      expect(result.checks.temporal_plausibility.passed).toBe(false);
+      expect(result.checks.temporal_plausibility.detail).toContain('2.0s');
+    });
+
+    it('fails when challenge is too long', async () => {
+      const detections = Array(7).fill(null).map(() => makeFaceDetection({ yaw: 0 }));
+      const faceService = createMockFaceService(detections);
+      const metadata = makeMetadata({
+        start_timestamp: 0,
+        end_timestamp: 100000, // 100s — too long
+      });
+      const result = await verifyMultiFrameLiveness(metadata, faceService);
+
+      expect(result.checks.temporal_plausibility.passed).toBe(false);
+    });
+
+    it('fails when frame timestamps are not chronological', async () => {
+      const detections = Array(7).fill(null).map(() => makeFaceDetection({ yaw: 0 }));
+      const faceService = createMockFaceService(detections);
+      const frames: AnalysisFrame[] = [
+        { frame_base64: FAKE_FRAME_BASE64, timestamp: 5000, phase: 'color_red', color_rgb: [255, 0, 0] },
+        { frame_base64: FAKE_FRAME_BASE64, timestamp: 3000, phase: 'color_green', color_rgb: [0, 255, 0] }, // out of order
+        { frame_base64: FAKE_FRAME_BASE64, timestamp: 4000, phase: 'color_blue', color_rgb: [0, 0, 255] },
+        { frame_base64: FAKE_FRAME_BASE64, timestamp: 5500, phase: 'color_white', color_rgb: [255, 255, 255] },
+        { frame_base64: FAKE_FRAME_BASE64, timestamp: 7000, phase: 'turn_start' },
+        { frame_base64: FAKE_FRAME_BASE64, timestamp: 10000, phase: 'turn_peak' },
+        { frame_base64: FAKE_FRAME_BASE64, timestamp: 13000, phase: 'turn_return' },
+      ];
+      const metadata = makeMetadata({ frames, start_timestamp: 0, end_timestamp: 15000 });
+      const result = await verifyMultiFrameLiveness(metadata, faceService);
+
+      expect(result.checks.temporal_plausibility.passed).toBe(false);
+      expect(result.checks.temporal_plausibility.detail).toContain('chronological: false');
+    });
+  });
+
+  describe('face bounding box consistency', () => {
+    it('passes when face sizes are consistent', async () => {
+      // All faces roughly the same size (±10%)
+      const detections = [
+        makeFaceDetection({ yaw: 0, bboxSize: 240 }),
+        makeFaceDetection({ yaw: 0, bboxSize: 245 }),
+        makeFaceDetection({ yaw: 0, bboxSize: 235 }),
+        makeFaceDetection({ yaw: 0, bboxSize: 242 }),
+        makeFaceDetection({ yaw: 0, bboxSize: 238 }),
+        makeFaceDetection({ yaw: 20, bboxSize: 250 }),
+        makeFaceDetection({ yaw: 2, bboxSize: 240 }),
+      ];
 
       const faceService = createMockFaceService(detections);
       const result = await verifyMultiFrameLiveness(makeMetadata(), faceService);
 
-      expect(result.checks.color_reflection_match.passed).toBe(true);
+      expect(result.checks.face_bbox_consistency.passed).toBe(true);
+    });
+
+    it('fails when face sizes vary wildly (spliced frames)', async () => {
+      // Some frames have very different face sizes — suggests different sources
+      const detections = [
+        makeFaceDetection({ yaw: 0, bboxSize: 240 }),
+        makeFaceDetection({ yaw: 0, bboxSize: 100 }), // much smaller — different source
+        makeFaceDetection({ yaw: 0, bboxSize: 240 }),
+        makeFaceDetection({ yaw: 0, bboxSize: 400 }), // much larger — different source
+        makeFaceDetection({ yaw: 0, bboxSize: 240 }),
+        makeFaceDetection({ yaw: 20, bboxSize: 120 }), // different source
+        makeFaceDetection({ yaw: 2, bboxSize: 240 }),
+      ];
+
+      const faceService = createMockFaceService(detections);
+      const result = await verifyMultiFrameLiveness(makeMetadata(), faceService);
+
+      expect(result.checks.face_bbox_consistency.passed).toBe(false);
     });
   });
 
   describe('virtual camera detection', () => {
     it('penalizes score when virtual camera detected', async () => {
-      setupPassingColorPixels();
       const detections = Array(7).fill(null).map((_, i) => {
         if (i === 5) return makeFaceDetection({ yaw: 20 }); // left = positive in front camera
         return makeFaceDetection({ yaw: 0 });
@@ -351,7 +345,6 @@ describe('MultiFrameLivenessVerifier', () => {
     });
 
     it('passes when camera is real', async () => {
-      setupPassingColorPixels();
       const detections = Array(7).fill(null).map(() =>
         makeFaceDetection({ yaw: 0 }),
       );
@@ -371,7 +364,6 @@ describe('MultiFrameLivenessVerifier', () => {
 
   describe('score calculation', () => {
     it('returns weighted score between 0 and 1', async () => {
-      setupPassingColorPixels();
       const detections = Array(7).fill(null).map(() =>
         makeFaceDetection({ yaw: 0 }),
       );
@@ -383,7 +375,6 @@ describe('MultiFrameLivenessVerifier', () => {
     });
 
     it('includes reason when failed', async () => {
-      setupFailingColorPixels();
       // All null detections → fails multiple checks
       const faceService = createMockFaceService(Array(7).fill(null));
       const result = await verifyMultiFrameLiveness(makeMetadata(), faceService);
@@ -394,13 +385,30 @@ describe('MultiFrameLivenessVerifier', () => {
     });
 
     it('fails overall when score < 0.70', async () => {
-      setupFailingColorPixels();
       // No face in any frame → multiple checks fail
       const faceService = createMockFaceService(Array(7).fill(null));
       const result = await verifyMultiFrameLiveness(makeMetadata(), faceService);
 
       expect(result.passed).toBe(false);
       expect(result.score).toBeLessThan(0.70);
+    });
+
+    it('achieves perfect score with all checks passing', async () => {
+      const detections = [
+        makeFaceDetection({ yaw: 0 }),
+        makeFaceDetection({ yaw: 0 }),
+        makeFaceDetection({ yaw: 0 }),
+        makeFaceDetection({ yaw: 0 }),
+        makeFaceDetection({ yaw: 0 }),
+        makeFaceDetection({ yaw: 20 }),
+        makeFaceDetection({ yaw: 2 }),
+      ];
+
+      const faceService = createMockFaceService(detections);
+      const result = await verifyMultiFrameLiveness(makeMetadata(), faceService);
+
+      expect(result.score).toBeCloseTo(1, 5);
+      expect(result.passed).toBe(true);
     });
   });
 });
