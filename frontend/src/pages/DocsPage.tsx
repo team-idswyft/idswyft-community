@@ -392,7 +392,7 @@ if (r.final_result === 'failed') throw new Error('Cross-validation failed: ' + r
 
 // ─── 6. Submit live capture (file upload) ────────────────────────
 const fd3 = new FormData();
-fd3.append('selfie', selfieBlob, 'selfie.jpg');  // Blob from canvas.toBlob()
+fd3.append('selfie', captureBlob, 'capture.jpg');  // Blob from canvas.toBlob()
 await fetch(\`\${BASE}/api/v2/verify/\${verification_id}/live-capture\`, {
   method: 'POST',
   headers,
@@ -406,7 +406,7 @@ do {
 } while (!r.final_result);
 
 console.log(r.final_result);               // 'verified' | 'failed' | 'manual_review'
-console.log(r.face_match_results?.score);   // 0.0 – 1.0
+console.log(r.face_match_results?.similarity_score);   // 0.0 – 1.0
 console.log(r.ocr_data.name);              // "Jane Smith"`}
             python={`import requests, time
 
@@ -450,9 +450,9 @@ if r.get('final_result') == 'failed':
     raise Exception('Cross-validation failed: ' + r.get('failure_reason', ''))
 
 # ─── 6. Submit live capture (file upload) ────────────────────────
-with open('selfie.jpg', 'rb') as f:
+with open('capture.jpg', 'rb') as f:
     requests.post(f'{BASE}/api/v2/verify/{vid}/live-capture', headers=HEADERS,
-        files={'selfie': f})
+        files={'selfie': f})  # field name is 'selfie' in the API
 
 # ─── 7. Poll for final result ────────────────────────────────────
 r = poll(vid, until_final=True)
@@ -644,7 +644,7 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
           <EndpointCard step={4} method="POST" path="/api/v2/verify/:id/live-capture" title="Submit Live Capture"
             badge={{ label: 'final gate', color: C.green, bg: C.greenDim }}>
             <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
-              Submit a <strong style={{ color: C.text }}>selfie image file</strong> for liveness detection (Gate 4) and
+              Submit a <strong style={{ color: C.text }}>live capture image file</strong> for liveness detection (Gate 4) and
               face matching (Gate 5) against the front document photo. Only available after cross-validation passes.
               Uses multipart file upload with field name <code style={{ fontFamily: C.mono, color: C.cyan }}>selfie</code>.
               This is the final step — the response includes face match scores, liveness results, and
@@ -663,7 +663,7 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
             </div>
 
             <div style={{ marginBottom: 12 }}>
-              <FieldRow name="selfie" type="File" req={true} desc="JPEG or PNG selfie image. Max 10 MB." />
+              <FieldRow name="selfie" type="File" req={true} desc="JPEG or PNG live capture image. Max 10 MB." />
             </div>
             <Pre label="Request" code={`curl -X POST ${apiUrl}/api/v2/verify/550e8400-e29b-41d4-a716-446655440001/live-capture \\
   -H "X-API-Key: your-key" \\
@@ -676,11 +676,11 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
   "selfie_id": "selfie_abc789",
   "message": "Verification complete",
 
-  // Face match (selfie vs document photo):
+  // Face match (live capture vs document photo):
   "face_match_results": {
     "passed": true,
-    "score": 0.94,                // similarity 0.0 – 1.0
-    "distance": 0.32              // lower = more similar
+    "similarity_score": 0.94,     // similarity 0.0 – 1.0
+    "threshold_used": 0.6         // configurable confidence threshold
   },
 
   // Liveness detection:
@@ -760,19 +760,19 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
   "cross_validation_results": {
     "verdict": "PASS",
     "has_critical_failure": false,
-    "score": 0.95,
+    "overall_score": 0.95,
     "failures": []
   },
 
   // ── Live capture (liveness + face match) ─────────────────────
   "face_match_results": {
     "passed": true,
-    "score": 0.94,
-    "distance": 0.32
+    "similarity_score": 0.94,
+    "threshold_used": 0.6
   },
   "liveness_results": {
-    "liveness_passed": true,
-    "liveness_score": 0.96
+    "passed": true,
+    "score": 0.96
   },
 
   // ── Final decision ───────────────────────────────────────────
