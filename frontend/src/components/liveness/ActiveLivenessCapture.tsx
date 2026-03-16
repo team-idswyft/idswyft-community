@@ -18,7 +18,9 @@ export function ActiveLivenessCapture({
   const [streamReady, setStreamReady] = useState(false);
   const [videoDims, setVideoDims] = useState({ w: 480, h: 640 }); // portrait default for mobile
 
-  // Start camera
+  // Start camera — use `playing` event for readiness instead of awaiting play(),
+  // because the async gap after getUserMedia can expire the user-gesture context
+  // on some desktop browsers, causing play() to reject and silently falling back.
   useEffect(() => {
     let stream: MediaStream | null = null;
     let cancelled = false;
@@ -33,19 +35,24 @@ export function ActiveLivenessCapture({
           stream.getTracks().forEach(t => t.stop());
           return;
         }
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-          videoRef.current.addEventListener('loadedmetadata', () => {
-            const w = videoRef.current?.videoWidth || 480;
-            const h = videoRef.current?.videoHeight || 640;
+        const video = videoRef.current;
+        if (video) {
+          video.srcObject = stream;
+          video.addEventListener('loadedmetadata', () => {
+            const w = video.videoWidth || 480;
+            const h = video.videoHeight || 640;
             setVideoDims({ w, h });
           });
-          await videoRef.current.play();
-          setStreamReady(true);
+          // Listen for the video to actually start rendering frames
+          video.addEventListener('playing', () => {
+            if (!cancelled) setStreamReady(true);
+          }, { once: true });
+          // Kick play — autoPlay attribute is the primary trigger, this is a safety net
+          video.play().catch(() => {});
         }
       } catch (err) {
         console.error('Camera access failed:', err);
-        onFallback();
+        if (!cancelled) onFallback();
       }
     })();
 
@@ -145,6 +152,7 @@ export function ActiveLivenessCapture({
       }}>
         <video
           ref={videoRef}
+          autoPlay
           playsInline
           muted
           style={{
@@ -165,7 +173,7 @@ export function ActiveLivenessCapture({
           <div
             className="lv-flash"
             style={{
-              backgroundColor: `rgba(${flashColor[0]}, ${flashColor[1]}, ${flashColor[2]}, 0.65)`,
+              backgroundColor: `rgba(${flashColor[0]}, ${flashColor[1]}, ${flashColor[2]}, 0.85)`,
             }}
           />
         )}
