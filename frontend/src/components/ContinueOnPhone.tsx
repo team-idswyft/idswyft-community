@@ -15,12 +15,14 @@ interface VerificationResult {
 interface ContinueOnPhoneProps {
   apiKey: string;
   userId: string;
+  source?: 'api' | 'vaas' | 'demo';
   onComplete: (result: VerificationResult) => void;
 }
 
 export const ContinueOnPhone: React.FC<ContinueOnPhoneProps> = ({
   apiKey,
   userId,
+  source,
   onComplete,
 }) => {
   const [state, setState] = useState<HandoffState>('idle');
@@ -55,7 +57,7 @@ export const ContinueOnPhone: React.FC<ContinueOnPhoneProps> = ({
       const res = await fetch(`${API_BASE_URL}/api/verify/handoff/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ api_key: apiKey, user_id: userId }),
+        body: JSON.stringify({ api_key: apiKey, user_id: userId, ...(source && { source }) }),
       });
       if (!res.ok) throw new Error('Failed to create handoff session');
       const data = await res.json();

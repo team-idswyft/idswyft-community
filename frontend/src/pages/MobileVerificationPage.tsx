@@ -449,8 +449,8 @@ const MobileVerificationPage: React.FC = () => {
         if (!data.api_key || !data.user_id) throw new Error('Session response is incomplete. Please try scanning the QR code again.');
         setApiKey(data.api_key);
         setUserId(data.user_id);
-        // Auto-start verification
-        initializeVerification(data.api_key, data.user_id);
+        // Auto-start verification with source from handoff session
+        initializeVerification(data.api_key, data.user_id, data.source);
       })
       .catch(e => {
         if (e.name === 'AbortError') return;
@@ -473,12 +473,12 @@ const MobileVerificationPage: React.FC = () => {
   }, []);
 
   // ── Step 0: Initialize verification session ────────────────────────────
-  const initializeVerification = async (key: string, uid: string) => {
+  const initializeVerification = async (key: string, uid: string, source?: string) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/v2/verify/initialize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-API-Key': key },
-        body: JSON.stringify({ user_id: uid }),
+        body: JSON.stringify({ user_id: uid, ...(source && { source }) }),
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'Failed to start'); }
       const data = await res.json();
