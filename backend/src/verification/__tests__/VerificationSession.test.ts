@@ -320,7 +320,7 @@ describe('VerificationSession — Face match auto-triggers', () => {
     expect(session.getState().face_match).toBeDefined();
   });
 
-  it('auto-passes face match when both embeddings are empty (no TF available)', async () => {
+  it('flags for manual review when both embeddings are empty (no TF available)', async () => {
     // Simulate no TensorFlow: both front and live have empty embeddings
     mockExtractFront.mockResolvedValue({
       ...mockFrontResult,
@@ -340,12 +340,13 @@ describe('VerificationSession — Face match auto-triggers', () => {
     expect(session.getState().current_step).toBe(VerificationStatus.COMPLETE);
     // computeFaceMatch should NOT be called when no embeddings exist
     expect(mockComputeFaceMatch).not.toHaveBeenCalled();
-    // Auto-pass should set similarity to 1.0
-    expect(session.getState().face_match!.similarity_score).toBe(1.0);
+    // Skipped: score 0, passed true, flagged for manual review
+    expect(session.getState().face_match!.similarity_score).toBe(0);
     expect(session.getState().face_match!.passed).toBe(true);
+    expect(session.getState().face_match!.skipped_reason).toBeDefined();
   });
 
-  it('auto-passes face match when ID has no face embedding but selfie does', async () => {
+  it('flags for manual review when ID has no face embedding but selfie does', async () => {
     // Simulate: small ID photo — face-api cannot detect the face on the card,
     // but the selfie has a good face embedding.
     mockExtractFront.mockResolvedValue({
@@ -364,8 +365,9 @@ describe('VerificationSession — Face match auto-triggers', () => {
     expect(result.passed).toBe(true);
     expect(session.getState().current_step).toBe(VerificationStatus.COMPLETE);
     expect(mockComputeFaceMatch).not.toHaveBeenCalled();
-    expect(session.getState().face_match!.similarity_score).toBe(1.0);
+    expect(session.getState().face_match!.similarity_score).toBe(0);
     expect(session.getState().face_match!.passed).toBe(true);
+    expect(session.getState().face_match!.skipped_reason).toContain('ID document');
   });
 
   it('uses real face matching when embeddings are available', async () => {
