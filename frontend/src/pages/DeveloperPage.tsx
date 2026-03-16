@@ -9,6 +9,7 @@ import {
   ClipboardDocumentIcon,
   ChevronRightIcon,
   ChevronDownIcon,
+  CodeBracketIcon,
 } from '@heroicons/react/24/outline'
 
 // â”€â”€â”€ Types â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
@@ -43,6 +44,33 @@ interface ApiActivity {
   error_message?: string
   user_agent?: string
   ip_address?: string
+}
+
+interface VerificationDetail {
+  success: boolean
+  verification_id: string
+  is_sandbox?: boolean
+  status: string
+  current_step: number
+  total_steps: number
+  final_result: string | null
+  front_document_uploaded?: boolean
+  back_document_uploaded?: boolean
+  live_capture_uploaded?: boolean
+  cross_validation_results?: { overall_score: number; verdict: string; has_critical_failure?: boolean } | null
+  face_match_results?: { similarity_score: number; passed: boolean; skipped_reason?: string } | null
+  liveness_results?: { score: number; passed: boolean } | null
+  risk_score?: { overall_score: number; risk_level: string; risk_factors?: unknown[] } | null
+  ocr_data?: Record<string, unknown> | null
+  barcode_data?: unknown | null
+  aml_screening?: unknown | null
+  rejection_reason?: string | null
+  rejection_detail?: string | null
+  failure_reason?: string | null
+  manual_review_reason?: string | null
+  created_at?: string
+  updated_at?: string
+  message?: string
 }
 
 interface DeveloperWebhook {
@@ -298,6 +326,10 @@ export function DeveloperPage() {
   const [selectedLog, setSelectedLog] = useState<ApiActivity | null>(null)
   const [logSearchByKey, setLogSearchByKey] = useState<Record<string, string>>({})
   const [expandedSessionByKey, setExpandedSessionByKey] = useState<Record<string, string | null>>({})
+  const [verificationDetail, setVerificationDetail] = useState<VerificationDetail | null>(null)
+  const [verificationDetailLoading, setVerificationDetailLoading] = useState<string | null>(null)
+  const [verificationDetailError, setVerificationDetailError] = useState<string | null>(null)
+  const [detailTab, setDetailTab] = useState<'scores' | 'json'>('scores')
 
   const fetchKeys = async (t: string) => {
     try {
@@ -493,6 +525,26 @@ export function DeveloperPage() {
       toast.success('Copied to clipboard')
     } catch {
       toast.error('Failed to copy — try selecting and copying manually')
+    }
+  }
+
+  const fetchVerificationDetail = async (verificationId: string) => {
+    if (!token) return
+    setVerificationDetailLoading(verificationId)
+    setVerificationDetailError(null)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/verifications/${verificationId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message || 'Failed to load verification details')
+      setVerificationDetail(data)
+      setDetailTab('scores')
+    } catch (err: unknown) {
+      setVerificationDetailError(err instanceof Error ? err.message : 'Failed to load verification details')
+      setVerificationDetail(null)
+    } finally {
+      setVerificationDetailLoading(null)
     }
   }
 
@@ -777,26 +829,68 @@ export function DeveloperPage() {
                                           >
                                             <div style={{ display: 'flex', justifyContent: 'space-between', gap: 8 }}>
                                               <div>
-                                                <div style={{ fontFamily: C.mono, fontSize: 12, color: C.text }}>
+                                                <div style={{ fontFamily: C.mono, fontSize: 12, color: C.text, display: 'flex', alignItems: 'center', gap: 6 }}>
                                                   Session: {sessionId === 'no-session' ? 'unscoped request' : sessionId}
+                                                  {sessionId !== 'no-session' && (
+                                                    <ClipboardDocumentIcon
+                                                      style={{ width: 12, height: 12, color: C.muted, cursor: 'pointer', flexShrink: 0 }}
+                                                      onClick={(e: React.MouseEvent) => { e.stopPropagation(); copyKey(sessionId) }}
+                                                    />
+                                                  )}
                                                 </div>
                                                 <div style={{ fontSize: 11, color: C.muted, marginTop: 2, display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
                                                   <span>{logs.length} call{logs.length > 1 ? 's' : ''} • last activity {new Date(latestTs).toLocaleString()}</span>
-                                                  <span
-                                                    style={{
-                                                      background: isFailedOutcome ? C.redDim : isSuccessOutcome ? C.greenDim : C.surface,
-                                                      color: isFailedOutcome ? C.red : isSuccessOutcome ? C.green : C.muted,
-                                                      border: `1px solid ${isFailedOutcome ? `${C.red}33` : isSuccessOutcome ? `${C.green}33` : C.border}`,
-                                                      borderRadius: 4,
-                                                      padding: '1px 6px',
-                                                      fontSize: 10,
-                                                      fontFamily: C.mono,
-                                                      textTransform: 'uppercase',
-                                                      letterSpacing: '0.04em',
-                                                    }}
-                                                  >
-                                                    {outcomeLabel}
-                                                  </span>
+                                                  {sessionId !== 'no-session' ? (
+                                                    <span
+                                                      role="button"
+                                                      tabIndex={0}
+                                                      onClick={(e: React.MouseEvent) => {
+                                                        e.stopPropagation()
+                                                        fetchVerificationDetail(sessionId)
+                                                      }}
+                                                      onKeyDown={(e: React.KeyboardEvent) => {
+                                                        if (e.key === 'Enter' || e.key === ' ') {
+                                                          e.preventDefault()
+                                                          e.stopPropagation()
+                                                          fetchVerificationDetail(sessionId)
+                                                        }
+                                                      }}
+                                                      style={{
+                                                        background: isFailedOutcome ? C.redDim : isSuccessOutcome ? C.greenDim : C.surface,
+                                                        color: isFailedOutcome ? C.red : isSuccessOutcome ? C.green : C.muted,
+                                                        border: `1px solid ${isFailedOutcome ? `${C.red}33` : isSuccessOutcome ? `${C.green}33` : C.border}`,
+                                                        borderRadius: 4,
+                                                        padding: '1px 6px',
+                                                        fontSize: 10,
+                                                        fontFamily: C.mono,
+                                                        textTransform: 'uppercase',
+                                                        letterSpacing: '0.04em',
+                                                        cursor: 'pointer',
+                                                        display: 'inline-flex',
+                                                        alignItems: 'center',
+                                                        gap: 4,
+                                                      }}
+                                                    >
+                                                      <CodeBracketIcon style={{ width: 10, height: 10 }} />
+                                                      {verificationDetailLoading === sessionId ? 'loading...' : outcomeLabel}
+                                                    </span>
+                                                  ) : (
+                                                    <span
+                                                      style={{
+                                                        background: C.surface,
+                                                        color: C.muted,
+                                                        border: `1px solid ${C.border}`,
+                                                        borderRadius: 4,
+                                                        padding: '1px 6px',
+                                                        fontSize: 10,
+                                                        fontFamily: C.mono,
+                                                        textTransform: 'uppercase',
+                                                        letterSpacing: '0.04em',
+                                                      }}
+                                                    >
+                                                      {outcomeLabel}
+                                                    </span>
+                                                  )}
                                                 </div>
                                               </div>
                                               <div style={{ color: C.cyan, fontSize: 12, fontFamily: C.mono }}>
@@ -1055,6 +1149,234 @@ export function DeveloperPage() {
                 Request/response body payloads are not currently captured in this log stream.
               </div>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Verification detail modal */}
+      {(verificationDetail || verificationDetailError) && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 70, padding: 16 }}
+          onClick={() => { setVerificationDetail(null); setVerificationDetailError(null) }}
+        >
+          <div
+            style={{ width: '100%', maxWidth: 800, maxHeight: '90vh', overflowY: 'auto', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 24 }}
+            onClick={e => e.stopPropagation()}
+          >
+            {verificationDetailError ? (
+              <>
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16 }}>
+                  <div style={{ color: C.red, fontSize: 14, fontWeight: 600 }}>Failed to load verification details</div>
+                  <button onClick={() => { setVerificationDetail(null); setVerificationDetailError(null) }} style={{ background: 'none', border: `1px solid ${C.border}`, color: C.muted, borderRadius: 6, padding: '6px 10px', cursor: 'pointer', fontSize: 12 }}>Close</button>
+                </div>
+                <div style={{ color: C.muted, fontSize: 13 }}>{verificationDetailError}</div>
+              </>
+            ) : verificationDetail && (
+              <>
+                {/* Header */}
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 20 }}>
+                  <div>
+                    <div style={{ fontFamily: C.mono, fontSize: 11, color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Verification Detail</div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 6 }}>
+                      <span style={{ fontFamily: C.mono, fontSize: 13, color: C.text }}>{verificationDetail.verification_id}</span>
+                      <ClipboardDocumentIcon
+                        style={{ width: 14, height: 14, color: C.muted, cursor: 'pointer', flexShrink: 0 }}
+                        onClick={() => copyKey(verificationDetail.verification_id)}
+                      />
+                      {verificationDetail.is_sandbox && (
+                        <span style={{ background: C.amberDim, color: C.amber, border: `1px solid ${C.amber}33`, borderRadius: 4, padding: '1px 6px', fontSize: 10, fontFamily: C.mono, textTransform: 'uppercase' }}>sandbox</span>
+                      )}
+                    </div>
+                  </div>
+                  <button onClick={() => { setVerificationDetail(null); setVerificationDetailError(null) }} style={{ background: 'none', border: `1px solid ${C.border}`, color: C.muted, borderRadius: 6, padding: '6px 10px', cursor: 'pointer', fontSize: 12 }}>Close</button>
+                </div>
+
+                {/* Tabs */}
+                <div style={{ display: 'flex', gap: 0, marginBottom: 20, borderBottom: `1px solid ${C.border}` }}>
+                  {(['scores', 'json'] as const).map(tab => (
+                    <button
+                      key={tab}
+                      onClick={() => setDetailTab(tab)}
+                      style={{
+                        background: 'none',
+                        border: 'none',
+                        borderBottom: detailTab === tab ? `2px solid ${C.cyan}` : '2px solid transparent',
+                        color: detailTab === tab ? C.cyan : C.muted,
+                        padding: '8px 16px',
+                        fontSize: 13,
+                        fontWeight: 500,
+                        cursor: 'pointer',
+                        fontFamily: C.sans,
+                      }}
+                    >
+                      {tab === 'scores' ? 'Scores' : 'Raw JSON'}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Scores tab */}
+                {detailTab === 'scores' && (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 12 }}>
+                    {/* Status + step */}
+                    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 14 }}>
+                      <div style={{ color: C.muted, fontSize: 11, marginBottom: 6 }}>Status</div>
+                      <div style={{ fontFamily: C.mono, fontSize: 13, color: C.text }}>{verificationDetail.status}</div>
+                      <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>Step {verificationDetail.current_step} of {verificationDetail.total_steps}</div>
+                    </div>
+
+                    {/* Final result */}
+                    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 14 }}>
+                      <div style={{ color: C.muted, fontSize: 11, marginBottom: 6 }}>Final Result</div>
+                      <div style={{
+                        fontFamily: C.mono,
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: verificationDetail.final_result === 'verified' ? C.green
+                          : verificationDetail.final_result === 'failed' ? C.red
+                          : verificationDetail.final_result === 'manual_review' ? C.amber
+                          : C.muted,
+                      }}>
+                        {verificationDetail.final_result || 'In progress'}
+                      </div>
+                    </div>
+
+                    {/* Cross-validation */}
+                    {verificationDetail.cross_validation_results && (
+                      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 14 }}>
+                        <div style={{ color: C.muted, fontSize: 11, marginBottom: 6 }}>Cross-Validation</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                          <div style={{ flex: 1, height: 6, borderRadius: 3, background: C.bg, overflow: 'hidden' }}>
+                            <div style={{ width: `${(verificationDetail.cross_validation_results.overall_score ?? 0) * 100}%`, height: '100%', borderRadius: 3, background: (verificationDetail.cross_validation_results.overall_score ?? 0) >= 0.8 ? C.green : C.amber }} />
+                          </div>
+                          <span style={{ fontFamily: C.mono, fontSize: 12, color: C.text }}>{((verificationDetail.cross_validation_results.overall_score ?? 0) * 100).toFixed(0)}%</span>
+                        </div>
+                        <span style={{
+                          background: verificationDetail.cross_validation_results.verdict === 'PASS' ? C.greenDim : verificationDetail.cross_validation_results.verdict === 'FAIL' ? C.redDim : C.amberDim,
+                          color: verificationDetail.cross_validation_results.verdict === 'PASS' ? C.green : verificationDetail.cross_validation_results.verdict === 'FAIL' ? C.red : C.amber,
+                          borderRadius: 4, padding: '1px 6px', fontSize: 10, fontFamily: C.mono, textTransform: 'uppercase',
+                        }}>
+                          {verificationDetail.cross_validation_results.verdict}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Face match */}
+                    {verificationDetail.face_match_results && (
+                      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 14 }}>
+                        <div style={{ color: C.muted, fontSize: 11, marginBottom: 6 }}>Face Match</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                          <div style={{ flex: 1, height: 6, borderRadius: 3, background: C.bg, overflow: 'hidden' }}>
+                            <div style={{ width: `${(verificationDetail.face_match_results.similarity_score ?? 0) * 100}%`, height: '100%', borderRadius: 3, background: verificationDetail.face_match_results.passed ? C.green : C.red }} />
+                          </div>
+                          <span style={{ fontFamily: C.mono, fontSize: 12, color: C.text }}>{((verificationDetail.face_match_results.similarity_score ?? 0) * 100).toFixed(1)}%</span>
+                        </div>
+                        <span style={{
+                          background: verificationDetail.face_match_results.passed ? C.greenDim : C.redDim,
+                          color: verificationDetail.face_match_results.passed ? C.green : C.red,
+                          borderRadius: 4, padding: '1px 6px', fontSize: 10, fontFamily: C.mono, textTransform: 'uppercase',
+                        }}>
+                          {verificationDetail.face_match_results.passed ? 'passed' : 'failed'}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Liveness */}
+                    {verificationDetail.liveness_results && (
+                      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 14 }}>
+                        <div style={{ color: C.muted, fontSize: 11, marginBottom: 6 }}>Liveness</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                          <div style={{ flex: 1, height: 6, borderRadius: 3, background: C.bg, overflow: 'hidden' }}>
+                            <div style={{ width: `${(verificationDetail.liveness_results.score ?? 0) * 100}%`, height: '100%', borderRadius: 3, background: verificationDetail.liveness_results.passed ? C.green : C.red }} />
+                          </div>
+                          <span style={{ fontFamily: C.mono, fontSize: 12, color: C.text }}>{((verificationDetail.liveness_results.score ?? 0) * 100).toFixed(1)}%</span>
+                        </div>
+                        <span style={{
+                          background: verificationDetail.liveness_results.passed ? C.greenDim : C.redDim,
+                          color: verificationDetail.liveness_results.passed ? C.green : C.red,
+                          borderRadius: 4, padding: '1px 6px', fontSize: 10, fontFamily: C.mono, textTransform: 'uppercase',
+                        }}>
+                          {verificationDetail.liveness_results.passed ? 'passed' : 'failed'}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* Risk score */}
+                    {verificationDetail.risk_score && (
+                      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 14 }}>
+                        <div style={{ color: C.muted, fontSize: 11, marginBottom: 6 }}>Risk Score</div>
+                        <div style={{ fontFamily: C.mono, fontSize: 20, fontWeight: 600, color: C.text }}>{verificationDetail.risk_score.overall_score}</div>
+                        <span style={{
+                          background: verificationDetail.risk_score.risk_level === 'low' ? C.greenDim : verificationDetail.risk_score.risk_level === 'high' ? C.redDim : C.amberDim,
+                          color: verificationDetail.risk_score.risk_level === 'low' ? C.green : verificationDetail.risk_score.risk_level === 'high' ? C.red : C.amber,
+                          borderRadius: 4, padding: '1px 6px', fontSize: 10, fontFamily: C.mono, textTransform: 'uppercase', marginTop: 4, display: 'inline-block',
+                        }}>
+                          {verificationDetail.risk_score.risk_level}
+                        </span>
+                      </div>
+                    )}
+
+                    {/* OCR data — full width */}
+                    {verificationDetail.ocr_data && (
+                      <div style={{ gridColumn: '1 / -1', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 14 }}>
+                        <div style={{ color: C.muted, fontSize: 11, marginBottom: 8 }}>OCR Extracted Data</div>
+                        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 8 }}>
+                          {Object.entries(verificationDetail.ocr_data as Record<string, unknown>).map(([field, value]) => (
+                            <div key={field}>
+                              <div style={{ color: C.muted, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{field.replace(/_/g, ' ')}</div>
+                              <div style={{ fontFamily: C.mono, fontSize: 12, color: C.text, marginTop: 2 }}>{value != null ? String(value) : '—'}</div>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Rejection info — full width, only when rejected */}
+                    {verificationDetail.rejection_reason && (
+                      <div style={{ gridColumn: '1 / -1', background: C.redDim, border: `1px solid ${C.red}33`, borderRadius: 8, padding: 14 }}>
+                        <div style={{ color: C.red, fontSize: 11, marginBottom: 6, fontWeight: 600 }}>Rejection</div>
+                        <div style={{ color: C.red, fontFamily: C.mono, fontSize: 13 }}>{verificationDetail.rejection_reason}</div>
+                        {verificationDetail.rejection_detail && (
+                          <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>{verificationDetail.rejection_detail}</div>
+                        )}
+                      </div>
+                    )}
+
+                    {/* Manual review reason — full width */}
+                    {verificationDetail.manual_review_reason && (
+                      <div style={{ gridColumn: '1 / -1', background: C.amberDim, border: `1px solid ${C.amber}33`, borderRadius: 8, padding: 14 }}>
+                        <div style={{ color: C.amber, fontSize: 11, marginBottom: 6, fontWeight: 600 }}>Manual Review Required</div>
+                        <div style={{ color: C.amber, fontFamily: C.mono, fontSize: 13 }}>{verificationDetail.manual_review_reason}</div>
+                      </div>
+                    )}
+
+                    {/* "Not yet available" if no documents uploaded */}
+                    {verificationDetail.message && (
+                      <div style={{ gridColumn: '1 / -1', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 14 }}>
+                        <div style={{ color: C.muted, fontSize: 13 }}>{verificationDetail.message}</div>
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Raw JSON tab */}
+                {detailTab === 'json' && (
+                  <div>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                      <div style={{ color: C.muted, fontSize: 12 }}>
+                        Response from <code style={{ fontFamily: C.mono, color: C.code }}>GET /api/developer/verifications/:id</code>
+                      </div>
+                      <button
+                        onClick={() => copyKey(JSON.stringify(verificationDetail, null, 2))}
+                        style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.muted, borderRadius: 6, padding: '4px 10px', cursor: 'pointer', fontSize: 11, display: 'flex', alignItems: 'center', gap: 4 }}
+                      >
+                        <ClipboardDocumentIcon style={{ width: 12, height: 12 }} /> Copy
+                      </button>
+                    </div>
+                    <pre style={{ background: C.codeBg, borderRadius: 8, padding: '16px 18px', margin: 0, fontFamily: C.mono, fontSize: 12, color: C.code, lineHeight: 1.6, overflowX: 'auto', maxHeight: 500, overflowY: 'auto' }}>{JSON.stringify(verificationDetail, null, 2)}</pre>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         </div>
       )}

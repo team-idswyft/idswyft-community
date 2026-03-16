@@ -8,6 +8,7 @@ import { logger } from '@/utils/logger.js';
 import { getRecentActivities } from '@/middleware/apiLogger.js';
 import rateLimit from 'express-rate-limit';
 import crypto from 'crypto';
+import { loadSessionState, mapStatusForResponse, fetchRiskScore } from '@/verification/statusReader.js';
 
 const router = express.Router();
 
@@ -836,6 +837,94 @@ router.post('/api-key/:id/rotate',
       old_key_expires_at: expiresAt.toISOString(),
       grace_period_hours: gracePeriodHours,
       message: `Old key will remain active until ${expiresAt.toISOString()}. Update your integration before then.`,
+    });
+  })
+);
+
+// Get full verification detail for a session (JWT-authenticated developer portal)
+router.get('/verifications/:verificationId',
+  apiKeyRateLimit,
+  [
+    param('verificationId')
+      .isUUID()
+      .withMessage('Invalid verification ID format')
+  ],
+  authenticateDeveloperJWT,
+  catchAsync(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw new ValidationError('Validation failed', 'multiple', errors.array());
+    }
+
+    const developer = req.developer;
+    if (!developer) {
+      throw new AuthenticationError('Developer authentication required');
+    }
+
+    const { verificationId } = req.params;
+
+    // Ownership check: verification must belong to this developer
+    const { data: verification, error: verErr } = await supabase
+      .from('verification_requests')
+      .select('id, is_sandbox')
+      .eq('id', verificationId)
+      .eq('developer_id', developer.id)
+      .single();
+
+    if (verErr || !verification) {
+      throw new NotFoundError('Verification not found or does not belong to this developer');
+    }
+
+    // Load session state from verification_contexts
+    const state = await loadSessionState(verificationId);
+
+    if (!state) {
+      // Session just initialized — no context row yet
+      return res.json({
+        success: true,
+        verification_id: verificationId,
+        status: 'pending',
+        current_step: 0,
+        total_steps: 5,
+        message: 'Verification session has been created but no documents have been submitted yet.',
+      });
+    }
+
+    const mapped = mapStatusForResponse(state);
+    const riskScore = await fetchRiskScore(verificationId);
+
+    res.json({
+      success: true,
+      verification_id: verificationId,
+      is_sandbox: verification.is_sandbox ?? false,
+      status: mapped.status,
+      current_step: mapped.current_step,
+      total_steps: mapped.total_steps,
+      front_document_uploaded: !!state.front_extraction,
+      back_document_uploaded: !!state.back_extraction,
+      live_capture_uploaded: !!state.face_match,
+      ocr_data: state.front_extraction?.ocr ?? null,
+      barcode_data: state.back_extraction?.qr_payload ?? null,
+      cross_validation_results: state.cross_validation ?? null,
+      face_match_results: state.face_match ?? null,
+      liveness_results: state.liveness ?? null,
+      aml_screening: state.aml_screening ?? null,
+      risk_score: riskScore,
+      barcode_extraction_failed: state.back_extraction ? !state.back_extraction.qr_payload : null,
+      documents_match: state.cross_validation ? !state.cross_validation.has_critical_failure : null,
+      face_match_passed: state.face_match?.passed ?? null,
+      liveness_passed: state.liveness?.passed ?? null,
+      final_result: mapped.final_result,
+      rejection_reason: state.rejection_reason,
+      rejection_detail: state.rejection_detail,
+      failure_reason: state.rejection_detail,
+      manual_review_reason: state.cross_validation?.verdict === 'REVIEW'
+        ? 'Cross-validation requires review'
+        : state.face_match?.skipped_reason
+          ? `Face match skipped: ${state.face_match.skipped_reason}`
+          : null,
+      created_at: state.created_at,
+      updated_at: state.updated_at,
     });
   })
 );
