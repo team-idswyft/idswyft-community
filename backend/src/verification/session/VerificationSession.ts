@@ -174,20 +174,25 @@ export class VerificationSession {
     const liveEmbedding = liveResult.face_embedding;
     const threshold = this.deps.faceMatchThreshold ?? 0.60;
 
-    // Skip face matching when either embedding is unavailable.
-    // ID card photos are often too small for face-api to extract an embedding
-    // (Gate 1 already soft-checked this). Cross-validation (Gate 3) still
-    // protects against fraud when face match cannot be performed.
+    // When either embedding is unavailable, mark for manual review.
+    // ID card photos are often too small for face-api to extract an embedding.
+    // Rather than silently auto-passing (security gap), we flag it so a human
+    // can visually confirm the live capture matches the ID photo.
     const hasIdEmbedding = idEmbedding && idEmbedding.length > 0;
     const hasLiveEmbedding = liveEmbedding && liveEmbedding.length > 0;
 
     let faceMatchResult: FaceMatchResult;
     if (!hasIdEmbedding || !hasLiveEmbedding) {
-      // Cannot compare — auto-pass face match.
+      const reason = !hasIdEmbedding && !hasLiveEmbedding
+        ? 'No face embedding from ID or live capture'
+        : !hasIdEmbedding
+          ? 'No face embedding from ID document'
+          : 'No face embedding from live capture';
       faceMatchResult = {
-        similarity_score: 1.0,
+        similarity_score: 0,
         passed: true,
         threshold_used: threshold,
+        skipped_reason: reason,
       };
     } else {
       faceMatchResult = this.deps.computeFaceMatch(

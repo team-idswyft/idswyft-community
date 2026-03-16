@@ -653,7 +653,6 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
   // ── Active liveness complete — submit blob + metadata directly ─────────
   const handleActiveLivenessComplete = useCallback(async (blob: Blob, metadata: LivenessMetadata) => {
     if (!verificationId || !session) return;
-    setShowActiveLiveness(false);
     setIsProcessing(true);
     setStepError(null);
     try {
@@ -670,7 +669,10 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
       }
       pollFinalResult(verificationId, 0);
     } catch (err: any) {
-      if (mountedRef.current) setStepError(err.message);
+      if (mountedRef.current) {
+        setShowActiveLiveness(false);
+        setStepError(err.message);
+      }
     } finally {
       if (mountedRef.current) setIsProcessing(false);
     }
@@ -1141,6 +1143,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
                       onComplete={handleActiveLivenessComplete}
                       onCancel={() => setShowActiveLiveness(false)}
                       onFallback={handleActiveLivenessFallback}
+                      isProcessing={isProcessing}
                     />
                   </div>
                 )}

@@ -358,7 +358,6 @@ export const LiveCaptureWidget: React.FC<LiveCaptureWidgetProps> = ({
           onComplete={handleActiveLivenessComplete}
           onCancel={() => onError?.('Live capture cancelled')}
           onFallback={() => setUseFallbackCapture(true)}
-          theme={theme}
         />
       </div>
     );

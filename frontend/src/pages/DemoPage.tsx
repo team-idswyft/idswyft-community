@@ -1244,7 +1244,6 @@ const DemoPage: React.FC = () => {
           onComplete={handleActiveLivenessComplete}
           onCancel={() => { cleanup(); setShowLiveCapture(false); setUseFallbackCapture(false); }}
           onFallback={() => setUseFallbackCapture(true)}
-          theme="dark"
         />
       )}
 

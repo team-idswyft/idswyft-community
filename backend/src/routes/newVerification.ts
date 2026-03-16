@@ -780,7 +780,7 @@ router.post('/:verification_id/cross-validation',
       rejection_reason: state.rejection_reason,
       rejection_detail: state.rejection_detail,
       failure_reason: state.rejection_detail,
-      manual_review_reason: state.cross_validation?.verdict === 'REVIEW' ? 'Cross-validation score requires review' : null,
+      manual_review_reason: state.cross_validation?.verdict === 'REVIEW' ? 'Cross-validation score requires review' : state.face_match?.skipped_reason ? `Face match skipped: ${state.face_match.skipped_reason}` : null,
       message: state.cross_validation
         ? 'Cross-validation results retrieved (auto-triggered after back document)'
         : 'Cross-validation has not been performed yet',
@@ -891,8 +891,10 @@ router.post('/:verification_id/live-capture',
     // Update main DB record
     const state = session.getState();
     let dbStatus: string;
+    const needsManualReview = state.cross_validation?.verdict === 'REVIEW'
+      || !!state.face_match?.skipped_reason;
     if (state.current_step === VerificationStatus.COMPLETE) {
-      dbStatus = state.cross_validation?.verdict === 'REVIEW' ? 'manual_review' : 'verified';
+      dbStatus = needsManualReview ? 'manual_review' : 'verified';
     } else if (state.current_step === VerificationStatus.HARD_REJECTED) {
       dbStatus = 'failed';
     } else {
@@ -947,7 +949,7 @@ router.post('/:verification_id/live-capture',
       rejection_reason: state.rejection_reason,
       rejection_detail: state.rejection_detail,
       failure_reason: state.rejection_detail,
-      manual_review_reason: state.cross_validation?.verdict === 'REVIEW' ? 'Cross-validation requires review' : null,
+      manual_review_reason: state.cross_validation?.verdict === 'REVIEW' ? 'Cross-validation requires review' : state.face_match?.skipped_reason ? `Face match skipped: ${state.face_match.skipped_reason}` : null,
       message: state.current_step === VerificationStatus.COMPLETE
         ? 'Verification completed successfully'
         : state.current_step === VerificationStatus.HARD_REJECTED
@@ -1057,7 +1059,7 @@ router.get('/:verification_id/status',
       rejection_reason: state.rejection_reason,
       rejection_detail: state.rejection_detail,
       failure_reason: state.rejection_detail,
-      manual_review_reason: state.cross_validation?.verdict === 'REVIEW' ? 'Cross-validation requires review' : null,
+      manual_review_reason: state.cross_validation?.verdict === 'REVIEW' ? 'Cross-validation requires review' : state.face_match?.skipped_reason ? `Face match skipped: ${state.face_match.skipped_reason}` : null,
       created_at: state.created_at,
       updated_at: state.updated_at,
     });

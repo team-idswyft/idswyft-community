@@ -1073,7 +1073,6 @@ export const LiveCapturePage: React.FC = () => {
               onComplete={handleActiveLivenessComplete}
               onCancel={() => navigate('/verify')}
               onFallback={() => setUseFallbackCapture(true)}
-              theme="light"
             />
           </div>
         )}

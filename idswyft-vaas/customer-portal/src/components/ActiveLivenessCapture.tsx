@@ -5,12 +5,15 @@ interface ActiveLivenessCaptureProps {
   onComplete: (blob: Blob, metadata: LivenessMetadata) => void;
   onCancel: () => void;
   onFallback: () => void;
+  /** When true, shows a processing overlay after liveness completes */
+  isProcessing?: boolean;
 }
 
 export function ActiveLivenessCapture({
   onComplete,
   onCancel,
   onFallback,
+  isProcessing = false,
 }: ActiveLivenessCaptureProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -75,7 +78,6 @@ export function ActiveLivenessCapture({
     progress,
     error,
     retry,
-    flashColor,
   } = useActiveLiveness({
     videoElement: streamReady ? videoRef.current : null,
     canvasElement: canvasRef.current,
@@ -85,17 +87,15 @@ export function ActiveLivenessCapture({
   });
 
   // ── Dot state computation ──
-  // 6 progress dots: 4 color flashes + turn 1 + turn 2
-  const TOTAL_DOTS = 6;
+  // 4 progress dots: turn 1 + return 1 + turn 2 + return 2
+  const TOTAL_DOTS = 4;
 
   const getActiveStep = (): number => {
     if (phase === 'ready') return -1;
     if (phase === 'completed') return TOTAL_DOTS;
-    if (phase === 'failed') return Math.min(Math.floor(progress * 9), TOTAL_DOTS - 1);
-    if (phase === 'color_flash') return Math.min(Math.floor(progress * 9), 3);
-    if (phase === 'turn') return progress < 6 / 9 ? 4 : 5;
-    if (phase === 'return_center' || phase === 'capturing') return progress < 6 / 9 ? 4 : 5;
-    return Math.floor(progress * 9);
+    if (phase === 'failed') return Math.min(Math.floor(progress * 4), TOTAL_DOTS - 1);
+    // progress is 0/4..4/4 — map to dot index
+    return Math.min(Math.floor(progress * 4), TOTAL_DOTS - 1);
   };
 
   const activeStep = getActiveStep();
@@ -109,11 +109,11 @@ export function ActiveLivenessCapture({
   // ── Border state ──
   const borderState = phase === 'failed' ? 'fail'
     : phase === 'completed' ? 'success'
-    : (phase === 'color_flash' || phase === 'turn' || phase === 'return_center') ? 'active'
+    : (phase === 'turn' || phase === 'return_center') ? 'active'
     : 'idle';
 
   const showScanLine = phase !== 'completed' && phase !== 'failed';
-  const challengeActive = phase === 'color_flash' || phase === 'turn' || phase === 'return_center';
+  const challengeActive = phase === 'turn' || phase === 'return_center';
 
   // ── Tip text ──
   const tipText = phase === 'ready' ? 'Good lighting \u00B7 Face uncovered \u00B7 No sunglasses'
@@ -153,16 +153,6 @@ export function ActiveLivenessCapture({
 
         {/* Ambient glow — top-left */}
         <div className="lv-glow lv-glow-tl" />
-
-        {/* Color flash overlay */}
-        {flashColor && (
-          <div
-            className="lv-flash"
-            style={{
-              backgroundColor: `rgba(${flashColor[0]}, ${flashColor[1]}, ${flashColor[2]}, 0.85)`,
-            }}
-          />
-        )}
 
         {/* Oval face guide with mask + animated border */}
         <svg
@@ -253,41 +243,54 @@ export function ActiveLivenessCapture({
           </div>
         )}
 
+        {/* Processing overlay — shown while backend analyzes */}
+        {isProcessing && (
+          <div className="lv-processing">
+            <div className="lv-processing-spinner" />
+            <p className="lv-processing-text">Processing verification...</p>
+            <p className="lv-processing-sub">Analyzing your document and identity</p>
+          </div>
+        )}
+
         {/* Cancel pill — top-left */}
-        <button onClick={onCancel} className="lv-cancel">
-          {phase === 'completed' ? 'Done' : 'Skip'}
-        </button>
+        {!isProcessing && (
+          <button onClick={onCancel} className="lv-cancel">
+            {phase === 'completed' ? 'Done' : 'Skip'}
+          </button>
+        )}
 
         {/* Glassmorphism instruction bar — bottom overlay */}
-        <div className="lv-bar">
-          <p className="lv-bar-text" style={{
-            color: phase === 'completed' ? '#00d4b4' : phase === 'failed' ? '#ff3b5c' : '#e8f4f8',
-          }}>
-            {instruction}
-          </p>
+        {!isProcessing && (
+          <div className="lv-bar">
+            <p className="lv-bar-text" style={{
+              color: phase === 'completed' ? '#00d4b4' : phase === 'failed' ? '#ff3b5c' : '#e8f4f8',
+            }}>
+              {instruction}
+            </p>
 
-          {error && <p className="lv-bar-error">{error}</p>}
+            {error && <p className="lv-bar-error">{error}</p>}
 
-          {/* Challenge progress dots */}
-          <div className="lv-dots">
-            {Array.from({ length: TOTAL_DOTS }).map((_, i) => (
-              <div key={i} className={`lv-dot lv-dot--${getDotState(i)}`} />
-            ))}
+            {/* Challenge progress dots */}
+            <div className="lv-dots">
+              {Array.from({ length: TOTAL_DOTS }).map((_, i) => (
+                <div key={i} className={`lv-dot lv-dot--${getDotState(i)}`} />
+              ))}
+            </div>
+
+            {/* Tip */}
+            <div className="lv-tip">
+              <span className="lv-tip-dot" />
+              <span>{tipText}</span>
+            </div>
+
+            {/* Retry button */}
+            {phase === 'failed' && (
+              <button onClick={retry} className="lv-btn-retry">
+                Try Again
+              </button>
+            )}
           </div>
-
-          {/* Tip */}
-          <div className="lv-tip">
-            <span className="lv-tip-dot" />
-            <span>{tipText}</span>
-          </div>
-
-          {/* Retry button */}
-          {phase === 'failed' && (
-            <button onClick={retry} className="lv-btn-retry">
-              Try Again
-            </button>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );
@@ -305,14 +308,6 @@ const LIVENESS_CSS = `
 .lv-glow-tl {
   top: -80px; left: -80px; width: 240px; height: 240px;
   background: radial-gradient(circle, rgba(0,212,180,0.05) 0%, transparent 70%);
-}
-
-/* ── Color Flash Overlay ── */
-.lv-flash {
-  position: absolute; inset: 0;
-  pointer-events: none; z-index: 1;
-  /* No transition — color must appear instantly so the early capture (150ms)
-     catches reflected screen light before the camera's AWB compensates. */
 }
 
 /* ── Scan Line ── */
@@ -413,6 +408,32 @@ const LIVENESS_CSS = `
 }
 .lv-btn-retry:hover { background: #00ffdf; transform: translateY(-1px); }
 
+/* ── Processing Overlay ── */
+.lv-processing {
+  position: absolute; inset: 0; z-index: 20;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+  background: rgba(4,13,26,0.92);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+}
+.lv-processing-spinner {
+  width: 48px; height: 48px; border-radius: 50%;
+  border: 3px solid rgba(0,212,180,0.15);
+  border-top-color: #00d4b4;
+  animation: lv-spin 0.8s linear infinite;
+}
+.lv-processing-text {
+  margin: 0;
+  font-family: 'Syne', sans-serif;
+  font-size: 16px; font-weight: 700; color: #e8f4f8;
+  letter-spacing: -0.01em;
+}
+.lv-processing-sub {
+  margin: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; color: rgba(232,244,248,0.45);
+  letter-spacing: 0.04em;
+}
+
 /* ── Keyframes ── */
 @keyframes lv-fscan {
   0%   { top: 18%; opacity: 0; }
@@ -435,5 +456,8 @@ const LIVENESS_CSS = `
 @keyframes lv-arrowPulse {
   0%, 100% { opacity: 0.6; transform: scale(1); }
   50%      { opacity: 1; transform: scale(1.15); }
+}
+@keyframes lv-spin {
+  to { transform: rotate(360deg); }
 }
 `;

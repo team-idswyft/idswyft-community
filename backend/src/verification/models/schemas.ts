@@ -134,6 +134,8 @@ export const FaceMatchResultSchema = z.object({
   similarity_score: confidence,
   passed: z.boolean(),
   threshold_used: confidence,
+  /** Set when face match could not be performed (missing embedding). */
+  skipped_reason: z.string().optional(),
 });
 
 export type FaceMatchResult = z.infer<typeof FaceMatchResultSchema>;
