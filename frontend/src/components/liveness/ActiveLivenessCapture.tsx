@@ -77,7 +77,6 @@ export function ActiveLivenessCapture({
     progress,
     error,
     retry,
-    flashColor,
   } = useActiveLiveness({
     videoElement: streamReady ? videoRef.current : null,
     canvasElement: canvasRef.current,
@@ -87,17 +86,15 @@ export function ActiveLivenessCapture({
   });
 
   // ── Dot state computation ──
-  // 6 progress dots: 4 color flashes + turn 1 + turn 2
-  const TOTAL_DOTS = 6;
+  // 4 progress dots: turn 1 + return 1 + turn 2 + return 2
+  const TOTAL_DOTS = 4;
 
   const getActiveStep = (): number => {
     if (phase === 'ready') return -1;
     if (phase === 'completed') return TOTAL_DOTS;
-    if (phase === 'failed') return Math.min(Math.floor(progress * 9), TOTAL_DOTS - 1);
-    if (phase === 'color_flash') return Math.min(Math.floor(progress * 9), 3);
-    if (phase === 'turn') return progress < 6 / 9 ? 4 : 5;
-    if (phase === 'return_center' || phase === 'capturing') return progress < 6 / 9 ? 4 : 5;
-    return Math.floor(progress * 9);
+    if (phase === 'failed') return Math.min(Math.floor(progress * 4), TOTAL_DOTS - 1);
+    // progress is 0/4..4/4 — map to dot index
+    return Math.min(Math.floor(progress * 4), TOTAL_DOTS - 1);
   };
 
   const activeStep = getActiveStep();
@@ -111,11 +108,11 @@ export function ActiveLivenessCapture({
   // ── Border state ──
   const borderState = phase === 'failed' ? 'fail'
     : phase === 'completed' ? 'success'
-    : (phase === 'color_flash' || phase === 'turn' || phase === 'return_center') ? 'active'
+    : (phase === 'turn' || phase === 'return_center') ? 'active'
     : 'idle';
 
   const showScanLine = phase !== 'completed' && phase !== 'failed';
-  const challengeActive = phase === 'color_flash' || phase === 'turn' || phase === 'return_center';
+  const challengeActive = phase === 'turn' || phase === 'return_center';
 
   // ── Tip text ──
   const tipText = phase === 'ready' ? 'Good lighting \u00B7 Face uncovered \u00B7 No sunglasses'
@@ -167,16 +164,6 @@ export function ActiveLivenessCapture({
 
         {/* Ambient glow — top-left */}
         <div className="lv-glow lv-glow-tl" />
-
-        {/* Color flash overlay */}
-        {flashColor && (
-          <div
-            className="lv-flash"
-            style={{
-              backgroundColor: `rgba(${flashColor[0]}, ${flashColor[1]}, ${flashColor[2]}, 0.85)`,
-            }}
-          />
-        )}
 
         {/* Oval face guide with mask + animated border */}
         <svg
@@ -326,14 +313,6 @@ const LIVENESS_CSS = `
 .lv-glow-tl {
   top: -80px; left: -80px; width: 240px; height: 240px;
   background: radial-gradient(circle, rgba(0,212,180,0.05) 0%, transparent 70%);
-}
-
-/* ── Color Flash Overlay ── */
-.lv-flash {
-  position: absolute; inset: 0;
-  pointer-events: none; z-index: 1;
-  /* No transition — color must appear instantly so the early capture (150ms)
-     catches reflected screen light before the camera's AWB compensates. */
 }
 
 /* ── Scan Line ── */

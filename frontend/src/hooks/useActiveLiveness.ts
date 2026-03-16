@@ -4,7 +4,6 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 
 export type LivenessPhase =
   | 'ready'
-  | 'color_flash'
   | 'turn'
   | 'return_center'
   | 'capturing'
@@ -54,23 +53,13 @@ export interface UseActiveLivenessReturn {
   currentYaw: number;
   error: string | null;
   retry: () => void;
-  /** Current flash color (null when not in color_flash phase) */
-  flashColor: [number, number, number] | null;
 }
 
 // ─── Constants ──────────────────────────────────────────
 
-const DEFAULT_CHALLENGE_TIMEOUT = 35000;  // longer challenge with two turn directions
-const COLOR_FLASH_DURATION = 1500;  // 1.5s per color — longer for camera sensor to register reflected screen light
+const DEFAULT_CHALLENGE_TIMEOUT = 35000;
 const TURN_HOLD_MS = 3000;         // hold turn for 3s — user needs time to turn head ≥12°
 const RETURN_HOLD_MS = 3000;       // hold center for 3s — unhurried return
-
-const COLORS: { name: string; rgb: [number, number, number]; phase: string }[] = [
-  { name: 'red', rgb: [255, 0, 0], phase: 'color_red' },
-  { name: 'green', rgb: [0, 255, 0], phase: 'color_green' },
-  { name: 'blue', rgb: [0, 0, 255], phase: 'color_blue' },
-  { name: 'white', rgb: [255, 255, 255], phase: 'color_white' },
-];
 
 const VIRTUAL_CAMERA_REGEX = /obs|virtual|manycam|snap camera|fake|xsplit|streamlabs/i;
 
@@ -80,19 +69,9 @@ function pickRandomDirection(): ChallengeDirection {
   return Math.random() < 0.5 ? 'left' : 'right';
 }
 
-function shuffleArray<T>(arr: T[]): T[] {
-  const shuffled = [...arr];
-  for (let i = shuffled.length - 1; i > 0; i--) {
-    const j = Math.floor(Math.random() * (i + 1));
-    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
-  }
-  return shuffled;
-}
-
 function getInstructionForPhase(phase: LivenessPhase, direction: ChallengeDirection): string {
   switch (phase) {
     case 'ready': return 'Position your face in the oval';
-    case 'color_flash': return 'Hold still — verifying...';
     case 'turn': return direction === 'left' ? 'Slowly turn your head left' : 'Slowly turn your head right';
     case 'return_center': return 'Now look straight ahead';
     case 'capturing': return 'Hold still — capturing...';
@@ -141,14 +120,10 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
   const [direction, setDirection] = useState<ChallengeDirection>(pickRandomDirection);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [flashColor, setFlashColor] = useState<[number, number, number] | null>(null);
 
   const phaseRef = useRef(phase);
   const framesRef = useRef<AnalysisFrame[]>([]);
-  const colorSequenceRef = useRef<typeof COLORS>([]);
-  const colorIndexRef = useRef(0);
   const challengeStartRef = useRef(0);
-  const turnStartRef = useRef(0);
   const returnStartRef = useRef(0);
   const virtualCameraRef = useRef<{ label: string; suspected_virtual: boolean } | undefined>(undefined);
   const animFrameRef = useRef(0);
@@ -177,24 +152,28 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
 
   // ── Auto-start challenge when video is playing ──
   useEffect(() => {
-    if (phase !== 'ready' || !videoElement || !enabled) return;
+    if (phase !== 'ready' || !videoElement || !canvasElement || !enabled) return;
 
     const startChallenge = () => {
-      // Randomize color order and pick direction pair (both tested)
-      colorSequenceRef.current = shuffleArray(COLORS);
-      colorIndexRef.current = 0;
       framesRef.current = [];
       turnCountRef.current = 0;
       const firstDir = pickRandomDirection();
       scoredDirectionRef.current = firstDir === 'left' ? 'right' : 'left';
       setDirection(firstDir);
       challengeStartRef.current = performance.now();
-      setPhase('color_flash');
-      setFlashColor(colorSequenceRef.current[0].rgb);
+
+      // Capture baseline frame for first turn
+      const base64 = captureFrameAsBase64(videoElement, canvasElement);
+      framesRef.current.push({
+        frame_base64: base64,
+        timestamp: performance.now(),
+        phase: 'turn1_start',
+      });
+
+      setPhase('turn');
     };
 
     if (videoElement.readyState >= 2) {
-      // Longer delay so user can read instruction and position face
       const timer = setTimeout(startChallenge, 2500);
       return () => clearTimeout(timer);
     } else {
@@ -204,86 +183,13 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
       videoElement.addEventListener('playing', onPlaying);
       return () => videoElement.removeEventListener('playing', onPlaying);
     }
-  }, [phase, videoElement, enabled]);
-
-  // ── Color flash sequence ──
-  useEffect(() => {
-    if (phase !== 'color_flash' || !videoElement || !canvasElement) return;
-
-    const colors = colorSequenceRef.current;
-    let idx = colorIndexRef.current;
-    let running = true;
-
-    const captureFrame = () => {
-      if (!running || idx >= colors.length) return;
-
-      const color = colors[idx];
-      // Capture at 80% through flash — camera sensor has fully adapted to reflected color
-      const base64 = captureFrameAsBase64(videoElement, canvasElement);
-      framesRef.current.push({
-        frame_base64: base64,
-        timestamp: performance.now(),
-        phase: color.phase,
-        color_rgb: color.rgb,
-      });
-    };
-
-    const advanceToNext = () => {
-      if (!running || idx >= colors.length) return;
-
-      idx++;
-      colorIndexRef.current = idx;
-      setProgress(idx / 9); // 9 total steps: 4 colors + 5 motion steps
-
-      if (idx < colors.length) {
-        setFlashColor(colors[idx].rgb);
-      } else {
-        // Done with colors → transition to turn phase
-        setFlashColor(null);
-        turnStartRef.current = performance.now();
-
-        // Capture turn1_start frame (first turn baseline — not scored by server)
-        const startBase64 = captureFrameAsBase64(videoElement, canvasElement);
-        framesRef.current.push({
-          frame_base64: startBase64,
-          timestamp: performance.now(),
-          phase: 'turn1_start',
-        });
-
-        // Brief pause so user sees the transition before turn instruction
-        turnDelayRef.current = setTimeout(() => {
-          if (phaseRef.current === 'color_flash') setPhase('turn');
-        }, 1200);
-      }
-    };
-
-    // Capture early — 150ms into the flash, before the camera's auto white balance
-    // has time to compensate (~100-300ms response). The CSS transition is removed
-    // so the color appears instantly on screen.
-    const captureTimer = setTimeout(captureFrame, COLOR_FLASH_DURATION * 0.1);
-    // Advance to next color at end of flash
-    const advanceTimer = setTimeout(advanceToNext, COLOR_FLASH_DURATION);
-    return () => {
-      running = false;
-      clearTimeout(captureTimer);
-      clearTimeout(advanceTimer);
-      // NOTE: Do NOT clear turnDelayRef here. When the last color finishes,
-      // advanceToNext sets colorIndexRef.current which triggers this effect to
-      // re-run. Clearing turnDelayRef in cleanup would kill the 1.2s transition
-      // timeout before it fires, permanently stalling the challenge after colors.
-      // The turnDelay callback has its own phase guard, and the component-level
-      // cleanup effect handles unmount.
-    };
-  }, [phase, videoElement, canvasElement, colorIndexRef.current]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [phase, videoElement, canvasElement, enabled]);
 
   // ── Turn phase — wait for user to hold turn position ──
   useEffect(() => {
     if (phase !== 'turn' || !videoElement || !canvasElement) return;
 
     let running = true;
-
-    // Update progress immediately when second turn starts
-    if (turnCountRef.current === 1) setProgress(6 / 9);
 
     const timer = setTimeout(() => {
       if (!running) return;
@@ -296,7 +202,7 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
         phase: isFirstTurn ? 'turn1_peak' : 'turn_peak',
       });
 
-      setProgress(isFirstTurn ? 5 / 9 : 7 / 9);
+      setProgress(isFirstTurn ? 1 / 4 : 3 / 4);
 
       returnStartRef.current = performance.now();
       setPhase('return_center');
@@ -336,7 +242,7 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
 
       if (isFirstTurn) {
         // First turn done — capture scored baseline and start second turn
-        setProgress(6 / 9);
+        setProgress(2 / 4);
         const startBase64 = captureFrameAsBase64(videoElement, canvasElement);
         framesRef.current.push({
           frame_base64: startBase64,
@@ -351,7 +257,7 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
         }, 1200);
       } else {
         // Second turn done — finalize
-        setProgress(8 / 9);
+        setProgress(1);
         setPhase('capturing');
         finalizeLiveness();
       }
@@ -395,7 +301,7 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
           challenge_type: 'multi_frame_color',
           challenge_direction: scoredDirectionRef.current,
           frames: framesRef.current,
-          color_sequence: colorSequenceRef.current.map((c) => c.rgb),
+          color_sequence: [],
           start_timestamp: challengeStartRef.current,
           end_timestamp: performance.now(),
           screen_width: window.innerWidth,
@@ -415,15 +321,12 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
   // ── Retry ──
   const retry = useCallback(() => {
     framesRef.current = [];
-    colorIndexRef.current = 0;
     turnCountRef.current = 0;
     challengeStartRef.current = 0;
-    turnStartRef.current = 0;
     returnStartRef.current = 0;
     setDirection(pickRandomDirection());
     setError(null);
     setProgress(0);
-    setFlashColor(null);
     setPhase('ready');
   }, []);
 
@@ -444,6 +347,5 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
     currentYaw: 0,       // No client-side yaw estimation
     error,
     retry,
-    flashColor,
   };
 }
