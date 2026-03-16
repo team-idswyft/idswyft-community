@@ -20,10 +20,10 @@ export interface FaceDetectionService {
 
 const WEIGHTS = {
   face_present_all_frames: 0.15,
-  head_turn_detected: 0.20,
-  correct_direction: 0.15,
+  head_turn_detected: 0.25,
+  correct_direction: 0.20,
   return_to_center: 0.15,
-  color_reflection_match: 0.25,
+  color_reflection_match: 0.15,
   virtual_camera_not_detected: 0.10,
 } as const;
 
