@@ -22,14 +22,17 @@ export function isCorsAllowed(origin: string, config: CorsConfig): boolean {
   //    so that phones on the same network can reach the dev backend.
   if (config.nodeEnv === 'development') {
     if (origin.startsWith('http://localhost:') ||
-        origin.startsWith('http://127.0.0.1:')) {
+        origin.startsWith('https://localhost:') ||
+        origin.startsWith('http://127.0.0.1:') ||
+        origin.startsWith('https://127.0.0.1:')) {
       return true;
     }
     try {
-      const { hostname } = new URL(origin);
-      if (/^10\./.test(hostname) ||
-          /^192\.168\./.test(hostname) ||
-          /^172\.(1[6-9]|2\d|3[01])\./.test(hostname)) {
+      const { hostname, protocol } = new URL(origin);
+      if ((protocol === 'http:' || protocol === 'https:') &&
+          (/^10\./.test(hostname) ||
+           /^192\.168\./.test(hostname) ||
+           /^172\.(1[6-9]|2\d|3[01])\./.test(hostname))) {
         return true;
       }
     } catch { /* unparseable origin — deny */ }
