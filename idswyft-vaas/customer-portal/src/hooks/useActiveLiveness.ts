@@ -60,10 +60,10 @@ export interface UseActiveLivenessReturn {
 
 // ─── Constants ──────────────────────────────────────────
 
-const DEFAULT_CHALLENGE_TIMEOUT = 15000;
-const COLOR_FLASH_DURATION = 1000;  // 1s per color
-const TURN_HOLD_MS = 1500;         // hold turn for 1.5s
-const RETURN_HOLD_MS = 1000;       // hold center for 1s
+const DEFAULT_CHALLENGE_TIMEOUT = 25000;
+const COLOR_FLASH_DURATION = 1500;  // 1.5s per color — longer for camera sensor to register reflected screen light
+const TURN_HOLD_MS = 3000;         // hold turn for 3s — user needs time to turn head ≥12°
+const RETURN_HOLD_MS = 2000;       // hold center for 2s
 
 const COLORS: { name: string; rgb: [number, number, number]; phase: string }[] = [
   { name: 'red', rgb: [255, 0, 0], phase: 'color_red' },
@@ -187,12 +187,12 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
     };
 
     if (videoElement.readyState >= 2) {
-      // Small delay so user can see "Position your face" instruction
-      const timer = setTimeout(startChallenge, 1000);
+      // Longer delay so user can read instruction and position face
+      const timer = setTimeout(startChallenge, 2500);
       return () => clearTimeout(timer);
     } else {
       const onPlaying = () => {
-        setTimeout(startChallenge, 1000);
+        setTimeout(startChallenge, 2500);
       };
       videoElement.addEventListener('playing', onPlaying);
       return () => videoElement.removeEventListener('playing', onPlaying);
@@ -207,11 +207,11 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
     let idx = colorIndexRef.current;
     let running = true;
 
-    const captureAndAdvance = () => {
+    const captureFrame = () => {
       if (!running || idx >= colors.length) return;
 
       const color = colors[idx];
-      // Capture frame at peak of this color flash
+      // Capture at 80% through flash — camera sensor has fully adapted to reflected color
       const base64 = captureFrameAsBase64(videoElement, canvasElement);
       framesRef.current.push({
         frame_base64: base64,
@@ -219,6 +219,10 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
         phase: color.phase,
         color_rgb: color.rgb,
       });
+    };
+
+    const advanceToNext = () => {
+      if (!running || idx >= colors.length) return;
 
       idx++;
       colorIndexRef.current = idx;
@@ -243,11 +247,14 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
       }
     };
 
-    // Capture at the end of each COLOR_FLASH_DURATION
-    const timer = setTimeout(captureAndAdvance, COLOR_FLASH_DURATION);
+    // Capture at 80% through the flash (color has been reflecting for 1.2s of 1.5s)
+    const captureTimer = setTimeout(captureFrame, COLOR_FLASH_DURATION * 0.8);
+    // Advance to next color at end of flash
+    const advanceTimer = setTimeout(advanceToNext, COLOR_FLASH_DURATION);
     return () => {
       running = false;
-      clearTimeout(timer);
+      clearTimeout(captureTimer);
+      clearTimeout(advanceTimer);
     };
   }, [phase, videoElement, canvasElement, colorIndexRef.current]); // eslint-disable-line react-hooks/exhaustive-deps
 
