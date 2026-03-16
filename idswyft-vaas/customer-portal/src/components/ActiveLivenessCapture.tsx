@@ -69,6 +69,7 @@ export function ActiveLivenessCapture({
     faceDetected,
     error,
     retry,
+    flashColor,
   } = useActiveLiveness({
     videoElement: streamReady ? videoRef.current : null,
     canvasElement: canvasRef.current,
@@ -92,9 +93,21 @@ export function ActiveLivenessCapture({
         />
         <canvas ref={canvasRef} className="hidden" />
 
+        {/* Color flash overlay — semi-transparent so face is visible through the color */}
+        {flashColor && (
+          <div
+            className="absolute inset-0 pointer-events-none transition-colors duration-150"
+            style={{
+              backgroundColor: `rgba(${flashColor[0]}, ${flashColor[1]}, ${flashColor[2]}, 0.5)`,
+              zIndex: 1,
+            }}
+          />
+        )}
+
         {/* Oval face guide — viewBox matches video dimensions for perfect alignment */}
         <svg
           className="absolute inset-0 w-full h-full pointer-events-none"
+          style={{ zIndex: 2 }}
           viewBox={`0 0 ${videoDims.w} ${videoDims.h}`}
           preserveAspectRatio="xMidYMid slice"
         >
@@ -131,6 +144,7 @@ export function ActiveLivenessCapture({
               left: direction === 'left' ? 20 : 'auto',
               right: direction === 'right' ? 20 : 'auto',
               transform: 'translateY(-50%)',
+              zIndex: 3,
             }}
           >
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
@@ -148,8 +162,8 @@ export function ActiveLivenessCapture({
         )}
 
         {/* Progress ring */}
-        {(phase === 'center_face' || phase === 'turn' || phase === 'return_center') && (
-          <div className="absolute top-3 right-3">
+        {(phase === 'color_flash' || phase === 'turn' || phase === 'return_center') && (
+          <div className="absolute top-3 right-3" style={{ zIndex: 3 }}>
             <svg width="44" height="44" viewBox="0 0 44 44">
               <circle cx="22" cy="22" r="18" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth={3} />
               <circle

@@ -1,15 +1,10 @@
 import { useEffect, useRef, useState, useCallback } from 'react';
-// Type-only import — the actual module is loaded dynamically inside useEffect
-// to keep @mediapipe/tasks-vision out of the main bundle (prevents page crash
-// if WASM init fails at module level on mobile browsers)
-import type { FaceDetector as FaceDetectorType } from '@mediapipe/tasks-vision';
 
-// ─── Types ──────────────────────────────────────────────────
+// ─── Types ──────────────────────────────────────────────
 
 export type LivenessPhase =
-  | 'loading'
   | 'ready'
-  | 'center_face'
+  | 'color_flash'
   | 'turn'
   | 'return_center'
   | 'capturing'
@@ -19,23 +14,26 @@ export type LivenessPhase =
 
 export type ChallengeDirection = 'left' | 'right';
 
-export interface HeadPoseSample {
+export interface AnalysisFrame {
+  frame_base64: string;
   timestamp: number;
-  yaw: number;
-  pitch: number;
-  roll: number;
-  landmarks: number[];
+  phase: string;
+  color_rgb?: [number, number, number];
 }
 
 export interface LivenessMetadata {
-  challenge_type: 'head_turn';
+  challenge_type: 'multi_frame_color';
   challenge_direction: ChallengeDirection;
-  samples: HeadPoseSample[];
+  frames: AnalysisFrame[];
+  color_sequence: [number, number, number][];
   start_timestamp: number;
   end_timestamp: number;
-  mediapipe_version?: string;
   screen_width?: number;
   screen_height?: number;
+  virtual_camera_check?: {
+    label: string;
+    suspected_virtual: boolean;
+  };
 }
 
 export interface UseActiveLivenessOptions {
@@ -56,64 +54,78 @@ export interface UseActiveLivenessReturn {
   currentYaw: number;
   error: string | null;
   retry: () => void;
+  /** Current flash color (null when not in color_flash phase) */
+  flashColor: [number, number, number] | null;
 }
 
-// FaceDetector keypoint indices:
-// right_eye (#0), left_eye (#1), nose_tip (#2),
-// mouth_center (#3), right_ear_tragion (#4), left_ear_tragion (#5)
+// ─── Constants ──────────────────────────────────────────
 
-// ─── Thresholds ──────────────────────────────────────────────
-const CENTER_YAW_THRESHOLD = 5;       // ±5° for "centered"
-const CENTER_HOLD_MS = 500;           // Hold center for 500ms
-const TURN_YAW_THRESHOLD = 20;        // Must turn 20° from baseline
-const RETURN_YAW_THRESHOLD = 8;       // ±8° to be "back to center"
-const MEDIAPIPE_LOAD_TIMEOUT = 45000; // 45s — generous for slow mobile connections
-const DEFAULT_CHALLENGE_TIMEOUT = 10000;
+const DEFAULT_CHALLENGE_TIMEOUT = 15000;
+const COLOR_FLASH_DURATION = 1000;  // 1s per color
+const TURN_HOLD_MS = 1500;         // hold turn for 1.5s
+const RETURN_HOLD_MS = 1000;       // hold center for 1s
 
-// FaceDetector model — 224KB vs FaceLandmarker's 4.6MB.
-// Compiles in seconds on mobile WebKit vs hanging indefinitely.
-const MODEL_CDN_URL = 'https://storage.googleapis.com/mediapipe-models/face_detector/blaze_face_short_range/float16/1/blaze_face_short_range.tflite';
-const WASM_CDN_URL = 'https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.21/wasm';
+const COLORS: { name: string; rgb: [number, number, number]; phase: string }[] = [
+  { name: 'red', rgb: [255, 0, 0], phase: 'color_red' },
+  { name: 'green', rgb: [0, 255, 0], phase: 'color_green' },
+  { name: 'blue', rgb: [0, 0, 255], phase: 'color_blue' },
+  { name: 'white', rgb: [255, 255, 255], phase: 'color_white' },
+];
+
+const VIRTUAL_CAMERA_REGEX = /obs|virtual|manycam|snap camera|fake|xsplit|streamlabs/i;
+
+// ─── Helpers ────────────────────────────────────────────
 
 function pickRandomDirection(): ChallengeDirection {
   return Math.random() < 0.5 ? 'left' : 'right';
 }
 
-function getInstructionForPhase(phase: LivenessPhase, direction: ChallengeDirection, loadingDetail?: string): string {
+function shuffleArray<T>(arr: T[]): T[] {
+  const shuffled = [...arr];
+  for (let i = shuffled.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+  }
+  return shuffled;
+}
+
+function getInstructionForPhase(phase: LivenessPhase, direction: ChallengeDirection): string {
   switch (phase) {
-    case 'loading': return loadingDetail || 'Preparing face detection...';
-    case 'ready': return 'Camera ready. Position your face in the oval.';
-    case 'center_face': return 'Look straight at the camera';
+    case 'ready': return 'Position your face in the oval';
+    case 'color_flash': return 'Hold still — verifying...';
     case 'turn': return direction === 'left' ? 'Slowly turn your head left' : 'Slowly turn your head right';
-    case 'return_center': return 'Now look straight ahead again';
+    case 'return_center': return 'Now look straight ahead';
     case 'capturing': return 'Hold still — capturing...';
     case 'completed': return 'Liveness check passed!';
     case 'failed': return 'Liveness check failed. Tap to retry.';
-    case 'fallback': return 'Face detection unavailable. Using standard capture.';
+    case 'fallback': return 'Camera unavailable. Using standard capture.';
     default: return '';
   }
 }
 
-/**
- * Estimate yaw angle from nose tip and eye keypoints.
- * Uses nose-tip horizontal offset relative to eye midpoint,
- * normalized by inter-eye distance.
- */
-function estimateYaw(
-  noseTip: { x: number; y: number },
-  leftEye: { x: number; y: number },
-  rightEye: { x: number; y: number },
-): number {
-  const eyeMidX = (leftEye.x + rightEye.x) / 2;
-  const interEyeDist = Math.abs(rightEye.x - leftEye.x);
-  if (interEyeDist < 0.001) return 0;
+/** Max analysis frame dimensions — keeps base64 under the 200K schema limit. */
+const MAX_ANALYSIS_WIDTH = 640;
+const MAX_ANALYSIS_HEIGHT = 480;
 
-  const offset = (noseTip.x - eyeMidX) / interEyeDist;
-  // Map normalized offset to approximate degrees (-90 to +90)
-  return Math.max(-90, Math.min(90, offset * 90));
+/** Capture a frame from video as base64 JPEG using the hidden canvas.
+ *  Downscales to MAX_ANALYSIS dimensions to keep payload small. */
+function captureFrameAsBase64(
+  video: HTMLVideoElement,
+  canvas: HTMLCanvasElement,
+  quality: number = 0.7,
+): string {
+  const srcW = video.videoWidth || 640;
+  const srcH = video.videoHeight || 480;
+  const scale = Math.min(1, MAX_ANALYSIS_WIDTH / srcW, MAX_ANALYSIS_HEIGHT / srcH);
+  canvas.width = Math.round(srcW * scale);
+  canvas.height = Math.round(srcH * scale);
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return '';
+  ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+  return canvas.toDataURL('image/jpeg', quality).replace(/^data:image\/jpeg;base64,/, '');
 }
 
-// ─── Hook ────────────────────────────────────────────────────
+// ─── Hook ────────────────────────────────────────────────
 
 export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveLivenessReturn {
   const {
@@ -121,263 +133,210 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
     canvasElement,
     enabled,
     onComplete,
-    onFallback,
+    // onFallback is handled by the component (camera access errors), not the hook
     challengeTimeoutMs = DEFAULT_CHALLENGE_TIMEOUT,
   } = options;
 
-  const [phase, setPhase] = useState<LivenessPhase>('loading');
+  const [phase, setPhase] = useState<LivenessPhase>('ready');
   const [direction, setDirection] = useState<ChallengeDirection>(pickRandomDirection);
-  const [faceDetected, setFaceDetected] = useState(false);
-  const [currentYaw, setCurrentYaw] = useState(0);
   const [progress, setProgress] = useState(0);
   const [error, setError] = useState<string | null>(null);
-  const [loadingDetail, setLoadingDetail] = useState('Preparing face detection...');
+  const [flashColor, setFlashColor] = useState<[number, number, number] | null>(null);
 
-  const detectorRef = useRef<FaceDetectorType | null>(null);
-  const samplesRef = useRef<HeadPoseSample[]>([]);
-  const baselineYawRef = useRef(0);
-  const centerStartRef = useRef(0);
-  const challengeStartRef = useRef(0);
-  const bestFrameRef = useRef<Blob | null>(null);
-  const animFrameRef = useRef(0);
   const phaseRef = useRef(phase);
+  const framesRef = useRef<AnalysisFrame[]>([]);
+  const colorSequenceRef = useRef<typeof COLORS>([]);
+  const colorIndexRef = useRef(0);
+  const challengeStartRef = useRef(0);
+  const turnStartRef = useRef(0);
+  const returnStartRef = useRef(0);
+  const virtualCameraRef = useRef<{ label: string; suspected_virtual: boolean } | undefined>();
+  const animFrameRef = useRef(0);
 
   // Keep phaseRef in sync
   useEffect(() => { phaseRef.current = phase; }, [phase]);
 
-  // ── Initialize FaceDetector ──
+  // ── Virtual camera detection on mount ──
   useEffect(() => {
-    if (!enabled) return;
+    if (!enabled || !videoElement) return;
+    const stream = videoElement.srcObject as MediaStream | null;
+    if (!stream) return;
 
-    let cancelled = false;
-    const timeout = setTimeout(() => {
-      if (!cancelled && phaseRef.current === 'loading') {
-        cancelled = true; // Prevent late-resolving createFromOptions from overriding fallback
-        console.warn('MediaPipe load timeout — falling back');
-        setPhase('fallback');
-        onFallback();
-      }
-    }, MEDIAPIPE_LOAD_TIMEOUT);
+    const track = stream.getVideoTracks()[0];
+    if (track) {
+      const label = track.label;
+      virtualCameraRef.current = {
+        label,
+        suspected_virtual: VIRTUAL_CAMERA_REGEX.test(label),
+      };
+    }
+  }, [enabled, videoElement]);
 
-    (async () => {
-      try {
-        // Step 1: Dynamic import — code-splits @mediapipe/tasks-vision into a separate chunk
-        // so WASM init failures don't crash the entire page
-        setLoadingDetail('Loading detection library...');
-        const { FaceDetector, FilesetResolver } = await import('@mediapipe/tasks-vision');
-        if (cancelled) return;
+  // ── Auto-start challenge when video is playing ──
+  useEffect(() => {
+    if (phase !== 'ready' || !videoElement || !enabled) return;
 
-        // Step 2: Pre-fetch model as ArrayBuffer — avoids silent fetch failure inside WASM context on mobile
-        setLoadingDetail('Downloading face model...');
-        const modelResponse = await fetch(MODEL_CDN_URL);
-        if (!modelResponse.ok) throw new Error(`Model download failed: ${modelResponse.status}`);
-        const modelBuffer = await modelResponse.arrayBuffer();
-        if (cancelled) return;
-
-        // Step 3: Load WASM runtime from CDN
-        setLoadingDetail('Loading detection engine...');
-        const vision = await FilesetResolver.forVisionTasks(WASM_CDN_URL);
-        if (cancelled) return;
-
-        // Step 4: Create FaceDetector with pre-fetched 224KB BlazeFace model
-        setLoadingDetail('Initializing face detection...');
-        const detector = await FaceDetector.createFromOptions(vision, {
-          baseOptions: {
-            modelAssetBuffer: new Uint8Array(modelBuffer),
-            delegate: 'CPU',
-          },
-          runningMode: 'VIDEO',
-          minDetectionConfidence: 0.5,
-        });
-
-        if (cancelled) {
-          detector.close();
-          return;
-        }
-
-        detectorRef.current = detector;
-        clearTimeout(timeout);
-        setPhase('ready');
-      } catch (err) {
-        console.error('MediaPipe init failed:', err);
-        if (!cancelled) {
-          setPhase('fallback');
-          onFallback();
-        }
-      }
-    })();
-
-    return () => {
-      cancelled = true;
-      clearTimeout(timeout);
+    const startChallenge = () => {
+      // Randomize color order
+      colorSequenceRef.current = shuffleArray(COLORS);
+      colorIndexRef.current = 0;
+      framesRef.current = [];
+      challengeStartRef.current = performance.now();
+      setPhase('color_flash');
+      setFlashColor(colorSequenceRef.current[0].rgb);
     };
-  }, [enabled]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Auto-transition from ready → center_face when video is playing ──
-  useEffect(() => {
-    if (phase === 'ready' && videoElement && videoElement.readyState >= 2) {
-      setPhase('center_face');
-    } else if (phase === 'ready' && videoElement) {
-      const onPlaying = () => setPhase('center_face');
+    if (videoElement.readyState >= 2) {
+      // Small delay so user can see "Position your face" instruction
+      const timer = setTimeout(startChallenge, 1000);
+      return () => clearTimeout(timer);
+    } else {
+      const onPlaying = () => {
+        setTimeout(startChallenge, 1000);
+      };
       videoElement.addEventListener('playing', onPlaying);
       return () => videoElement.removeEventListener('playing', onPlaying);
     }
-  }, [phase, videoElement]);
+  }, [phase, videoElement, enabled]);
 
-  // ── Main detection loop ──
+  // ── Color flash sequence ──
   useEffect(() => {
-    if (!enabled || !videoElement || !detectorRef.current) return;
-    if (phase !== 'center_face' && phase !== 'turn' && phase !== 'return_center') return;
+    if (phase !== 'color_flash' || !videoElement || !canvasElement) return;
 
-    const detector = detectorRef.current;
+    const colors = colorSequenceRef.current;
+    let idx = colorIndexRef.current;
     let running = true;
 
-    const detect = () => {
-      if (!running || !videoElement || videoElement.readyState < 2) {
-        animFrameRef.current = requestAnimationFrame(detect);
-        return;
+    const captureAndAdvance = () => {
+      if (!running || idx >= colors.length) return;
+
+      const color = colors[idx];
+      // Capture frame at peak of this color flash
+      const base64 = captureFrameAsBase64(videoElement, canvasElement);
+      framesRef.current.push({
+        frame_base64: base64,
+        timestamp: performance.now(),
+        phase: color.phase,
+        color_rgb: color.rgb,
+      });
+
+      idx++;
+      colorIndexRef.current = idx;
+      setProgress(idx / (colors.length + 3)); // +3 for turn phases
+
+      if (idx < colors.length) {
+        setFlashColor(colors[idx].rgb);
+      } else {
+        // Done with colors → transition to turn phase
+        setFlashColor(null);
+        turnStartRef.current = performance.now();
+
+        // Capture turn_start frame
+        const startBase64 = captureFrameAsBase64(videoElement, canvasElement);
+        framesRef.current.push({
+          frame_base64: startBase64,
+          timestamp: performance.now(),
+          phase: 'turn_start',
+        });
+
+        setPhase('turn');
       }
-
-      const now = performance.now();
-      let results;
-      try {
-        results = detector.detectForVideo(videoElement, now);
-      } catch (e) {
-        console.warn('FaceDetector.detectForVideo error:', e);
-        animFrameRef.current = requestAnimationFrame(detect);
-        return;
-      }
-
-      const det = results.detections?.[0];
-      const hasDetections = !!det?.keypoints && det.keypoints.length >= 3;
-      setFaceDetected(!!hasDetections);
-
-      if (!hasDetections) {
-        animFrameRef.current = requestAnimationFrame(detect);
-        return;
-      }
-
-      // FaceDetector keypoints: right_eye(0), left_eye(1), nose_tip(2),
-      // mouth_center(3), right_ear_tragion(4), left_ear_tragion(5)
-      const keypoints = results.detections[0].keypoints!;
-      const rightEye = keypoints[0];
-      const leftEye = keypoints[1];
-      const noseTip = keypoints[2];
-      const mouthCenter = keypoints[3] || noseTip;
-      const rightEar = keypoints[4] || rightEye;
-      const leftEar = keypoints[5] || leftEye;
-
-      const yaw = estimateYaw(noseTip, leftEye, rightEye);
-      const pitch = 0; // FaceDetector lacks chin keypoint — not needed for head-turn
-      const roll = 0;
-      setCurrentYaw(yaw);
-
-      // Build landmark array (6 keypoints × 3 coords, z=0 for backend compatibility)
-      const landmarkArray = [noseTip, mouthCenter, leftEye, rightEye, leftEar, rightEar]
-        .flatMap(kp => [kp.x, kp.y, 0]);
-
-      const currentPhase = phaseRef.current;
-
-      // ── Phase: center_face ──
-      if (currentPhase === 'center_face') {
-        if (Math.abs(yaw) <= CENTER_YAW_THRESHOLD) {
-          if (centerStartRef.current === 0) {
-            centerStartRef.current = now;
-          } else if (now - centerStartRef.current >= CENTER_HOLD_MS) {
-            // Face centered for long enough — start challenge
-            baselineYawRef.current = yaw;
-            samplesRef.current = [];
-            challengeStartRef.current = now;
-            setPhase('turn');
-          }
-          setProgress((now - centerStartRef.current) / CENTER_HOLD_MS);
-        } else {
-          centerStartRef.current = 0;
-          setProgress(0);
-        }
-      }
-
-      // ── Phase: turn ──
-      if (currentPhase === 'turn') {
-        const sample: HeadPoseSample = {
-          timestamp: now,
-          yaw,
-          pitch,
-          roll,
-          landmarks: landmarkArray,
-        };
-        samplesRef.current.push(sample);
-
-        const delta = yaw - baselineYawRef.current;
-        const expectedSign = direction === 'left' ? -1 : 1;
-        const normalizedDelta = delta * expectedSign;
-        setProgress(Math.min(1, normalizedDelta / TURN_YAW_THRESHOLD));
-
-        if (normalizedDelta >= TURN_YAW_THRESHOLD) {
-          setPhase('return_center');
-        }
-
-        // Timeout check
-        if (now - challengeStartRef.current > challengeTimeoutMs) {
-          setPhase('failed');
-          setError('Challenge timed out. Please try again.');
-        }
-      }
-
-      // ── Phase: return_center ──
-      if (currentPhase === 'return_center') {
-        const sample: HeadPoseSample = {
-          timestamp: now,
-          yaw,
-          pitch,
-          roll,
-          landmarks: landmarkArray,
-        };
-        samplesRef.current.push(sample);
-
-        const returnDelta = Math.abs(yaw - baselineYawRef.current);
-        setProgress(1 - Math.min(1, returnDelta / TURN_YAW_THRESHOLD));
-
-        if (returnDelta <= RETURN_YAW_THRESHOLD) {
-          // Capture the best frame
-          setPhase('capturing');
-          captureFrame();
-        }
-
-        // Timeout check
-        if (now - challengeStartRef.current > challengeTimeoutMs) {
-          setPhase('failed');
-          setError('Challenge timed out. Please try again.');
-        }
-      }
-
-      animFrameRef.current = requestAnimationFrame(detect);
     };
 
-    animFrameRef.current = requestAnimationFrame(detect);
+    // Capture at the end of each COLOR_FLASH_DURATION
+    const timer = setTimeout(captureAndAdvance, COLOR_FLASH_DURATION);
     return () => {
       running = false;
-      cancelAnimationFrame(animFrameRef.current);
+      clearTimeout(timer);
     };
-  }, [phase, enabled, videoElement, direction, challengeTimeoutMs]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [phase, videoElement, canvasElement, colorIndexRef.current]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Capture frame from canvas ──
-  const captureFrame = useCallback(() => {
+  // ── Turn phase — wait for user to hold turn position ──
+  useEffect(() => {
+    if (phase !== 'turn' || !videoElement || !canvasElement) return;
+
+    let running = true;
+
+    const timer = setTimeout(() => {
+      if (!running) return;
+
+      // Capture turn_peak frame after hold time
+      const base64 = captureFrameAsBase64(videoElement, canvasElement);
+      framesRef.current.push({
+        frame_base64: base64,
+        timestamp: performance.now(),
+        phase: 'turn_peak',
+      });
+
+      const totalPhases = colorSequenceRef.current.length + 3;
+      setProgress((colorSequenceRef.current.length + 1) / totalPhases);
+
+      returnStartRef.current = performance.now();
+      setPhase('return_center');
+    }, TURN_HOLD_MS);
+
+    // Timeout check
+    const timeoutTimer = setTimeout(() => {
+      if (running && phaseRef.current === 'turn') {
+        setPhase('failed');
+        setError('Challenge timed out. Please try again.');
+      }
+    }, challengeTimeoutMs);
+
+    return () => {
+      running = false;
+      clearTimeout(timer);
+      clearTimeout(timeoutTimer);
+    };
+  }, [phase, videoElement, canvasElement, challengeTimeoutMs]);
+
+  // ── Return to center phase ──
+  useEffect(() => {
+    if (phase !== 'return_center' || !videoElement || !canvasElement) return;
+
+    let running = true;
+
+    const timer = setTimeout(() => {
+      if (!running) return;
+
+      // Capture turn_return frame
+      const base64 = captureFrameAsBase64(videoElement, canvasElement);
+      framesRef.current.push({
+        frame_base64: base64,
+        timestamp: performance.now(),
+        phase: 'turn_return',
+      });
+
+      const totalPhases = colorSequenceRef.current.length + 3;
+      setProgress((totalPhases - 1) / totalPhases);
+
+      setPhase('capturing');
+      finalizeLiveness();
+    }, RETURN_HOLD_MS);
+
+    return () => {
+      running = false;
+      clearTimeout(timer);
+    };
+  }, [phase, videoElement, canvasElement]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Finalize: capture best frame and build metadata ──
+  const finalizeLiveness = useCallback(() => {
     if (!canvasElement || !videoElement) {
       setPhase('failed');
       setError('Canvas not available for capture');
       return;
     }
 
+    // Capture the best (final, centered) frame as blob
+    canvasElement.width = videoElement.videoWidth || 640;
+    canvasElement.height = videoElement.videoHeight || 480;
     const ctx = canvasElement.getContext('2d');
     if (!ctx) {
       setPhase('failed');
       setError('Canvas context not available');
       return;
     }
-
-    canvasElement.width = videoElement.videoWidth || 640;
-    canvasElement.height = videoElement.videoHeight || 480;
     ctx.drawImage(videoElement, 0, 0);
 
     canvasElement.toBlob(
@@ -388,21 +347,19 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
           return;
         }
 
-        bestFrameRef.current = blob;
-        const endTime = performance.now();
-        const samples = samplesRef.current;
-
         const metadata: LivenessMetadata = {
-          challenge_type: 'head_turn',
+          challenge_type: 'multi_frame_color',
           challenge_direction: direction,
-          samples,
+          frames: framesRef.current,
+          color_sequence: colorSequenceRef.current.map((c) => c.rgb),
           start_timestamp: challengeStartRef.current,
-          end_timestamp: endTime,
-          mediapipe_version: '0.10.21',
+          end_timestamp: performance.now(),
           screen_width: window.innerWidth,
           screen_height: window.innerHeight,
+          virtual_camera_check: virtualCameraRef.current,
         };
 
+        setProgress(1);
         setPhase('completed');
         onComplete(blob, metadata);
       },
@@ -413,34 +370,34 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
 
   // ── Retry ──
   const retry = useCallback(() => {
-    samplesRef.current = [];
-    centerStartRef.current = 0;
+    framesRef.current = [];
+    colorIndexRef.current = 0;
     challengeStartRef.current = 0;
+    turnStartRef.current = 0;
+    returnStartRef.current = 0;
     setDirection(pickRandomDirection());
     setError(null);
     setProgress(0);
-    setPhase('center_face');
+    setFlashColor(null);
+    setPhase('ready');
   }, []);
 
   // ── Cleanup ──
   useEffect(() => {
     return () => {
       cancelAnimationFrame(animFrameRef.current);
-      if (detectorRef.current) {
-        detectorRef.current.close();
-        detectorRef.current = null;
-      }
     };
   }, []);
 
   return {
     phase,
     direction,
-    instruction: getInstructionForPhase(phase, direction, loadingDetail),
+    instruction: getInstructionForPhase(phase, direction),
     progress,
-    faceDetected,
-    currentYaw,
+    faceDetected: true,  // No client-side detection — always true when camera is active
+    currentYaw: 0,       // No client-side yaw estimation
     error,
     retry,
+    flashColor,
   };
 }

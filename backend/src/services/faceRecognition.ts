@@ -86,6 +86,13 @@ export interface FaceDetectionResult {
   embedding: number[] | null;
 }
 
+export interface FaceBufferDetectionResult {
+  confidence: number;
+  embedding: Float32Array;
+  landmarks: Array<{ x: number; y: number }>;
+  boundingBox: { x: number; y: number; width: number; height: number };
+}
+
 export class FaceRecognitionService {
   private storageService: StorageService;
   private initialized = false;
@@ -225,6 +232,54 @@ export class FaceRecognitionService {
         error: error instanceof Error ? error.message : String(error),
       });
       return { confidence: 0, embedding: null };
+    }
+  }
+
+  /**
+   * Detect a face in an image buffer directly (no file I/O).
+   * Returns full detection data: landmarks, bounding box, confidence, and embedding.
+   * Used by multi-frame liveness verifier for yaw estimation and color analysis.
+   */
+  async detectFaceFromBuffer(buffer: Buffer): Promise<FaceBufferDetectionResult | null> {
+    try {
+      await this.initialize();
+
+      const tensor = await bufferToTensor(buffer);
+
+      try {
+        const result = await faceapi
+          .detectSingleFace(tensor as any, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.3 }))
+          .withFaceLandmarks()
+          .withFaceDescriptor();
+
+        if (!result) return null;
+
+        const landmarks = result.landmarks.positions.map((pt: any) => ({
+          x: pt.x ?? pt._x,
+          y: pt.y ?? pt._y,
+        }));
+
+        const box = result.detection.box;
+
+        return {
+          confidence: result.detection.score,
+          embedding: result.descriptor,
+          landmarks,
+          boundingBox: {
+            x: box.x,
+            y: box.y,
+            width: box.width,
+            height: box.height,
+          },
+        };
+      } finally {
+        tensor.dispose();
+      }
+    } catch (error) {
+      logger.error('Face detection from buffer failed', {
+        error: error instanceof Error ? error.message : String(error),
+      });
+      return null;
     }
   }
 

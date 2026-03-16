@@ -127,3 +127,4 @@ backend/temp/
 
 # Internal docs — all markdown (except README.md / CLAUDE.md) lives in docs/
 docs/
+.vercel

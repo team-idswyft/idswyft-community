@@ -1238,7 +1238,7 @@ const DemoPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Primary: Active liveness with MediaPipe */}
+      {/* Primary: Active liveness with multi-frame color challenge */}
       {!useFallbackCapture && (
         <ActiveLivenessCapture
           onComplete={handleActiveLivenessComplete}
