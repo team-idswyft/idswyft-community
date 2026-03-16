@@ -152,6 +152,7 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
   const returnStartRef = useRef(0);
   const virtualCameraRef = useRef<{ label: string; suspected_virtual: boolean } | undefined>(undefined);
   const animFrameRef = useRef(0);
+  const turnDelayRef = useRef<ReturnType<typeof setTimeout>>();
 
   // Keep phaseRef in sync
   useEffect(() => { phaseRef.current = phase; }, [phase]);
@@ -235,7 +236,7 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
         setFlashColor(null);
         turnStartRef.current = performance.now();
 
-        // Capture turn_start frame
+        // Capture turn_start frame (baseline — no overlay)
         const startBase64 = captureFrameAsBase64(videoElement, canvasElement);
         framesRef.current.push({
           frame_base64: startBase64,
@@ -243,7 +244,10 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
           phase: 'turn_start',
         });
 
-        setPhase('turn');
+        // Brief pause so user sees the transition before turn instruction
+        turnDelayRef.current = setTimeout(() => {
+          if (phaseRef.current === 'color_flash') setPhase('turn');
+        }, 1200);
       }
     };
 
@@ -393,6 +397,7 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
   useEffect(() => {
     return () => {
       cancelAnimationFrame(animFrameRef.current);
+      if (turnDelayRef.current) clearTimeout(turnDelayRef.current);
     };
   }, []);
 
