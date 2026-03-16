@@ -25,10 +25,10 @@ const back = new FormData()
 back.append('document', backFile)
 await fetch(\`\${BASE}/api/v2/verify/\${verification_id}/back-document\`, { method: 'POST', headers: h, body: back })
 
-// 4. Upload selfie for liveness + face match
-const selfie = new FormData()
-selfie.append('image', selfieFile)
-await fetch(\`\${BASE}/api/v2/verify/\${verification_id}/live-capture\`, { method: 'POST', headers: h, body: selfie })
+// 4. Upload live capture for liveness + face match
+const capture = new FormData()
+capture.append('image', captureFile)
+await fetch(\`\${BASE}/api/v2/verify/\${verification_id}/live-capture\`, { method: 'POST', headers: h, body: capture })
 
 // 5. Get results
 const result = await fetch(\`\${BASE}/api/v2/verify/\${verification_id}/status\`, { headers: h }).then(r => r.json())
@@ -55,8 +55,8 @@ with open("back.jpg", "rb") as f:
     requests.post(f"{BASE}/api/v2/verify/{verification_id}/back-document",
         files={"document": f}, headers=H)
 
-# 4. Upload selfie for liveness + face match
-with open("selfie.jpg", "rb") as f:
+# 4. Upload live capture for liveness + face match
+with open("capture.jpg", "rb") as f:
     requests.post(f"{BASE}/api/v2/verify/{verification_id}/live-capture",
         files={"image": f}, headers=H)
 
@@ -302,7 +302,7 @@ export function HomePage() {
             { n: '01', title: 'Create Session', desc: 'POST /sessions' },
             { n: '02', title: 'Upload Front',   desc: 'POST /upload-front' },
             { n: '03', title: 'Upload Back',    desc: 'POST /upload-back' },
-            { n: '04', title: 'Live Capture',   desc: 'POST /upload-selfie' },
+            { n: '04', title: 'Live Capture',   desc: 'POST /live-capture' },
             { n: '05', title: 'Get Results',    desc: 'GET /status' },
           ].map((step, i, arr) => (
             <React.Fragment key={step.n}>
@@ -424,7 +424,7 @@ export function HomePage() {
             { title: 'OCR Extraction',       desc: 'Name, DOB, document number, expiry — extracted from passports, driver\'s licenses, and national IDs across 19+ countries.', tags: [] as string[] },
             { title: 'Back-of-ID / Barcode', desc: 'PDF417 barcodes (US), MRZ zones (international), and QR codes — all cross-validated against front-side data.', tags: [] as string[] },
             { title: 'Liveness Detection',   desc: 'Anti-spoof scoring with live capture to confirm a real person is present. Detects printed photos, screen replays, and 3D masks.', tags: [] as string[] },
-            { title: 'Face Matching',         desc: 'Selfie matched against document photo with a configurable confidence threshold.', tags: [] as string[] },
+            { title: 'Face Matching',         desc: 'Live capture matched against document photo with a configurable confidence threshold.', tags: [] as string[] },
             { title: 'Webhooks',              desc: 'Real-time POST callbacks on status changes — verified, failed, or manual_review.', tags: [] as string[] },
             { title: 'GDPR Compliant',        desc: 'Configurable data retention, deletion endpoints, and encrypted storage at rest.', tags: [] as string[] },
             { title: 'JavaScript SDK',        desc: 'Drop-in TypeScript SDK with IdswyftEmbed component, real-time event watcher, and automatic error handling.', tags: ['npm install', 'TypeScript', 'watch()'] },
