@@ -1431,6 +1431,7 @@ const DemoPage: React.FC = () => {
                   <ContinueOnPhone
                     apiKey={apiKey}
                     userId={userId}
+                    source="demo"
                     onComplete={(result) => {
                       setMobileResult(result);
                       setMobileHandoffDone(true);

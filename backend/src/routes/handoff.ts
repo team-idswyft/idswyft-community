@@ -8,18 +8,19 @@ const router = express.Router();
 
 // POST /api/verify/handoff/create — desktop creates a session, returns token
 router.post('/create', catchAsync(async (req: Request, res: Response) => {
-  const { api_key, user_id } = req.body;
+  const { api_key, user_id, source } = req.body;
 
   if (!api_key || !user_id) {
     throw new ValidationError('api_key and user_id are required', 'body', req.body);
   }
 
+  const validSource = ['api', 'vaas', 'demo'].includes(source) ? source : 'api';
   const token = crypto.randomBytes(32).toString('hex');
   const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
 
   const { error } = await supabase
     .from('mobile_handoff_sessions')
-    .insert({ token, api_key, user_id, expires_at: expiresAt.toISOString() });
+    .insert({ token, api_key, user_id, source: validSource, expires_at: expiresAt.toISOString() });
 
   if (error) {
     logger.error('Failed to create handoff session', {
@@ -44,7 +45,7 @@ router.get('/:token/session', catchAsync(async (req: Request, res: Response) => 
 
   const { data, error } = await supabase
     .from('mobile_handoff_sessions')
-    .select('api_key, user_id, status, expires_at')
+    .select('api_key, user_id, source, status, expires_at')
     .eq('token', token)
     .single();
 
@@ -67,7 +68,7 @@ router.get('/:token/session', catchAsync(async (req: Request, res: Response) => 
     return res.status(409).json({ error: 'Session already used' });
   }
 
-  res.json({ api_key: data.api_key, user_id: data.user_id });
+  res.json({ api_key: data.api_key, user_id: data.user_id, source: data.source || 'api' });
 }));
 
 // PATCH /api/verify/handoff/:token/complete — mobile reports completion
