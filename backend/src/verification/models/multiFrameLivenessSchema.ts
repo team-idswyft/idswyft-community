@@ -11,6 +11,7 @@ export const AnalysisFrameSchema = z.object({
   phase: z.enum([
     'color_red', 'color_green', 'color_blue', 'color_white',
     'turn_start', 'turn_peak', 'turn_return',
+    'turn1_start', 'turn1_peak', 'turn1_return',
   ]),
   /** RGB value of the color that was flashed on screen (color phases only) */
   color_rgb: z.tuple([z.number(), z.number(), z.number()]).optional(),
@@ -26,7 +27,7 @@ export const MultiFrameLivenessMetadataSchema = z.object({
   /** Direction the user was asked to turn their head */
   challenge_direction: z.enum(['left', 'right']),
   /** Analysis frames captured during the challenge (5-10 frames) */
-  frames: z.array(AnalysisFrameSchema).min(5).max(10),
+  frames: z.array(AnalysisFrameSchema).min(5).max(12),
   /** Ordered list of RGB colors that were flashed on screen */
   color_sequence: z.array(z.tuple([z.number(), z.number(), z.number()])),
   /** Challenge start timestamp (ms) */

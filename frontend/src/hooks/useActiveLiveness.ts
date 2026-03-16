@@ -265,6 +265,7 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
       running = false;
       clearTimeout(captureTimer);
       clearTimeout(advanceTimer);
+      clearTimeout(turnDelayRef.current);
     };
   }, [phase, videoElement, canvasElement, colorIndexRef.current]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -352,6 +353,7 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
     return () => {
       running = false;
       clearTimeout(timer);
+      clearTimeout(turnDelayRef.current);
     };
   }, [phase, videoElement, canvasElement]); // eslint-disable-line react-hooks/exhaustive-deps
 
