@@ -228,6 +228,15 @@ const startServer = async () => {
     // Verify API_KEY_SECRET hasn't changed (would break all existing API keys)
     await verifyApiKeySecretStability(config.apiKeySecret);
 
+    // Ensure source-separated storage buckets exist (vaas-documents, demo-documents)
+    try {
+      const { StorageService } = await import('./services/storage.js');
+      await new StorageService().ensureBucketsExist();
+      console.log('🪣 Source-separated storage buckets verified');
+    } catch (err) {
+      logger.warn('Failed to verify storage buckets (non-blocking):', err);
+    }
+
     // Start HTTP server
     const server = app.listen(config.port, async () => {
       console.log(`🚀 Idswyft API server running on port ${config.port}`);
@@ -276,6 +285,31 @@ const startServer = async () => {
         logger.info('Data retention scheduler started', {
           retentionDays: config.compliance.dataRetentionDays,
           schedule: '0 2 * * * (daily at 2 AM UTC)',
+        });
+      }
+
+      // Demo data cleanup cron — runs hourly, deletes ephemeral demo verifications
+      {
+        const cron = await import('node-cron');
+        const { DataRetentionService } = await import('@/services/dataRetention.js');
+        const demoRetentionService = new DataRetentionService();
+
+        cron.schedule('0 * * * *', async () => {
+          try {
+            const count = await demoRetentionService.runDemoCleanup(
+              config.sandbox.retentionHours
+            );
+            if (count > 0) {
+              logger.info(`Demo cleanup: ${count} verifications deleted`);
+            }
+          } catch (err) {
+            logger.error('Demo cleanup cron failed', { error: err });
+          }
+        });
+
+        logger.info('Demo cleanup scheduler started', {
+          retentionHours: config.sandbox.retentionHours,
+          schedule: '0 * * * * (hourly)',
         });
       }
 

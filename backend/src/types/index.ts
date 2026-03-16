@@ -40,10 +40,12 @@ export interface VerificationRequest {
 
 export type VerificationStatus = 'pending' | 'processing' | 'verified' | 'failed' | 'manual_review';
 
+export type VerificationSource = 'api' | 'vaas' | 'demo';
+
 export interface Document {
   id: string;
   verification_request_id: string;
-  file_path: string;
+  file_path: string | null;
   file_name: string;
   file_size: number;
   mime_type: string;
@@ -68,7 +70,7 @@ export type DocumentType = 'passport' | 'drivers_license' | 'national_id' | 'oth
 export interface Selfie {
   id: string;
   verification_request_id: string;
-  file_path: string;
+  file_path: string | null;
   file_name: string;
   file_size: number;
   liveness_score?: number;
@@ -254,6 +256,8 @@ export interface AppConfig {
     anonKey: string;
     serviceRoleKey: string;
     storageBucket: string;
+    vaasBucket: string;
+    demoBucket: string;
   };
   storage: {
     provider: 'supabase' | 'local' | 's3';
@@ -292,6 +296,7 @@ export interface AppConfig {
     enabled: boolean;
     mockVerification: boolean;
     mockDelayMs: number;
+    retentionHours: number;
   };
   providers: {
     ocr: 'tesseract' | 'openai' | 'azure' | 'aws-textract' | 'auto';

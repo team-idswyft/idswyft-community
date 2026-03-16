@@ -96,6 +96,7 @@ class NewVerificationAPI {
 
     const requestBody = {
       user_id: session.id,
+      source: 'vaas' as const,
       ...(issuingCountry && { issuing_country: issuingCountry }),
       ...(useSandbox && { sandbox: true })
     };

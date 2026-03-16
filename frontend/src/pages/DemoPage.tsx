@@ -386,6 +386,7 @@ const DemoPage: React.FC = () => {
       const useSandbox = shouldUseSandbox();
       const requestBody = {
         user_id: userId,
+        source: 'demo' as const,
         ...(useSandbox && { sandbox: true })
       };
 
