@@ -60,10 +60,10 @@ export interface UseActiveLivenessReturn {
 
 // ─── Constants ──────────────────────────────────────────
 
-const DEFAULT_CHALLENGE_TIMEOUT = 25000;
+const DEFAULT_CHALLENGE_TIMEOUT = 35000;  // longer challenge with two turn directions
 const COLOR_FLASH_DURATION = 1500;  // 1.5s per color — longer for camera sensor to register reflected screen light
 const TURN_HOLD_MS = 3000;         // hold turn for 3s — user needs time to turn head ≥12°
-const RETURN_HOLD_MS = 2000;       // hold center for 2s
+const RETURN_HOLD_MS = 3000;       // hold center for 3s — unhurried return
 
 const COLORS: { name: string; rgb: [number, number, number]; phase: string }[] = [
   { name: 'red', rgb: [255, 0, 0], phase: 'color_red' },
@@ -153,6 +153,8 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
   const virtualCameraRef = useRef<{ label: string; suspected_virtual: boolean } | undefined>(undefined);
   const animFrameRef = useRef(0);
   const turnDelayRef = useRef<ReturnType<typeof setTimeout>>(undefined);
+  const turnCountRef = useRef(0);
+  const scoredDirectionRef = useRef<ChallengeDirection>('left');
 
   // Keep phaseRef in sync
   useEffect(() => { phaseRef.current = phase; }, [phase]);
@@ -178,10 +180,14 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
     if (phase !== 'ready' || !videoElement || !enabled) return;
 
     const startChallenge = () => {
-      // Randomize color order
+      // Randomize color order and pick direction pair (both tested)
       colorSequenceRef.current = shuffleArray(COLORS);
       colorIndexRef.current = 0;
       framesRef.current = [];
+      turnCountRef.current = 0;
+      const firstDir = pickRandomDirection();
+      scoredDirectionRef.current = firstDir === 'left' ? 'right' : 'left';
+      setDirection(firstDir);
       challengeStartRef.current = performance.now();
       setPhase('color_flash');
       setFlashColor(colorSequenceRef.current[0].rgb);
@@ -227,7 +233,7 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
 
       idx++;
       colorIndexRef.current = idx;
-      setProgress(idx / (colors.length + 3)); // +3 for turn phases
+      setProgress(idx / 9); // 9 total steps: 4 colors + 5 motion steps
 
       if (idx < colors.length) {
         setFlashColor(colors[idx].rgb);
@@ -236,12 +242,12 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
         setFlashColor(null);
         turnStartRef.current = performance.now();
 
-        // Capture turn_start frame (baseline — no overlay)
+        // Capture turn1_start frame (first turn baseline — not scored by server)
         const startBase64 = captureFrameAsBase64(videoElement, canvasElement);
         framesRef.current.push({
           frame_base64: startBase64,
           timestamp: performance.now(),
-          phase: 'turn_start',
+          phase: 'turn1_start',
         });
 
         // Brief pause so user sees the transition before turn instruction
@@ -259,6 +265,7 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
       running = false;
       clearTimeout(captureTimer);
       clearTimeout(advanceTimer);
+      clearTimeout(turnDelayRef.current);
     };
   }, [phase, videoElement, canvasElement, colorIndexRef.current]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -268,19 +275,21 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
 
     let running = true;
 
+    // Update progress immediately when second turn starts
+    if (turnCountRef.current === 1) setProgress(6 / 9);
+
     const timer = setTimeout(() => {
       if (!running) return;
 
-      // Capture turn_peak frame after hold time
+      const isFirstTurn = turnCountRef.current === 0;
       const base64 = captureFrameAsBase64(videoElement, canvasElement);
       framesRef.current.push({
         frame_base64: base64,
         timestamp: performance.now(),
-        phase: 'turn_peak',
+        phase: isFirstTurn ? 'turn1_peak' : 'turn_peak',
       });
 
-      const totalPhases = colorSequenceRef.current.length + 3;
-      setProgress((colorSequenceRef.current.length + 1) / totalPhases);
+      setProgress(isFirstTurn ? 5 / 9 : 7 / 9);
 
       returnStartRef.current = performance.now();
       setPhase('return_center');
@@ -310,24 +319,41 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
     const timer = setTimeout(() => {
       if (!running) return;
 
-      // Capture turn_return frame
+      const isFirstTurn = turnCountRef.current === 0;
       const base64 = captureFrameAsBase64(videoElement, canvasElement);
       framesRef.current.push({
         frame_base64: base64,
         timestamp: performance.now(),
-        phase: 'turn_return',
+        phase: isFirstTurn ? 'turn1_return' : 'turn_return',
       });
 
-      const totalPhases = colorSequenceRef.current.length + 3;
-      setProgress((totalPhases - 1) / totalPhases);
-
-      setPhase('capturing');
-      finalizeLiveness();
+      if (isFirstTurn) {
+        // First turn done — capture scored baseline and start second turn
+        setProgress(6 / 9);
+        const startBase64 = captureFrameAsBase64(videoElement, canvasElement);
+        framesRef.current.push({
+          frame_base64: startBase64,
+          timestamp: performance.now(),
+          phase: 'turn_start',
+        });
+        turnCountRef.current = 1;
+        setDirection(scoredDirectionRef.current);
+        // Brief pause before second turn instruction
+        turnDelayRef.current = setTimeout(() => {
+          if (phaseRef.current === 'return_center') setPhase('turn');
+        }, 1200);
+      } else {
+        // Second turn done — finalize
+        setProgress(8 / 9);
+        setPhase('capturing');
+        finalizeLiveness();
+      }
     }, RETURN_HOLD_MS);
 
     return () => {
       running = false;
       clearTimeout(timer);
+      clearTimeout(turnDelayRef.current);
     };
   }, [phase, videoElement, canvasElement]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -360,7 +386,7 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
 
         const metadata: LivenessMetadata = {
           challenge_type: 'multi_frame_color',
-          challenge_direction: direction,
+          challenge_direction: scoredDirectionRef.current,
           frames: framesRef.current,
           color_sequence: colorSequenceRef.current.map((c) => c.rgb),
           start_timestamp: challengeStartRef.current,
@@ -377,12 +403,13 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
       'image/jpeg',
       0.92,
     );
-  }, [canvasElement, videoElement, direction, onComplete]);
+  }, [canvasElement, videoElement, onComplete]);
 
   // ── Retry ──
   const retry = useCallback(() => {
     framesRef.current = [];
     colorIndexRef.current = 0;
+    turnCountRef.current = 0;
     challengeStartRef.current = 0;
     turnStartRef.current = 0;
     returnStartRef.current = 0;

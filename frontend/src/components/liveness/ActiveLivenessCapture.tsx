@@ -80,17 +80,17 @@ export function ActiveLivenessCapture({
   });
 
   // ── Dot state computation ──
-  // 6 progress dots: 4 color flashes + turn + return
+  // 6 progress dots: 4 color flashes + turn 1 + turn 2
   const TOTAL_DOTS = 6;
 
   const getActiveStep = (): number => {
     if (phase === 'ready') return -1;
     if (phase === 'completed') return TOTAL_DOTS;
-    if (phase === 'failed') return Math.min(Math.floor(progress * 7), TOTAL_DOTS - 1);
-    if (phase === 'color_flash') return Math.min(Math.floor(progress * 7), 3);
-    if (phase === 'turn') return 4;
-    if (phase === 'return_center' || phase === 'capturing') return 5;
-    return Math.floor(progress * 7);
+    if (phase === 'failed') return Math.min(Math.floor(progress * 9), TOTAL_DOTS - 1);
+    if (phase === 'color_flash') return Math.min(Math.floor(progress * 9), 3);
+    if (phase === 'turn') return progress < 6 / 9 ? 4 : 5;
+    if (phase === 'return_center' || phase === 'capturing') return progress < 6 / 9 ? 4 : 5;
+    return Math.floor(progress * 9);
   };
 
   const activeStep = getActiveStep();
