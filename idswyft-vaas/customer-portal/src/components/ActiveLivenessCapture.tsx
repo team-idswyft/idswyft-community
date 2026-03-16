@@ -5,12 +5,15 @@ interface ActiveLivenessCaptureProps {
   onComplete: (blob: Blob, metadata: LivenessMetadata) => void;
   onCancel: () => void;
   onFallback: () => void;
+  /** When true, shows a processing overlay after liveness completes */
+  isProcessing?: boolean;
 }
 
 export function ActiveLivenessCapture({
   onComplete,
   onCancel,
   onFallback,
+  isProcessing = false,
 }: ActiveLivenessCaptureProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -240,41 +243,54 @@ export function ActiveLivenessCapture({
           </div>
         )}
 
+        {/* Processing overlay — shown while backend analyzes */}
+        {isProcessing && (
+          <div className="lv-processing">
+            <div className="lv-processing-spinner" />
+            <p className="lv-processing-text">Processing verification...</p>
+            <p className="lv-processing-sub">Analyzing your document and identity</p>
+          </div>
+        )}
+
         {/* Cancel pill — top-left */}
-        <button onClick={onCancel} className="lv-cancel">
-          {phase === 'completed' ? 'Done' : 'Skip'}
-        </button>
+        {!isProcessing && (
+          <button onClick={onCancel} className="lv-cancel">
+            {phase === 'completed' ? 'Done' : 'Skip'}
+          </button>
+        )}
 
         {/* Glassmorphism instruction bar — bottom overlay */}
-        <div className="lv-bar">
-          <p className="lv-bar-text" style={{
-            color: phase === 'completed' ? '#00d4b4' : phase === 'failed' ? '#ff3b5c' : '#e8f4f8',
-          }}>
-            {instruction}
-          </p>
+        {!isProcessing && (
+          <div className="lv-bar">
+            <p className="lv-bar-text" style={{
+              color: phase === 'completed' ? '#00d4b4' : phase === 'failed' ? '#ff3b5c' : '#e8f4f8',
+            }}>
+              {instruction}
+            </p>
 
-          {error && <p className="lv-bar-error">{error}</p>}
+            {error && <p className="lv-bar-error">{error}</p>}
 
-          {/* Challenge progress dots */}
-          <div className="lv-dots">
-            {Array.from({ length: TOTAL_DOTS }).map((_, i) => (
-              <div key={i} className={`lv-dot lv-dot--${getDotState(i)}`} />
-            ))}
+            {/* Challenge progress dots */}
+            <div className="lv-dots">
+              {Array.from({ length: TOTAL_DOTS }).map((_, i) => (
+                <div key={i} className={`lv-dot lv-dot--${getDotState(i)}`} />
+              ))}
+            </div>
+
+            {/* Tip */}
+            <div className="lv-tip">
+              <span className="lv-tip-dot" />
+              <span>{tipText}</span>
+            </div>
+
+            {/* Retry button */}
+            {phase === 'failed' && (
+              <button onClick={retry} className="lv-btn-retry">
+                Try Again
+              </button>
+            )}
           </div>
-
-          {/* Tip */}
-          <div className="lv-tip">
-            <span className="lv-tip-dot" />
-            <span>{tipText}</span>
-          </div>
-
-          {/* Retry button */}
-          {phase === 'failed' && (
-            <button onClick={retry} className="lv-btn-retry">
-              Try Again
-            </button>
-          )}
-        </div>
+        )}
       </div>
     </div>
   );
@@ -392,6 +408,32 @@ const LIVENESS_CSS = `
 }
 .lv-btn-retry:hover { background: #00ffdf; transform: translateY(-1px); }
 
+/* ── Processing Overlay ── */
+.lv-processing {
+  position: absolute; inset: 0; z-index: 20;
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
+  background: rgba(4,13,26,0.92);
+  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+}
+.lv-processing-spinner {
+  width: 48px; height: 48px; border-radius: 50%;
+  border: 3px solid rgba(0,212,180,0.15);
+  border-top-color: #00d4b4;
+  animation: lv-spin 0.8s linear infinite;
+}
+.lv-processing-text {
+  margin: 0;
+  font-family: 'Syne', sans-serif;
+  font-size: 16px; font-weight: 700; color: #e8f4f8;
+  letter-spacing: -0.01em;
+}
+.lv-processing-sub {
+  margin: 0;
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px; color: rgba(232,244,248,0.45);
+  letter-spacing: 0.04em;
+}
+
 /* ── Keyframes ── */
 @keyframes lv-fscan {
   0%   { top: 18%; opacity: 0; }
@@ -414,5 +456,8 @@ const LIVENESS_CSS = `
 @keyframes lv-arrowPulse {
   0%, 100% { opacity: 0.6; transform: scale(1); }
   50%      { opacity: 1; transform: scale(1.15); }
+}
+@keyframes lv-spin {
+  to { transform: rotate(360deg); }
 }
 `;

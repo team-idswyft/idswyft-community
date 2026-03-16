@@ -686,7 +686,6 @@ const MobileVerificationPage: React.FC = () => {
   // ── Active liveness complete — submit blob + metadata directly ─────────
   const handleActiveLivenessComplete = useCallback(async (blob: Blob, metadata: LivenessMetadata) => {
     if (!verificationId || !apiKey) return;
-    setShowActiveLiveness(false);
     setIsProcessing(true);
     setStepError(null);
     try {
@@ -701,7 +700,10 @@ const MobileVerificationPage: React.FC = () => {
       setScreenIdx(4);
       waitForFinalResult(0);
     } catch (err: any) {
-      if (mountedRef.current) setStepError(err.message);
+      if (mountedRef.current) {
+        setShowActiveLiveness(false);
+        setStepError(err.message);
+      }
     } finally {
       if (mountedRef.current) setIsProcessing(false);
     }
@@ -1070,7 +1072,7 @@ const MobileVerificationPage: React.FC = () => {
                       onComplete={handleActiveLivenessComplete}
                       onCancel={() => setShowActiveLiveness(false)}
                       onFallback={handleActiveLivenessFallback}
-                      theme="dark"
+                      isProcessing={isProcessing}
                     />
                   </div>
                 )}
