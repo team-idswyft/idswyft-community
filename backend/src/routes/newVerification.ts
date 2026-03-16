@@ -32,7 +32,7 @@ import type { FrontExtractionResult, BackExtractionResult, LiveCaptureResult, Se
 import { computeFaceMatch } from '@/verification/face/faceMatchService.js';
 import { SessionFlowError } from '@/verification/exceptions.js';
 import { WebhookService } from '@/services/webhook.js';
-import type { WebhookPayload } from '@/types/index.js';
+import type { WebhookPayload, VerificationSource } from '@/types/index.js';
 
 const router = express.Router();
 
@@ -464,6 +464,7 @@ router.post('/initialize',
     body('document_type').optional().isIn(['passport', 'drivers_license', 'national_id']).withMessage('Invalid document type'),
     body('issuing_country').optional().isLength({ min: 2, max: 2 }).isAlpha().withMessage('Issuing country must be a 2-letter ISO code'),
     body('sandbox').optional().isBoolean().withMessage('Sandbox must be a boolean'),
+    body('source').optional().isIn(['api', 'vaas', 'demo']).withMessage('Source must be api, vaas, or demo'),
   ],
   catchAsync(async (req: Request, res: Response) => {
     const errors = validationResult(req);
@@ -472,6 +473,7 @@ router.post('/initialize',
     }
 
     const { user_id, document_type = 'drivers_license', issuing_country } = req.body;
+    const source: VerificationSource = req.body.source || 'api';
 
     req.body.user_id = user_id;
     await new Promise((resolve, reject) => {
@@ -484,11 +486,12 @@ router.post('/initialize',
     const isSandbox = req.isSandbox || false;
     const developerId = (req as any).developer.id;
 
-    // Create DB record
+    // Create DB record with source tag
     const verificationRecord = await verificationService.createVerificationRequest({
       user_id,
       developer_id: developerId,
       is_sandbox: isSandbox,
+      source,
     });
 
     // Set session start timestamp for processing-time analytics
@@ -549,13 +552,15 @@ router.post('/:verification_id/front-document',
     const { document_type = 'drivers_license', issuing_country } = req.body;
     const verification = await requireOwnedVerification(req, verification_id);
     const isSandbox = (verification as any).is_sandbox || false;
+    const source: VerificationSource = (verification as any).source || 'api';
 
-    // Store document
+    // Store document in the source-appropriate bucket
     const documentPath = await storageService.storeDocument(
       req.file.buffer,
       req.file.originalname || 'front_document.jpg',
       req.file.mimetype,
-      verification_id
+      verification_id,
+      source
     );
 
     const document = await verificationService.createDocument({
@@ -574,8 +579,16 @@ router.post('/:verification_id/front-document',
     // Resolve issuing_country: per-request override > session state
     const resolvedCountry = issuing_country?.toUpperCase() || undefined;
 
-    // Run front extraction
+    // Run front extraction (downloadFile resolves bucket from encoded path)
     const frontResult = await extractFrontDocument(documentPath, document.id, document_type, resolvedCountry);
+
+    // Ephemeral cleanup: demo files are deleted immediately after extraction
+    if (source === 'demo') {
+      storageService.deleteFile(documentPath).catch(err =>
+        logger.warn('Ephemeral cleanup failed (front)', { documentPath, error: err })
+      );
+      verificationService.updateDocument(document.id, { file_path: null } as any).catch(() => {});
+    }
 
     // Hydrate session and run Gate 1 via session
     const session = await hydrateSession(verification_id, isSandbox);
@@ -656,13 +669,15 @@ router.post('/:verification_id/back-document',
     const { document_type = 'other' } = req.body;
     const verification = await requireOwnedVerification(req, verification_id);
     const isSandbox = (verification as any).is_sandbox || false;
+    const source: VerificationSource = (verification as any).source || 'api';
 
-    // Store document
+    // Store document in the source-appropriate bucket
     const documentPath = await storageService.storeDocument(
       req.file.buffer,
       req.file.originalname || 'back_document.jpg',
       req.file.mimetype,
-      verification_id
+      verification_id,
+      source
     );
 
     const document = await verificationService.createDocument({
@@ -676,6 +691,14 @@ router.post('/:verification_id/back-document',
 
     // Run back extraction (country context flows to Gate 2 via session state)
     const backResult = await extractBackDocument(documentPath);
+
+    // Ephemeral cleanup: demo files are deleted immediately after extraction
+    if (source === 'demo') {
+      storageService.deleteFile(documentPath).catch(err =>
+        logger.warn('Ephemeral cleanup failed (back)', { documentPath, error: err })
+      );
+      verificationService.updateDocument(document.id, { file_path: null } as any).catch(() => {});
+    }
 
     // Hydrate session and run Gate 2 + auto cross-validation via session
     const session = await hydrateSession(verification_id, isSandbox);
@@ -813,13 +836,15 @@ router.post('/:verification_id/live-capture',
     const { verification_id } = req.params;
     const verification = await requireOwnedVerification(req, verification_id);
     const isSandbox = (verification as any).is_sandbox || false;
+    const source: VerificationSource = (verification as any).source || 'api';
 
-    // Store selfie
+    // Store selfie in the source-appropriate bucket
     const selfiePath = await storageService.storeSelfie(
       req.file.buffer,
       req.file.originalname || 'selfie.jpg',
       req.file.mimetype,
-      verification_id
+      verification_id,
+      source
     );
 
     const selfie = await verificationService.createSelfie({
@@ -863,6 +888,14 @@ router.post('/:verification_id/live-capture',
 
     // Run live capture extraction with real liveness detection
     const liveResult = await extractLiveCapture(selfiePath, null, req.file.buffer, isSandbox, activeLivenessMetadata, multiFrameMetadata);
+
+    // Ephemeral cleanup: demo selfie files are deleted immediately after extraction
+    if (source === 'demo') {
+      storageService.deleteFile(selfiePath).catch(err =>
+        logger.warn('Ephemeral cleanup failed (selfie)', { selfiePath, error: err })
+      );
+      supabase.from('selfies').update({ file_path: null }).eq('id', selfie.id).then(() => {});
+    }
 
     // Hydrate session and run Gate 4 + auto face match via session
     const session = await hydrateSession(verification_id, isSandbox);

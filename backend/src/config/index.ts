@@ -18,7 +18,9 @@ export const config: AppConfig = {
     url: process.env.SUPABASE_URL || '',
     anonKey: process.env.SUPABASE_ANON_KEY || '',
     serviceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
-    storageBucket: process.env.SUPABASE_STORAGE_BUCKET || 'identity-documents'
+    storageBucket: process.env.SUPABASE_STORAGE_BUCKET || 'identity-documents',
+    vaasBucket: process.env.SUPABASE_VAAS_BUCKET || 'vaas-documents',
+    demoBucket: process.env.SUPABASE_DEMO_BUCKET || 'demo-documents',
   },
   
   storage: {
@@ -63,7 +65,8 @@ export const config: AppConfig = {
   sandbox: {
     enabled: process.env.SANDBOX_MODE === 'true',
     mockVerification: process.env.ENABLE_MOCK_VERIFICATION === 'true',
-    mockDelayMs: parseInt(process.env.MOCK_VERIFICATION_DELAY_MS || '2000')
+    mockDelayMs: parseInt(process.env.MOCK_VERIFICATION_DELAY_MS || '2000'),
+    retentionHours: parseInt(process.env.SANDBOX_RETENTION_HOURS || '24'),
   },
 
   providers: {

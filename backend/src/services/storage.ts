@@ -4,6 +4,7 @@ import { logger } from '@/utils/logger.js';
 import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs/promises';
+import type { VerificationSource } from '@/types/index.js';
 
 export class StorageService {
   private generateSecureFileName(originalName: string, verificationId: string): string {
@@ -12,7 +13,7 @@ export class StorageService {
     const extension = path.extname(originalName);
     return `${verificationId}_${timestamp}_${random}${extension}`;
   }
-  
+
   private async ensureDirectoryExists(dirPath: string): Promise<void> {
     try {
       await fs.mkdir(dirPath, { recursive: true });
@@ -21,18 +22,56 @@ export class StorageService {
       throw new Error('Failed to create storage directory');
     }
   }
-  
+
+  // ─── Bucket routing helpers ─────────────────────────────────
+
+  /**
+   * Parse bucket from an encoded file_path.
+   * Format: `bucket-name:inner/path` for non-default buckets.
+   * Paths without a prefix resolve to the default identity-documents bucket.
+   */
+  private resolveBucket(filePath: string): { bucket: string; path: string } {
+    const idx = filePath.indexOf(':');
+    // Guard: the colon must be present, reasonably early, and not look like a
+    // Windows drive letter (e.g. C:\...) or absolute path.
+    if (idx > 0 && idx < 40 && !filePath.startsWith('/')) {
+      return { bucket: filePath.substring(0, idx), path: filePath.substring(idx + 1) };
+    }
+    return { bucket: config.supabase.storageBucket, path: filePath };
+  }
+
+  /** Map a verification source to its target Supabase Storage bucket. */
+  getBucketForSource(source: VerificationSource): string {
+    if (source === 'vaas') return config.supabase.vaasBucket;
+    if (source === 'demo') return config.supabase.demoBucket;
+    return config.supabase.storageBucket;
+  }
+
+  /** Create non-default buckets on startup if they don't already exist. */
+  async ensureBucketsExist(): Promise<void> {
+    for (const bucket of [config.supabase.vaasBucket, config.supabase.demoBucket]) {
+      const { error } = await supabase.storage.createBucket(bucket, { public: false });
+      if (error && !error.message.includes('already exists')) {
+        logger.warn('Failed to create bucket', { bucket, error: error.message });
+      }
+    }
+  }
+
+  // ─── Store operations ───────────────────────────────────────
+
   async storeDocument(
     buffer: Buffer,
     originalName: string,
     mimeType: string,
-    verificationId: string
+    verificationId: string,
+    source: VerificationSource = 'api'
   ): Promise<string> {
     const fileName = this.generateSecureFileName(originalName, verificationId);
-    
+    const bucket = this.getBucketForSource(source);
+
     try {
       if (config.storage.provider === 'supabase') {
-        return await this.storeInSupabase(buffer, fileName, 'documents', mimeType);
+        return await this.storeInSupabase(buffer, fileName, 'documents', mimeType, bucket);
       } else if (config.storage.provider === 'local') {
         return await this.storeLocally(buffer, fileName, 'documents');
       } else if (config.storage.provider === 's3') {
@@ -45,18 +84,20 @@ export class StorageService {
       throw new Error('Failed to store document');
     }
   }
-  
+
   async storeSelfie(
     buffer: Buffer,
     originalName: string,
     mimeType: string,
-    verificationId: string
+    verificationId: string,
+    source: VerificationSource = 'api'
   ): Promise<string> {
     const fileName = this.generateSecureFileName(originalName, verificationId);
-    
+    const bucket = this.getBucketForSource(source);
+
     try {
       if (config.storage.provider === 'supabase') {
-        return await this.storeInSupabase(buffer, fileName, 'selfies', mimeType);
+        return await this.storeInSupabase(buffer, fileName, 'selfies', mimeType, bucket);
       } else if (config.storage.provider === 'local') {
         return await this.storeLocally(buffer, fileName, 'selfies');
       } else if (config.storage.provider === 's3') {
@@ -69,36 +110,44 @@ export class StorageService {
       throw new Error('Failed to store selfie');
     }
   }
-  
+
   private async storeInSupabase(
     buffer: Buffer,
     fileName: string,
     folder: string,
-    mimeType: string
+    mimeType: string,
+    bucket?: string
   ): Promise<string> {
-    const filePath = `${folder}/${fileName}`;
-    
+    const targetBucket = bucket || config.supabase.storageBucket;
+    const innerPath = `${folder}/${fileName}`;
+
     const { data, error } = await supabase.storage
-      .from(config.supabase.storageBucket)
-      .upload(filePath, buffer, {
+      .from(targetBucket)
+      .upload(innerPath, buffer, {
         contentType: mimeType,
         duplex: 'half'
       });
-    
+
     if (error) {
       logger.error('Supabase storage error:', error);
       throw new Error('Failed to upload to Supabase storage');
     }
-    
+
+    // Encode bucket in returned path for non-default buckets
+    const returnPath = targetBucket === config.supabase.storageBucket
+      ? data.path
+      : `${targetBucket}:${data.path}`;
+
     logger.info('File stored in Supabase', {
-      path: data.path,
+      path: returnPath,
+      bucket: targetBucket,
       folder,
       fileName
     });
-    
-    return data.path;
+
+    return returnPath;
   }
-  
+
   private async storeLocally(
     buffer: Buffer,
     fileName: string,
@@ -106,19 +155,19 @@ export class StorageService {
   ): Promise<string> {
     const uploadDir = path.join(process.cwd(), 'uploads', folder);
     await this.ensureDirectoryExists(uploadDir);
-    
+
     const filePath = path.join(uploadDir, fileName);
     await fs.writeFile(filePath, buffer);
-    
+
     logger.info('File stored locally', {
       path: filePath,
       folder,
       fileName
     });
-    
+
     return `uploads/${folder}/${fileName}`;
   }
-  
+
   private async storeInS3(
     buffer: Buffer,
     fileName: string,
@@ -148,18 +197,21 @@ export class StorageService {
     logger.info('File stored in S3', { bucket: config.storage.awsS3Bucket, key });
     return key;
   }
-  
+
+  // ─── Read / URL operations ─────────────────────────────────
+
   async getFileUrl(filePath: string, expiresIn: number = 3600): Promise<string> {
     try {
       if (config.storage.provider === 'supabase') {
+        const { bucket, path: innerPath } = this.resolveBucket(filePath);
         const { data } = await supabase.storage
-          .from(config.supabase.storageBucket)
-          .createSignedUrl(filePath, expiresIn);
-        
+          .from(bucket)
+          .createSignedUrl(innerPath, expiresIn);
+
         if (!data?.signedUrl) {
           throw new Error('Failed to generate signed URL');
         }
-        
+
         return data.signedUrl;
       } else if (config.storage.provider === 'local') {
         // For local storage, return a relative path
@@ -190,18 +242,19 @@ export class StorageService {
       throw new Error('Failed to get file URL');
     }
   }
-  
+
   async downloadFile(filePath: string): Promise<Buffer> {
     try {
       if (config.storage.provider === 'supabase') {
+        const { bucket, path: innerPath } = this.resolveBucket(filePath);
         const { data, error } = await supabase.storage
-          .from(config.supabase.storageBucket)
-          .download(filePath);
-        
+          .from(bucket)
+          .download(innerPath);
+
         if (error || !data) {
           throw new Error('Failed to download from Supabase storage');
         }
-        
+
         return Buffer.from(await data.arrayBuffer());
       } else if (config.storage.provider === 'local') {
         const fullPath = path.join(process.cwd(), filePath);
@@ -217,14 +270,17 @@ export class StorageService {
       throw new Error('Failed to download file');
     }
   }
-  
+
+  // ─── Delete operations ─────────────────────────────────────
+
   async deleteFile(filePath: string): Promise<void> {
     try {
       if (config.storage.provider === 'supabase') {
+        const { bucket, path: innerPath } = this.resolveBucket(filePath);
         const { error } = await supabase.storage
-          .from(config.supabase.storageBucket)
-          .remove([filePath]);
-        
+          .from(bucket)
+          .remove([innerPath]);
+
         if (error) {
           throw new Error('Failed to delete from Supabase storage');
         }
@@ -235,14 +291,14 @@ export class StorageService {
         // S3 delete implementation would go here
         throw new Error('S3 delete not implemented yet');
       }
-      
+
       logger.info('File deleted', { filePath });
     } catch (error) {
       logger.error('Failed to delete file:', error);
       throw new Error('Failed to delete file');
     }
   }
-  
+
   // GDPR compliance: Delete all files for a user
   async deleteUserFiles(userId: string): Promise<void> {
     try {
@@ -255,14 +311,14 @@ export class StorageService {
           selfies(file_path)
         `)
         .eq('user_id', userId);
-      
+
       if (error) {
         logger.error('Failed to get user files for deletion:', error);
         throw new Error('Failed to get user files');
       }
-      
+
       const filesToDelete: string[] = [];
-      
+
       verifications.forEach((verification: any) => {
         verification.documents?.forEach((doc: any) => {
           if (doc.file_path) filesToDelete.push(doc.file_path);
@@ -271,17 +327,17 @@ export class StorageService {
           if (selfie.file_path) filesToDelete.push(selfie.file_path);
         });
       });
-      
-      // Delete files
-      for (const filePath of filesToDelete) {
+
+      // Delete files — resolveBucket() handles bucket routing automatically
+      for (const fp of filesToDelete) {
         try {
-          await this.deleteFile(filePath);
+          await this.deleteFile(fp);
         } catch (error) {
-          logger.error(`Failed to delete file ${filePath}:`, error);
+          logger.error(`Failed to delete file ${fp}:`, error);
           // Continue with other files even if one fails
         }
       }
-      
+
       logger.info('User files deleted for GDPR compliance', {
         userId,
         filesDeleted: filesToDelete.length
@@ -291,7 +347,7 @@ export class StorageService {
       throw new Error('Failed to delete user files');
     }
   }
-  
+
   async getLocalFilePath(filePath: string): Promise<string> {
     try {
       if (config.storage.provider === 'local') {
@@ -301,14 +357,14 @@ export class StorageService {
         // For Supabase, download to temp directory for processing
         const tempDir = path.join(process.cwd(), 'temp');
         await this.ensureDirectoryExists(tempDir);
-        
+
         const fileName = path.basename(filePath);
         const tempFilePath = path.join(tempDir, `temp_${Date.now()}_${fileName}`);
-        
-        // Download file from Supabase
+
+        // Download file from Supabase — bucket resolved automatically
         const buffer = await this.downloadFile(filePath);
         await fs.writeFile(tempFilePath, buffer);
-        
+
         return tempFilePath;
       } else {
         throw new Error(`Local file path not available for provider: ${config.storage.provider}`);
@@ -318,7 +374,7 @@ export class StorageService {
       throw new Error('Failed to get local file path');
     }
   }
-  
+
   // Health check for storage service
   async healthCheck(): Promise<{ status: string; provider: string; error?: string }> {
     try {
@@ -327,7 +383,7 @@ export class StorageService {
         const { error } = await supabase.storage
           .from(config.supabase.storageBucket)
           .list('', { limit: 1 });
-        
+
         return {
           status: error ? 'error' : 'healthy',
           provider: 'supabase',
@@ -337,7 +393,7 @@ export class StorageService {
         // Check if upload directory exists and is writable
         const uploadDir = path.join(process.cwd(), 'uploads');
         await this.ensureDirectoryExists(uploadDir);
-        
+
         return {
           status: 'healthy',
           provider: 'local'

@@ -80,4 +80,57 @@ export class DataRetentionService {
 
     return (old ?? []).length;
   }
+
+  /**
+   * Hard-delete demo verification data older than `retentionHours`.
+   * Demo data has no audit requirements — full deletion is appropriate.
+   * Files may already be null (ephemeral cleanup deletes them after extraction),
+   * but we clean up any stragglers here.
+   */
+  async runDemoCleanup(retentionHours: number): Promise<number> {
+    const cutoff = new Date();
+    cutoff.setHours(cutoff.getHours() - retentionHours);
+
+    const { data: old } = await supabase
+      .from('verification_requests')
+      .select('id')
+      .eq('source', 'demo')
+      .lt('created_at', cutoff.toISOString());
+
+    if (!old?.length) return 0;
+    const ids = old.map((v: any) => v.id);
+
+    // Delete any remaining files (in case ephemeral cleanup missed some)
+    const { data: docs } = await supabase
+      .from('documents').select('file_path')
+      .in('verification_request_id', ids)
+      .not('file_path', 'is', null);
+
+    for (const doc of docs ?? []) {
+      await this.storageService.deleteFile(doc.file_path).catch(() => {});
+    }
+
+    const { data: selfies } = await supabase
+      .from('selfies').select('file_path')
+      .in('verification_request_id', ids)
+      .not('file_path', 'is', null);
+
+    for (const s of selfies ?? []) {
+      await this.storageService.deleteFile(s.file_path).catch(() => {});
+    }
+
+    // Hard-delete all DB records (demo data, no audit requirement)
+    await supabase.from('documents').delete().in('verification_request_id', ids);
+    await supabase.from('selfies').delete().in('verification_request_id', ids);
+    await supabase.from('verification_contexts').delete().in('verification_id', ids);
+    await supabase.from('verification_risk_scores').delete().in('verification_request_id', ids);
+    await supabase.from('verification_requests').delete().in('id', ids);
+
+    logger.info(`Demo cleanup: ${ids.length} verifications deleted`, {
+      count: ids.length,
+      cutoffHours: retentionHours,
+    });
+
+    return ids.length;
+  }
 }

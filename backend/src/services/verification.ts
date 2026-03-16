@@ -5,7 +5,8 @@ import {
   Document,
   Selfie,
   OCRData,
-  VerificationStatus
+  VerificationStatus,
+  VerificationSource
 } from '@/types/index.js';
 import { DocumentQualityService, DocumentQualityResult } from './documentQuality.js';
 import config from '@/config/index.js';
@@ -15,6 +16,7 @@ export class VerificationService {
     user_id: string;
     developer_id: string;
     is_sandbox?: boolean;
+    source?: VerificationSource;
   }): Promise<VerificationRequest> {
     const { data: verification, error } = await supabase
       .from('verification_requests')
@@ -23,6 +25,7 @@ export class VerificationService {
         developer_id: data.developer_id,
         status: 'pending',
         is_sandbox: data.is_sandbox ?? false,
+        source: data.source ?? 'api',
       })
       .select('*')
       .single();
