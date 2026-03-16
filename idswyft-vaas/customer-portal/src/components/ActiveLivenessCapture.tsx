@@ -310,8 +310,9 @@ const LIVENESS_CSS = `
 /* ── Color Flash Overlay ── */
 .lv-flash {
   position: absolute; inset: 0;
-  transition: background-color 0.3s ease-in-out;
   pointer-events: none; z-index: 1;
+  /* No transition — color must appear instantly so the early capture (150ms)
+     catches reflected screen light before the camera's AWB compensates. */
 }
 
 /* ── Scan Line ── */

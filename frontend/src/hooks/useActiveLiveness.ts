@@ -257,8 +257,10 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
       }
     };
 
-    // Capture at 80% through the flash (color has been reflecting for 1.2s of 1.5s)
-    const captureTimer = setTimeout(captureFrame, COLOR_FLASH_DURATION * 0.8);
+    // Capture early — 150ms into the flash, before the camera's auto white balance
+    // has time to compensate (~100-300ms response). The CSS transition is removed
+    // so the color appears instantly on screen.
+    const captureTimer = setTimeout(captureFrame, COLOR_FLASH_DURATION * 0.1);
     // Advance to next color at end of flash
     const advanceTimer = setTimeout(advanceToNext, COLOR_FLASH_DURATION);
     return () => {
