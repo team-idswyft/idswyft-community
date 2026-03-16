@@ -157,15 +157,16 @@ describe('MultiFrameLivenessVerifier', () => {
   describe('valid multi-frame sequence', () => {
     it('passes with correct head turn and color reflection', async () => {
       setupPassingColorPixels();
-      // 4 color frames (neutral face) + turn_start (yaw=0), turn_peak (yaw=-20), turn_return (yaw=0)
+      // 4 color frames (neutral face) + turn_start (yaw=0), turn_peak (yaw=20), turn_return (yaw=0)
+      // Front camera: physical left turn = positive yaw in raw image
       const detections = [
-        makeFaceDetection({ yaw: 0 }),   // color_red
-        makeFaceDetection({ yaw: 0 }),   // color_green
-        makeFaceDetection({ yaw: 0 }),   // color_blue
-        makeFaceDetection({ yaw: 0 }),   // color_white
-        makeFaceDetection({ yaw: 0 }),   // turn_start
-        makeFaceDetection({ yaw: -20 }), // turn_peak (left)
-        makeFaceDetection({ yaw: -2 }),  // turn_return (back to center)
+        makeFaceDetection({ yaw: 0 }),  // color_red
+        makeFaceDetection({ yaw: 0 }),  // color_green
+        makeFaceDetection({ yaw: 0 }),  // color_blue
+        makeFaceDetection({ yaw: 0 }),  // color_white
+        makeFaceDetection({ yaw: 0 }),  // turn_start
+        makeFaceDetection({ yaw: 20 }), // turn_peak (left = positive in raw front-camera image)
+        makeFaceDetection({ yaw: 2 }),  // turn_return (back to center)
       ];
 
       const faceService = createMockFaceService(detections);
@@ -182,14 +183,15 @@ describe('MultiFrameLivenessVerifier', () => {
 
     it('passes for right direction turn', async () => {
       setupPassingColorPixels();
+      // Front camera: physical right turn = negative yaw in raw image
       const detections = [
-        makeFaceDetection({ yaw: 0 }),  // color_red
-        makeFaceDetection({ yaw: 0 }),  // color_green
-        makeFaceDetection({ yaw: 0 }),  // color_blue
-        makeFaceDetection({ yaw: 0 }),  // color_white
-        makeFaceDetection({ yaw: 0 }),  // turn_start
-        makeFaceDetection({ yaw: 20 }), // turn_peak (right)
-        makeFaceDetection({ yaw: 2 }),  // turn_return
+        makeFaceDetection({ yaw: 0 }),   // color_red
+        makeFaceDetection({ yaw: 0 }),   // color_green
+        makeFaceDetection({ yaw: 0 }),   // color_blue
+        makeFaceDetection({ yaw: 0 }),   // color_white
+        makeFaceDetection({ yaw: 0 }),   // turn_start
+        makeFaceDetection({ yaw: -20 }), // turn_peak (right = negative in raw front-camera image)
+        makeFaceDetection({ yaw: -2 }),  // turn_return
       ];
 
       const faceService = createMockFaceService(detections);
@@ -239,13 +241,13 @@ describe('MultiFrameLivenessVerifier', () => {
     it('fails when yaw delta is insufficient', async () => {
       setupPassingColorPixels();
       const detections = [
-        makeFaceDetection({ yaw: 0 }),  // color frames...
+        makeFaceDetection({ yaw: 0 }), // color frames...
         makeFaceDetection({ yaw: 0 }),
         makeFaceDetection({ yaw: 0 }),
         makeFaceDetection({ yaw: 0 }),
-        makeFaceDetection({ yaw: 0 }),  // turn_start
-        makeFaceDetection({ yaw: -5 }), // turn_peak — only 5 degrees
-        makeFaceDetection({ yaw: 0 }),  // turn_return
+        makeFaceDetection({ yaw: 0 }), // turn_start
+        makeFaceDetection({ yaw: 5 }), // turn_peak — only 5 degrees (positive = left, but insufficient)
+        makeFaceDetection({ yaw: 0 }), // turn_return
       ];
 
       const faceService = createMockFaceService(detections);
@@ -259,15 +261,15 @@ describe('MultiFrameLivenessVerifier', () => {
   describe('direction validation', () => {
     it('fails when head turns in wrong direction', async () => {
       setupPassingColorPixels();
-      // Asked to turn left but turned right
+      // Asked to turn left but turned right (front camera: right = negative yaw)
       const detections = [
         makeFaceDetection({ yaw: 0 }),
         makeFaceDetection({ yaw: 0 }),
         makeFaceDetection({ yaw: 0 }),
         makeFaceDetection({ yaw: 0 }),
-        makeFaceDetection({ yaw: 0 }),  // turn_start
-        makeFaceDetection({ yaw: 20 }), // turn_peak — right instead of left
-        makeFaceDetection({ yaw: 2 }),  // turn_return
+        makeFaceDetection({ yaw: 0 }),   // turn_start
+        makeFaceDetection({ yaw: -20 }), // turn_peak — right (negative) instead of left (positive)
+        makeFaceDetection({ yaw: -2 }),  // turn_return
       ];
 
       const faceService = createMockFaceService(detections);
@@ -286,9 +288,9 @@ describe('MultiFrameLivenessVerifier', () => {
         makeFaceDetection({ yaw: 0 }),
         makeFaceDetection({ yaw: 0 }),
         makeFaceDetection({ yaw: 0 }),
-        makeFaceDetection({ yaw: 0 }),   // turn_start
-        makeFaceDetection({ yaw: -20 }), // turn_peak
-        makeFaceDetection({ yaw: -15 }), // turn_return — still turned
+        makeFaceDetection({ yaw: 0 }),  // turn_start
+        makeFaceDetection({ yaw: 20 }), // turn_peak (left = positive)
+        makeFaceDetection({ yaw: 15 }), // turn_return — still turned (15° from start > 8° tolerance)
       ];
 
       const faceService = createMockFaceService(detections);
@@ -302,7 +304,7 @@ describe('MultiFrameLivenessVerifier', () => {
     it('fails when no color shift detected (photo attack)', async () => {
       setupFailingColorPixels();
       const detections = Array(7).fill(null).map((_, i) => {
-        if (i === 5) return makeFaceDetection({ yaw: -20 });
+        if (i === 5) return makeFaceDetection({ yaw: 20 }); // left = positive in front camera
         return makeFaceDetection({ yaw: 0 });
       });
 
@@ -316,7 +318,7 @@ describe('MultiFrameLivenessVerifier', () => {
     it('passes when correct color shifts detected', async () => {
       setupPassingColorPixels();
       const detections = Array(7).fill(null).map((_, i) => {
-        if (i === 5) return makeFaceDetection({ yaw: -20 });
+        if (i === 5) return makeFaceDetection({ yaw: 20 }); // left = positive in front camera
         return makeFaceDetection({ yaw: 0 });
       });
 
@@ -331,7 +333,7 @@ describe('MultiFrameLivenessVerifier', () => {
     it('penalizes score when virtual camera detected', async () => {
       setupPassingColorPixels();
       const detections = Array(7).fill(null).map((_, i) => {
-        if (i === 5) return makeFaceDetection({ yaw: -20 });
+        if (i === 5) return makeFaceDetection({ yaw: 20 }); // left = positive in front camera
         return makeFaceDetection({ yaw: 0 });
       });
 

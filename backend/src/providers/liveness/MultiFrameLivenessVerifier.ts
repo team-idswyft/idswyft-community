@@ -216,7 +216,8 @@ export async function verifyMultiFrameLiveness(
 
   // ── Check 3: Correct direction ──
   const yawShift = peakYaw - startYaw;
-  const expectedSign = metadata.challenge_direction === 'left' ? -1 : 1;
+  // Front-facing camera: physical left turn → nose moves right in raw image → positive yaw
+  const expectedSign = metadata.challenge_direction === 'left' ? 1 : -1;
   const directionCorrect = yawDelta >= MIN_YAW_DELTA && yawShift * expectedSign > 0;
   checks.correct_direction = {
     passed: directionCorrect,
