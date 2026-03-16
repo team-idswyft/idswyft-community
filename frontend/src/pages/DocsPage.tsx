@@ -219,22 +219,31 @@ const Pipeline = () => {
 };
 
 // ─── Tabbed code block ────────────────────────────────────────────────────────
-const CodeTabs = ({ js, python, tab, onChange }: { js: string; python: string; tab: 'js' | 'python'; onChange: (t: 'js' | 'python') => void }) => (
-  <div style={{ borderRadius: 8, border: `1px solid ${C.border}`, overflow: 'hidden', marginBottom: 16 }}>
-    <div style={{ display: 'flex', background: C.surface, borderBottom: `1px solid ${C.border}` }}>
-      {(['js', 'python'] as const).map(t => (
-        <button key={t} onClick={() => onChange(t)} style={{ padding: '8px 18px', fontFamily: CODE_FONT, fontSize: '0.75rem', fontWeight: 500, color: tab === t ? C.cyan : C.muted, background: 'none', border: 'none', borderBottom: tab === t ? `2px solid ${C.cyan}` : '2px solid transparent', cursor: 'pointer', transition: 'color 0.15s' }}>
-          {t === 'js' ? 'JavaScript' : 'Python'}
-        </button>
-      ))}
+type CodeTabType = 'curl' | 'js' | 'python';
+const TAB_META: Record<CodeTabType, { label: string; lang: CodeLanguage; file: string }> = {
+  curl:   { label: 'cURL',       lang: 'bash',   file: 'snippet.sh' },
+  js:     { label: 'JavaScript', lang: 'js',     file: 'snippet.js' },
+  python: { label: 'Python',     lang: 'python', file: 'snippet.py' },
+};
+
+const CodeTabs = ({ curl, js, python, tab, onChange }: { curl?: string; js: string; python: string; tab: CodeTabType; onChange: (t: CodeTabType) => void }) => {
+  const tabs = (curl ? ['curl', 'js', 'python'] : ['js', 'python']) as CodeTabType[];
+  const activeTab = tabs.includes(tab) ? tab : tabs[0];
+  const code = activeTab === 'curl' ? curl! : activeTab === 'js' ? js : python;
+  const meta = TAB_META[activeTab];
+  return (
+    <div style={{ borderRadius: 8, border: `1px solid ${C.border}`, overflow: 'hidden', marginBottom: 16 }}>
+      <div style={{ display: 'flex', background: C.surface, borderBottom: `1px solid ${C.border}` }}>
+        {tabs.map(t => (
+          <button key={t} onClick={() => onChange(t)} style={{ padding: '8px 18px', fontFamily: CODE_FONT, fontSize: '0.75rem', fontWeight: 500, color: activeTab === t ? C.cyan : C.muted, background: 'none', border: 'none', borderBottom: activeTab === t ? `2px solid ${C.cyan}` : '2px solid transparent', cursor: 'pointer', transition: 'color 0.15s' }}>
+            {TAB_META[t].label}
+          </button>
+        ))}
+      </div>
+      <IDECodeBlock code={code} language={meta.lang} fileName={meta.file} />
     </div>
-    <IDECodeBlock
-      code={tab === 'js' ? js : python}
-      language={tab === 'js' ? 'js' : 'python'}
-      fileName={tab === 'js' ? 'quickstart.js' : 'quickstart.py'}
-    />
-  </div>
-);
+  );
+};
 
 // ─── Endpoint card ────────────────────────────────────────────────────────────
 const EndpointCard = ({ step, method, path, title, badge, children }: {
@@ -285,7 +294,7 @@ const NAV = [
 // ─── Main component ───────────────────────────────────────────────────────────
 export const DocsPage: React.FC = () => {
   const apiUrl = getDocumentationApiUrl();
-  const [tab, setTab] = useState<'js' | 'python'>('js');
+  const [tab, setTab] = useState<CodeTabType>('curl');
   const [active, setActive] = useState('quick-start');
 
   // Inject fonts
@@ -514,10 +523,28 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
               <FieldRow name="user_id" type="UUID string" req={true} desc="Your unique identifier for the user being verified." />
               <FieldRow name="sandbox" type="boolean" req={false} desc="Set true to use sandbox mode. Defaults to false." />
             </div>
-            <Pre label="Request" code={`curl -X POST ${apiUrl}/api/v2/verify/initialize \\
+            <CodeTabs tab={tab} onChange={setTab}
+              curl={`curl -X POST ${apiUrl}/api/v2/verify/initialize \\
   -H "X-API-Key: your-key" \\
   -H "Content-Type: application/json" \\
-  -d '{"user_id": "550e8400-e29b-41d4-a716-446655440000"}'`} />
+  -d '{"user_id": "550e8400-e29b-41d4-a716-446655440000"}'`}
+              js={`const res = await fetch(\`${apiUrl}/api/v2/verify/initialize\`, {
+  method: 'POST',
+  headers: {
+    'X-API-Key': 'your-key',
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({ user_id: '550e8400-e29b-41d4-a716-446655440000' }),
+});
+const data = await res.json();`}
+              python={`import requests
+
+res = requests.post(
+    '${apiUrl}/api/v2/verify/initialize',
+    headers={ 'X-API-Key': 'your-key' },
+    json={ 'user_id': '550e8400-e29b-41d4-a716-446655440000' },
+)
+data = res.json()`} />
             <Pre label="Response  —  HTTP 201" code={`{
   "success": true,
   "verification_id": "550e8400-e29b-41d4-a716-446655440001",
@@ -541,10 +568,29 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
               <FieldRow name="document_type" type="string" req={true} desc="'passport' | 'drivers_license' | 'national_id' | 'other'" />
               <FieldRow name="document" type="File" req={true} desc="JPEG, PNG, WebP, or PDF. Max 10 MB." />
             </div>
-            <Pre label="Request" code={`curl -X POST ${apiUrl}/api/v2/verify/550e8400-e29b-41d4-a716-446655440001/front-document \\
+            <CodeTabs tab={tab} onChange={setTab}
+              curl={`curl -X POST ${apiUrl}/api/v2/verify/550e8400-e29b-41d4-a716-446655440001/front-document \\
   -H "X-API-Key: your-key" \\
   -F "document_type=drivers_license" \\
-  -F "document=@front.jpg"`} />
+  -F "document=@front.jpg"`}
+              js={`const fd = new FormData();
+fd.append('document_type', 'drivers_license');
+fd.append('document', frontFile); // File from <input type="file">
+
+const res = await fetch(
+  \`${apiUrl}/api/v2/verify/\${verification_id}/front-document\`,
+  { method: 'POST', headers: { 'X-API-Key': 'your-key' }, body: fd },
+);
+const data = await res.json();`}
+              python={`import requests
+
+res = requests.post(
+    f'${apiUrl}/api/v2/verify/{verification_id}/front-document',
+    headers={ 'X-API-Key': 'your-key' },
+    data={ 'document_type': 'drivers_license' },
+    files={ 'document': open('front.jpg', 'rb') },
+)
+data = res.json()`} />
             <Pre label="Response  —  HTTP 201" code={`{
   "success": true,
   "verification_id": "550e8400-e29b-41d4-a716-446655440001",
@@ -601,10 +647,29 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
               <FieldRow name="document_type" type="string" req={true} desc="Must match the document_type used in Step 2." />
               <FieldRow name="document" type="File" req={true} desc="JPEG, PNG, or WebP. Max 10 MB. Field name is 'document'." />
             </div>
-            <Pre label="Request" code={`curl -X POST ${apiUrl}/api/v2/verify/550e8400-e29b-41d4-a716-446655440001/back-document \\
+            <CodeTabs tab={tab} onChange={setTab}
+              curl={`curl -X POST ${apiUrl}/api/v2/verify/550e8400-e29b-41d4-a716-446655440001/back-document \\
   -H "X-API-Key: your-key" \\
   -F "document_type=drivers_license" \\
-  -F "document=@back.jpg"`} />
+  -F "document=@back.jpg"`}
+              js={`const fd = new FormData();
+fd.append('document_type', 'drivers_license');
+fd.append('document', backFile); // File from <input type="file">
+
+const res = await fetch(
+  \`${apiUrl}/api/v2/verify/\${verification_id}/back-document\`,
+  { method: 'POST', headers: { 'X-API-Key': 'your-key' }, body: fd },
+);
+const data = await res.json();`}
+              python={`import requests
+
+res = requests.post(
+    f'${apiUrl}/api/v2/verify/{verification_id}/back-document',
+    headers={ 'X-API-Key': 'your-key' },
+    data={ 'document_type': 'drivers_license' },
+    files={ 'document': open('back.jpg', 'rb') },
+)
+data = res.json()`} />
             <Pre label="Response  —  HTTP 201" code={`{
   "success": true,
   "verification_id": "550e8400-e29b-41d4-a716-446655440001",
@@ -665,9 +730,26 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
             <div style={{ marginBottom: 12 }}>
               <FieldRow name="selfie" type="File" req={true} desc="JPEG or PNG live capture image. Max 10 MB." />
             </div>
-            <Pre label="Request" code={`curl -X POST ${apiUrl}/api/v2/verify/550e8400-e29b-41d4-a716-446655440001/live-capture \\
+            <CodeTabs tab={tab} onChange={setTab}
+              curl={`curl -X POST ${apiUrl}/api/v2/verify/550e8400-e29b-41d4-a716-446655440001/live-capture \\
   -H "X-API-Key: your-key" \\
-  -F "selfie=@selfie.jpg"`} />
+  -F "selfie=@selfie.jpg"`}
+              js={`const fd = new FormData();
+fd.append('selfie', captureFile); // File from live capture
+
+const res = await fetch(
+  \`${apiUrl}/api/v2/verify/\${verification_id}/live-capture\`,
+  { method: 'POST', headers: { 'X-API-Key': 'your-key' }, body: fd },
+);
+const data = await res.json();`}
+              python={`import requests
+
+res = requests.post(
+    f'${apiUrl}/api/v2/verify/{verification_id}/live-capture',
+    headers={ 'X-API-Key': 'your-key' },
+    files={ 'selfie': open('selfie.jpg', 'rb') },
+)
+data = res.json()`} />
             <Pre label="Response  —  HTTP 201" code={`{
   "success": true,
   "verification_id": "550e8400-e29b-41d4-a716-446655440001",
@@ -725,8 +807,21 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
               ))}
             </div>
 
-            <Pre label="Request" code={`curl -X GET ${apiUrl}/api/v2/verify/550e8400-e29b-41d4-a716-446655440001/status \\
-  -H "X-API-Key: your-key"`} />
+            <CodeTabs tab={tab} onChange={setTab}
+              curl={`curl -X GET ${apiUrl}/api/v2/verify/550e8400-e29b-41d4-a716-446655440001/status \\
+  -H "X-API-Key: your-key"`}
+              js={`const res = await fetch(
+  \`${apiUrl}/api/v2/verify/\${verification_id}/status\`,
+  { headers: { 'X-API-Key': 'your-key' } },
+);
+const data = await res.json();`}
+              python={`import requests
+
+res = requests.get(
+    f'${apiUrl}/api/v2/verify/{verification_id}/status',
+    headers={ 'X-API-Key': 'your-key' },
+)
+data = res.json()`} />
             <Pre label="Response  —  completed verification" code={`{
   "success": true,
   "verification_id": "550e8400-e29b-41d4-a716-446655440001",
