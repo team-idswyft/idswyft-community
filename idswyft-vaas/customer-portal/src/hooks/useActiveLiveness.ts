@@ -150,7 +150,7 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
   const challengeStartRef = useRef(0);
   const turnStartRef = useRef(0);
   const returnStartRef = useRef(0);
-  const virtualCameraRef = useRef<{ label: string; suspected_virtual: boolean } | undefined>();
+  const virtualCameraRef = useRef<{ label: string; suspected_virtual: boolean } | undefined>(undefined);
   const animFrameRef = useRef(0);
 
   // Keep phaseRef in sync
