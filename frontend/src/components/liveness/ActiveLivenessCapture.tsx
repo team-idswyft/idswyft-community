@@ -72,6 +72,7 @@ export function ActiveLivenessCapture({
     faceDetected,
     error,
     retry,
+    flashColor,
   } = useActiveLiveness({
     videoElement: streamReady ? videoRef.current : null,
     canvasElement: canvasRef.current,
@@ -114,6 +115,18 @@ export function ActiveLivenessCapture({
         />
         <canvas ref={canvasRef} style={{ display: 'none' }} />
 
+        {/* Color flash overlay — semi-transparent so face is visible through the color */}
+        {flashColor && (
+          <div style={{
+            position: 'absolute',
+            inset: 0,
+            backgroundColor: `rgba(${flashColor[0]}, ${flashColor[1]}, ${flashColor[2]}, 0.5)`,
+            transition: 'background-color 0.15s ease-in-out',
+            pointerEvents: 'none',
+            zIndex: 1,
+          }} />
+        )}
+
         {/* Oval face guide — viewBox matches video dimensions for perfect alignment */}
         <svg
           style={{
@@ -122,6 +135,7 @@ export function ActiveLivenessCapture({
             width: '100%',
             height: '100%',
             pointerEvents: 'none',
+            zIndex: 2,
           }}
           viewBox={`0 0 ${videoDims.w} ${videoDims.h}`}
           preserveAspectRatio="xMidYMid slice"
@@ -160,6 +174,7 @@ export function ActiveLivenessCapture({
             right: direction === 'right' ? 20 : 'auto',
             transform: 'translateY(-50%)',
             animation: 'pulse 1.2s ease-in-out infinite',
+            zIndex: 3,
           }}>
             <svg width="48" height="48" viewBox="0 0 24 24" fill="none">
               <path
@@ -176,11 +191,12 @@ export function ActiveLivenessCapture({
         )}
 
         {/* Phase-specific progress ring (top-right) */}
-        {(phase === 'center_face' || phase === 'turn' || phase === 'return_center') && (
+        {(phase === 'color_flash' || phase === 'turn' || phase === 'return_center') && (
           <div style={{
             position: 'absolute',
             top: 12,
             right: 12,
+            zIndex: 3,
           }}>
             <svg width="44" height="44" viewBox="0 0 44 44">
               <circle cx="22" cy="22" r="18" fill="none" stroke="rgba(255,255,255,0.2)" strokeWidth={3} />

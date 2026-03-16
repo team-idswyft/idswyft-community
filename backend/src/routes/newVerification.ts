@@ -16,8 +16,11 @@ import { supabase } from '@/config/database.js';
 import { VERIFICATION_THRESHOLDS, getFaceMatchingThresholdSync, getLivenessThresholdSync } from '@/config/verificationThresholds.js';
 import { createLivenessProvider } from '@/providers/liveness/index.js';
 import { verifyActiveLivenessMetadata } from '@/providers/liveness/ActiveLivenessVerifier.js';
+import { verifyMultiFrameLiveness } from '@/providers/liveness/MultiFrameLivenessVerifier.js';
 import { ActiveLivenessMetadataSchema } from '@/verification/models/activeLivenessSchema.js';
 import type { ActiveLivenessMetadata } from '@/verification/models/activeLivenessSchema.js';
+import { MultiFrameLivenessMetadataSchema } from '@/verification/models/multiFrameLivenessSchema.js';
+import type { MultiFrameLivenessMetadata } from '@/verification/models/multiFrameLivenessSchema.js';
 import { createAMLProvider } from '@/providers/aml/index.js';
 import { computeRiskScore } from '@/services/riskScoring.js';
 import { broadcastStatusChange } from '@/services/realtime.js';
@@ -268,6 +271,7 @@ async function extractLiveCapture(
   selfieBuffer: Buffer,
   isSandbox: boolean = false,
   activeLivenessMetadata?: ActiveLivenessMetadata,
+  multiFrameMetadata?: MultiFrameLivenessMetadata,
 ): Promise<LiveCaptureResult> {
   // Detect face and extract embedding from selfie
   let faceConfidence = 0;
@@ -280,11 +284,28 @@ async function extractLiveCapture(
     faceConfidence = 0;
   }
 
-  // Liveness detection: active (challenge-response) or passive (image heuristics)
+  // Liveness detection: multi-frame color, active head-turn, or passive heuristics
   let livenessScore = 0;
   let livenessPassed = false;
 
-  if (activeLivenessMetadata) {
+  if (multiFrameMetadata) {
+    // Multi-frame color liveness — server-side face analysis of captured frames
+    try {
+      const multiResult = await verifyMultiFrameLiveness(multiFrameMetadata, faceRecognitionService);
+      livenessScore = multiResult.score;
+      livenessPassed = multiResult.passed;
+      logger.info('Multi-frame liveness verification complete', {
+        score: livenessScore.toFixed(3),
+        passed: livenessPassed,
+        reason: multiResult.reason,
+        challenge: multiFrameMetadata.challenge_direction,
+        frameCount: multiFrameMetadata.frames.length,
+      });
+    } catch (err) {
+      logger.error('Multi-frame liveness verifier failed, falling back to passive', { error: err });
+      // Fall through to passive liveness below
+    }
+  } else if (activeLivenessMetadata) {
     // Active liveness — verify temporal consistency of client-side head-pose data
     try {
       const activeResult = verifyActiveLivenessMetadata(activeLivenessMetadata);
@@ -303,7 +324,7 @@ async function extractLiveCapture(
     }
   }
 
-  if (!activeLivenessMetadata || (livenessScore === 0 && !livenessPassed)) {
+  if ((!multiFrameMetadata && !activeLivenessMetadata) || (livenessScore === 0 && !livenessPassed)) {
     // Passive liveness — image-based heuristics (original path)
     try {
       livenessScore = await livenessProvider.assessLiveness({
@@ -812,27 +833,36 @@ router.post('/:verification_id/live-capture',
       selfie_id: selfie.id,
     } as any);
 
-    // Parse optional active liveness metadata from client
+    // Parse optional liveness metadata from client — try multi-frame first, then head-turn
     let activeLivenessMetadata: ActiveLivenessMetadata | undefined;
+    let multiFrameMetadata: MultiFrameLivenessMetadata | undefined;
     if (req.body?.liveness_metadata) {
       try {
         const raw = typeof req.body.liveness_metadata === 'string'
           ? JSON.parse(req.body.liveness_metadata)
           : req.body.liveness_metadata;
-        activeLivenessMetadata = ActiveLivenessMetadataSchema.parse(raw);
-        logger.info('Active liveness metadata received', {
-          challenge: activeLivenessMetadata.challenge_direction,
-          samples: activeLivenessMetadata.samples.length,
-        });
+
+        if (raw.challenge_type === 'multi_frame_color') {
+          multiFrameMetadata = MultiFrameLivenessMetadataSchema.parse(raw);
+          logger.info('Multi-frame liveness metadata received', {
+            challenge: multiFrameMetadata.challenge_direction,
+            frames: multiFrameMetadata.frames.length,
+          });
+        } else {
+          activeLivenessMetadata = ActiveLivenessMetadataSchema.parse(raw);
+          logger.info('Active liveness metadata received', {
+            challenge: activeLivenessMetadata.challenge_direction,
+            samples: activeLivenessMetadata.samples.length,
+          });
+        }
       } catch (err) {
         // Invalid metadata → log warning, fall back to passive liveness
-        logger.warn('Invalid active liveness metadata, falling back to passive', { error: err });
+        logger.warn('Invalid liveness metadata, falling back to passive', { error: err });
       }
     }
 
     // Run live capture extraction with real liveness detection
-    const savedState = await loadSessionState(verification_id);
-    const liveResult = await extractLiveCapture(selfiePath, null, req.file.buffer, isSandbox, activeLivenessMetadata);
+    const liveResult = await extractLiveCapture(selfiePath, null, req.file.buffer, isSandbox, activeLivenessMetadata, multiFrameMetadata);
 
     // Hydrate session and run Gate 4 + auto face match via session
     const session = await hydrateSession(verification_id, isSandbox);
