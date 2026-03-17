@@ -3,6 +3,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
 import Login from './components/auth/Login';
+import SsoCallback from './components/auth/SsoCallback';
 import EmailVerification from './components/auth/EmailVerification';
 import DashboardLayout from './components/layout/DashboardLayout';
 import RequirePermission from './components/auth/RequirePermission';
@@ -93,6 +94,7 @@ function App() {
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
+            <Route path="/sso/callback" element={<SsoCallback />} />
             <Route path="/verify-email" element={<EmailVerification />} />
             <Route path="/dev" element={<DevInfo />} />
 

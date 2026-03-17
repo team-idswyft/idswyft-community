@@ -1032,6 +1032,13 @@ class ApiClient {
   getToken(): string | null {
     return this.token;
   }
+
+  /** Store a JWT received from SSO callback (URL fragment). */
+  setToken(token: string) {
+    this.token = token;
+    localStorage.setItem('vaas_admin_token', token);
+    this.setAuthHeader(token);
+  }
 }
 
 export const apiClient = new ApiClient();
