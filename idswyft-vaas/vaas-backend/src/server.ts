@@ -6,10 +6,11 @@ import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 
 import config from './config/index.js';
-import { connectVaasDB } from './config/database.js';
+import { connectVaasDB, vaasSupabase } from './config/database.js';
 import { sessionExpirationService } from './services/sessionExpirationService.js';
 import { seedPlatformAdmin } from './scripts/seedPlatformAdmin.js';
 import { authRateLimit } from './middleware/rateLimit.js';
+import { logger } from './utils/logger.js';
 
 // Import routes
 console.log('📦 Importing route modules...');
@@ -186,14 +187,46 @@ app.use('/api/auth/login', authRateLimit);
 app.use('/api/auth/refresh', authRateLimit);
 app.use('/api/platform/auth/login', authRateLimit);
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'healthy',
+// Health check endpoint — probes DB connectivity, returns diagnostics in non-production
+app.get('/health', async (req, res) => {
+  let dbStatus: 'connected' | 'error' = 'error';
+  let dbLatencyMs: number | null = null;
+
+  try {
+    const start = Date.now();
+    const { count, error } = await vaasSupabase
+      .from('vaas_organizations')
+      .select('*', { count: 'exact', head: true });
+    dbLatencyMs = Date.now() - start;
+    dbStatus = error ? 'error' : 'connected';
+  } catch {
+    dbStatus = 'error';
+  }
+
+  const healthy = dbStatus === 'connected';
+  const base = {
+    status: healthy ? 'healthy' : 'degraded',
     service: 'idswyft-vaas-backend',
     version: '1.0.0',
     timestamp: new Date().toISOString(),
-    environment: config.nodeEnv
+  };
+
+  // In production, only expose status — no memory/latency fingerprinting
+  if (config.nodeEnv === 'production') {
+    return res.status(healthy ? 200 : 503).json(base);
+  }
+
+  const mem = process.memoryUsage();
+  res.status(healthy ? 200 : 503).json({
+    ...base,
+    environment: config.nodeEnv,
+    uptime_seconds: Math.floor(process.uptime()),
+    db: { status: dbStatus, latency_ms: dbLatencyMs },
+    memory: {
+      rss_mb: Math.round(mem.rss / 1048576),
+      heap_used_mb: Math.round(mem.heapUsed / 1048576),
+      heap_total_mb: Math.round(mem.heapTotal / 1048576),
+    },
   });
 });
 
@@ -368,7 +401,7 @@ app.use('*', (req, res) => {
 
 // Global error handling middleware
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
-  console.error('VaaS API Error:', err);
+  logger.error('VaaS API Error', { error: err.message, stack: err.stack, path: req.originalUrl });
   
   // Handle specific error types
   if (err.name === 'ValidationError') {
@@ -455,7 +488,7 @@ const startVaasServer = async () => {
     
     return server;
   } catch (error) {
-    console.error('Failed to start VaaS server:', error);
+    logger.error('Failed to start VaaS server', { error });
     process.exit(1);
   }
 };

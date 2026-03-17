@@ -6,6 +6,7 @@ import config from '../config/index.js';
 import { VaasApiResponse, VaasCreateOrganizationRequest, VaasEnterpriseSignupRequest } from '../types/index.js';
 import { validateCreateOrganization, validateEnterpriseSignup } from '../middleware/validation.js';
 import { requireAuth, requireSuperAdmin } from '../middleware/auth.js';
+import { auditService } from '../services/auditService.js';
 
 const router = Router();
 
@@ -196,12 +197,22 @@ router.put('/:id', requireAuth, async (req, res) => {
     }
     
     const organization = await organizationService.updateOrganization(id, updates);
-    
+
+    auditService.logAuditEvent({
+      organizationId: id,
+      adminId: admin.id,
+      action: 'organization.updated',
+      resourceType: 'organization',
+      resourceId: id,
+      details: { fields: Object.keys(updates) },
+      req,
+    });
+
     const response: VaasApiResponse = {
       success: true,
       data: organization
     };
-    
+
     res.json(response);
   } catch (error: any) {
     const response: VaasApiResponse = {
@@ -220,14 +231,24 @@ router.put('/:id', requireAuth, async (req, res) => {
 router.delete('/:id', requireSuperAdmin, async (req, res) => {
   try {
     const { id } = req.params;
-    
+    const admin = (req as any).admin;
+
     await organizationService.deleteOrganization(id);
-    
+
+    auditService.logAuditEvent({
+      organizationId: id,
+      adminId: admin?.id,
+      action: 'organization.deleted',
+      resourceType: 'organization',
+      resourceId: id,
+      req,
+    });
+
     const response: VaasApiResponse = {
       success: true,
       data: { message: 'Organization deleted successfully' }
     };
-    
+
     res.json(response);
   } catch (error: any) {
     const response: VaasApiResponse = {

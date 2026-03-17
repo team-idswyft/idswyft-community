@@ -7,6 +7,7 @@ import config from '../config/index.js';
 import { VaasApiResponse, VaasLoginRequest, VaasLoginResponse } from '../types/index.js';
 import { validateLoginRequest } from '../middleware/validation.js';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
+import { auditService } from '../services/auditService.js';
 
 const ACCESS_TOKEN_EXPIRY = '1h';
 const REFRESH_TOKEN_EXPIRY_DAYS = 7;
@@ -122,6 +123,14 @@ router.post('/login', validateLoginRequest, async (req, res) => {
         .update(lockUpdate)
         .eq('id', admin.id);
 
+      auditService.logAuditEvent({
+        organizationId: admin.organization_id,
+        adminId: admin.id,
+        action: 'auth.login_failed',
+        details: { email, attempts },
+        req,
+      });
+
       const response: VaasApiResponse = {
         success: false,
         error: {
@@ -132,7 +141,7 @@ router.post('/login', validateLoginRequest, async (req, res) => {
 
       return res.status(401).json(response);
     }
-    
+
     // Check email verification
     if (!admin.email_verified) {
       const response: VaasApiResponse = {
@@ -205,6 +214,13 @@ router.post('/login', validateLoginRequest, async (req, res) => {
       expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString() // 1h
     };
 
+    auditService.logAuditEvent({
+      organizationId: admin.organization_id,
+      adminId: admin.id,
+      action: 'auth.login_success',
+      req,
+    });
+
     const response: VaasApiResponse<VaasLoginResponse> = {
       success: true,
       data: loginResponse
@@ -226,6 +242,13 @@ router.post('/login', validateLoginRequest, async (req, res) => {
 
 // Admin logout — deletes refresh token for server-side session invalidation
 router.post('/logout', requireAuth, async (req: AuthenticatedRequest, res) => {
+  auditService.logAuditEvent({
+    organizationId: req.admin!.organization_id,
+    adminId: req.admin!.id,
+    action: 'auth.logout',
+    req,
+  });
+
   const { refresh_token } = req.body;
 
   if (refresh_token) {
@@ -497,12 +520,20 @@ router.post('/forgot-password', async (req, res) => {
         config.jwtSecret,
         { expiresIn: '1h' }
       );
-      
+
       // TODO: Send password reset email
       // For now, just log the reset URL (in production, send via email service)
       console.log(`Password reset URL for ${admin.email}: ${config.frontendUrl}/reset-password?token=${resetToken}`);
+
+      auditService.logAuditEvent({
+        organizationId: (admin.vaas_organizations as any).id,
+        adminId: admin.id,
+        action: 'auth.forgot_password',
+        details: { email },
+        req,
+      });
     }
-    
+
     res.json(response);
   } catch (error: any) {
     const response: VaasApiResponse = {
@@ -571,12 +602,19 @@ router.post('/reset-password', async (req, res) => {
     if (error) {
       throw new Error('Failed to update password');
     }
-    
+
+    auditService.logAuditEvent({
+      organizationId: decoded.organization_id || 'unknown',
+      adminId: decoded.admin_id,
+      action: 'auth.password_reset',
+      req,
+    });
+
     const response: VaasApiResponse = {
       success: true,
       data: { message: 'Password reset successfully' }
     };
-    
+
     res.json(response);
   } catch (error: any) {
     const response: VaasApiResponse = {
@@ -586,7 +624,7 @@ router.post('/reset-password', async (req, res) => {
         message: 'Invalid or expired reset token'
       }
     };
-    
+
     res.status(400).json(response);
   }
 });

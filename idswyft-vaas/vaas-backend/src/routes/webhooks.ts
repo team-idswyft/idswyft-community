@@ -7,6 +7,7 @@ import { validateWebhookConfig } from '../middleware/validation.js';
 import { VaasApiResponse } from '../types/index.js';
 import { vaasSupabase } from '../config/database.js';
 import config from '../config/index.js';
+import { auditService } from '../services/auditService.js';
 
 const router = Router();
 
@@ -21,12 +22,22 @@ router.post('/', requireAuth, requirePermission('manage_webhooks'), validateWebh
       events,
       secret_key
     });
-    
+
+    auditService.logAuditEvent({
+      organizationId,
+      adminId: req.admin!.id,
+      action: 'webhook.created',
+      resourceType: 'webhook',
+      resourceId: webhook?.id,
+      details: { url, events },
+      req,
+    });
+
     const response: VaasApiResponse = {
       success: true,
       data: webhook
     };
-    
+
     res.status(201).json(response);
   } catch (error: any) {
     const response: VaasApiResponse = {
@@ -116,12 +127,21 @@ router.put('/:id', requireAuth, requirePermission('manage_webhooks'), async (req
     const { id: _, organization_id, secret_key, created_at, updated_at, ...allowedUpdates } = updates;
     
     const webhook = await webhookService.updateWebhook(organizationId, id, allowedUpdates);
-    
+
+    auditService.logAuditEvent({
+      organizationId,
+      adminId: req.admin!.id,
+      action: 'webhook.updated',
+      resourceType: 'webhook',
+      resourceId: id,
+      req,
+    });
+
     const response: VaasApiResponse = {
       success: true,
       data: webhook
     };
-    
+
     res.json(response);
   } catch (error: any) {
     const response: VaasApiResponse = {
@@ -143,12 +163,21 @@ router.delete('/:id', requireAuth, requirePermission('manage_webhooks'), async (
     const organizationId = req.admin!.organization_id;
     
     await webhookService.deleteWebhook(organizationId, id);
-    
+
+    auditService.logAuditEvent({
+      organizationId,
+      adminId: req.admin!.id,
+      action: 'webhook.deleted',
+      resourceType: 'webhook',
+      resourceId: id,
+      req,
+    });
+
     const response: VaasApiResponse = {
       success: true,
       data: { message: 'Webhook deleted successfully' }
     };
-    
+
     res.json(response);
   } catch (error: any) {
     const response: VaasApiResponse = {

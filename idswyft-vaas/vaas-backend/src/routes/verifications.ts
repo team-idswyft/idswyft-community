@@ -5,6 +5,7 @@ import { validateStartVerification, validatePagination } from '../middleware/val
 import { apiKeyRateLimit } from '../middleware/rateLimit.js';
 import { VaasApiResponse, VaasStartVerificationRequest } from '../types/index.js';
 import { vaasSupabase } from '../config/database.js';
+import { auditService } from '../services/auditService.js';
 
 const router = Router();
 
@@ -216,12 +217,22 @@ router.post('/:id/approve', requireAuth, requirePermission('approve_verification
     const reviewerId = req.admin!.id;
     
     const verification = await verificationService.approveVerification(organizationId, id, reviewerId, notes);
-    
+
+    auditService.logAuditEvent({
+      organizationId,
+      adminId: reviewerId,
+      action: 'verification.approved',
+      resourceType: 'verification',
+      resourceId: id,
+      details: { notes },
+      req,
+    });
+
     const response: VaasApiResponse = {
       success: true,
       data: verification
     };
-    
+
     res.json(response);
   } catch (error: any) {
     const response: VaasApiResponse = {
@@ -257,12 +268,22 @@ router.post('/:id/reject', requireAuth, requirePermission('approve_verifications
     }
     
     const verification = await verificationService.rejectVerification(organizationId, id, reviewerId, reason, notes);
-    
+
+    auditService.logAuditEvent({
+      organizationId,
+      adminId: reviewerId,
+      action: 'verification.rejected',
+      resourceType: 'verification',
+      resourceId: id,
+      details: { reason, notes },
+      req,
+    });
+
     const response: VaasApiResponse = {
       success: true,
       data: verification
     };
-    
+
     res.json(response);
   } catch (error: any) {
     const response: VaasApiResponse = {
@@ -298,12 +319,21 @@ router.post('/:id/sync', requireAuth, requirePermission('view_verifications'), a
     }
     
     const updatedVerification = await verificationService.syncVerificationFromIdswyft(verification.idswyft_verification_id);
-    
+
+    auditService.logAuditEvent({
+      organizationId: req.admin!.organization_id,
+      adminId: req.admin!.id,
+      action: 'verification.synced',
+      resourceType: 'verification',
+      resourceId: id,
+      req,
+    });
+
     const response: VaasApiResponse = {
       success: true,
       data: updatedVerification
     };
-    
+
     res.json(response);
   } catch (error: any) {
     const response: VaasApiResponse = {

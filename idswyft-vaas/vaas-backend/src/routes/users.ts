@@ -6,6 +6,7 @@ import { VaasApiResponse, VaasEndUser } from '../types/index.js';
 import { vaasSupabase } from '../config/database.js';
 import { emailService } from '../services/emailService.js';
 import { v4 as uuidv4 } from 'uuid';
+import { auditService } from '../services/auditService.js';
 
 const router = Router();
 
@@ -609,13 +610,20 @@ router.delete('/:id', requireAuth, requirePermission('manage_users'), async (req
       throw new Error(`Failed to delete user: ${error.message}`);
     }
     
-    console.log(`[UserRoutes] Deleted end user: ${id}`);
-    
+    auditService.logAuditEvent({
+      organizationId,
+      adminId: req.admin!.id,
+      action: 'user.deleted',
+      resourceType: 'end_user',
+      resourceId: id,
+      req,
+    });
+
     const response: VaasApiResponse = {
       success: true,
       data: { message: 'User deleted successfully' }
     };
-    
+
     res.json(response);
   } catch (error: any) {
     console.error('[UserRoutes] Delete user failed:', error);
@@ -772,6 +780,16 @@ router.post('/:id/send-verification-invitation', requireAuth, requirePermission(
       console.log(`⚠️ Failed to send verification invitation email to ${user.email}`);
     }
     
+    auditService.logAuditEvent({
+      organizationId,
+      adminId: req.admin!.id,
+      action: 'user.invitation_sent',
+      resourceType: 'end_user',
+      resourceId: id,
+      details: { email: user.email, email_sent: emailSent },
+      req,
+    });
+
     const response: VaasApiResponse = {
       success: true,
       data: {
@@ -784,7 +802,7 @@ router.post('/:id/send-verification-invitation', requireAuth, requirePermission(
         email_status: emailSent ? 'sent' : 'failed'
       }
     };
-    
+
     res.json(response);
   } catch (error: any) {
     console.error('[UserRoutes] Send verification invitation failed:', error);

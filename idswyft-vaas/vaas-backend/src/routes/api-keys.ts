@@ -5,6 +5,7 @@ import { VaasApiResponse } from '../types/index.js';
 import { vaasSupabase } from '../config/database.js';
 import config from '../config/index.js';
 import crypto from 'crypto';
+import { auditService } from '../services/auditService.js';
 
 const router = Router();
 
@@ -212,6 +213,16 @@ router.post('/',
       throw new Error(`Failed to save API key: ${saveError.message}`);
     }
 
+    auditService.logAuditEvent({
+      organizationId,
+      adminId: req.admin!.id,
+      action: 'api_key.created',
+      resourceType: 'api_key',
+      resourceId: keyId,
+      details: { key_name: key_name.trim() },
+      req,
+    });
+
     const response: VaasApiResponse = {
       success: true,
       data: {
@@ -366,6 +377,15 @@ router.delete('/:keyId',
       return res.status(400).json(response);
     }
 
+    auditService.logAuditEvent({
+      organizationId,
+      adminId: req.admin!.id,
+      action: 'api_key.deleted',
+      resourceType: 'api_key',
+      resourceId: keyId,
+      req,
+    });
+
     const response: VaasApiResponse = {
       success: true,
       data: {
@@ -439,6 +459,15 @@ router.post('/:keyId/rotate',
       };
       return res.status(404).json(response);
     }
+
+    auditService.logAuditEvent({
+      organizationId,
+      adminId: req.admin!.id,
+      action: 'api_key.rotated',
+      resourceType: 'api_key',
+      resourceId: keyId,
+      req,
+    });
 
     const response: VaasApiResponse = {
       success: true,
