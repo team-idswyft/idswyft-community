@@ -1,10 +1,12 @@
 import { Router } from 'express';
+import crypto from 'crypto';
 import { webhookService } from '../services/webhookService.js';
 import { verificationService } from '../services/verificationService.js';
 import { requireAuth, requirePermission, AuthenticatedRequest } from '../middleware/auth.js';
 import { validateWebhookConfig } from '../middleware/validation.js';
 import { VaasApiResponse } from '../types/index.js';
 import { vaasSupabase } from '../config/database.js';
+import config from '../config/index.js';
 
 const router = Router();
 
@@ -193,21 +195,26 @@ router.post('/idswyft', async (req, res) => {
   try {
     const signature = req.headers['x-idswyft-signature'] as string;
     const payload = JSON.stringify(req.body);
-    
-    // Verify webhook signature (in production, use proper secret)
-    const expectedSecret = process.env.IDSWYFT_WEBHOOK_SECRET || 'default-webhook-secret';
-    
+
     if (!signature) {
       console.warn('[WebhookRoute] Missing signature for Idswyft webhook');
       return res.status(400).json({ error: 'Missing signature' });
     }
-    
-    // TODO: Implement proper signature verification
-    // const isValid = idswyftApiService.verifyWebhookSignature(payload, signature, expectedSecret);
-    // if (!isValid) {
-    //   return res.status(401).json({ error: 'Invalid signature' });
-    // }
-    
+
+    // Verify HMAC-SHA256 webhook signature (main API sends "sha256=<hex>")
+    const expectedSignature = 'sha256=' + crypto
+      .createHmac('sha256', config.idswyftWebhookSecret)
+      .update(payload)
+      .digest('hex');
+
+    const sigBuffer = Buffer.from(signature);
+    const expectedBuffer = Buffer.from(expectedSignature);
+
+    if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
+      console.warn('[WebhookRoute] Invalid signature for Idswyft webhook');
+      return res.status(401).json({ error: 'Invalid signature' });
+    }
+
     const event = req.body;
     console.log('[WebhookRoute] Received Idswyft webhook:', event.type, event.data?.verification_id);
     
