@@ -415,7 +415,8 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
   const [finalResult, setFinalResult] = useState<any>(null);
   const [stepError, setStepError] = useState<string | null>(null);
 
-  const [idempotencyKey] = useState(() => crypto.randomUUID());
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
+  const [retryProcessing, setRetryProcessing] = useState(false);
   const mountedRef = useRef(true);
 
   const screen: Screen = SCREENS[screenIdx];
@@ -452,6 +453,16 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
         }
         if (sessionData.organization?.name) {
           setOrganizationName(sessionData.organization.name);
+        }
+
+        // If session already failed, show the failure screen with retry option
+        if (sessionData.status === 'failed') {
+          setFinalResult({
+            final_result: 'failed',
+            failure_reason: (sessionData as any).results?.failure_reason,
+            retry_available: (sessionData as any).retry_available,
+          });
+          setScreenIdx(5);
         }
 
         setLoading(false);
@@ -733,6 +744,39 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
     if (!mountedRef.current) return;
     setFinalResult(data);
     setScreenIdx(5); // Done screen (shifted by country screen)
+  };
+
+  // ── Retry: restart the session and reset all state ────────────────────
+  const handleRetry = async () => {
+    setRetryProcessing(true);
+    try {
+      await customerPortalAPI.restartSession(sessionToken);
+      // Reset all flow state
+      if (frontPreviewUrl) URL.revokeObjectURL(frontPreviewUrl);
+      if (backPreviewUrl) URL.revokeObjectURL(backPreviewUrl);
+      if (selfiePreviewUrl) URL.revokeObjectURL(selfiePreviewUrl);
+      setFrontFile(null);
+      setFrontPreviewUrl(null);
+      setBackFile(null);
+      setBackPreviewUrl(null);
+      setSelfieFile(null);
+      setSelfieMetadata(null);
+      setSelfiePreviewUrl(null);
+      setVerificationId(null);
+      setFinalResult(null);
+      setStepError(null);
+      setCheckingMsg('');
+      setShowCamera(false);
+      setShowSelfieCamera(false);
+      setShowActiveLiveness(false);
+      setUseFallbackSelfie(false);
+      setIdempotencyKey(crypto.randomUUID());
+      setScreenIdx(0); // Back to country selection
+    } catch (err: any) {
+      setStepError(err.message || t('failure.maxRetries'));
+    } finally {
+      setRetryProcessing(false);
+    }
   };
 
   // ─── Shared styles ────────────────────────────────────────────────────
@@ -1304,6 +1348,35 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
                       ? (finalResult.failure_reason || t('failure.message'))
                       : t('manualReview.message')}
                   </p>
+
+                  {isFailed && finalResult.retry_available !== false && (
+                    <div style={{ width: '100%', maxWidth: 320, marginTop: 8 }}>
+                      <PrimaryBtn onClick={handleRetry} disabled={retryProcessing}>
+                        {retryProcessing ? (
+                          <span style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8 }}>
+                            <span style={{
+                              width: 16, height: 16, border: '2px solid rgba(4,13,26,0.3)',
+                              borderTopColor: 'var(--navy)', borderRadius: '50%',
+                              animation: 'spin 0.8s linear infinite', display: 'inline-block',
+                            }} />
+                            {t('common.processing')}
+                          </span>
+                        ) : t('common.tryAgain')}
+                      </PrimaryBtn>
+                    </div>
+                  )}
+
+                  {isFailed && finalResult.retry_available === false && (
+                    <p style={{ fontSize: 12, color: 'var(--muted)', lineHeight: 1.55, marginTop: 8, textAlign: 'center' }}>
+                      {t('failure.maxRetries')}
+                    </p>
+                  )}
+
+                  {stepError && (
+                    <p style={{ marginTop: 10, fontSize: 12, color: '#ef4444', fontFamily: "'JetBrains Mono', monospace", textAlign: 'center' }}>
+                      {stepError}
+                    </p>
+                  )}
                 </>
               );
             })()}

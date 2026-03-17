@@ -55,7 +55,8 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
   const [showLiveCapture, setShowLiveCapture] = useState(false);
   const [finalStatus, setFinalStatus] = useState<'pending' | 'processing' | 'completed' | 'verified' | 'failed' | 'manual_review' | null>(null);
   const [verificationResults, setVerificationResults] = useState<any>(null);
-  const [idempotencyKey] = useState(() => crypto.randomUUID());
+  const [idempotencyKey, setIdempotencyKey] = useState(() => crypto.randomUUID());
+  const [retryProcessing, setRetryProcessing] = useState(false);
   const { branding, organizationName, setBranding, setOrganizationName } = useOrganization();
   const { t: tr } = useTranslation();
 
@@ -92,6 +93,17 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
         if (sessionData.organization?.name) {
           setOrganizationName(sessionData.organization.name);
         }
+
+        // If session already failed, show the failure screen with retry option
+        if (sessionData.status === 'failed') {
+          setFinalStatus('failed');
+          setVerificationResults({
+            failure_reason: (sessionData as any).results?.failure_reason,
+            retry_available: (sessionData as any).retry_available,
+          });
+          setCurrentStep(6);
+        }
+
         setLoading(false);
       } catch (err: any) {
         if (!mountedRef.current) return;
@@ -253,6 +265,33 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
     } catch {
       if (mountedRef.current && attempt < 3) setTimeout(() => pollForFinalResults(vId, attempt + 1), 5000);
       else if (mountedRef.current) setError(tr('errors.statusCheckFailed'));
+    }
+  };
+
+  // ── Retry: restart the session and reset all state ─────────────────────────
+  const handleRetry = async () => {
+    setRetryProcessing(true);
+    setError(null);
+    try {
+      await customerPortalAPI.restartSession(sessionToken);
+      // Reset all flow state
+      if (frontPreviewUrl) URL.revokeObjectURL(frontPreviewUrl);
+      if (backPreviewUrl) URL.revokeObjectURL(backPreviewUrl);
+      setDocuments({});
+      setFrontPreviewUrl(null);
+      setBackPreviewUrl(null);
+      setFinalStatus(null);
+      setVerificationResults(null);
+      setVerificationId(null);
+      setOcrData(null);
+      setBackOfIdUploaded(false);
+      setShowLiveCapture(false);
+      setIdempotencyKey(crypto.randomUUID());
+      setCurrentStep(1); // Back to country selection
+    } catch (err: any) {
+      setError(err.message || tr('failure.maxRetries'));
+    } finally {
+      setRetryProcessing(false);
     }
   };
 
@@ -696,10 +735,22 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
               </div>
             )}
 
-            {isFailed && (
-              <button onClick={() => window.location.reload()} className="btn-primary">
-                {tr('common.tryAgain')}
+            {isFailed && verificationResults?.retry_available !== false && (
+              <button onClick={handleRetry} disabled={retryProcessing} className="btn-primary">
+                {retryProcessing ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                    {tr('common.processing')}
+                  </span>
+                ) : tr('common.tryAgain')}
               </button>
+            )}
+
+            {isFailed && verificationResults?.retry_available === false && (
+              <p className={`text-sm ${t.textSec}`}>{tr('failure.maxRetries')}</p>
             )}
           </div>
         );

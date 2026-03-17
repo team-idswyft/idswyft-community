@@ -145,6 +145,7 @@
     "heading": "Verifizierung fehlgeschlagen",
     "message": "Ihre Verifizierung konnte nicht abgeschlossen werden.",
     "helpText": "Bitte überprüfen Sie die Angaben und versuchen Sie es erneut, oder kontaktieren Sie den Support.",
+    "maxRetries": "Sie haben alle verfügbaren Wiederholungsversuche aufgebraucht. Bitte fordern Sie einen neuen Verifizierungslink an.",
     "checklist": {
       "documentNotRead": "Dokument konnte nicht gelesen werden",
       "detailsMismatch": "Daten stimmen nicht überein",

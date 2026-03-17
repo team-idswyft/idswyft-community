@@ -464,6 +464,7 @@ router.get('/session/:token', async (req, res) => {
         status,
         expires_at,
         results,
+        retry_count,
         created_at,
         updated_at,
         vaas_organizations!inner(
@@ -509,13 +510,14 @@ router.get('/session/:token', async (req, res) => {
     }
     
     // Block access to sessions that have reached a terminal status.
-    // Once verified/failed/completed/manual_review/terminated, the link is stale.
-    const terminalStatuses = ['verified', 'failed', 'completed', 'manual_review', 'terminated'];
+    // Once verified/completed/manual_review/terminated, the link is stale.
+    // Note: 'failed' is intentionally excluded so the customer portal can
+    // re-fetch session data and offer the user a retry option.
+    const terminalStatuses = ['verified', 'completed', 'manual_review', 'terminated'];
     if (terminalStatuses.includes(session.status)) {
       const messages: Record<string, string> = {
         verified:      'This identity has already been verified. The link is no longer active.',
         completed:     'This identity has already been verified. The link is no longer active.',
-        failed:        'This verification has already been processed. Please request a new link if needed.',
         manual_review: 'This verification is under review. You will be notified of the result.',
         terminated:    'This verification link has been deactivated.',
       };
@@ -536,7 +538,7 @@ router.get('/session/:token', async (req, res) => {
     const organization = (session.vaas_organizations as any);
     const endUser = (session.vaas_end_users as any);
     
-    const sessionData = {
+    const sessionData: Record<string, any> = {
       id: session.id,
       status: session.status,
       expires_at: session.expires_at,
@@ -555,6 +557,14 @@ router.get('/session/:token', async (req, res) => {
         require_back_of_id: organization.settings?.require_back_of_id !== false
       }
     };
+
+    // For failed sessions, include results and retry availability
+    // so the customer portal can show the failure reason + retry button
+    if (session.status === 'failed') {
+      sessionData.results = session.results || {};
+      sessionData.retry_available = (session.retry_count ?? 0) < 3;
+      sessionData.retry_count = session.retry_count ?? 0;
+    }
     
     const response: VaasApiResponse = {
       success: true,
@@ -640,7 +650,7 @@ router.post('/session/:token/terminate', async (req, res) => {
       throw new Error('Failed to terminate session');
     }
     
-    console.log(`[VerificationRoutes] Session ${token} terminated successfully`);
+    console.log(`[VerificationRoutes] Session ${token.substring(0, 8)}... terminated successfully`);
     
     const response: VaasApiResponse = {
       success: true,
@@ -661,6 +671,156 @@ router.post('/session/:token/terminate', async (req, res) => {
       }
     };
     
+    res.status(500).json(response);
+  }
+});
+
+// Restart a failed verification session (public endpoint for customer portal)
+router.post('/session/:token/restart', async (req, res) => {
+  try {
+    const { token } = req.params;
+
+    if (!token) {
+      const response: VaasApiResponse = {
+        success: false,
+        error: {
+          code: 'INVALID_TOKEN',
+          message: 'Session token is required'
+        }
+      };
+
+      return res.status(400).json(response);
+    }
+
+    // Find session by token
+    const { data: session, error: findError } = await vaasSupabase
+      .from('vaas_verification_sessions')
+      .select('id, status, expires_at, retry_count, end_user_id')
+      .eq('session_token', token)
+      .single();
+
+    if (findError || !session) {
+      const response: VaasApiResponse = {
+        success: false,
+        error: {
+          code: 'SESSION_NOT_FOUND',
+          message: 'Invalid verification session'
+        }
+      };
+
+      return res.status(404).json(response);
+    }
+
+    // Only failed sessions can be restarted
+    if (session.status !== 'failed') {
+      const response: VaasApiResponse = {
+        success: false,
+        error: {
+          code: 'INVALID_SESSION_STATUS',
+          message: 'Only failed sessions can be restarted'
+        }
+      };
+
+      return res.status(400).json(response);
+    }
+
+    // Check expiration
+    if (new Date(session.expires_at) < new Date()) {
+      const response: VaasApiResponse = {
+        success: false,
+        error: {
+          code: 'SESSION_EXPIRED',
+          message: 'This verification session has expired and cannot be restarted'
+        }
+      };
+
+      return res.status(410).json(response);
+    }
+
+    // Enforce max 3 retries
+    const currentRetryCount = session.retry_count ?? 0;
+    if (currentRetryCount >= 3) {
+      const response: VaasApiResponse = {
+        success: false,
+        error: {
+          code: 'MAX_RETRIES_EXCEEDED',
+          message: 'Maximum retry attempts reached. Please request a new verification link.'
+        }
+      };
+
+      return res.status(400).json(response);
+    }
+
+    // Reset session: status → pending, clear results and scores, increment retry_count
+    // The .eq('status', 'failed') acts as an atomic guard — if a concurrent request
+    // already transitioned this session out of 'failed', zero rows will match.
+    const { error: updateError, count } = await vaasSupabase
+      .from('vaas_verification_sessions')
+      .update({
+        status: 'pending',
+        results: null,
+        confidence_score: null,
+        completed_at: null,
+        retry_count: currentRetryCount + 1,
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', session.id)
+      .eq('status', 'failed');
+
+    if (updateError) {
+      throw new Error('Failed to restart session');
+    }
+
+    if (count === 0) {
+      const response: VaasApiResponse = {
+        success: false,
+        error: {
+          code: 'SESSION_ALREADY_RESTARTED',
+          message: 'This session has already been restarted'
+        }
+      };
+
+      return res.status(409).json(response);
+    }
+
+    // Reset end user verification status back to in_progress
+    if (session.end_user_id) {
+      const { error: userUpdateError } = await vaasSupabase
+        .from('vaas_end_users')
+        .update({
+          verification_status: 'in_progress',
+          verification_completed_at: null,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', session.end_user_id);
+
+      if (userUpdateError) {
+        console.warn('[VerificationRoutes] Failed to reset end user status:', userUpdateError);
+      }
+    }
+
+    console.log(`[VerificationRoutes] Session ${token.substring(0, 8)}... restarted (retry ${currentRetryCount + 1})`);
+
+    const response: VaasApiResponse = {
+      success: true,
+      data: {
+        retry_count: currentRetryCount + 1,
+        message: 'Verification session restarted successfully'
+      }
+    };
+
+    res.json(response);
+  } catch (error: any) {
+    console.error('[VerificationRoutes] Restart session failed:', error);
+
+    const response: VaasApiResponse = {
+      success: false,
+      error: {
+        code: 'RESTART_SESSION_FAILED',
+        message: 'Failed to restart verification session'
+      }
+    };
+
     res.status(500).json(response);
   }
 });

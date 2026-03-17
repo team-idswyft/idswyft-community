@@ -145,6 +145,7 @@
     "heading": "Verificación fallida",
     "message": "Su verificación no pudo completarse.",
     "helpText": "Revise los detalles e intente de nuevo, o contacte al soporte para asistencia.",
+    "maxRetries": "Ha agotado todos los intentos de reintento disponibles. Solicite un nuevo enlace de verificación.",
     "checklist": {
       "documentNotRead": "No se pudo leer el documento",
       "detailsMismatch": "Los datos no coinciden",

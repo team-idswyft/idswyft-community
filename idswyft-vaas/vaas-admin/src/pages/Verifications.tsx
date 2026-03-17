@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Search,
   Filter,
@@ -80,13 +80,37 @@ export default function Verifications() {
   const [totalPages, setTotalPages] = useState(1);
   const [totalRecords, setTotalRecords] = useState(0);
 
+  const loadingRef = useRef(false);
+
   useEffect(() => {
     loadVerifications();
   }, [currentPage, filters]);
 
-  const loadVerifications = async () => {
+  // Polling: auto-refresh every 15s with visibility awareness
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'hidden' || loadingRef.current) return;
+      loadVerifications(true);
+    }, 15000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && !loadingRef.current) {
+        loadVerifications(true);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [currentPage, filters]);
+
+  const loadVerifications = async (silent = false) => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       const params: any = {
         page: currentPage,
@@ -116,13 +140,16 @@ export default function Verifications() {
       setTotalPages(totalPages);
       setTotalRecords(result.meta?.total || 0);
     } catch (err: unknown) {
-      console.error('Failed to load verifications:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load verifications');
-      setVerifications([]);
-      setTotalPages(1);
-      setTotalRecords(0);
+      if (!silent) {
+        console.error('Failed to load verifications:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load verifications');
+        setVerifications([]);
+        setTotalPages(1);
+        setTotalRecords(0);
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
+      loadingRef.current = false;
     }
   };
 

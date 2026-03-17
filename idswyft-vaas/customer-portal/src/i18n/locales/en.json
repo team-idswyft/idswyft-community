@@ -145,6 +145,7 @@
     "heading": "Verification Failed",
     "message": "Your verification could not be completed.",
     "helpText": "Please review the details and try again, or contact support for assistance.",
+    "maxRetries": "You've used all available retry attempts. Please request a new verification link.",
     "checklist": {
       "documentNotRead": "Document could not be read",
       "detailsMismatch": "Details do not match",

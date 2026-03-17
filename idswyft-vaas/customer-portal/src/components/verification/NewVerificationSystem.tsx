@@ -30,6 +30,8 @@ export const NewVerificationSystem: React.FC<NewVerificationSystemProps> = ({ se
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [uploading, setUploading] = useState(false);
+  const [retryProcessing, setRetryProcessing] = useState(false);
+  const [failedSessionData, setFailedSessionData] = useState<any>(null);
   const { branding, organizationName } = useOrganization();
 
   // Initialize session and verification engine
@@ -43,6 +45,16 @@ export const NewVerificationSystem: React.FC<NewVerificationSystemProps> = ({ se
         const sessionData = await customerPortalAPI.getVerificationSession(sessionToken);
         console.log('✅ Session data retrieved:', sessionData);
         setSession(sessionData);
+
+        // If session already failed, show failure with retry option
+        if (sessionData.status === 'failed') {
+          setFailedSessionData({
+            failure_reason: (sessionData as any).results?.failure_reason,
+            retry_available: (sessionData as any).retry_available,
+          });
+          setLoading(false);
+          return;
+        }
 
         // Initialize verification engine
         const engine = new CustomerPortalVerificationEngine('new_verification_id');
@@ -139,6 +151,34 @@ export const NewVerificationSystem: React.FC<NewVerificationSystemProps> = ({ se
     verificationEngine.goBackToCountry();
   };
 
+  // Retry: restart the session and reset all state
+  const handleRetry = async () => {
+    setRetryProcessing(true);
+    setError(null);
+    try {
+      await customerPortalAPI.restartSession(sessionToken);
+      // Reset all state and re-initialize
+      setFailedSessionData(null);
+      setVerificationEngine(null);
+      setVerificationState(null);
+      setSession(null);
+      setLoading(true);
+      // Re-trigger session init via effect
+      const sessionData = await customerPortalAPI.getVerificationSession(sessionToken);
+      setSession(sessionData);
+      const engine = new CustomerPortalVerificationEngine('new_verification_id');
+      setVerificationEngine(engine);
+      engine.onStatusUpdate((state) => setVerificationState(state));
+      await engine.initializeVerification();
+      setLoading(false);
+    } catch (err: any) {
+      setError(err.message || 'Failed to restart verification');
+      setLoading(false);
+    } finally {
+      setRetryProcessing(false);
+    }
+  };
+
   const getStepIcon = (status: VerificationStatus) => {
     if (status === VerificationStatusValues.PENDING) return <Loader className="w-5 h-5 animate-spin" />;
     if (status.includes('processing')) return <Loader className="w-5 h-5 animate-spin" />;
@@ -204,6 +244,37 @@ export const NewVerificationSystem: React.FC<NewVerificationSystemProps> = ({ se
           >
             Try Again
           </button>
+        </div>
+      </div>
+    );
+  }
+
+  // Failed session from init — show failure screen with retry
+  if (failedSessionData) {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md">
+          <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
+          <h3 className="text-xl font-semibold text-red-800 mb-2">Verification Failed</h3>
+          <p className="text-red-700 mb-6">
+            {failedSessionData.failure_reason || 'Your verification could not be completed.'}
+          </p>
+          {failedSessionData.retry_available !== false ? (
+            <button
+              onClick={handleRetry}
+              disabled={retryProcessing}
+              className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+            >
+              {retryProcessing ? 'Restarting...' : 'Try Again'}
+            </button>
+          ) : (
+            <p className="text-gray-500 text-sm">
+              You've used all available retry attempts. Please request a new verification link.
+            </p>
+          )}
+          {error && (
+            <p className="mt-4 text-sm text-red-600">{error}</p>
+          )}
         </div>
       </div>
     );
@@ -425,7 +496,14 @@ export const NewVerificationSystem: React.FC<NewVerificationSystemProps> = ({ se
                 <div className="bg-red-50 border border-red-200 rounded-lg p-6">
                   <AlertCircle className="w-12 h-12 text-red-500 mx-auto mb-4" />
                   <h3 className="text-xl font-semibold text-red-800 mb-2">Verification Failed</h3>
-                  <p className="text-red-700">{verificationState?.resultMessage}</p>
+                  <p className="text-red-700 mb-4">{verificationState?.resultMessage}</p>
+                  <button
+                    onClick={handleRetry}
+                    disabled={retryProcessing}
+                    className="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 disabled:opacity-50"
+                  >
+                    {retryProcessing ? 'Restarting...' : 'Try Again'}
+                  </button>
                 </div>
               )}
 
