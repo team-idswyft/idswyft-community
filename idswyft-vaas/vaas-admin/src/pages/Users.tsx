@@ -246,7 +246,7 @@ export default function Users() {
       {error && (
         <div className="p-4 bg-rose-500/12 border border-rose-500/25 rounded-lg text-rose-300 text-sm flex items-center justify-between">
           <span>{error}</span>
-          <button onClick={loadUsers} className="ml-4 text-rose-200 hover:text-white underline text-xs font-mono">Retry</button>
+          <button onClick={() => loadUsers()} className="ml-4 text-rose-200 hover:text-white underline text-xs font-mono">Retry</button>
         </div>
       )}
 

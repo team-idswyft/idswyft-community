@@ -259,7 +259,7 @@ export default function Verifications() {
       {error && (
         <div className="p-4 bg-rose-500/12 border border-rose-500/25 rounded-lg text-rose-300 text-sm flex items-center justify-between">
           <span>{error}</span>
-          <button onClick={loadVerifications} className="ml-4 text-rose-200 hover:text-white underline text-xs font-mono">Retry</button>
+          <button onClick={() => loadVerifications()} className="ml-4 text-rose-200 hover:text-white underline text-xs font-mono">Retry</button>
         </div>
       )}
 
