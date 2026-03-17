@@ -413,6 +413,7 @@ const MobileVerificationPage: React.FC = () => {
   // Final result
   const [finalResult, setFinalResult] = useState<any>(null);
   const [stepError, setStepError] = useState<string | null>(null);
+  const [retryProcessing, setRetryProcessing] = useState(false);
 
   const mountedRef = useRef(true);
 
@@ -748,6 +749,43 @@ const MobileVerificationPage: React.FC = () => {
       else { setTimeout(() => waitForFinalResult(attempt + 1), 3000); }
     } catch {
       if (mountedRef.current) setTimeout(() => waitForFinalResult(attempt + 1), 3000);
+    }
+  };
+
+  // ── Retry failed verification ───────────────────────────────────────────
+  const handleRetry = async () => {
+    if (!verificationId || !apiKey) return;
+    setRetryProcessing(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v2/verify/${verificationId}/restart`, {
+        method: 'POST',
+        headers: { 'X-API-Key': apiKey },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: 'Failed to restart' }));
+        throw new Error(err.message || 'Failed to restart verification');
+      }
+      if (!mountedRef.current) return;
+      // Reset all local state — reuse same verificationId
+      if (frontPreviewUrl) URL.revokeObjectURL(frontPreviewUrl);
+      if (backPreviewUrl) URL.revokeObjectURL(backPreviewUrl);
+      if (selfiePreviewUrl) URL.revokeObjectURL(selfiePreviewUrl);
+      setFrontFile(null);
+      setFrontPreviewUrl(null);
+      setBackFile(null);
+      setBackPreviewUrl(null);
+      setSelfieFile(null);
+      setSelfiePreviewUrl(null);
+      setFinalResult(null);
+      setStepError(null);
+      setShowActiveLiveness(false);
+      setUseFallbackSelfie(false);
+      selfieMetadataRef.current = null;
+      setScreenIdx(0); // Back to front ID
+    } catch (err: any) {
+      if (mountedRef.current) setStepError(err.message);
+    } finally {
+      if (mountedRef.current) setRetryProcessing(false);
     }
   };
 
@@ -1254,6 +1292,22 @@ const MobileVerificationPage: React.FC = () => {
                       ? 'We were unable to verify your identity. Please return to your desktop to see details.'
                       : 'Your verification is being reviewed. You will be notified of the result.'}
                   </p>
+
+                  {isFailed && finalResult.retry_available === true && (
+                    <div style={{ marginTop: 16, width: '100%', maxWidth: 320 }}>
+                      <PrimaryBtn onClick={handleRetry} disabled={retryProcessing}>
+                        {retryProcessing ? 'Restarting…' : 'Try Again'}
+                      </PrimaryBtn>
+                    </div>
+                  )}
+                  {isFailed && finalResult.retry_available === false && (
+                    <p style={{
+                      marginTop: 16, fontSize: 11, color: 'rgba(239,68,68,0.8)',
+                      fontFamily: "'JetBrains Mono', monospace",
+                    }}>
+                      Maximum retry attempts reached.
+                    </p>
+                  )}
 
                   {patchFailed && (
                     <p style={{

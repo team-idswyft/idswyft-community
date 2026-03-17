@@ -415,6 +415,7 @@ router.post('/sessions/:sessionToken/result', async (req: Request, res: Response
     // Validate result payload
     const parseResult = resultSchema.safeParse(req.body);
     if (!parseResult.success) {
+      console.error('[PublicRoutes] Result schema validation failed:', JSON.stringify(parseResult.error.issues));
       const response: VaasApiResponse = {
         success: false,
         error: {

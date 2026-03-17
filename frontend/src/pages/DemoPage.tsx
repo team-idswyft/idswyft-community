@@ -97,6 +97,8 @@ interface VerificationRequest {
   face_match_passed?: boolean | null;
   liveness_passed?: boolean | null;
   manual_review_reason?: string | null;
+  retry_available?: boolean;
+  retry_count?: number;
 }
 
 interface LiveCaptureSession {
@@ -168,6 +170,7 @@ const DemoPage: React.FC = () => {
   const [_faceDetectionBuffer, setFaceDetectionBuffer] = useState<boolean[]>([]);
   const [mobileHandoffDone, setMobileHandoffDone] = useState(false);
   const [mobileResult, setMobileResult] = useState<any>(null);
+  const [retryProcessing, setRetryProcessing] = useState(false);
 
   // Address verification state
   const [addressFile, setAddressFile] = useState<File | null>(null);
@@ -287,6 +290,42 @@ const DemoPage: React.FC = () => {
       }
     } catch (error) {
       console.error('Failed to load verification results:', error);
+    }
+  };
+
+  // ── Retry failed verification ──────────────────────────────────────────
+  const handleRetry = async () => {
+    if (!verificationId) return;
+    setRetryProcessing(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v2/verify/${verificationId}/restart`, {
+        method: 'POST',
+        headers: { 'X-API-Key': apiKey },
+      });
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({ message: 'Failed to restart' }));
+        throw new Error(err.message || 'Failed to restart verification');
+      }
+      // Stop camera tracks if active
+      cleanup();
+      // Reset local state — reuse same verificationId
+      setSelectedFile(null);
+      if (previewUrl) URL.revokeObjectURL(previewUrl);
+      setPreviewUrl(null);
+      setVerificationRequest(null);
+      setBackOfIdUploaded(false);
+      setShowLiveCapture(false);
+      setUseFallbackCapture(false);
+      setCaptureResult(null);
+      setCameraState('prompt');
+      setFaceDetected(false);
+      setMobileHandoffDone(false);
+      setMobileResult(null);
+      setCurrentStep(2); // Back to front doc upload
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to restart verification');
+    } finally {
+      setRetryProcessing(false);
     }
   };
 
@@ -1865,6 +1904,30 @@ const DemoPage: React.FC = () => {
                 {JSON.stringify(verificationRequest, null, 2)}
               </pre>
             </div>
+
+            {/* Retry Button (failed only) */}
+            {isFailed && verificationRequest?.retry_available === true && (
+              <div style={{ textAlign: 'center', marginBottom: 16 }}>
+                <button
+                  onClick={handleRetry}
+                  disabled={retryProcessing}
+                  style={{
+                    background: retryProcessing ? 'rgba(34,211,238,0.4)' : C.cyan,
+                    color: '#080c14', border: 'none', borderRadius: 8,
+                    padding: '10px 32px', fontWeight: 600, fontSize: 14,
+                    cursor: retryProcessing ? 'not-allowed' : 'pointer',
+                    opacity: retryProcessing ? 0.6 : 1,
+                  }}
+                >
+                  {retryProcessing ? 'Restarting…' : 'Try Again'}
+                </button>
+              </div>
+            )}
+            {isFailed && verificationRequest?.retry_available === false && (
+              <p style={{ color: C.red, fontSize: 11, textAlign: 'center', marginBottom: 16 }}>
+                Maximum retry attempts reached.
+              </p>
+            )}
 
             {/* Action Buttons */}
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>

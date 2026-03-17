@@ -24,7 +24,8 @@ export class OCRService {
     documentId: string,
     filePath: string,
     documentType: string,
-    issuingCountry?: string
+    issuingCountry?: string,
+    verificationId?: string
   ): Promise<OCRData> {
     logger.info('Starting OCR processing', { documentId, filePath, documentType, issuingCountry });
 
@@ -41,7 +42,7 @@ export class OCRService {
       await this.metricsService.record({
         providerName: this.provider.name,
         providerType: 'ocr',
-        verificationId: documentId,
+        verificationId: verificationId || documentId,
         latencyMs: Date.now() - start,
         success: true,
         confidenceScore: avgConfidence,
