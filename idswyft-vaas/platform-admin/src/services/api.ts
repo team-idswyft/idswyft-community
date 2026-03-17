@@ -283,6 +283,75 @@ class PlatformApiClient {
     }
   }
 
+  // ── Sessions ─────────────────────────────────────────────────────────────
+  async getSessions(): Promise<any[]> {
+    const response: AxiosResponse<ApiResponse<any[]>> =
+      await this.client.get('/sessions');
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to load sessions');
+    }
+
+    return response.data.data!;
+  }
+
+  async revokeSession(id: string): Promise<void> {
+    const response: AxiosResponse<ApiResponse> =
+      await this.client.delete(`/sessions/${id}`);
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to revoke session');
+    }
+  }
+
+  // ── Provider Metrics ──────────────────────────────────────────────────
+  async getProviderMetrics(provider: string, days: number = 7): Promise<any> {
+    const response: AxiosResponse<ApiResponse> =
+      await this.client.get('/provider-metrics', { params: { provider, days } });
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to load provider metrics');
+    }
+
+    return response.data.data!;
+  }
+
+  // ── Audit Logs ────────────────────────────────────────────────────────
+  async getAuditLogs(params?: Record<string, any>): Promise<any> {
+    const response: AxiosResponse<ApiResponse> =
+      await this.client.get('/audit-logs', { params });
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to get audit logs');
+    }
+
+    return response.data.data!;
+  }
+
+  async getAuditLogStats(params?: Record<string, any>): Promise<any> {
+    const response: AxiosResponse<ApiResponse> =
+      await this.client.get('/audit-logs/stats', { params });
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to get audit log statistics');
+    }
+
+    return response.data.data!;
+  }
+
+  async exportAuditLogs(params?: Record<string, any>): Promise<Blob> {
+    const response = await this.client.get('/audit-logs/export', {
+      params,
+      responseType: 'blob',
+    });
+
+    if (response.status !== 200) {
+      throw new Error('Failed to export audit logs');
+    }
+
+    return response.data;
+  }
+
   // ── Utility ──────────────────────────────────────────────────────────────
   isAuthenticated(): boolean {
     return !!this.token;

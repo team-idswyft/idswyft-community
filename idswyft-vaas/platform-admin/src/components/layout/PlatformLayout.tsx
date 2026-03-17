@@ -13,6 +13,8 @@ import {
   User,
   ChevronDown,
   Shield,
+  Monitor,
+  BarChart3,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -22,6 +24,9 @@ const navigationItems = [
   { name: 'Branding',          href: '/branding',          icon: Palette },
   { name: 'Email Templates',   href: '/email-templates',   icon: Mail },
   { name: 'Admin Management',  href: '/admin-management',  icon: UserCog },
+  { name: 'Sessions',          href: '/sessions',          icon: Monitor },
+  { name: 'Provider Metrics',  href: '/provider-metrics',  icon: BarChart3 },
+  { name: 'Audit Logs',        href: '/audit-logs',        icon: Shield },
   { name: 'Settings',          href: '/settings',          icon: Settings },
 ];
 

@@ -100,7 +100,7 @@ export default function Dashboard() {
       const [statsResponse, usageResponse, verificationsResponse] = await Promise.all([
         apiClient.getVerificationStats(30),
         organization ? apiClient.getOrganizationUsage(organization.id) : Promise.resolve(null),
-        apiClient.listVerifications({ page: 1, per_page: 20 })
+        apiClient.listVerifications({ page: 1, per_page: 5 })
       ]);
 
       setStats(statsResponse);

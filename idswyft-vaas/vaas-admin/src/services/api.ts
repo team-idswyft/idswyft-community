@@ -40,9 +40,6 @@ import {
   AdminUserResponse,
   RolePermissionUpdate,
   AdminUserPasswordReset,
-  ActiveSession,
-  ProviderSummary,
-  ProviderType,
   AssetUploadResult,
   PlatformBranding,
   OrgAssets,
@@ -1093,43 +1090,6 @@ class ApiClient {
   }
 
 
-  // Session management
-  async getSessions(): Promise<ActiveSession[]> {
-    const response: AxiosResponse<ApiResponse<{ sessions: ActiveSession[] } | ActiveSession[]>> =
-      await this.client.get('/auth/sessions');
-    if (!response.data.success) {
-      throw new Error(response.data.error?.message || 'Failed to load sessions');
-    }
-    const data = response.data.data!;
-    if (Array.isArray(data)) return data;
-    if (data && 'sessions' in data) return (data as { sessions: ActiveSession[] }).sessions;
-    throw new Error('Unexpected response shape from /auth/sessions');
-  }
-
-  async revokeSession(sessionId: string): Promise<void> {
-    const response: AxiosResponse<ApiResponse<void>> =
-      await this.client.delete(`/auth/sessions/${sessionId}`);
-    if (!response.data.success) {
-      throw new Error(response.data.error?.message || 'Failed to revoke session');
-    }
-  }
-
-  // Provider metrics
-  async getProviderMetrics(
-    providerType: ProviderType,
-    days: number = 7,
-  ): Promise<ProviderSummary> {
-    const response: AxiosResponse<ApiResponse<ProviderSummary>> =
-      await this.client.get(`/admin/provider-metrics?provider=${providerType}&days=${days}`);
-    if (!response.data.success) {
-      throw new Error(response.data.error?.message || 'Failed to load provider metrics');
-    }
-    const data = response.data.data;
-    if (!data) {
-      throw new Error('Provider metrics response missing data payload');
-    }
-    return data;
-  }
 
   // Asset management
   async uploadOrgAsset(orgId: string, assetType: string, file: File): Promise<AssetUploadResult> {

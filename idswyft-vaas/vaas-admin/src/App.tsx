@@ -24,8 +24,6 @@ const ApiKeys = React.lazy(() => import('./pages/ApiKeys'));
 const Billing = React.lazy(() => import('./pages/Billing'));
 const AuditLogs = React.lazy(() => import('./pages/AuditLogs'));
 const AdminUserManagement = React.lazy(() => import('./pages/AdminUserManagement'));
-const Sessions = React.lazy(() => import('./pages/Sessions'));
-const ProviderMetrics = React.lazy(() => import('./pages/ProviderMetrics'));
 const Profile = React.lazy(() => import('./pages/Profile'));
 
 // Suspense fallback — matches DashboardLayout content area
@@ -133,8 +131,6 @@ function App() {
                   <Suspense fallback={<PageSkeleton />}><AdminUserManagement /></Suspense>
                 </RequirePermission>
               } />
-              <Route path="sessions" element={<Suspense fallback={<PageSkeleton />}><Sessions /></Suspense>} />
-              <Route path="provider-metrics" element={<Suspense fallback={<PageSkeleton />}><ProviderMetrics /></Suspense>} />
               <Route path="profile" element={<Suspense fallback={<PageSkeleton />}><Profile /></Suspense>} />
               <Route path="settings" element={
                 <RequirePermission permission="manage_settings">

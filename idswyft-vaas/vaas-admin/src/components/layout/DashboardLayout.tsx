@@ -12,7 +12,6 @@ import {
   Building,
   LogOut,
   Shield,
-  Monitor,
   User,
   ChevronDown,
   Key,
@@ -44,8 +43,6 @@ const navigationItems: NavItem[] = [
   { name: 'Billing', href: '/billing', icon: CreditCard, current: false, permission: 'manage_billing' },
   { name: 'API Keys', href: '/api-keys', icon: Key, current: false, permission: 'manage_integrations' },
   { name: 'Audit Logs', href: '/audit-logs', icon: Shield, current: false },
-  { name: 'Sessions', href: '/sessions', icon: Monitor, current: false },
-  { name: 'Provider Metrics', href: '/provider-metrics', icon: BarChart3, current: false },
   { name: 'Team', href: '/team', icon: UserCog, current: false, permission: 'manage_admins' },
   { name: 'Verification Settings', href: '/settings', icon: Settings, current: false, permission: 'manage_settings' },
 ];
