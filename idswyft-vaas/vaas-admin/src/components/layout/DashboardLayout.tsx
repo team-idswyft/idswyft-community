@@ -23,21 +23,30 @@ import {
   Plus
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
+import type { AdminPermissions } from '../../types';
 
-const navigationItems = [
+interface NavItem {
+  name: string;
+  href: string;
+  icon: React.ComponentType<{ className?: string }>;
+  current: boolean;
+  permission?: keyof AdminPermissions;
+}
+
+const navigationItems: NavItem[] = [
   { name: 'Dashboard', href: '/dashboard', icon: LayoutDashboard, current: false },
   { name: 'Verifications', href: '/verifications', icon: CheckCircle, current: false },
   { name: 'End Users', href: '/users', icon: Users, current: false },
-  { name: 'Webhooks', href: '/webhooks', icon: Webhook, current: false },
+  { name: 'Webhooks', href: '/webhooks', icon: Webhook, current: false, permission: 'manage_webhooks' },
   { name: 'Analytics', href: '/analytics', icon: BarChart3, current: false },
   { name: 'Organization', href: '/organization', icon: Building, current: false },
-  { name: 'Billing', href: '/billing', icon: CreditCard, current: false },
-  { name: 'API Keys', href: '/api-keys', icon: Key, current: false },
+  { name: 'Billing', href: '/billing', icon: CreditCard, current: false, permission: 'manage_billing' },
+  { name: 'API Keys', href: '/api-keys', icon: Key, current: false, permission: 'manage_integrations' },
   { name: 'Audit Logs', href: '/audit-logs', icon: Shield, current: false },
   { name: 'Sessions', href: '/sessions', icon: Monitor, current: false },
   { name: 'Provider Metrics', href: '/provider-metrics', icon: BarChart3, current: false },
-  { name: 'Team', href: '/team', icon: UserCog, current: false },
-  { name: 'Verification Settings', href: '/settings', icon: Settings, current: false },
+  { name: 'Team', href: '/team', icon: UserCog, current: false, permission: 'manage_admins' },
+  { name: 'Verification Settings', href: '/settings', icon: Settings, current: false, permission: 'manage_settings' },
 ];
 
 export default function DashboardLayout() {
@@ -77,10 +86,18 @@ export default function DashboardLayout() {
     }
   };
 
-  const updatedNavigation = navigationItems.map((item) => ({
-    ...item,
-    current: location.pathname.startsWith(item.href),
-  }));
+  const isOwnerOrSuper = admin?.role === 'owner' || admin?.is_super_admin;
+
+  const updatedNavigation = navigationItems
+    .filter((item) => {
+      if (!item.permission) return true;
+      if (isOwnerOrSuper) return true;
+      return admin?.permissions?.[item.permission];
+    })
+    .map((item) => ({
+      ...item,
+      current: location.pathname.startsWith(item.href),
+    }));
 
   const currentPage = updatedNavigation.find((item) => item.current);
 

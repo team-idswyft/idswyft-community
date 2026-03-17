@@ -19,7 +19,8 @@ import {
 } from 'lucide-react';
 import { apiClient } from '../services/api';
 import type { Webhook, WebhookDelivery, WebhookFormData } from '../types.js';
-import Modal from '../components/ui/Modal';
+import Modal, { ConfirmationModal } from '../components/ui/Modal';
+import { showToast } from '../lib/toast';
 import { sectionLabel, statNumber, monoXs, monoSm, cardSurface, statusPill, tableHeaderClass, infoPanel, getStatusAccent } from '../styles/tokens';
 
 const WEBHOOK_EVENTS = [
@@ -45,6 +46,7 @@ export default function Webhooks() {
   const [searchTerm, setSearchTerm] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'disabled' | 'failing'>('all');
   const [selectedWebhooks, setSelectedWebhooks] = useState<string[]>([]);
+  const [confirmAction, setConfirmAction] = useState<{ message: string; onConfirm: () => void } | null>(null);
 
   useEffect(() => {
     loadWebhooks();
@@ -96,17 +98,20 @@ export default function Webhooks() {
     }
   };
 
-  const deleteWebhook = async (webhookId: string) => {
-    if (!confirm('Are you sure you want to delete this webhook?')) {
-      return;
-    }
-
-    try {
-      await apiClient.deleteWebhook(webhookId);
-      setWebhooks(prev => prev.filter(w => w.id !== webhookId));
-    } catch (error) {
-      console.error('Failed to delete webhook:', error);
-    }
+  const deleteWebhook = (webhookId: string) => {
+    setConfirmAction({
+      message: 'Are you sure you want to delete this webhook?',
+      onConfirm: async () => {
+        try {
+          await apiClient.deleteWebhook(webhookId);
+          setWebhooks(prev => prev.filter(w => w.id !== webhookId));
+          showToast.success('Webhook deleted');
+        } catch (error) {
+          console.error('Failed to delete webhook:', error);
+          showToast.error('Failed to delete webhook');
+        }
+      },
+    });
   };
 
   const bulkToggleWebhooks = async (enabled: boolean) => {
@@ -129,24 +134,26 @@ export default function Webhooks() {
     }
   };
 
-  const bulkDeleteWebhooks = async () => {
+  const bulkDeleteWebhooks = () => {
     if (selectedWebhooks.length === 0) return;
 
-    if (!confirm(`Are you sure you want to delete ${selectedWebhooks.length} webhook(s)?`)) {
-      return;
-    }
-
-    try {
-      const promises = selectedWebhooks.map(webhookId =>
-        apiClient.deleteWebhook(webhookId)
-      );
-
-      await Promise.all(promises);
-      setWebhooks(prev => prev.filter(w => !selectedWebhooks.includes(w.id)));
-      setSelectedWebhooks([]);
-    } catch (error) {
-      console.error('Failed to bulk delete webhooks:', error);
-    }
+    setConfirmAction({
+      message: `Are you sure you want to delete ${selectedWebhooks.length} webhook(s)?`,
+      onConfirm: async () => {
+        try {
+          const promises = selectedWebhooks.map(webhookId =>
+            apiClient.deleteWebhook(webhookId)
+          );
+          await Promise.all(promises);
+          setWebhooks(prev => prev.filter(w => !selectedWebhooks.includes(w.id)));
+          setSelectedWebhooks([]);
+          showToast.success(`${selectedWebhooks.length} webhook(s) deleted`);
+        } catch (error) {
+          console.error('Failed to bulk delete webhooks:', error);
+          showToast.error('Failed to delete some webhooks');
+        }
+      },
+    });
   };
 
   const testAllWebhooks = async () => {
@@ -158,10 +165,10 @@ export default function Webhooks() {
         .map(w => apiClient.testWebhook(w.id));
 
       await Promise.all(promises);
-      alert(`Test requests sent to ${promises.length} active webhook(s)!`);
+      showToast.success(`Test requests sent to ${promises.length} active webhook(s)`);
     } catch (error) {
       console.error('Failed to test webhooks:', error);
-      alert('Failed to send test requests to some webhooks');
+      showToast.error('Failed to send test requests to some webhooks');
     }
   };
 
@@ -218,10 +225,10 @@ export default function Webhooks() {
   const testWebhook = async (webhookId: string) => {
     try {
       await apiClient.testWebhook(webhookId);
-      alert('Test webhook sent successfully!');
+      showToast.success('Test webhook sent successfully');
     } catch (error) {
       console.error('Failed to test webhook:', error);
-      alert('Failed to send test webhook');
+      showToast.error('Failed to send test webhook');
     }
   };
 
@@ -608,6 +615,17 @@ export default function Webhooks() {
           onClose={() => setShowHealthModal(false)}
         />
       )}
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={() => { confirmAction?.onConfirm(); }}
+        title="Confirm Action"
+        message={confirmAction?.message || ''}
+        confirmText="Delete"
+        confirmVariant="danger"
+      />
     </div>
   );
 }
@@ -651,7 +669,7 @@ function WebhookFormModal({ webhook, onClose, onSuccess }: WebhookFormModalProps
   const copySecretKey = async () => {
     try {
       await navigator.clipboard.writeText(formData.secret_key);
-      alert('Secret key copied to clipboard!');
+      showToast.success('Secret key copied to clipboard');
     } catch (error) {
       console.error('Failed to copy secret key:', error);
     }

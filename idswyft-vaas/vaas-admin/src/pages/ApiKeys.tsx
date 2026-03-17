@@ -2,6 +2,8 @@ import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../services/api';
 import { ApiKey, ApiKeyFormData, ApiKeyPermissions, ApiKeyUsage } from '../types.js';
+import { showToast } from '../lib/toast';
+import { ConfirmationModal } from '../components/ui/Modal';
 import {
   Key,
   Plus,
@@ -46,6 +48,7 @@ export default function ApiKeys() {
   const [usageData, setUsageData] = useState<ApiKeyUsage[]>([]);
   const [secretKey, setSecretKey] = useState<string | null>(null);
   const [showSecretModal, setShowSecretModal] = useState(false);
+  const [confirmAction, setConfirmAction] = useState<{ message: string; onConfirm: () => void } | null>(null);
 
   useEffect(() => {
     loadApiKeys();
@@ -115,34 +118,37 @@ export default function ApiKeys() {
     }
   };
 
-  const handleDeleteApiKey = async (id: string) => {
-    if (!confirm('Are you sure you want to delete this API key? This action cannot be undone.')) {
-      return;
-    }
-
-    try {
-      await apiClient.deleteApiKey(id);
-      setApiKeys(prev => prev.filter(key => key.id !== id));
-    } catch (error) {
-      console.error('Failed to delete API key:', error);
-      alert('Failed to delete API key');
-    }
+  const handleDeleteApiKey = (id: string) => {
+    setConfirmAction({
+      message: 'Are you sure you want to delete this API key? This action cannot be undone.',
+      onConfirm: async () => {
+        try {
+          await apiClient.deleteApiKey(id);
+          setApiKeys(prev => prev.filter(key => key.id !== id));
+          showToast.success('API key deleted');
+        } catch (error) {
+          console.error('Failed to delete API key:', error);
+          showToast.error('Failed to delete API key');
+        }
+      },
+    });
   };
 
-  const handleRotateApiKey = async (id: string) => {
-    if (!confirm('Are you sure you want to rotate this API key? The old key will stop working immediately.')) {
-      return;
-    }
-
-    try {
-      const response = await apiClient.rotateApiKey(id);
-      setSecretKey(response.secret_key);
-      setShowSecretModal(true);
-      loadApiKeys(); // Refresh to get updated key info
-    } catch (error) {
-      console.error('Failed to rotate API key:', error);
-      alert('Failed to rotate API key');
-    }
+  const handleRotateApiKey = (id: string) => {
+    setConfirmAction({
+      message: 'Are you sure you want to rotate this API key? The old key will stop working immediately.',
+      onConfirm: async () => {
+        try {
+          const response = await apiClient.rotateApiKey(id);
+          setSecretKey(response.secret_key);
+          setShowSecretModal(true);
+          loadApiKeys();
+        } catch (error) {
+          console.error('Failed to rotate API key:', error);
+          showToast.error('Failed to rotate API key');
+        }
+      },
+    });
   };
 
   const handleViewUsage = async (apiKey: ApiKey) => {
@@ -478,6 +484,17 @@ export default function ApiKeys() {
           setSelectedApiKey(null);
           setUsageData([]);
         }}
+      />
+
+      {/* Confirmation Modal */}
+      <ConfirmationModal
+        isOpen={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        onConfirm={() => { confirmAction?.onConfirm(); }}
+        title="Confirm Action"
+        message={confirmAction?.message || ''}
+        confirmText="Confirm"
+        confirmVariant="danger"
       />
     </div>
   );

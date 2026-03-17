@@ -15,6 +15,7 @@ import {
   Globe
 } from 'lucide-react';
 import { apiClient } from '../services/api';
+import { showToast } from '../lib/toast';
 import type { VerificationSession } from '../types.js';
 import Modal from '../components/ui/Modal';
 import { sectionLabel, monoXs, monoSm, cardSurface, statusPill, tableHeaderClass, infoPanel, getStatusAccent } from '../styles/tokens';
@@ -66,6 +67,7 @@ function mapStatus(status: string): string {
 export default function Verifications() {
   const [verifications, setVerifications] = useState<VerificationSession[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<VerificationFilters>({
     status: 'all',
     dateFrom: '',
@@ -84,6 +86,7 @@ export default function Verifications() {
   const loadVerifications = async () => {
     try {
       setLoading(true);
+      setError(null);
       const params: any = {
         page: currentPage,
         per_page: 20
@@ -110,9 +113,9 @@ export default function Verifications() {
                         result.meta?.pages ||
                         Math.ceil((result.meta?.total || 0) / 20) || 1;
       setTotalPages(totalPages);
-    } catch (error) {
-      console.error('Failed to load verifications:', error);
-      // Set safe defaults on error
+    } catch (err: unknown) {
+      console.error('Failed to load verifications:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load verifications');
       setVerifications([]);
       setTotalPages(1);
     } finally {
@@ -146,8 +149,8 @@ export default function Verifications() {
       if (selectedVerification?.id === verificationId) {
         setSelectedVerification(prev => prev ? { ...prev, status: newStatus } : null);
       }
-    } catch (error) {
-      console.error('Failed to update verification status:', error);
+    } catch (err: unknown) {
+      showToast.error(`Status update failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
 
@@ -200,8 +203,8 @@ export default function Verifications() {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Failed to export verifications:', error);
+    } catch (err: unknown) {
+      showToast.error('Failed to export verifications');
     }
   };
 
@@ -222,6 +225,13 @@ export default function Verifications() {
           Export CSV
         </button>
       </div>
+
+      {error && (
+        <div className="p-4 bg-rose-500/12 border border-rose-500/25 rounded-lg text-rose-300 text-sm flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={loadVerifications} className="ml-4 text-rose-200 hover:text-white underline text-xs font-mono">Retry</button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className={`${cardSurface} p-4`}>
