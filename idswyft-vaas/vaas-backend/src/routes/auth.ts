@@ -594,6 +594,74 @@ router.post('/reset-password', validateBody(resetPasswordSchema), async (req, re
   }
 });
 
+// List active sessions — returns current session derived from JWT + request metadata
+router.get('/sessions', requireAuth as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const admin = req.admin!;
+    const ip = req.headers['x-forwarded-for']?.toString().split(',')[0]?.trim()
+      || req.socket.remoteAddress
+      || 'unknown';
+    const userAgent = req.headers['user-agent'] || 'unknown';
+
+    const session = {
+      id: admin.id, // use admin id as session id (single-session model)
+      ip,
+      userAgent,
+      lastActiveAt: new Date().toISOString(),
+      isCurrent: true,
+    };
+
+    const response: VaasApiResponse = {
+      success: true,
+      data: { sessions: [session] },
+    };
+    res.json(response);
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: { code: 'SESSIONS_FETCH_FAILED', message: error.message },
+    } as VaasApiResponse);
+  }
+});
+
+// Revoke a session — if it matches the current admin, log them out
+router.delete('/sessions/:id', requireAuth as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const admin = req.admin!;
+    const sessionId = req.params.id;
+
+    if (sessionId !== admin.id) {
+      return res.status(404).json({
+        success: false,
+        error: { code: 'SESSION_NOT_FOUND', message: 'Session not found' },
+      } as VaasApiResponse);
+    }
+
+    // Revoke all refresh tokens for this admin (server-side invalidation)
+    await vaasSupabase
+      .from('vaas_refresh_tokens')
+      .delete()
+      .eq('admin_id', admin.id);
+
+    auditService.logAuditEvent({
+      organizationId: admin.organization_id,
+      adminId: admin.id,
+      action: 'auth.session_revoked',
+      req,
+    });
+
+    res.json({
+      success: true,
+      data: { message: 'Session revoked' },
+    } as VaasApiResponse);
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: { code: 'SESSION_REVOKE_FAILED', message: error.message },
+    } as VaasApiResponse);
+  }
+});
+
 // Email verification endpoint
 router.get('/verify-email', async (req, res) => {
   try {

@@ -248,6 +248,16 @@ class ApiClient {
     return response.data.data!;
   }
 
+  async getVerificationDocuments(id: string): Promise<any[]> {
+    const response: AxiosResponse<ApiResponse<any[]>> = await this.client.get(`/verifications/${id}/documents`);
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to get documents');
+    }
+
+    return response.data.data || [];
+  }
+
   async startVerification(request: StartVerificationRequest): Promise<StartVerificationResponse> {
     const response: AxiosResponse<ApiResponse<StartVerificationResponse>> = await this.client.post('/verifications/start', request);
     
@@ -692,24 +702,102 @@ class ApiClient {
   }
 
   // Audit Logs API methods (Organization-scoped)
+  // Backend DB columns: id, organization_id, admin_id, action, resource_type, resource_id,
+  //   details, ip_address, user_agent, created_at
+  // Frontend AuditLogEntry expects: actor_type, actor_name, actor_email, timestamp,
+  //   status, severity, metadata (object), etc.
+  // We transform each row in the API client adapter layer.
   async getAuditLogs(organizationId: string, params?: AuditLogFilters & PaginationParams): Promise<AuditLogResponse> {
-    const response: AxiosResponse<ApiResponse<AuditLogResponse>> = await this.client.get(`/organizations/${organizationId}/audit-logs`, { params });
-    
+    const response: AxiosResponse<ApiResponse<any>> = await this.client.get(`/organizations/${organizationId}/audit-logs`, { params });
+
     if (!response.data.success) {
       throw new Error(response.data.error?.message || 'Failed to get audit logs');
     }
 
-    return response.data.data!;
+    const raw = response.data.data!;
+    const rawLogs: any[] = raw.audit_logs ?? raw.entries ?? [];
+    const meta = raw.meta ?? {};
+    const page = meta.page ?? params?.page ?? 1;
+    const totalPages = meta.total_pages ?? 1;
+
+    // Transform each raw DB row → AuditLogEntry
+    const entries: AuditLogEntry[] = rawLogs.map((row: any) => {
+      // Normalise action: backend stores "auth.login_success" → frontend expects "login"
+      const rawAction: string = row.action || 'unknown';
+      const shortAction = rawAction.includes('.') ? rawAction.split('.').pop()! : rawAction;
+
+      // Derive severity from action name
+      const failActions = ['login_failed', 'account_locked', 'unauthorized_access_attempt', 'rate_limit_exceeded'];
+      const highActions = ['password_reset', 'password_changed', 'user_deleted', 'api_key_deleted', 'data_deletion_requested'];
+      let severity: 'low' | 'medium' | 'high' | 'critical' = 'low';
+      if (failActions.includes(shortAction)) severity = 'high';
+      else if (highActions.includes(shortAction)) severity = 'medium';
+
+      // Derive status from action name
+      let status: 'success' | 'failure' | 'warning' = 'success';
+      if (shortAction.includes('failed') || shortAction.includes('locked') || shortAction.includes('exceeded')) {
+        status = 'failure';
+      } else if (shortAction.includes('flagged') || shortAction.includes('suspicious')) {
+        status = 'warning';
+      }
+
+      return {
+        id: row.id,
+        organization_id: row.organization_id,
+        actor_type: row.actor_type ?? 'admin',
+        actor_id: row.actor_id ?? row.admin_id ?? '',
+        actor_name: row.actor_name ?? (row.admin_id ? row.admin_id.substring(0, 8) : 'System'),
+        actor_email: row.actor_email ?? undefined,
+        action: shortAction as AuditLogEntry['action'],
+        resource_type: (row.resource_type || 'system') as AuditLogEntry['resource_type'],
+        resource_id: row.resource_id ?? undefined,
+        resource_name: row.resource_name ?? (row.resource_id ? row.resource_id.substring(0, 12) : undefined),
+        details: row.details || {},
+        metadata: row.metadata ?? {
+          ip_address: row.ip_address ?? undefined,
+          user_agent: row.user_agent ?? undefined,
+        },
+        severity: row.severity ?? severity,
+        status: row.status ?? status,
+        timestamp: row.timestamp ?? row.created_at,
+        created_at: row.created_at,
+      };
+    });
+
+    return {
+      entries,
+      total: meta.total_count ?? meta.total ?? rawLogs.length,
+      page,
+      per_page: meta.per_page ?? params?.per_page ?? 20,
+      total_pages: totalPages,
+      has_next_page: meta.has_more ?? page < totalPages,
+      has_prev_page: page > 1,
+    };
   }
 
+  // Backend returns { total_logs, period_days, action_breakdown, most_active_actions }
+  // but frontend expects AuditLogStats with different field names
   async getAuditLogStats(organizationId: string): Promise<AuditLogStats> {
-    const response: AxiosResponse<ApiResponse<AuditLogStats>> = await this.client.get(`/organizations/${organizationId}/audit-logs/stats`);
-    
+    const response: AxiosResponse<ApiResponse<any>> = await this.client.get(`/organizations/${organizationId}/audit-logs/stats`);
+
     if (!response.data.success) {
       throw new Error(response.data.error?.message || 'Failed to get audit log statistics');
     }
 
-    return response.data.data!;
+    const raw = response.data.data!;
+
+    return {
+      total_events_today: raw.total_events_today ?? 0,
+      total_events_week: raw.total_events_week ?? 0,
+      total_events_month: raw.total_logs ?? raw.total_events_month ?? 0,
+      security_alerts_count: raw.security_alerts_count ?? 0,
+      failed_login_attempts: raw.failed_login_attempts ?? 0,
+      api_key_usage_violations: raw.api_key_usage_violations ?? 0,
+      recent_critical_events: raw.recent_critical_events ?? [],
+      activity_by_hour: raw.activity_by_hour ?? [],
+      activity_by_action: raw.most_active_actions ?? raw.activity_by_action ?? [],
+      top_actors: raw.top_actors ?? [],
+    };
   }
 
   async exportAuditLogs(organizationId: string, filters?: AuditLogFilters & { format?: 'csv' | 'json' }): Promise<Blob> {

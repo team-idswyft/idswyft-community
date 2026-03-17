@@ -56,12 +56,23 @@ export default function Verifications() {
     });
   };
 
-  // Group verifications by end_user_id for de-duplication
+  // Group only pending/processing verifications by end_user_id;
+  // completed/failed/verified etc. appear as individual rows.
   const userGroups = useMemo(() => {
     if (!verifications || verifications.length === 0) return [];
 
-    const map = new Map<string, VerificationSession[]>();
+    const GROUPABLE = new Set(['pending', 'processing']);
+    const groupable: VerificationSession[] = [];
+    const individual: VerificationSession[] = [];
+
     for (const v of verifications) {
+      if (GROUPABLE.has(v.status)) groupable.push(v);
+      else individual.push(v);
+    }
+
+    // Group only the groupable ones by end_user_id
+    const map = new Map<string, VerificationSession[]>();
+    for (const v of groupable) {
       const key = v.end_user_id || v.id;
       const group = map.get(key);
       if (group) group.push(v);
@@ -72,6 +83,11 @@ export default function Verifications() {
     for (const [endUserId, vList] of map) {
       vList.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       groups.push({ endUserId, verifications: vList, latest: vList[0] });
+    }
+
+    // Each non-groupable verification becomes its own single-item group
+    for (const v of individual) {
+      groups.push({ endUserId: v.end_user_id || v.id, verifications: [v], latest: v });
     }
 
     // Sort groups by latest verification date (most recent first)
