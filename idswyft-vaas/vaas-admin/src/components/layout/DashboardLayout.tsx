@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { Outlet, Link, useLocation, Navigate } from 'react-router-dom';
 import {
   Menu,
@@ -13,7 +13,6 @@ import {
   LogOut,
   Shield,
   Monitor,
-  Bell,
   User,
   ChevronDown,
   Key,
@@ -24,6 +23,8 @@ import {
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import type { AdminPermissions } from '../../types';
+import NotificationDropdown from './NotificationDropdown';
+import SearchModal from './SearchModal';
 
 interface NavItem {
   name: string;
@@ -57,6 +58,19 @@ export default function DashboardLayout() {
   const [searchOpen, setSearchOpen] = useState(false);
   const [logoUrl, setLogoUrl] = useState('/idswyft-logo.png');
   const location = useLocation();
+
+  // Cmd+K / Ctrl+K keyboard shortcut
+  const toggleSearch = useCallback(() => setSearchOpen(prev => !prev), []);
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
+        e.preventDefault();
+        toggleSearch();
+      }
+    };
+    document.addEventListener('keydown', handleKeyDown);
+    return () => document.removeEventListener('keydown', handleKeyDown);
+  }, [toggleSearch]);
 
   useEffect(() => {
     const loadPlatformLogo = async () => {
@@ -265,10 +279,7 @@ export default function DashboardLayout() {
                   New Verification
                 </Link>
 
-                <button className="relative rounded-md border border-white/10 bg-slate-900/70 p-2 text-slate-400 transition hover:border-cyan-400/40 hover:text-cyan-200">
-                  <Bell className="h-4 w-4" />
-                  <span className="absolute -right-1 -top-1 h-2.5 w-2.5 rounded-full border border-slate-950 bg-rose-400" />
-                </button>
+                <NotificationDropdown />
 
                 <div className="hidden lg:block">
                   <AdminMenu compact />
@@ -282,6 +293,8 @@ export default function DashboardLayout() {
           </main>
         </div>
       </div>
+
+      <SearchModal isOpen={searchOpen} onClose={() => setSearchOpen(false)} />
     </div>
   );
 }

@@ -2,6 +2,7 @@ import axios from 'axios';
 import crypto from 'crypto';
 import { vaasSupabase } from '../config/database.js';
 import { VaasWebhook, VaasWebhookDelivery, VaasWebhookEvent } from '../types/index.js';
+import { notificationService } from './notificationService.js';
 
 export class WebhookService {
   
@@ -235,8 +236,16 @@ export class WebhookService {
           .from('vaas_webhooks')
           .update({ enabled: false })
           .eq('id', webhook.id);
-          
+
         console.log(`[WebhookService] Disabled webhook ${webhook.id} due to excessive failures`);
+
+        notificationService.create({
+          organizationId: webhook.organization_id,
+          type: 'webhook.delivery_failed',
+          title: 'Webhook Disabled',
+          message: `Webhook to ${webhook.url} was disabled after ${webhook.failure_count + 1} consecutive failures.`,
+          metadata: { webhook_id: webhook.id, url: webhook.url, failure_count: webhook.failure_count + 1 },
+        }).catch(() => {});
       }
       
       // Schedule retry if applicable

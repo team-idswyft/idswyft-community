@@ -31,6 +31,8 @@ import platformOrgRoutes from './routes/platformOrganizations.js';
 import platformEmailRoutes from './routes/platformEmail.js';
 import platformBrandingRoutes from './routes/platformBranding.js';
 import samlRoutes from './routes/saml.js';
+import notificationRoutes from './routes/notifications.js';
+import searchRoutes from './routes/search.js';
 
 console.log('📧 Importing email routes...');
 import emailUtilRoutes from './routes/email-utils.js';
@@ -360,6 +362,8 @@ app.use('/api/webhooks', webhookRoutes);
 app.use('/api/admin', adminSecretRoutes);
 app.use('/api/admin/thresholds', adminThresholdsRoutes);
 app.use('/api/assets', assetsRoutes);
+app.use('/api/notifications', notificationRoutes);
+app.use('/api/search', searchRoutes);
 
 // Mount public routes for customer portal (no authentication required)
 console.log('🌐 Mounting public routes...');

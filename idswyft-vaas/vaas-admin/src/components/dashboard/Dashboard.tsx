@@ -9,7 +9,6 @@ import {
   TrendingDown,
   Eye,
   RefreshCw,
-  ArrowUpRight,
   BarChart3,
   FileText,
   Shield,
@@ -310,10 +309,6 @@ export default function Dashboard() {
             <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
             Refresh
           </button>
-          <Link to="/verifications/start" className="btn btn-primary">
-            Start Verification
-            <ArrowUpRight className="h-4 w-4" />
-          </Link>
         </div>
       </div>
 

@@ -45,7 +45,9 @@ import {
   ProviderType,
   AssetUploadResult,
   PlatformBranding,
-  OrgAssets
+  OrgAssets,
+  AdminNotification,
+  SearchResults
 } from '../types.js';
 
 class ApiClient {
@@ -905,6 +907,59 @@ class ApiClient {
     
     if (!response.data.success) {
       throw new Error(response.data.error?.message || 'Failed to bulk update admin users');
+    }
+
+    return response.data.data!;
+  }
+
+  // Notifications
+  async getNotifications(params?: { read?: boolean; page?: number; per_page?: number }): Promise<{ notifications: AdminNotification[]; total: number }> {
+    const response: AxiosResponse<ApiResponse<AdminNotification[]>> = await this.client.get('/notifications', { params });
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to get notifications');
+    }
+
+    return {
+      notifications: response.data.data!,
+      total: response.data.meta?.total || 0,
+    };
+  }
+
+  async getUnreadNotificationCount(): Promise<number> {
+    const response: AxiosResponse<ApiResponse<{ count: number }>> = await this.client.get('/notifications/unread-count');
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to get unread count');
+    }
+
+    return response.data.data!.count;
+  }
+
+  async markNotificationRead(id: string): Promise<void> {
+    const response: AxiosResponse<ApiResponse> = await this.client.post(`/notifications/${id}/read`);
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to mark notification as read');
+    }
+  }
+
+  async markAllNotificationsRead(): Promise<void> {
+    const response: AxiosResponse<ApiResponse> = await this.client.post('/notifications/read-all');
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to mark all as read');
+    }
+  }
+
+  // Global search
+  async search(q: string, limit?: number): Promise<SearchResults> {
+    const response: AxiosResponse<ApiResponse<SearchResults>> = await this.client.get('/search', {
+      params: { q, limit: limit || 5 },
+    });
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Search failed');
     }
 
     return response.data.data!;
