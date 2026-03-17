@@ -10,11 +10,11 @@ ARG VITE_NODE_ENV
 ARG VITE_MOCK_AUTH_ENABLED
 ARG VITE_API_TIMEOUT
 
-# Copy package files
-COPY package*.json ./
+# Copy package files (workspace child — no standalone lockfile)
+COPY package.json ./
 
-# Install dependencies
-RUN npm ci
+# Install dependencies (npm install, not npm ci, since lockfile lives at workspace root)
+RUN npm install --ignore-scripts=false
 
 # Copy source code
 COPY . .
