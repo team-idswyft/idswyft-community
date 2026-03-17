@@ -80,16 +80,7 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
       return res.status(403).json(response);
     }
     
-    // Update last login
-    await vaasSupabase
-      .from('vaas_admins')
-      .update({ 
-        last_login_at: new Date().toISOString(),
-        login_count: ((admin as any).login_count || 0) + 1
-      })
-      .eq('id', admin.id);
-    
-    // Attach admin to request
+    // Attach admin to request (login stats are updated in auth.ts login handler only)
     req.admin = {
       id: admin.id,
       organization_id: admin.organization_id,

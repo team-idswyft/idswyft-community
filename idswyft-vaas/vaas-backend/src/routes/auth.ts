@@ -1,11 +1,31 @@
 import { Router } from 'express';
 import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 import jwt from 'jsonwebtoken';
 import { vaasSupabase } from '../config/database.js';
 import config from '../config/index.js';
 import { VaasApiResponse, VaasLoginRequest, VaasLoginResponse } from '../types/index.js';
 import { validateLoginRequest } from '../middleware/validation.js';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
+
+const ACCESS_TOKEN_EXPIRY = '1h';
+const REFRESH_TOKEN_EXPIRY_DAYS = 7;
+const MAX_FAILED_ATTEMPTS = 5;
+const LOCKOUT_MINUTES = 15;
+
+/** Domain-separated key for refresh token HMAC (derived from jwtSecret). */
+const REFRESH_HMAC_KEY = crypto.createHmac('sha256', config.jwtSecret).update('vaas-refresh-token-domain').digest();
+
+/** Hash a refresh token for DB storage/lookup. */
+function hashRefreshToken(token: string): string {
+  return crypto.createHmac('sha256', REFRESH_HMAC_KEY).update(token).digest('hex');
+}
+
+/** Generate a cryptographically random refresh token and its HMAC-SHA256 hash. */
+function generateRefreshToken(): { token: string; hash: string } {
+  const token = crypto.randomBytes(48).toString('hex');
+  return { token, hash: hashRefreshToken(token) };
+}
 
 const router = Router();
 
@@ -14,7 +34,7 @@ router.post('/login', validateLoginRequest, async (req, res) => {
   try {
     const { email, password, organization_slug }: VaasLoginRequest = req.body;
     
-    // Build query to find admin
+    // Build query to find admin (include lockout fields)
     let query = vaasSupabase
       .from('vaas_admins')
       .select(`
@@ -29,6 +49,8 @@ router.post('/login', validateLoginRequest, async (req, res) => {
         status,
         email_verified,
         login_count,
+        failed_login_attempts,
+        locked_until,
         vaas_organizations!inner(
           id,
           name,
@@ -70,13 +92,36 @@ router.post('/login', validateLoginRequest, async (req, res) => {
           message: 'Organization account is suspended. Please contact support.'
         }
       };
-      
+
       return res.status(403).json(response);
     }
-    
+
+    // Check account lockout BEFORE bcrypt (avoids timing oracle)
+    if ((admin as any).locked_until && new Date((admin as any).locked_until) > new Date()) {
+      const response: VaasApiResponse = {
+        success: false,
+        error: {
+          code: 'ACCOUNT_LOCKED',
+          message: 'Account temporarily locked due to too many failed attempts. Please try again later.'
+        }
+      };
+      return res.status(423).json(response);
+    }
+
     // Verify password
     const passwordMatch = await bcrypt.compare(password, (admin as any).password_hash);
     if (!passwordMatch) {
+      // Increment failed attempts; lock if threshold exceeded
+      const attempts = ((admin as any).failed_login_attempts || 0) + 1;
+      const lockUpdate: Record<string, any> = { failed_login_attempts: attempts };
+      if (attempts >= MAX_FAILED_ATTEMPTS) {
+        lockUpdate.locked_until = new Date(Date.now() + LOCKOUT_MINUTES * 60_000).toISOString();
+      }
+      await vaasSupabase
+        .from('vaas_admins')
+        .update(lockUpdate)
+        .eq('id', admin.id);
+
       const response: VaasApiResponse = {
         success: false,
         error: {
@@ -84,7 +129,7 @@ router.post('/login', validateLoginRequest, async (req, res) => {
           message: 'Invalid email or password'
         }
       };
-      
+
       return res.status(401).json(response);
     }
     
@@ -101,7 +146,7 @@ router.post('/login', validateLoginRequest, async (req, res) => {
       return res.status(403).json(response);
     }
     
-    // Generate JWT token
+    // Generate short-lived access token (1h)
     const token = jwt.sign(
       {
         admin_id: admin.id,
@@ -109,21 +154,37 @@ router.post('/login', validateLoginRequest, async (req, res) => {
         role: admin.role
       },
       config.jwtSecret,
-      { expiresIn: '24h' }
+      { expiresIn: ACCESS_TOKEN_EXPIRY }
     );
-    
-    // Update login stats
-    await vaasSupabase
-      .from('vaas_admins')
-      .update({
-        last_login_at: new Date().toISOString(),
-        login_count: (admin.login_count || 0) + 1
-      })
-      .eq('id', admin.id);
-    
+
+    // Generate refresh token and store hash in DB
+    const { token: refreshToken, hash: refreshHash } = generateRefreshToken();
+    const refreshExpiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+
+    // Update login stats, reset lockout, and store refresh token (parallel)
+    await Promise.all([
+      vaasSupabase
+        .from('vaas_admins')
+        .update({
+          last_login_at: new Date().toISOString(),
+          login_count: (admin.login_count || 0) + 1,
+          failed_login_attempts: 0,
+          locked_until: null,
+        })
+        .eq('id', admin.id),
+      vaasSupabase
+        .from('vaas_refresh_tokens')
+        .insert({
+          admin_id: admin.id,
+          token_hash: refreshHash,
+          expires_at: refreshExpiresAt.toISOString(),
+        }),
+    ]);
+
     // Prepare response
     const loginResponse: VaasLoginResponse = {
       token,
+      refresh_token: refreshToken,
       admin: {
         id: admin.id,
         organization_id: admin.organization_id,
@@ -141,14 +202,14 @@ router.post('/login', validateLoginRequest, async (req, res) => {
         updated_at: (admin as any).updated_at
       },
       organization: admin.vaas_organizations as any,
-      expires_at: new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString()
+      expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString() // 1h
     };
-    
+
     const response: VaasApiResponse<VaasLoginResponse> = {
       success: true,
       data: loginResponse
     };
-    
+
     res.json(response);
   } catch (error: any) {
     const response: VaasApiResponse = {
@@ -163,18 +224,134 @@ router.post('/login', validateLoginRequest, async (req, res) => {
   }
 });
 
-// Admin logout
+// Admin logout — deletes refresh token for server-side session invalidation
 router.post('/logout', requireAuth, async (req: AuthenticatedRequest, res) => {
-  // Note: JWT tokens are stateless, so we can't invalidate them server-side
-  // In production, you might want to implement token blacklisting
-  // For now, the client should just delete the token
-  
+  const { refresh_token } = req.body;
+
+  if (refresh_token) {
+    const hash = hashRefreshToken(refresh_token);
+    await vaasSupabase
+      .from('vaas_refresh_tokens')
+      .delete()
+      .eq('token_hash', hash)
+      .eq('admin_id', req.admin!.id);
+  } else {
+    // If no refresh token provided, delete all refresh tokens for this admin
+    await vaasSupabase
+      .from('vaas_refresh_tokens')
+      .delete()
+      .eq('admin_id', req.admin!.id);
+  }
+
   const response: VaasApiResponse = {
     success: true,
     data: { message: 'Logged out successfully' }
   };
-  
+
   res.json(response);
+});
+
+// Refresh access token using a valid refresh token
+router.post('/refresh', async (req, res) => {
+  try {
+    const { refresh_token } = req.body;
+
+    if (!refresh_token) {
+      return res.status(400).json({
+        success: false,
+        error: { code: 'VALIDATION_ERROR', message: 'refresh_token is required' }
+      } as VaasApiResponse);
+    }
+
+    // Hash the provided token and look it up
+    const hash = hashRefreshToken(refresh_token);
+
+    const { data: tokenRow, error: lookupErr } = await vaasSupabase
+      .from('vaas_refresh_tokens')
+      .select('id, admin_id, expires_at')
+      .eq('token_hash', hash)
+      .single();
+
+    if (lookupErr || !tokenRow) {
+      return res.status(401).json({
+        success: false,
+        error: { code: 'INVALID_REFRESH_TOKEN', message: 'Invalid or expired refresh token' }
+      } as VaasApiResponse);
+    }
+
+    // Check expiry
+    if (new Date(tokenRow.expires_at) <= new Date()) {
+      // Clean up expired token
+      await vaasSupabase.from('vaas_refresh_tokens').delete().eq('id', tokenRow.id);
+      return res.status(401).json({
+        success: false,
+        error: { code: 'REFRESH_TOKEN_EXPIRED', message: 'Refresh token has expired' }
+      } as VaasApiResponse);
+    }
+
+    // Fetch admin to build new access token
+    const { data: admin, error: adminErr } = await vaasSupabase
+      .from('vaas_admins')
+      .select('id, organization_id, role, status')
+      .eq('id', tokenRow.admin_id)
+      .eq('status', 'active')
+      .single();
+
+    if (adminErr || !admin) {
+      await vaasSupabase.from('vaas_refresh_tokens').delete().eq('id', tokenRow.id);
+      return res.status(401).json({
+        success: false,
+        error: { code: 'ADMIN_NOT_FOUND', message: 'Admin account not found or inactive' }
+      } as VaasApiResponse);
+    }
+
+    // Rotate: atomically consume old token, then issue new one.
+    // If delete returns 0 rows, another request already consumed it — possible replay.
+    const { data: deleted } = await vaasSupabase
+      .from('vaas_refresh_tokens')
+      .delete()
+      .eq('id', tokenRow.id)
+      .select('id');
+
+    if (!deleted || deleted.length === 0) {
+      // Token reuse detected — revoke ALL tokens for this admin (RFC 6749 §10.4)
+      await vaasSupabase.from('vaas_refresh_tokens').delete().eq('admin_id', tokenRow.admin_id);
+      return res.status(401).json({
+        success: false,
+        error: { code: 'REFRESH_TOKEN_REUSED', message: 'Refresh token has already been used. All sessions revoked.' }
+      } as VaasApiResponse);
+    }
+
+    const { token: newRefreshToken, hash: newHash } = generateRefreshToken();
+    const newExpiresAt = new Date(Date.now() + REFRESH_TOKEN_EXPIRY_DAYS * 24 * 60 * 60 * 1000);
+
+    await vaasSupabase.from('vaas_refresh_tokens').insert({
+      admin_id: admin.id,
+      token_hash: newHash,
+      expires_at: newExpiresAt.toISOString(),
+    });
+
+    // Issue new access token
+    const newAccessToken = jwt.sign(
+      { admin_id: admin.id, organization_id: admin.organization_id, role: admin.role },
+      config.jwtSecret,
+      { expiresIn: ACCESS_TOKEN_EXPIRY }
+    );
+
+    res.json({
+      success: true,
+      data: {
+        token: newAccessToken,
+        refresh_token: newRefreshToken,
+        expires_at: new Date(Date.now() + 60 * 60 * 1000).toISOString(),
+      }
+    } as VaasApiResponse);
+  } catch (error: any) {
+    res.status(500).json({
+      success: false,
+      error: { code: 'REFRESH_FAILED', message: 'Token refresh failed' }
+    } as VaasApiResponse);
+  }
 });
 
 // Get current admin info
@@ -374,13 +551,23 @@ router.post('/reset-password', async (req, res) => {
     // Hash new password
     const passwordHash = await bcrypt.hash(new_password, 12);
     
-    // Update password
-    const { error } = await vaasSupabase
-      .from('vaas_admins')
-      .update({ password_hash: passwordHash })
-      .eq('id', decoded.admin_id)
-      .eq('email', decoded.email);
-      
+    // Update password, clear lockout, and revoke all refresh tokens
+    const [{ error }] = await Promise.all([
+      vaasSupabase
+        .from('vaas_admins')
+        .update({
+          password_hash: passwordHash,
+          failed_login_attempts: 0,
+          locked_until: null,
+        })
+        .eq('id', decoded.admin_id)
+        .eq('email', decoded.email),
+      vaasSupabase
+        .from('vaas_refresh_tokens')
+        .delete()
+        .eq('admin_id', decoded.admin_id),
+    ]);
+
     if (error) {
       throw new Error('Failed to update password');
     }

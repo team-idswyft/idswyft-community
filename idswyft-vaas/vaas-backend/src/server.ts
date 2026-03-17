@@ -43,9 +43,28 @@ if (config.nodeEnv === 'production') {
 }
 
 // Security middleware
+const supabaseHost = (() => {
+  try { return new URL(config.vaasDatabase.url).host; }
+  catch { return 'placeholder.supabase.co'; }
+})();
+
 app.use(helmet({
   crossOriginResourcePolicy: { policy: "cross-origin" },
-  contentSecurityPolicy: false
+  contentSecurityPolicy: {
+    reportOnly: true,
+    directives: {
+      defaultSrc: ["'self'"],
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      styleSrc: ["'self'", "'unsafe-inline'", "https://fonts.googleapis.com"],
+      fontSrc: ["'self'", "https://fonts.gstatic.com"],
+      imgSrc: ["'self'", "data:", `https://${supabaseHost}`],
+      connectSrc: ["'self'", `https://${supabaseHost}`],
+      objectSrc: ["'none'"],
+      baseUri: ["'self'"],
+      formAction: ["'self'"],
+      frameAncestors: ["'self'"],
+    }
+  }
 }));
 
 // CORS configuration for VaaS domains
@@ -164,6 +183,7 @@ app.use('/api/', limiter);
 
 // Stricter rate limiting for authentication endpoints (brute-force protection)
 app.use('/api/auth/login', authRateLimit);
+app.use('/api/auth/refresh', authRateLimit);
 app.use('/api/platform/auth/login', authRateLimit);
 
 // Health check endpoint

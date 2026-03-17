@@ -247,6 +247,7 @@ export interface VaasLoginRequest {
 
 export interface VaasLoginResponse {
   token: string;
+  refresh_token: string;
   admin: Omit<VaasAdmin, 'password_hash'>;
   organization: VaasOrganization;
   expires_at: string;
