@@ -497,7 +497,7 @@ export class PaddleOCRProvider implements OCRProvider {
       ['last_name',   /\b(?:LN|LAST\s*NAME|FAMILY\s*NAME|SURNAME)\b/i],
       ['first_name',  /\b(?:FN|FIRST\s*NAME|GIVEN\s*NAME)\b/i],
       ['full_name',   /\b(?:FULL\s*)?NAME\b/i],
-      ['dob',         /(?:\bDOB\b|DOB(?=\d)|DATE\s*OF\s*BIRTH|BIRTH\s*DATE|\bBORN\b|3\s+DATE)/i],
+      ['dob',         /(?:\bD[O0]B\b|D[O0]B(?=\d)|DATE\s*OF\s*BIRTH|BIRTH\s*DATE|\bBORN\b|3\s+DATE)/i],
       ['expiry',      /\b(?:EXP(?:IRY|IRES)?|EXPIRATION|VALID\s*UNTIL|4b\b)\b/i],
       ['issued',      /\b(?:ISS(?:UED)?|ISSUE\s*DATE|4a\b)\b/i],
       ['address',     /\bADDR(?:ESS)?\b/i],
@@ -882,7 +882,7 @@ export class PaddleOCRProvider implements OCRProvider {
 
     // Strategy C: Look for lines where DOB label + date on same row
     for (const line of lines) {
-      if (!/DOB/i.test(line.text)) continue;
+      if (!/D[O0]B/i.test(line.text)) continue;
       const allDates = findAllDates(line.text);
       if (allDates.length >= 1) {
         return { value: allDates[0], confidence: line.confidence };
@@ -891,7 +891,7 @@ export class PaddleOCRProvider implements OCRProvider {
 
     // Strategy D: Scan for a date preceded by a DOB-like label (with or without separator)
     for (const line of lines) {
-      const m = line.text.match(/(?:DOB|BIRTH|BORN)[:\s]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i);
+      const m = line.text.match(/(?:D[O0]B|BIRTH|BORN)[:\s]*(\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4})/i);
       if (m) {
         return {
           value:      standardizeDateFormat(m[1]),

@@ -79,6 +79,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
 
   // Result state
   const [finalResult, setFinalResult] = useState<any>(null);
+  const [retryProcessing, setRetryProcessing] = useState(false);
 
   // Refs
   const mountedRef = useRef(true);
@@ -327,6 +328,41 @@ const EndUserVerification: React.FC<VerificationProps> = ({
         if (onRedirect) onRedirect(redirectUrl || '/');
         else if (redirectUrl) window.location.href = redirectUrl;
       }, 3000);
+    }
+  };
+
+  // ── Retry failed verification ────────────────────────────────────────────
+  const handleRetry = async () => {
+    if (!verificationId) return;
+    setRetryProcessing(true);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v2/verify/${verificationId}/restart`, {
+        method: 'POST',
+        headers: { 'X-API-Key': apiKey },
+      });
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.message || 'Failed to restart verification');
+      }
+      if (!mountedRef.current) return;
+      // Reset local state — reuse same verificationId (server reset it)
+      if (frontPreviewUrl) URL.revokeObjectURL(frontPreviewUrl);
+      if (backPreviewUrl) URL.revokeObjectURL(backPreviewUrl);
+      setFrontFile(null);
+      setFrontPreviewUrl(null);
+      setBackFile(null);
+      setBackPreviewUrl(null);
+      setFrontOCR(null);
+      setFinalResult(null);
+      if (redirectTimerRef.current) {
+        clearTimeout(redirectTimerRef.current);
+        redirectTimerRef.current = null;
+      }
+      setCurrentStep(2); // Back to front doc upload
+    } catch (err: any) {
+      toast.error(err.message || 'Failed to restart verification');
+    } finally {
+      if (mountedRef.current) setRetryProcessing(false);
     }
   };
 
@@ -676,6 +712,19 @@ const EndUserVerification: React.FC<VerificationProps> = ({
                 </div>
               )}
             </div>
+
+            {isFailed && finalResult.retry_available === true && (
+              <button
+                onClick={handleRetry}
+                disabled={retryProcessing}
+                className={`w-full py-3 px-6 bg-gradient-to-r ${isDark ? 'from-cyan-400 to-cyan-500 hover:from-cyan-500 hover:to-cyan-600' : 'from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700'} text-white font-medium rounded-xl disabled:opacity-50 transition-all`}
+              >
+                {retryProcessing ? 'Restarting…' : 'Try Again'}
+              </button>
+            )}
+            {isFailed && finalResult.retry_available === false && (
+              <p className={`text-xs ${isDark ? 'text-red-400' : 'text-red-500'}`}>Maximum retry attempts reached.</p>
+            )}
 
             {(redirectUrl || onRedirect) && (
               <p className={`text-xs ${styles.textSec}`}>Redirecting in 3 seconds…</p>

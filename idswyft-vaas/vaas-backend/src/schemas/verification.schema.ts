@@ -39,21 +39,24 @@ export const livenessDataSchema = z.object({
   { message: 'Liveness data payload must be under 100KB' }
 );
 
-/** Result reporting schema (previously inline in public.ts). */
+/** Result reporting schema (previously inline in public.ts).
+ *  Fields use `.nullable().optional()` because the main API returns JSON null
+ *  for empty DB columns, and Zod's `.optional()` only accepts undefined.
+ */
 export const resultSchema = z.object({
   final_result: z.enum(['verified', 'failed', 'manual_review']),
-  confidence_score: z.number().min(0).max(1).optional(),
+  confidence_score: z.number().min(0).max(1).nullable().optional(),
   face_match_results: z.object({
-    similarity_score: z.number().min(0).max(1).optional(),
-    score: z.number().min(0).max(1).optional(),
-    matched: z.boolean().optional(),
-  }).passthrough().optional(),
+    similarity_score: z.number().min(0).max(1).nullable().optional(),
+    score: z.number().min(0).max(1).nullable().optional(),
+    matched: z.boolean().nullable().optional(),
+  }).passthrough().nullable().optional(),
   liveness_results: z.object({
-    confidence: z.number().min(0).max(1).optional(),
-    passed: z.boolean().optional(),
-  }).passthrough().optional(),
-  ocr_data: z.record(z.unknown()).optional(),
-  cross_validation_results: z.record(z.unknown()).optional(),
-  failure_reason: z.string().max(1000).optional(),
-  manual_review_reason: z.string().max(1000).optional(),
-});
+    confidence: z.number().min(0).max(1).nullable().optional(),
+    passed: z.boolean().nullable().optional(),
+  }).passthrough().nullable().optional(),
+  ocr_data: z.record(z.unknown()).nullable().optional(),
+  cross_validation_results: z.record(z.unknown()).nullable().optional(),
+  failure_reason: z.string().max(1000).nullable().optional(),
+  manual_review_reason: z.string().max(1000).nullable().optional(),
+}).passthrough();

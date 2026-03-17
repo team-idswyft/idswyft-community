@@ -131,8 +131,9 @@ async function extractFrontDocument(
   documentId: string,
   documentType: string,
   issuingCountry?: string,
+  verificationId?: string,
 ): Promise<FrontExtractionResult> {
-  const ocrData = await ocrService.processDocument(documentId, documentPath, documentType, issuingCountry);
+  const ocrData = await ocrService.processDocument(documentId, documentPath, documentType, issuingCountry, verificationId);
 
   // Calculate average confidence from per-field confidence scores
   const confidenceScores = ocrData?.confidence_scores || {};
@@ -580,7 +581,7 @@ router.post('/:verification_id/front-document',
     const resolvedCountry = issuing_country?.toUpperCase() || undefined;
 
     // Run front extraction (downloadFile resolves bucket from encoded path)
-    const frontResult = await extractFrontDocument(documentPath, document.id, document_type, resolvedCountry);
+    const frontResult = await extractFrontDocument(documentPath, document.id, document_type, resolvedCountry, verification_id);
 
     // Ephemeral cleanup: demo files are deleted immediately after extraction
     if (source === 'demo') {
@@ -1034,6 +1035,94 @@ router.post('/:verification_id/finalize',
   })
 );
 
+// ─── Restart a failed verification (retry flow) ──────────────────────────
+router.post('/:verification_id/restart',
+  authenticateAPIKey,
+  verificationRateLimit,
+  [
+    param('verification_id').isUUID().withMessage('Invalid verification ID'),
+  ],
+  catchAsync(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw new ValidationError('Validation failed', 'multiple', errors.array());
+    }
+
+    const { verification_id } = req.params;
+    const verification = await requireOwnedVerification(req, verification_id);
+
+    // Only failed verifications can be restarted
+    const isSandbox = (verification as any).is_sandbox || false;
+    const session = await hydrateSession(verification_id, isSandbox);
+    const state = session.getState();
+    const mapped = mapStatusForResponse(state);
+
+    if (mapped.final_result !== 'failed') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only failed verifications can be restarted',
+      });
+    }
+
+    // Enforce max 3 retries
+    const currentRetryCount = (verification as any).retry_count ?? 0;
+    if (currentRetryCount >= 3) {
+      return res.status(400).json({
+        success: false,
+        message: 'Maximum retry attempts reached (3)',
+        retry_count: currentRetryCount,
+      });
+    }
+
+    // Reset verification_requests row with optimistic lock on retry_count
+    const { data: updated } = await supabase.from('verification_requests').update({
+      status: 'pending',
+      face_match_score: null,
+      liveness_score: null,
+      cross_validation_score: null,
+      failure_reason: null,
+      processing_completed_at: null,
+      document_id: null,
+      selfie_id: null,
+      retry_count: currentRetryCount + 1,
+    }).eq('id', verification_id)
+      .eq('retry_count', currentRetryCount)
+      .select('id');
+
+    if (!updated?.length) {
+      return res.status(409).json({
+        success: false,
+        message: 'Verification was modified concurrently. Please try again.',
+      });
+    }
+
+    // Delete related records — documents, selfies, risk scores, and session context
+    await Promise.all([
+      supabase.from('documents').delete().eq('verification_request_id', verification_id),
+      supabase.from('selfies').delete().eq('verification_request_id', verification_id),
+      supabase.from('verification_risk_scores').delete().eq('verification_request_id', verification_id),
+      supabase.from('verification_contexts').delete().eq('verification_id', verification_id),
+    ]);
+
+    logVerificationEvent('verification_restarted', verification_id, {
+      developerId: (req as any).developer.id,
+      retryCount: currentRetryCount + 1,
+    });
+
+    res.json({
+      success: true,
+      verification_id,
+      retry_count: currentRetryCount + 1,
+      message: 'Verification restarted — ready to upload front document',
+    });
+
+    // Broadcast restart to Realtime subscribers
+    broadcastStatusChange(
+      verification_id, 'AWAITING_FRONT', 1, null, null
+    ).catch(() => {});
+  })
+);
+
 router.get('/:verification_id/status',
   authenticateAPIKey,
   [
@@ -1093,6 +1182,10 @@ router.get('/:verification_id/status',
       rejection_detail: state.rejection_detail,
       failure_reason: state.rejection_detail,
       manual_review_reason: state.cross_validation?.verdict === 'REVIEW' ? 'Cross-validation requires review' : state.face_match?.skipped_reason ? `Face match skipped: ${state.face_match.skipped_reason}` : null,
+      ...(mapped.final_result === 'failed' && {
+        retry_available: ((verification as any).retry_count ?? 0) < 3,
+        retry_count: (verification as any).retry_count ?? 0,
+      }),
       created_at: state.created_at,
       updated_at: state.updated_at,
     });
