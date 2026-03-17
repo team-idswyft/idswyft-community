@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   Search,
   Filter,
@@ -9,7 +9,8 @@ import {
   Clock,
   AlertTriangle,
   User,
-  Calendar
+  Calendar,
+  ChevronDown
 } from 'lucide-react';
 import { apiClient } from '../services/api';
 import { showToast } from '../lib/toast';
@@ -42,6 +43,43 @@ export default function Verifications() {
   const [totalRecords, setTotalRecords] = useState(0);
 
   const loadingRef = useRef(false);
+
+  // Accordion state — tracks which user groups are expanded
+  const [expandedUsers, setExpandedUsers] = useState<Set<string>>(new Set());
+
+  const toggleExpand = (userId: string) => {
+    setExpandedUsers(prev => {
+      const next = new Set(prev);
+      if (next.has(userId)) next.delete(userId);
+      else next.add(userId);
+      return next;
+    });
+  };
+
+  // Group verifications by end_user_id for de-duplication
+  const userGroups = useMemo(() => {
+    if (!verifications || verifications.length === 0) return [];
+
+    const map = new Map<string, VerificationSession[]>();
+    for (const v of verifications) {
+      const key = v.end_user_id || v.id;
+      const group = map.get(key);
+      if (group) group.push(v);
+      else map.set(key, [v]);
+    }
+
+    const groups: { endUserId: string; verifications: VerificationSession[]; latest: VerificationSession }[] = [];
+    for (const [endUserId, vList] of map) {
+      vList.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+      groups.push({ endUserId, verifications: vList, latest: vList[0] });
+    }
+
+    // Sort groups by latest verification date (most recent first)
+    groups.sort((a, b) =>
+      new Date(b.latest.created_at).getTime() - new Date(a.latest.created_at).getTime()
+    );
+    return groups;
+  }, [verifications]);
 
   useEffect(() => {
     loadVerifications();
@@ -342,89 +380,179 @@ export default function Verifications() {
                     </div>
                   </td>
                 </tr>
-              ) : !verifications || verifications.length === 0 ? (
+              ) : userGroups.length === 0 ? (
                 <tr>
                   <td colSpan={5} className="px-6 py-4 text-center text-slate-500">
                     No verifications found matching your criteria
                   </td>
                 </tr>
               ) : (
-                verifications.map((verification) => (
-                  <tr key={verification.id} className="hover:bg-slate-800/40 transition-colors">
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        <User className="w-8 h-8 text-slate-500 mr-3" />
-                        <div>
-                          <div className={`${monoSm} text-slate-100`}>
-                            {verification.vaas_end_users?.email || 'Anonymous'}
-                          </div>
-                          <div className={`${monoXs} text-slate-500`}>
-                            ID: {verification.id.substring(0, 8)}...
-                          </div>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className="flex items-center">
-                        {getStatusIcon(verification.status)}
-                        <span className={`ml-2 ${statusPill} ${getStatusAccent(mapStatus(verification.status)).pill}`}>
-                          {verification.status.replace('_', ' ')}
-                        </span>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-100">
-                      {verification.issuing_country ? (
-                        <span title={COUNTRY_NAMES[verification.issuing_country] || verification.issuing_country}>
-                          {countryFlag(verification.issuing_country)}{' '}
-                          <span className={monoXs}>{verification.issuing_country}</span>
-                        </span>
-                      ) : (
-                        <span className="text-slate-500">--</span>
-                      )}
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap">
-                      <div className={`flex items-center ${monoXs} text-slate-500`}>
-                        <Calendar className="w-4 h-4 mr-1" />
-                        {formatDate(verification.created_at)}
-                      </div>
-                    </td>
-                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <div className="flex items-center space-x-2">
-                        <button
-                          onClick={() => {
-                            setSelectedVerification(verification);
-                            setShowDetails(true);
-                          }}
-                          className="text-primary-600 hover:text-primary-900"
-                          aria-label="View details"
-                        >
-                          <Eye className="w-4 h-4" />
-                        </button>
+                userGroups.map((group) => {
+                  const hasMultiple = group.verifications.length > 1;
+                  const isExpanded = expandedUsers.has(group.endUserId);
+                  const latest = group.latest;
 
-                        {(verification.status === 'processing' || verification.status === 'manual_review') && (
-                          <>
+                  return (
+                    <React.Fragment key={group.endUserId}>
+                      {/* Primary row (latest verification per user) */}
+                      <tr
+                        className={`hover:bg-slate-800/40 transition-colors ${hasMultiple ? 'cursor-pointer' : ''}`}
+                        onClick={hasMultiple ? () => toggleExpand(group.endUserId) : undefined}
+                      >
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            <User className="w-8 h-8 text-slate-500 mr-3" />
+                            <div>
+                              <div className={`${monoSm} text-slate-100 flex items-center gap-2`}>
+                                {latest.vaas_end_users?.email || 'Anonymous'}
+                                {hasMultiple && (
+                                  <span className="inline-flex items-center rounded-full border border-slate-500/35 bg-slate-500/15 px-1.5 py-0.5 text-[0.6rem] font-semibold text-slate-300">
+                                    &times;{group.verifications.length}
+                                  </span>
+                                )}
+                              </div>
+                              <div className={`${monoXs} text-slate-500 flex items-center gap-1`}>
+                                ID: {latest.id.substring(0, 8)}...
+                                {hasMultiple && (
+                                  <ChevronDown className={`w-3 h-3 ml-1 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="flex items-center">
+                            {getStatusIcon(latest.status)}
+                            <span className={`ml-2 ${statusPill} ${getStatusAccent(mapStatus(latest.status)).pill}`}>
+                              {latest.status.replace('_', ' ')}
+                            </span>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-slate-100">
+                          {latest.issuing_country ? (
+                            <span title={COUNTRY_NAMES[latest.issuing_country] || latest.issuing_country}>
+                              {countryFlag(latest.issuing_country)}{' '}
+                              <span className={monoXs}>{latest.issuing_country}</span>
+                            </span>
+                          ) : (
+                            <span className="text-slate-500">--</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className={`flex items-center ${monoXs} text-slate-500`}>
+                            <Calendar className="w-4 h-4 mr-1" />
+                            {formatDate(latest.created_at)}
+                          </div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                          <div className="flex items-center space-x-2" onClick={(e) => e.stopPropagation()}>
                             <button
-                              onClick={() => handleStatusUpdate(verification.id, 'verified')}
-                              className="text-green-600 hover:text-green-900"
-                              title="Approve"
-                              aria-label="Approve verification"
+                              onClick={() => {
+                                setSelectedVerification(latest);
+                                setShowDetails(true);
+                              }}
+                              className="text-primary-600 hover:text-primary-900"
+                              aria-label="View details"
                             >
-                              <CheckCircle className="w-4 h-4" />
+                              <Eye className="w-4 h-4" />
                             </button>
-                            <button
-                              onClick={() => handleStatusUpdate(verification.id, 'failed', 'Rejected during review')}
-                              className="text-red-600 hover:text-red-900"
-                              title="Reject"
-                              aria-label="Reject verification"
-                            >
-                              <XCircle className="w-4 h-4" />
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </td>
-                  </tr>
-                ))
+
+                            {(latest.status === 'processing' || latest.status === 'manual_review') && (
+                              <>
+                                <button
+                                  onClick={() => handleStatusUpdate(latest.id, 'verified')}
+                                  className="text-green-600 hover:text-green-900"
+                                  title="Approve"
+                                  aria-label="Approve verification"
+                                >
+                                  <CheckCircle className="w-4 h-4" />
+                                </button>
+                                <button
+                                  onClick={() => handleStatusUpdate(latest.id, 'failed', 'Rejected during review')}
+                                  className="text-red-600 hover:text-red-900"
+                                  title="Reject"
+                                  aria-label="Reject verification"
+                                >
+                                  <XCircle className="w-4 h-4" />
+                                </button>
+                              </>
+                            )}
+                          </div>
+                        </td>
+                      </tr>
+
+                      {/* Accordion sub-rows for older attempts */}
+                      {hasMultiple && isExpanded && group.verifications.slice(1).map((v) => (
+                        <tr key={v.id} className="bg-slate-900/40 hover:bg-slate-800/30 transition-colors">
+                          <td className="pl-16 pr-6 py-3 whitespace-nowrap">
+                            <div className={`${monoXs} text-slate-500`}>
+                              ID: {v.id.substring(0, 8)}...
+                            </div>
+                          </td>
+                          <td className="px-6 py-3 whitespace-nowrap">
+                            <div className="flex items-center">
+                              {getStatusIcon(v.status)}
+                              <span className={`ml-2 ${statusPill} ${getStatusAccent(mapStatus(v.status)).pill}`}>
+                                {v.status.replace('_', ' ')}
+                              </span>
+                            </div>
+                          </td>
+                          <td className="px-6 py-3 whitespace-nowrap text-sm text-slate-100">
+                            {v.issuing_country ? (
+                              <span title={COUNTRY_NAMES[v.issuing_country] || v.issuing_country}>
+                                {countryFlag(v.issuing_country)}{' '}
+                                <span className={monoXs}>{v.issuing_country}</span>
+                              </span>
+                            ) : (
+                              <span className="text-slate-500">--</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-3 whitespace-nowrap">
+                            <div className={`flex items-center ${monoXs} text-slate-500`}>
+                              <Calendar className="w-4 h-4 mr-1" />
+                              {formatDate(v.created_at)}
+                            </div>
+                          </td>
+                          <td className="px-6 py-3 whitespace-nowrap text-sm font-medium">
+                            <div className="flex items-center space-x-2">
+                              <button
+                                onClick={() => {
+                                  setSelectedVerification(v);
+                                  setShowDetails(true);
+                                }}
+                                className="text-primary-600 hover:text-primary-900"
+                                aria-label="View details"
+                              >
+                                <Eye className="w-4 h-4" />
+                              </button>
+
+                              {(v.status === 'processing' || v.status === 'manual_review') && (
+                                <>
+                                  <button
+                                    onClick={() => handleStatusUpdate(v.id, 'verified')}
+                                    className="text-green-600 hover:text-green-900"
+                                    title="Approve"
+                                    aria-label="Approve verification"
+                                  >
+                                    <CheckCircle className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleStatusUpdate(v.id, 'failed', 'Rejected during review')}
+                                    className="text-red-600 hover:text-red-900"
+                                    title="Reject"
+                                    aria-label="Reject verification"
+                                  >
+                                    <XCircle className="w-4 h-4" />
+                                  </button>
+                                </>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      ))}
+                    </React.Fragment>
+                  );
+                })
               )}
             </tbody>
           </table>
