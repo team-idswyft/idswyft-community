@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
 import apiClient from '../services/api';
+import { showToast } from '../lib/toast';
+import { ConfirmationModal } from '../components/ui/Modal';
 import type { ActiveSession } from '../types.js';
 import { sectionLabel, monoXs, monoSm, cardSurface, statusPill, tableHeaderClass } from '../styles/tokens';
 
@@ -9,6 +11,7 @@ export default function Sessions() {
   const [loading, setLoading] = useState(true);
   const [revoking, setRevoking] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [confirmRevokeId, setConfirmRevokeId] = useState<string | null>(null);
 
   const load = async () => {
     setLoading(true);
@@ -25,14 +28,14 @@ export default function Sessions() {
   useEffect(() => { load(); }, []);
 
   const revoke = async (id: string) => {
-    if (!window.confirm('Revoke this session? The device will be logged out immediately.')) return;
     setError(null);
     setRevoking(id);
     try {
       await apiClient.revokeSession(id);
       setSessions((s) => s.filter((session) => session.id !== id));
+      showToast.success('Session revoked');
     } catch (err: unknown) {
-      alert(`Failed to revoke: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      showToast.error(`Failed to revoke: ${err instanceof Error ? err.message : 'Unknown error'}`);
     } finally {
       setRevoking(null);
     }
@@ -118,7 +121,7 @@ export default function Sessions() {
                     <td className="px-5 py-3.5 text-right">
                       {!session.isCurrent && (
                         <button
-                          onClick={() => revoke(session.id)}
+                          onClick={() => setConfirmRevokeId(session.id)}
                           disabled={revoking === session.id}
                           className={`${monoXs} text-rose-400 hover:text-rose-300 disabled:opacity-50 transition-colors`}
                         >
@@ -133,6 +136,18 @@ export default function Sessions() {
           </div>
         </div>
       )}
+
+      <ConfirmationModal
+        isOpen={confirmRevokeId !== null}
+        title="Revoke Session"
+        message="Are you sure you want to revoke this session? The device will be logged out immediately."
+        confirmText="Revoke"
+        onConfirm={() => {
+          if (confirmRevokeId) revoke(confirmRevokeId);
+        }}
+        onClose={() => setConfirmRevokeId(null)}
+        confirmVariant="danger"
+      />
     </div>
   );
 }

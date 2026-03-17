@@ -1,10 +1,12 @@
 import { Router } from 'express';
 import { verificationService } from '../services/verificationService.js';
 import { requireAuth, requireApiKey, requirePermission, AuthenticatedRequest } from '../middleware/auth.js';
-import { validateStartVerification, validatePagination } from '../middleware/validation.js';
+import { validatePagination } from '../middleware/validation.js';
+import { startVerificationSchema } from '../schemas/verification.schema.js';
 import { apiKeyRateLimit } from '../middleware/rateLimit.js';
 import { VaasApiResponse, VaasStartVerificationRequest } from '../types/index.js';
 import { vaasSupabase } from '../config/database.js';
+import { auditService } from '../services/auditService.js';
 
 const router = Router();
 
@@ -44,7 +46,7 @@ router.post('/start', async (req: AuthenticatedRequest, res) => {
       organizationId = req.admin!.organization_id;
       
       // Check permissions
-      if (!req.admin!.permissions.manage_verifications && !req.admin!.permissions.view_verifications) {
+      if (!req.admin!.permissions.review_verifications && !req.admin!.permissions.view_verifications) {
         const response: VaasApiResponse = {
           success: false,
           error: {
@@ -58,14 +60,19 @@ router.post('/start', async (req: AuthenticatedRequest, res) => {
     }
     
     // Validate request body
-    await new Promise<void>((resolve, reject) => {
-      validateStartVerification(req, res, (error) => {
-        if (error) reject(error);
-        else resolve();
+    const parseResult = startVerificationSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Validation failed',
+          details: parseResult.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message })),
+        },
       });
-    });
-    
-    const verificationRequest: VaasStartVerificationRequest = req.body;
+    }
+
+    const verificationRequest: VaasStartVerificationRequest = parseResult.data;
     const result = await verificationService.startVerification(organizationId, verificationRequest);
     
     const response: VaasApiResponse = {
@@ -216,12 +223,22 @@ router.post('/:id/approve', requireAuth, requirePermission('approve_verification
     const reviewerId = req.admin!.id;
     
     const verification = await verificationService.approveVerification(organizationId, id, reviewerId, notes);
-    
+
+    auditService.logAuditEvent({
+      organizationId,
+      adminId: reviewerId,
+      action: 'verification.approved',
+      resourceType: 'verification',
+      resourceId: id,
+      details: { notes },
+      req,
+    });
+
     const response: VaasApiResponse = {
       success: true,
       data: verification
     };
-    
+
     res.json(response);
   } catch (error: any) {
     const response: VaasApiResponse = {
@@ -257,12 +274,22 @@ router.post('/:id/reject', requireAuth, requirePermission('approve_verifications
     }
     
     const verification = await verificationService.rejectVerification(organizationId, id, reviewerId, reason, notes);
-    
+
+    auditService.logAuditEvent({
+      organizationId,
+      adminId: reviewerId,
+      action: 'verification.rejected',
+      resourceType: 'verification',
+      resourceId: id,
+      details: { reason, notes },
+      req,
+    });
+
     const response: VaasApiResponse = {
       success: true,
       data: verification
     };
-    
+
     res.json(response);
   } catch (error: any) {
     const response: VaasApiResponse = {
@@ -298,12 +325,21 @@ router.post('/:id/sync', requireAuth, requirePermission('view_verifications'), a
     }
     
     const updatedVerification = await verificationService.syncVerificationFromIdswyft(verification.idswyft_verification_id);
-    
+
+    auditService.logAuditEvent({
+      organizationId: req.admin!.organization_id,
+      adminId: req.admin!.id,
+      action: 'verification.synced',
+      resourceType: 'verification',
+      resourceId: id,
+      req,
+    });
+
     const response: VaasApiResponse = {
       success: true,
       data: updatedVerification
     };
-    
+
     res.json(response);
   } catch (error: any) {
     const response: VaasApiResponse = {

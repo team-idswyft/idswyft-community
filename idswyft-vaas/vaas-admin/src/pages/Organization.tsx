@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../services/api';
+import { showToast } from '../lib/toast';
+import { ConfirmationModal } from '../components/ui/Modal';
 import { Organization as OrgType, OrganizationSettings, OrganizationBranding, ApiResponse } from '../types.js';
 import type { AxiosResponse } from 'axios';
 import { Save, CreditCard } from 'lucide-react';
@@ -195,6 +197,7 @@ function MainAPIKeysManagement({ organizationId, canManageKeys }: MainAPIKeysMan
   const [newKeyName, setNewKeyName] = useState('');
   const [isSandbox, setIsSandbox] = useState(true);
   const [createdKey, setCreatedKey] = useState<string | null>(null);
+  const [confirmRevoke, setConfirmRevoke] = useState<{ id: string; name: string } | null>(null);
 
   useEffect(() => {
     fetchAPIKeys();
@@ -248,23 +251,20 @@ function MainAPIKeysManagement({ organizationId, canManageKeys }: MainAPIKeysMan
     }
   };
 
-  const handleRevokeKey = async (keyId: string, keyName: string) => {
-    if (!canManageKeys || !confirm(`Are you sure you want to revoke the API key "${keyName}"? This action cannot be undone.`)) {
-      return;
-    }
-
+  const handleRevokeKey = async (keyId: string) => {
     try {
       setError(null);
       const response: AxiosResponse<ApiResponse> = await apiClient.delete(`/organizations/main-api-keys/${keyId}`);
 
       if (response.data.success) {
-        await fetchAPIKeys(); // Refresh the list
+        showToast.success('API key revoked');
+        await fetchAPIKeys();
       } else {
         throw new Error(response.data.error?.message || 'Failed to revoke API key');
       }
     } catch (err: any) {
       console.error('Failed to revoke API key:', err);
-      setError(err.message || 'Failed to revoke API key');
+      showToast.error(err.message || 'Failed to revoke API key');
     }
   };
 
@@ -429,7 +429,7 @@ function MainAPIKeysManagement({ organizationId, canManageKeys }: MainAPIKeysMan
                   {canManageKeys && (
                     <div className="flex items-center space-x-2">
                       <button
-                        onClick={() => handleRevokeKey(key.id, key.key_name)}
+                        onClick={() => setConfirmRevoke({ id: key.id, name: key.key_name })}
                         className="px-3 py-1.5 bg-rose-500/20 border border-rose-400/40 text-rose-200 hover:bg-rose-500/30 font-mono text-xs rounded-lg transition-colors"
                       >
                         Revoke
@@ -442,6 +442,18 @@ function MainAPIKeysManagement({ organizationId, canManageKeys }: MainAPIKeysMan
           )}
         </div>
       </div>
+
+      <ConfirmationModal
+        isOpen={confirmRevoke !== null}
+        title="Revoke API Key"
+        message={`Are you sure you want to revoke the API key "${confirmRevoke?.name}"? This action cannot be undone.`}
+        confirmText="Revoke"
+        onConfirm={() => {
+          if (confirmRevoke) handleRevokeKey(confirmRevoke.id);
+        }}
+        onClose={() => setConfirmRevoke(null)}
+        confirmVariant="danger"
+      />
 
       {/* Information Card */}
       <div className={infoPanel}>

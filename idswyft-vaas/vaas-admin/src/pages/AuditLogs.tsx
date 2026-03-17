@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import apiClient from '../services/api';
+import { showToast } from '../lib/toast';
 import type {
   AuditLogEntry,
   AuditLogFilters,
@@ -78,6 +79,7 @@ export default function AuditLogs() {
   const [logs, setLogs] = useState<AuditLogEntry[]>([]);
   const [stats, setStats] = useState<AuditLogStats | null>(null);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [statsLoading, setStatsLoading] = useState(true);
   const [exporting, setExporting] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
@@ -101,6 +103,7 @@ export default function AuditLogs() {
     if (!organization?.id) return;
 
     setLoading(true);
+    setError(null);
     try {
       const params = {
         ...newFilters,
@@ -114,8 +117,9 @@ export default function AuditLogs() {
       setTotalPages(response.total_pages);
       setTotal(response.total);
       setCurrentPage(page);
-    } catch (error) {
-      console.error('Failed to load audit logs:', error);
+    } catch (err: unknown) {
+      console.error('Failed to load audit logs:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load audit logs');
     } finally {
       setLoading(false);
     }
@@ -202,8 +206,8 @@ export default function AuditLogs() {
       a.click();
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Failed to export audit logs:', error);
+    } catch (err: unknown) {
+      showToast.error('Failed to export audit logs');
     } finally {
       setExporting(false);
     }
@@ -275,6 +279,13 @@ export default function AuditLogs() {
           <p className={sectionLabel}>Audit Logs</p>
           <p className="text-slate-400 mt-1 text-sm">Organization-wide security and compliance monitoring</p>
         </div>
+
+        {error && (
+          <div className="p-4 bg-rose-500/12 border border-rose-500/25 rounded-lg text-rose-300 text-sm flex items-center justify-between">
+            <span>{error}</span>
+            <button onClick={() => loadAuditLogs()} className="ml-4 text-rose-200 hover:text-white underline text-xs font-mono">Retry</button>
+          </div>
+        )}
 
         <div className="flex space-x-3">
           <button

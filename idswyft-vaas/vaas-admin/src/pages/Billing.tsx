@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../services/api';
+import { showToast } from '../lib/toast';
 import {
   BillingOverview,
   BillingPlan,
@@ -69,7 +70,7 @@ export default function Billing() {
       setShowPlanModal(false);
     } catch (error) {
       console.error('Failed to change plan:', error);
-      alert('Failed to change billing plan');
+      showToast.error('Failed to change billing plan');
     }
   };
 
@@ -86,7 +87,7 @@ export default function Billing() {
       URL.revokeObjectURL(url);
     } catch (error) {
       console.error('Failed to download invoice:', error);
-      alert('Failed to download invoice');
+      showToast.error('Failed to download invoice');
     }
   };
 

@@ -6,6 +6,7 @@ import { VaasApiResponse, VaasEndUser } from '../types/index.js';
 import { vaasSupabase } from '../config/database.js';
 import { emailService } from '../services/emailService.js';
 import { v4 as uuidv4 } from 'uuid';
+import { auditService } from '../services/auditService.js';
 
 const router = Router();
 
@@ -609,13 +610,20 @@ router.delete('/:id', requireAuth, requirePermission('manage_users'), async (req
       throw new Error(`Failed to delete user: ${error.message}`);
     }
     
-    console.log(`[UserRoutes] Deleted end user: ${id}`);
-    
+    auditService.logAuditEvent({
+      organizationId,
+      adminId: req.admin!.id,
+      action: 'user.deleted',
+      resourceType: 'end_user',
+      resourceId: id,
+      req,
+    });
+
     const response: VaasApiResponse = {
       success: true,
       data: { message: 'User deleted successfully' }
     };
-    
+
     res.json(response);
   } catch (error: any) {
     console.error('[UserRoutes] Delete user failed:', error);
@@ -629,6 +637,104 @@ router.delete('/:id', requireAuth, requirePermission('manage_users'), async (req
     };
     
     res.status(400).json(response);
+  }
+});
+
+// GDPR erasure — anonymizes PII but preserves aggregate data
+router.delete('/:id/gdpr-erase', requireAuth, requirePermission('manage_users'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const { id } = req.params;
+    const organizationId = req.admin!.organization_id;
+
+    // Find user scoped to the organization
+    const { data: user, error: fetchError } = await vaasSupabase
+      .from('vaas_end_users')
+      .select('id, email, data_deletion_requested_at')
+      .eq('id', id)
+      .eq('organization_id', organizationId)
+      .single();
+
+    if (fetchError || !user) {
+      const response: VaasApiResponse = {
+        success: false,
+        error: { code: 'USER_NOT_FOUND', message: 'User not found' }
+      };
+      return res.status(404).json(response);
+    }
+
+    const now = new Date().toISOString();
+
+    // Anonymize PII fields — keep id, organization_id, verification_status, timestamps
+    const { error: updateError } = await vaasSupabase
+      .from('vaas_end_users')
+      .update({
+        email: null,
+        phone: null,
+        first_name: null,
+        last_name: null,
+        external_id: null,
+        metadata: {},
+        tags: [],
+        data_deletion_requested_at: user.data_deletion_requested_at || now,
+        updated_at: now,
+      })
+      .eq('id', id)
+      .eq('organization_id', organizationId);
+
+    if (updateError) {
+      throw new Error(`Failed to erase user data: ${updateError.message}`);
+    }
+
+    // Scrub related verification session PII (ip_address, user_agent)
+    await vaasSupabase
+      .from('vaas_verification_sessions')
+      .update({
+        ip_address: null,
+        user_agent: null,
+        session_token: null,
+        updated_at: now,
+      })
+      .eq('end_user_id', id)
+      .eq('organization_id', organizationId);
+
+    // Delete uploaded documents for this user's sessions
+    const { data: sessions } = await vaasSupabase
+      .from('vaas_verification_sessions')
+      .select('id')
+      .eq('end_user_id', id)
+      .eq('organization_id', organizationId);
+
+    if (sessions && sessions.length > 0) {
+      const sessionIds = sessions.map(s => s.id);
+      await vaasSupabase
+        .from('vaas_verification_documents')
+        .delete()
+        .in('verification_session_id', sessionIds);
+    }
+
+    auditService.logAuditEvent({
+      organizationId,
+      adminId: req.admin!.id,
+      action: 'user.gdpr_erased',
+      resourceType: 'end_user',
+      resourceId: id,
+      details: { user_id: id, action: 'pii_anonymized' },
+      req,
+    });
+
+    const response: VaasApiResponse = {
+      success: true,
+      data: { message: 'User data erased per GDPR request. Aggregate records preserved.' }
+    };
+    res.json(response);
+  } catch (err: unknown) {
+    console.error('[UserRoutes] GDPR erase failed:', err);
+    const message = err instanceof Error ? err.message : 'Failed to erase user data';
+    const response: VaasApiResponse = {
+      success: false,
+      error: { code: 'GDPR_ERASE_FAILED', message }
+    };
+    res.status(500).json(response);
   }
 });
 
@@ -772,6 +878,16 @@ router.post('/:id/send-verification-invitation', requireAuth, requirePermission(
       console.log(`⚠️ Failed to send verification invitation email to ${user.email}`);
     }
     
+    auditService.logAuditEvent({
+      organizationId,
+      adminId: req.admin!.id,
+      action: 'user.invitation_sent',
+      resourceType: 'end_user',
+      resourceId: id,
+      details: { email: user.email, email_sent: emailSent },
+      req,
+    });
+
     const response: VaasApiResponse = {
       success: true,
       data: {
@@ -784,7 +900,7 @@ router.post('/:id/send-verification-invitation', requireAuth, requirePermission(
         email_status: emailSent ? 'sent' : 'failed'
       }
     };
-    
+
     res.json(response);
   } catch (error: any) {
     console.error('[UserRoutes] Send verification invitation failed:', error);

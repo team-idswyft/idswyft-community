@@ -74,6 +74,15 @@ export const config = {
     }
     return secret || 'vaas-api-key-encryption-secret';
   })(),
+  idswyftWebhookSecret: (() => {
+    const secret = process.env.IDSWYFT_WEBHOOK_SECRET;
+    if (!secret && process.env.NODE_ENV === 'production') {
+      throw new Error(
+        'IDSWYFT_WEBHOOK_SECRET environment variable must be set in production'
+      );
+    }
+    return secret || 'default-webhook-secret';
+  })(),
   superAdminEmails: process.env.VAAS_SUPER_ADMIN_EMAILS || '',
   
   // Frontend URLs

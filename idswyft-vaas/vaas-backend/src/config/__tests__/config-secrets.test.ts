@@ -19,6 +19,7 @@ describe('config startup secret validation', () => {
     process.env.NODE_ENV = 'production';
     delete process.env.VAAS_JWT_SECRET;
     process.env.VAAS_API_KEY_SECRET = 'some-secret-value';
+    process.env.IDSWYFT_WEBHOOK_SECRET = 'some-webhook-secret';
 
     await expect(import('../index.js')).rejects.toThrow(/VAAS_JWT_SECRET/);
   });
@@ -27,14 +28,16 @@ describe('config startup secret validation', () => {
     process.env.NODE_ENV = 'production';
     process.env.VAAS_JWT_SECRET = 'some-jwt-secret';
     delete process.env.VAAS_API_KEY_SECRET;
+    process.env.IDSWYFT_WEBHOOK_SECRET = 'some-webhook-secret';
 
     await expect(import('../index.js')).rejects.toThrow(/VAAS_API_KEY_SECRET/);
   });
 
-  it('does NOT throw when both secrets are set in production', async () => {
+  it('does NOT throw when all secrets are set in production', async () => {
     process.env.NODE_ENV = 'production';
     process.env.VAAS_JWT_SECRET = 'prod-jwt-secret-value';
     process.env.VAAS_API_KEY_SECRET = 'prod-api-key-secret-value';
+    process.env.IDSWYFT_WEBHOOK_SECRET = 'prod-webhook-secret-value';
 
     await expect(import('../index.js')).resolves.toBeDefined();
   });
@@ -43,6 +46,7 @@ describe('config startup secret validation', () => {
     process.env.NODE_ENV = 'development';
     delete process.env.VAAS_JWT_SECRET;
     delete process.env.VAAS_API_KEY_SECRET;
+    delete process.env.IDSWYFT_WEBHOOK_SECRET;
 
     await expect(import('../index.js')).resolves.toBeDefined();
   });
@@ -51,6 +55,16 @@ describe('config startup secret validation', () => {
     process.env.NODE_ENV = 'production';
     process.env.VAAS_JWT_SECRET = '';
     process.env.VAAS_API_KEY_SECRET = 'some-secret-value';
+    process.env.IDSWYFT_WEBHOOK_SECRET = 'some-webhook-secret';
     await expect(import('../index.js')).rejects.toThrow(/VAAS_JWT_SECRET/);
+  });
+
+  it('throws when IDSWYFT_WEBHOOK_SECRET is missing in production', async () => {
+    process.env.NODE_ENV = 'production';
+    process.env.VAAS_JWT_SECRET = 'some-jwt-secret';
+    process.env.VAAS_API_KEY_SECRET = 'some-api-key-secret';
+    delete process.env.IDSWYFT_WEBHOOK_SECRET;
+
+    await expect(import('../index.js')).rejects.toThrow(/IDSWYFT_WEBHOOK_SECRET/);
   });
 });

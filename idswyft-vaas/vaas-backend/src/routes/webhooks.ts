@@ -1,30 +1,43 @@
 import { Router } from 'express';
+import crypto from 'crypto';
 import { webhookService } from '../services/webhookService.js';
 import { verificationService } from '../services/verificationService.js';
 import { requireAuth, requirePermission, AuthenticatedRequest } from '../middleware/auth.js';
-import { validateWebhookConfig } from '../middleware/validation.js';
+import { validateBody } from '../schemas/validate.js';
+import { webhookConfigSchema } from '../schemas/webhook.schema.js';
 import { VaasApiResponse } from '../types/index.js';
 import { vaasSupabase } from '../config/database.js';
+import config from '../config/index.js';
+import { auditService } from '../services/auditService.js';
 
 const router = Router();
 
 // Create webhook (admin only)
-router.post('/', requireAuth, requirePermission('manage_webhooks'), validateWebhookConfig, async (req: AuthenticatedRequest, res) => {
+router.post('/', requireAuth, requirePermission('manage_webhooks'), validateBody(webhookConfigSchema), async (req: AuthenticatedRequest, res) => {
   try {
     const organizationId = req.admin!.organization_id;
-    const { url, events, secret_key } = req.body;
-    
+    const { url, events } = req.body;
+
     const webhook = await webhookService.createWebhook(organizationId, {
       url,
       events,
-      secret_key
     });
-    
+
+    auditService.logAuditEvent({
+      organizationId,
+      adminId: req.admin!.id,
+      action: 'webhook.created',
+      resourceType: 'webhook',
+      resourceId: webhook?.id,
+      details: { url, events },
+      req,
+    });
+
     const response: VaasApiResponse = {
       success: true,
       data: webhook
     };
-    
+
     res.status(201).json(response);
   } catch (error: any) {
     const response: VaasApiResponse = {
@@ -114,12 +127,21 @@ router.put('/:id', requireAuth, requirePermission('manage_webhooks'), async (req
     const { id: _, organization_id, secret_key, created_at, updated_at, ...allowedUpdates } = updates;
     
     const webhook = await webhookService.updateWebhook(organizationId, id, allowedUpdates);
-    
+
+    auditService.logAuditEvent({
+      organizationId,
+      adminId: req.admin!.id,
+      action: 'webhook.updated',
+      resourceType: 'webhook',
+      resourceId: id,
+      req,
+    });
+
     const response: VaasApiResponse = {
       success: true,
       data: webhook
     };
-    
+
     res.json(response);
   } catch (error: any) {
     const response: VaasApiResponse = {
@@ -141,12 +163,21 @@ router.delete('/:id', requireAuth, requirePermission('manage_webhooks'), async (
     const organizationId = req.admin!.organization_id;
     
     await webhookService.deleteWebhook(organizationId, id);
-    
+
+    auditService.logAuditEvent({
+      organizationId,
+      adminId: req.admin!.id,
+      action: 'webhook.deleted',
+      resourceType: 'webhook',
+      resourceId: id,
+      req,
+    });
+
     const response: VaasApiResponse = {
       success: true,
       data: { message: 'Webhook deleted successfully' }
     };
-    
+
     res.json(response);
   } catch (error: any) {
     const response: VaasApiResponse = {
@@ -193,21 +224,26 @@ router.post('/idswyft', async (req, res) => {
   try {
     const signature = req.headers['x-idswyft-signature'] as string;
     const payload = JSON.stringify(req.body);
-    
-    // Verify webhook signature (in production, use proper secret)
-    const expectedSecret = process.env.IDSWYFT_WEBHOOK_SECRET || 'default-webhook-secret';
-    
+
     if (!signature) {
       console.warn('[WebhookRoute] Missing signature for Idswyft webhook');
       return res.status(400).json({ error: 'Missing signature' });
     }
-    
-    // TODO: Implement proper signature verification
-    // const isValid = idswyftApiService.verifyWebhookSignature(payload, signature, expectedSecret);
-    // if (!isValid) {
-    //   return res.status(401).json({ error: 'Invalid signature' });
-    // }
-    
+
+    // Verify HMAC-SHA256 webhook signature (main API sends "sha256=<hex>")
+    const expectedSignature = 'sha256=' + crypto
+      .createHmac('sha256', config.idswyftWebhookSecret)
+      .update(payload)
+      .digest('hex');
+
+    const sigBuffer = Buffer.from(signature);
+    const expectedBuffer = Buffer.from(expectedSignature);
+
+    if (sigBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(sigBuffer, expectedBuffer)) {
+      console.warn('[WebhookRoute] Invalid signature for Idswyft webhook');
+      return res.status(401).json({ error: 'Invalid signature' });
+    }
+
     const event = req.body;
     console.log('[WebhookRoute] Received Idswyft webhook:', event.type, event.data?.verification_id);
     

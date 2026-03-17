@@ -10,6 +10,7 @@ import {
   Send
 } from 'lucide-react';
 import { apiClient } from '../services/api';
+import { showToast } from '../lib/toast';
 import type { EndUser } from '../types.js';
 import { sectionLabel, statNumber, monoXs, monoSm, cardSurface, statusPill, tableHeaderClass, infoPanel, getStatusAccent } from '../styles/tokens';
 import Modal from '../components/ui/Modal';
@@ -36,6 +37,7 @@ interface UserFormData {
 export default function Users() {
   const [users, setUsers] = useState<EndUser[]>([]);
   const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [filters, setFilters] = useState<UserFilters>({
     status: 'all',
     search: '',
@@ -47,6 +49,7 @@ export default function Users() {
   const [showEditForm, setShowEditForm] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [showInvitationModal, setShowInvitationModal] = useState(false);
   const [sendingInvitation, setSendingInvitation] = useState(false);
@@ -58,6 +61,7 @@ export default function Users() {
   const loadUsers = async () => {
     try {
       setLoading(true);
+      setError(null);
       const params: any = {
         page: currentPage,
         per_page: 20
@@ -81,10 +85,13 @@ export default function Users() {
                         result.meta?.pages ||
                         Math.ceil((result.meta?.total || 0) / 20) || 1;
       setTotalPages(totalPages);
-    } catch (error) {
-      console.error('Failed to load users:', error);
+      setTotalRecords(result.meta?.total || 0);
+    } catch (err: unknown) {
+      console.error('Failed to load users:', err);
+      setError(err instanceof Error ? err.message : 'Failed to load users');
       setUsers([]);
       setTotalPages(1);
+      setTotalRecords(0);
     } finally {
       setLoading(false);
     }
@@ -95,8 +102,8 @@ export default function Users() {
       await apiClient.deleteEndUser(userId);
       setUsers(prev => prev.filter(user => user.id !== userId));
       setDeleteConfirm(null);
-    } catch (error) {
-      console.error('Failed to delete user:', error);
+    } catch (err: unknown) {
+      showToast.error('Failed to delete user');
     }
   };
 
@@ -117,8 +124,7 @@ export default function Users() {
         user.id === updatedUser.id ? updatedUser : user
       ));
 
-      // Show success message
-      alert(`Verification invitation sent successfully to ${selectedUser.email}!`);
+      showToast.success(`Verification invitation sent to ${selectedUser.email}`);
 
       setShowInvitationModal(false);
       setSelectedUser(null);
@@ -141,7 +147,7 @@ export default function Users() {
         errorMessage += 'Please check your network connection and try again.';
       }
 
-      alert(errorMessage);
+      showToast.error(errorMessage);
     } finally {
       setSendingInvitation(false);
     }
@@ -177,8 +183,8 @@ export default function Users() {
       link.click();
       document.body.removeChild(link);
       window.URL.revokeObjectURL(url);
-    } catch (error) {
-      console.error('Failed to export users:', error);
+    } catch (err: unknown) {
+      showToast.error('Failed to export users');
     }
   };
 
@@ -209,6 +215,13 @@ export default function Users() {
           </button>
         </div>
       </div>
+
+      {error && (
+        <div className="p-4 bg-rose-500/12 border border-rose-500/25 rounded-lg text-rose-300 text-sm flex items-center justify-between">
+          <span>{error}</span>
+          <button onClick={loadUsers} className="ml-4 text-rose-200 hover:text-white underline text-xs font-mono">Retry</button>
+        </div>
+      )}
 
       {/* Filters */}
       <div className={`${cardSurface} p-6`}>
@@ -427,6 +440,7 @@ export default function Users() {
                           }}
                           className="p-1.5 text-slate-400 hover:text-cyan-300 hover:bg-slate-800/40 rounded transition-colors"
                           title="View Details"
+                          aria-label="View details"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
@@ -437,6 +451,7 @@ export default function Users() {
                           }}
                           className="p-1.5 text-slate-400 hover:text-cyan-300 hover:bg-slate-800/40 rounded transition-colors"
                           title="Edit User"
+                          aria-label="Edit user"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
@@ -448,6 +463,7 @@ export default function Users() {
                             }}
                             className="p-1.5 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded transition-colors"
                             title="Send Verification Link"
+                            aria-label="Send verification link"
                           >
                             <Send className="w-4 h-4" />
                           </button>
@@ -461,6 +477,7 @@ export default function Users() {
                           onClick={() => setDeleteConfirm(user.id)}
                           className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded transition-colors"
                           title="Delete User"
+                          aria-label="Delete user"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -495,6 +512,7 @@ export default function Users() {
             <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
               <div>
                 <p className={`${monoXs} text-slate-500`}>
+                  {totalRecords > 0 && <><span className="text-slate-300">{totalRecords}</span> records &middot; </>}
                   Page <span className="text-slate-300">{currentPage}</span> of{' '}
                   <span className="text-slate-300">{totalPages}</span>
                 </p>
@@ -544,8 +562,9 @@ export default function Users() {
               await apiClient.createEndUser(userData);
               setShowCreateForm(false);
               loadUsers();
-            } catch (error) {
-              console.error('Failed to create user:', error);
+              showToast.success('User created');
+            } catch (err: unknown) {
+              showToast.error(`Failed to create user: ${err instanceof Error ? err.message : 'Unknown error'}`);
             }
           }}
         />
@@ -566,8 +585,9 @@ export default function Users() {
               setShowEditForm(false);
               setSelectedUser(null);
               loadUsers();
-            } catch (error) {
-              console.error('Failed to update user:', error);
+              showToast.success('User updated');
+            } catch (err: unknown) {
+              showToast.error(`Failed to update user: ${err instanceof Error ? err.message : 'Unknown error'}`);
             }
           }}
         />

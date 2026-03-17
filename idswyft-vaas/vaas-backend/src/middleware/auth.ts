@@ -80,16 +80,7 @@ export const requireAuth = async (req: AuthenticatedRequest, res: Response, next
       return res.status(403).json(response);
     }
     
-    // Update last login
-    await vaasSupabase
-      .from('vaas_admins')
-      .update({ 
-        last_login_at: new Date().toISOString(),
-        login_count: ((admin as any).login_count || 0) + 1
-      })
-      .eq('id', admin.id);
-    
-    // Attach admin to request
+    // Attach admin to request (login stats are updated in auth.ts login handler only)
     req.admin = {
       id: admin.id,
       organization_id: admin.organization_id,
@@ -226,30 +217,45 @@ export const requireApiKey = async (req: AuthenticatedRequest, res: Response, ne
       return res.status(401).json(response);
     }
     
-    // Extract key prefix to find the organization
-    const keyPrefix = apiKey.substring(0, 20);
-    
-    const { data: apiKeyRecord, error } = await vaasSupabase
-      .from('vaas_api_keys')
-      .select(`
+    // Try 20-char prefix first (new keys), fall back to 12-char (legacy keys)
+    const keyPrefix20 = apiKey.substring(0, 20);
+    const keyPrefix12 = apiKey.substring(0, 12);
+
+    const selectFields = `
+      id,
+      organization_id,
+      key_name,
+      scopes,
+      rate_limit_per_hour,
+      is_active,
+      key_hash,
+      vaas_organizations!inner(
         id,
-        organization_id,
         name,
-        scopes,
-        rate_limit_per_hour,
-        enabled,
-        key_hash,
-        vaas_organizations!inner(
-          id,
-          name,
-          slug,
-          billing_status
-        )
-      `)
-      .eq('key_prefix', keyPrefix)
-      .eq('enabled', true)
+        slug,
+        billing_status
+      )
+    `;
+
+    let { data: apiKeyRecord, error } = await vaasSupabase
+      .from('vaas_api_keys')
+      .select(selectFields)
+      .eq('key_prefix', keyPrefix20)
+      .eq('is_active', true)
       .single();
-      
+
+    // Fall back to legacy 12-char prefix lookup
+    if ((error || !apiKeyRecord) && keyPrefix20 !== keyPrefix12) {
+      const legacy = await vaasSupabase
+        .from('vaas_api_keys')
+        .select(selectFields)
+        .eq('key_prefix', keyPrefix12)
+        .eq('is_active', true)
+        .single();
+      apiKeyRecord = legacy.data;
+      error = legacy.error;
+    }
+
     if (error || !apiKeyRecord) {
       const response: VaasApiResponse = {
         success: false,

@@ -1,7 +1,20 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
+import { fileTypeFromBuffer } from 'file-type';
 import { vaasSupabase } from '../config/database.js';
 import { VaasApiResponse } from '../types/index.js';
+import { livenessDataSchema, resultSchema } from '../schemas/verification.schema.js';
+
+// MIME types we accept, mapped from file-type magic-byte detection
+const ALLOWED_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/bmp',
+  'image/tiff',
+  'application/pdf',
+]);
 
 const router = Router();
 
@@ -34,6 +47,19 @@ router.post('/sessions/:sessionToken/documents', upload.single('document') as an
         error: {
           code: 'NO_FILE_UPLOADED',
           message: 'No file was uploaded'
+        }
+      };
+      return res.status(400).json(response);
+    }
+
+    // Validate magic bytes match claimed MIME type
+    const detected = await fileTypeFromBuffer(file.buffer);
+    if (!detected || !ALLOWED_MIME_TYPES.has(detected.mime)) {
+      const response: VaasApiResponse = {
+        success: false,
+        error: {
+          code: 'INVALID_FILE_CONTENT',
+          message: `File content does not match an allowed image or PDF type${detected ? ` (detected: ${detected.mime})` : ''}`,
         }
       };
       return res.status(400).json(response);
@@ -309,7 +335,21 @@ router.get('/sessions/:sessionToken/status', async (req: Request, res: Response)
 router.post('/sessions/:sessionToken/liveness', async (req: Request, res: Response) => {
   try {
     const { sessionToken } = req.params;
-    const livenessData = req.body;
+
+    // Validate liveness payload
+    const parseResult = livenessDataSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      const response: VaasApiResponse = {
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid liveness data',
+          details: parseResult.error.issues,
+        }
+      };
+      return res.status(400).json(response);
+    }
+    const livenessData = parseResult.data;
 
     // Find verification session by token
     const { data: session, error: sessionError } = await vaasSupabase
@@ -371,6 +411,21 @@ router.post('/sessions/:sessionToken/liveness', async (req: Request, res: Respon
 router.post('/sessions/:sessionToken/result', async (req: Request, res: Response) => {
   try {
     const { sessionToken } = req.params;
+
+    // Validate result payload
+    const parseResult = resultSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      const response: VaasApiResponse = {
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Invalid result data',
+          details: parseResult.error.issues,
+        }
+      };
+      return res.status(400).json(response);
+    }
+
     const {
       final_result,
       confidence_score,
@@ -380,18 +435,7 @@ router.post('/sessions/:sessionToken/result', async (req: Request, res: Response
       cross_validation_results,
       failure_reason,
       manual_review_reason,
-    } = req.body;
-
-    if (!final_result || !['verified', 'failed', 'manual_review'].includes(final_result)) {
-      const response: VaasApiResponse = {
-        success: false,
-        error: {
-          code: 'INVALID_RESULT',
-          message: 'final_result must be one of: verified, failed, manual_review'
-        }
-      };
-      return res.status(400).json(response);
-    }
+    } = parseResult.data;
 
     // Find session by token
     const { data: session, error: sessionError } = await vaasSupabase
