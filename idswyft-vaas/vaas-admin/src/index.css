@@ -1,5 +1,5 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=DM+Sans:wght@400;500;600;700&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=DM+Sans:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap');
 
 @theme {
   --font-sans: 'DM Sans', system-ui, sans-serif;
@@ -752,4 +752,95 @@ textarea,
 select,
 button {
   font: inherit;
+}
+
+/* ── Login page illustration animations ── */
+
+.font-display {
+  font-family: 'Syne', system-ui, sans-serif;
+}
+
+@keyframes loginScanSweep {
+  0% { transform: translateY(-100%); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateY(600%); opacity: 0; }
+}
+
+@keyframes loginScanPulse {
+  0%, 100% { opacity: 0.4; transform: scale(1); }
+  50% { opacity: 0.8; transform: scale(1.04); }
+}
+
+@keyframes loginFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-8px); }
+}
+
+@keyframes loginNodePulse {
+  0%, 100% { r: 3; opacity: 0.6; }
+  50% { r: 5; opacity: 1; }
+}
+
+@keyframes loginDataStream {
+  0% { stroke-dashoffset: 200; }
+  100% { stroke-dashoffset: 0; }
+}
+
+@keyframes loginBadgeReveal {
+  0% { opacity: 0; transform: translateY(10px) scale(0.9); }
+  100% { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes loginGlowPulse {
+  0%, 100% { opacity: 0.3; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes loginArcSpin {
+  0% { transform: rotate(0deg); }
+  100% { transform: rotate(360deg); }
+}
+
+.login-scan-sweep {
+  animation: loginScanSweep 4s ease-in-out infinite;
+}
+
+.login-scan-pulse {
+  animation: loginScanPulse 3s ease-in-out infinite;
+}
+
+.login-float {
+  animation: loginFloat 6s ease-in-out infinite;
+}
+
+.login-float-delay {
+  animation: loginFloat 6s ease-in-out 1.5s infinite;
+}
+
+.login-node-pulse {
+  animation: loginNodePulse 2.5s ease-in-out infinite;
+}
+
+.login-data-stream {
+  animation: loginDataStream 3s linear infinite;
+  stroke-dasharray: 8, 12;
+}
+
+.login-badge-reveal {
+  animation: loginBadgeReveal 0.6s ease-out forwards;
+}
+
+.login-badge-reveal-delay {
+  animation: loginBadgeReveal 0.6s ease-out 0.3s forwards;
+  opacity: 0;
+}
+
+.login-glow-pulse {
+  animation: loginGlowPulse 4s ease-in-out infinite;
+}
+
+.login-arc-spin {
+  animation: loginArcSpin 8s linear infinite;
+  transform-origin: center;
 }
