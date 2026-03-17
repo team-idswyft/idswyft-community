@@ -746,3 +746,64 @@ export interface ProviderSummary {
 }
 
 export type ProviderType = 'ocr' | 'face' | 'liveness';
+
+// Notification types
+export type NotificationType =
+  | 'verification.completed' | 'verification.failed'
+  | 'verification.manual_review' | 'verification.overridden'
+  | 'webhook.delivery_failed' | 'user.created';
+
+export interface AdminNotification {
+  id: string;
+  organization_id: string;
+  type: NotificationType;
+  title: string;
+  message: string;
+  metadata: Record<string, any>;
+  read: boolean;
+  created_at: string;
+}
+
+// Global search result types
+export interface SearchResults {
+  verifications: Array<{
+    id: string;
+    status: string;
+    confidence_score?: number;
+    created_at: string;
+    end_user_id: string;
+    vaas_end_users?: { first_name?: string; last_name?: string; email?: string };
+  }>;
+  users: Array<{
+    id: string;
+    email?: string;
+    first_name?: string;
+    last_name?: string;
+    external_id?: string;
+    verification_status: string;
+    created_at: string;
+  }>;
+  webhooks: Array<{
+    id: string;
+    url: string;
+    enabled: boolean;
+    failure_count: number;
+    created_at: string;
+  }>;
+  audit_logs: Array<{
+    id: string;
+    action: string;
+    resource_type: string;
+    resource_id?: string;
+    actor_name: string;
+    severity: string;
+    created_at: string;
+  }>;
+  api_keys: Array<{
+    id: string;
+    key_name: string;
+    key_prefix: string;
+    is_active: boolean;
+    created_at: string;
+  }>;
+}

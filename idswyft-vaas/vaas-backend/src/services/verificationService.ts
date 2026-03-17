@@ -3,6 +3,7 @@ import { vaasSupabase } from '../config/database.js';
 import { idswyftApiService } from './idswyftApiService.js';
 import { webhookService } from './webhookService.js';
 import { emailService } from './emailService.js';
+import { notificationService } from './notificationService.js';
 import {
   VaasEndUser,
   VaasVerificationSession,
@@ -251,18 +252,39 @@ export class VerificationService {
           verification_session: updatedSession,
           verification_results: updatedSession.results
         });
+        notificationService.create({
+          organizationId: session.organization_id,
+          type: 'verification.completed',
+          title: 'Verification Completed',
+          message: `Verification ${session.id.slice(0, 8)} completed successfully.`,
+          metadata: { session_id: session.id, end_user_id: session.end_user_id },
+        }).catch(() => {});
       } else if (newStatus === 'failed') {
         await webhookService.sendWebhook(session.organization_id, 'verification.failed', {
           verification_session: updatedSession,
           failure_reasons: idswyftVerification.failure_reasons
         });
+        notificationService.create({
+          organizationId: session.organization_id,
+          type: 'verification.failed',
+          title: 'Verification Failed',
+          message: `Verification ${session.id.slice(0, 8)} failed.`,
+          metadata: { session_id: session.id, end_user_id: session.end_user_id },
+        }).catch(() => {});
       } else if (endUserStatus === 'manual_review') {
         await webhookService.sendWebhook(session.organization_id, 'verification.manual_review', {
           verification_session: updatedSession,
           review_reason: 'Low confidence score'
         });
+        notificationService.create({
+          organizationId: session.organization_id,
+          type: 'verification.manual_review',
+          title: 'Manual Review Required',
+          message: `Verification ${session.id.slice(0, 8)} requires manual review.`,
+          metadata: { session_id: session.id, end_user_id: session.end_user_id },
+        }).catch(() => {});
       }
-      
+
       return updatedSession;
     } catch (error: any) {
       console.error('[VerificationService] Sync verification failed:', error);
@@ -440,6 +462,14 @@ export class VerificationService {
       reviewer_id: reviewerId
     }).catch(err => console.error('[VerificationService] Override webhook failed:', err.message));
 
+    notificationService.create({
+      organizationId,
+      type: 'verification.overridden',
+      title: 'Verification Overridden',
+      message: `Verification ${sessionId.slice(0, 8)} was overridden from ${previousStatus} to manual_review.`,
+      metadata: { session_id: sessionId, previous_status: previousStatus, reviewer_id: reviewerId },
+    }).catch(() => {});
+
     return updatedSession;
   }
 
@@ -540,11 +570,20 @@ export class VerificationService {
         })
         .select()
         .single();
-        
+
       if (error) {
         throw new Error(`Failed to create end user: ${error.message}`);
       }
-      
+
+      const userName = [userData.first_name, userData.last_name].filter(Boolean).join(' ') || userData.email || 'Unknown';
+      notificationService.create({
+        organizationId,
+        type: 'user.created',
+        title: 'New User Created',
+        message: `End user ${userName} was added to the system.`,
+        metadata: { user_id: newUser.id, email: userData.email },
+      }).catch(() => {});
+
       return newUser;
     }
   }

@@ -378,6 +378,22 @@ export interface AssetUploadResult {
   updated_at: string;
 }
 
+export type VaasNotificationType =
+  | 'verification.completed' | 'verification.failed'
+  | 'verification.manual_review' | 'verification.overridden'
+  | 'webhook.delivery_failed' | 'user.created';
+
+export interface VaasAdminNotification {
+  id: string;
+  organization_id: string;
+  type: VaasNotificationType;
+  title: string;
+  message: string;
+  metadata: Record<string, any>;
+  read: boolean;
+  created_at: string;
+}
+
 export interface PlatformBranding {
   logo_url: string | null;
   favicon_url: string | null;
