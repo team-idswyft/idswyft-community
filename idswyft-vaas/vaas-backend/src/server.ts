@@ -30,6 +30,9 @@ import platformAuthRoutes from './routes/platformAuth.js';
 import platformOrgRoutes from './routes/platformOrganizations.js';
 import platformEmailRoutes from './routes/platformEmail.js';
 import platformBrandingRoutes from './routes/platformBranding.js';
+import platformSessionsRoutes from './routes/platformSessions.js';
+import platformProviderMetricsRoutes from './routes/platformProviderMetrics.js';
+import platformAuditLogsRoutes from './routes/platformAuditLogs.js';
 import samlRoutes from './routes/saml.js';
 import notificationRoutes from './routes/notifications.js';
 import searchRoutes from './routes/search.js';
@@ -389,6 +392,9 @@ app.use('/api/platform/auth', platformAuthRoutes);
 app.use('/api/platform/organizations', platformOrgRoutes);
 app.use('/api/platform/email', platformEmailRoutes);
 app.use('/api/platform/branding', platformBrandingRoutes);
+app.use('/api/platform/sessions', platformSessionsRoutes);
+app.use('/api/platform/provider-metrics', platformProviderMetricsRoutes);
+app.use('/api/platform/audit-logs', platformAuditLogsRoutes);
 console.log('✅ Platform admin routes mounted');
 
 // 404 handler

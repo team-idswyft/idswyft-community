@@ -11,6 +11,9 @@ import OrganizationDetail from './pages/OrganizationDetail';
 import Branding from './pages/Branding';
 import EmailTemplates from './pages/EmailTemplates';
 import AdminManagement from './pages/AdminManagement';
+import Sessions from './pages/Sessions';
+import ProviderMetrics from './pages/ProviderMetrics';
+import AuditLogs from './pages/AuditLogs';
 import Settings from './pages/Settings';
 
 // ── Dynamic favicon from platform branding ───────────────────────────────────
@@ -54,6 +57,9 @@ export default function App() {
             <Route path="branding" element={<Branding />} />
             <Route path="email-templates" element={<EmailTemplates />} />
             <Route path="admin-management" element={<AdminManagement />} />
+            <Route path="sessions" element={<Sessions />} />
+            <Route path="provider-metrics" element={<ProviderMetrics />} />
+            <Route path="audit-logs" element={<AuditLogs />} />
             <Route path="settings" element={<Settings />} />
           </Route>
 

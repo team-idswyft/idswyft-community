@@ -1,10 +1,18 @@
 import React, { useEffect, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
-import apiClient from '../services/api';
-import type { ProviderSummary, ProviderType } from '../types.js';
-import { sectionLabel, statNumber, monoXs, monoSm, cardSurface } from '../styles/tokens';
+import { platformApi } from '../services/api';
+import { sectionLabel, monoXs, monoSm, cardSurface } from '../styles/tokens';
 
+type ProviderType = 'ocr' | 'face' | 'liveness';
 type Days = 7 | 30 | 90;
+
+interface ProviderSummary {
+  totalRequests: number;
+  successRate: number;
+  avgLatencyMs: number;
+  avgConfidence: number;
+  providerName: string;
+}
 
 interface ProviderCard {
   type: ProviderType;
@@ -30,9 +38,9 @@ export default function ProviderMetrics() {
     setCards([]);
     try {
       const [ocr, face, liveness] = await Promise.all([
-        apiClient.getProviderMetrics('ocr', d),
-        apiClient.getProviderMetrics('face', d),
-        apiClient.getProviderMetrics('liveness', d),
+        platformApi.getProviderMetrics('ocr', d),
+        platformApi.getProviderMetrics('face', d),
+        platformApi.getProviderMetrics('liveness', d),
       ]);
       setCards([
         { type: 'ocr', label: 'OCR', data: ocr },
@@ -59,12 +67,11 @@ export default function ProviderMetrics() {
 
   return (
     <div className="p-6 max-w-5xl mx-auto space-y-6">
-      {/* Header */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
         <div>
           <p className={sectionLabel}>Provider Performance</p>
           <p className="text-sm text-slate-500 mt-1">
-            OCR, face matching, and liveness provider metrics
+            Cross-organization OCR, face matching, and liveness metrics
           </p>
         </div>
         <div className="flex items-center gap-2">

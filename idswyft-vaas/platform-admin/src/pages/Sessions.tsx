@@ -1,10 +1,16 @@
 import React, { useEffect, useState } from 'react';
 import { RefreshCw } from 'lucide-react';
-import apiClient from '../services/api';
-import { showToast } from '../lib/toast';
+import { platformApi } from '../services/api';
 import { ConfirmationModal } from '../components/ui/Modal';
-import type { ActiveSession } from '../types.js';
 import { sectionLabel, monoXs, monoSm, cardSurface, statusPill, tableHeaderClass } from '../styles/tokens';
+
+interface ActiveSession {
+  id: string;
+  userAgent: string;
+  ip: string;
+  lastActiveAt: string;
+  isCurrent: boolean;
+}
 
 export default function Sessions() {
   const [sessions, setSessions] = useState<ActiveSession[]>([]);
@@ -17,7 +23,7 @@ export default function Sessions() {
     setLoading(true);
     setError(null);
     try {
-      setSessions(await apiClient.getSessions());
+      setSessions(await platformApi.getSessions());
     } catch (err: unknown) {
       setError(err instanceof Error ? err.message : 'Failed to load sessions');
     } finally {
@@ -31,32 +37,30 @@ export default function Sessions() {
     setError(null);
     setRevoking(id);
     try {
-      await apiClient.revokeSession(id);
+      await platformApi.revokeSession(id);
       setSessions((s) => s.filter((session) => session.id !== id));
-      showToast.success('Session revoked');
     } catch (err: unknown) {
-      showToast.error(`Failed to revoke: ${err instanceof Error ? err.message : 'Unknown error'}`);
+      setError(err instanceof Error ? err.message : 'Failed to revoke session');
     } finally {
       setRevoking(null);
     }
   };
 
   const formatDate = (iso: string) => {
-    if (!iso) return '—';
+    if (!iso) return '\u2014';
     const d = new Date(iso);
-    return isNaN(d.getTime()) ? '—' : d.toLocaleString(undefined, {
+    return isNaN(d.getTime()) ? '\u2014' : d.toLocaleString(undefined, {
       month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit',
     });
   };
 
   return (
     <div className="p-6 max-w-4xl mx-auto space-y-6">
-      {/* Header */}
       <div className="flex items-center justify-between">
         <div>
           <p className={sectionLabel}>Active Sessions</p>
           <p className="text-sm text-slate-500 mt-1">
-            Devices currently logged into your account.
+            Devices currently logged into the platform admin.
           </p>
         </div>
         <button
