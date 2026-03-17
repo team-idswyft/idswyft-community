@@ -3,6 +3,8 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { Toaster } from 'react-hot-toast';
 import { AuthProvider } from './contexts/AuthContext';
 import Login from './components/auth/Login';
+import ForgotPassword from './components/auth/ForgotPassword';
+import ResetPassword from './components/auth/ResetPassword';
 import SsoCallback from './components/auth/SsoCallback';
 import EmailVerification from './components/auth/EmailVerification';
 import DashboardLayout from './components/layout/DashboardLayout';
@@ -24,6 +26,7 @@ const AuditLogs = React.lazy(() => import('./pages/AuditLogs'));
 const AdminUserManagement = React.lazy(() => import('./pages/AdminUserManagement'));
 const Sessions = React.lazy(() => import('./pages/Sessions'));
 const ProviderMetrics = React.lazy(() => import('./pages/ProviderMetrics'));
+const Profile = React.lazy(() => import('./pages/Profile'));
 
 // Suspense fallback — matches DashboardLayout content area
 function PageSkeleton() {
@@ -94,6 +97,8 @@ function App() {
           <Routes>
             {/* Public routes */}
             <Route path="/login" element={<Login />} />
+            <Route path="/forgot-password" element={<ForgotPassword />} />
+            <Route path="/reset-password" element={<ResetPassword />} />
             <Route path="/sso/callback" element={<SsoCallback />} />
             <Route path="/verify-email" element={<EmailVerification />} />
             <Route path="/dev" element={<DevInfo />} />
@@ -130,6 +135,7 @@ function App() {
               } />
               <Route path="sessions" element={<Suspense fallback={<PageSkeleton />}><Sessions /></Suspense>} />
               <Route path="provider-metrics" element={<Suspense fallback={<PageSkeleton />}><ProviderMetrics /></Suspense>} />
+              <Route path="profile" element={<Suspense fallback={<PageSkeleton />}><Profile /></Suspense>} />
               <Route path="settings" element={
                 <RequirePermission permission="manage_settings">
                   <Suspense fallback={<PageSkeleton />}><Settings /></Suspense>

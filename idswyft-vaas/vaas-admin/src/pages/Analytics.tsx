@@ -60,8 +60,41 @@ export default function Analytics() {
   };
 
   const handleExport = () => {
-    // TODO: Implement analytics export
-    console.log('Exporting analytics data...');
+    if (!stats) return;
+
+    const rows = [
+      ['Metric', 'Value'],
+      ['Period', `${selectedPeriod} days`],
+      ['Total Verifications', String(stats.verification_sessions.total || 0)],
+      ['Completed', String(stats.verification_sessions.completed || 0)],
+      ['Failed', String(stats.verification_sessions.failed || 0)],
+      ['Pending', String(stats.verification_sessions.pending || 0)],
+      ['Processing', String(stats.verification_sessions.processing || 0)],
+      ['Success Rate', `${stats.verification_sessions.success_rate || 0}%`],
+      ['Total Users', String(stats.end_users.total || 0)],
+      ['Verified Users', String(stats.end_users.verified || 0)],
+      ['Manual Review', String(stats.end_users.manual_review || 0)],
+    ];
+
+    if (usage) {
+      rows.push(
+        ['Monthly Verification Count', String(usage.current_period.verification_count)],
+        ['Monthly Limit', String(usage.monthly_limit)],
+        ['API Calls', String(usage.current_period.api_calls)],
+        ['Storage Used (MB)', String(usage.current_period.storage_used_mb.toFixed(1))],
+      );
+    }
+
+    const csv = rows.map(r => r.map(c => `"${String(c).replace(/"/g, '""')}"`).join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `analytics-${selectedPeriod}d-${new Date().toISOString().split('T')[0]}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const canViewAnalytics = admin?.permissions.view_analytics || false;

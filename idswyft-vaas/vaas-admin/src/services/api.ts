@@ -163,6 +163,17 @@ class ApiClient {
     }
   }
 
+  async forgotPassword(email: string): Promise<void> {
+    await this.client.post('/auth/forgot-password', { email });
+  }
+
+  async resetPassword(token: string, new_password: string): Promise<void> {
+    const response: AxiosResponse<ApiResponse> = await this.client.post('/auth/reset-password', { token, new_password });
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to reset password');
+    }
+  }
+
   async getCurrentAdmin(): Promise<{ admin: Admin; organization: Organization }> {
     const response: AxiosResponse<ApiResponse> = await this.client.get('/auth/me');
     
