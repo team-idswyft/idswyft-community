@@ -214,6 +214,53 @@ router.get('/:id', async (req: AuthenticatedRequest, res) => {
   }
 });
 
+// Get documents for a verification session (admin auth)
+router.get('/:id/documents', requireAuth, requirePermission('view_verifications'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const { id } = req.params;
+    const organizationId = req.admin!.organization_id;
+
+    // Verify the session belongs to this org
+    const { data: session, error: sessionError } = await vaasSupabase
+      .from('vaas_verification_sessions')
+      .select('id')
+      .eq('id', id)
+      .eq('organization_id', organizationId)
+      .single();
+
+    if (sessionError || !session) {
+      const response: VaasApiResponse = {
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Verification not found' }
+      };
+      return res.status(404).json(response);
+    }
+
+    // Fetch uploaded documents from vaas_verification_documents
+    const { data: documents, error: docError } = await vaasSupabase
+      .from('vaas_verification_documents')
+      .select('id, document_type, filename, mimetype, size, file_path, uploaded_at')
+      .eq('verification_session_id', id)
+      .order('uploaded_at', { ascending: true });
+
+    if (docError) {
+      throw new Error(docError.message);
+    }
+
+    const response: VaasApiResponse = {
+      success: true,
+      data: documents || []
+    };
+    res.json(response);
+  } catch (error: any) {
+    const response: VaasApiResponse = {
+      success: false,
+      error: { code: 'GET_DOCUMENTS_FAILED', message: error.message }
+    };
+    res.status(500).json(response);
+  }
+});
+
 // Manual review: approve verification
 router.post('/:id/approve', requireAuth, requirePermission('approve_verifications'), async (req: AuthenticatedRequest, res) => {
   try {

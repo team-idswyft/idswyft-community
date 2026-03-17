@@ -150,13 +150,24 @@ export default function Dashboard() {
     }
   };
 
-  // Group verifications by end_user_id, sorted by most recent
+  // Group only pending/processing verifications by end_user_id;
+  // completed/failed/verified etc. appear as individual rows.
   const userGroups: UserGroup[] = useMemo(() => {
     if (!recentVerifications.length) return [];
 
-    const map = new Map<string, VerificationSession[]>();
+    const GROUPABLE = new Set(['pending', 'processing']);
+    const groupable: VerificationSession[] = [];
+    const individual: VerificationSession[] = [];
+
     for (const v of recentVerifications) {
-      const key = v.end_user_id || v.id; // fallback if no end_user_id
+      if (GROUPABLE.has(v.status)) groupable.push(v);
+      else individual.push(v);
+    }
+
+    // Group the groupable ones by end_user_id
+    const map = new Map<string, VerificationSession[]>();
+    for (const v of groupable) {
+      const key = v.end_user_id || v.id;
       const group = map.get(key);
       if (group) group.push(v);
       else map.set(key, [v]);
@@ -164,7 +175,6 @@ export default function Dashboard() {
 
     const groups: UserGroup[] = [];
     for (const [endUserId, verifications] of map) {
-      // Sort by created_at desc within each group
       verifications.sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
       const latest = verifications[0];
       const user = latest.vaas_end_users;
@@ -175,6 +185,19 @@ export default function Dashboard() {
         email: user?.email || '',
         verifications,
         latestVerification: latest,
+      });
+    }
+
+    // Each non-groupable verification becomes its own single-item group
+    for (const v of individual) {
+      const user = v.vaas_end_users;
+      groups.push({
+        endUserId: v.end_user_id || v.id,
+        firstName: user?.first_name || '',
+        lastName: user?.last_name || '',
+        email: user?.email || '',
+        verifications: [v],
+        latestVerification: v,
       });
     }
 

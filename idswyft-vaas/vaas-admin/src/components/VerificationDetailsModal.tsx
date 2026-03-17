@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   Eye,
   CheckCircle,
@@ -6,7 +6,11 @@ import {
   Clock,
   AlertTriangle,
   FileText,
-  User
+  User,
+  Image,
+  Camera,
+  CreditCard,
+  Loader2
 } from 'lucide-react';
 import { apiClient } from '../services/api';
 import type { VerificationSession } from '../types.js';
@@ -70,11 +74,25 @@ export interface VerificationDetailsModalProps {
 
 export function VerificationDetailsModal({ verification, isOpen, onClose, onStatusUpdate }: VerificationDetailsModalProps) {
   const [reason, setReason] = useState('');
-  const [activeTab, setActiveTab] = useState<'overview' | 'scores' | 'analysis' | 'raw'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'documents' | 'scores' | 'analysis' | 'raw'>('overview');
   const [showOverrideForm, setShowOverrideForm] = useState(false);
   const [overrideReason, setOverrideReason] = useState('');
   const [overrideNotes, setOverrideNotes] = useState('');
   const [overrideLoading, setOverrideLoading] = useState(false);
+  const [uploadedDocs, setUploadedDocs] = useState<any[]>([]);
+  const [docsLoading, setDocsLoading] = useState(false);
+
+  // Fetch uploaded documents when Documents tab is selected
+  useEffect(() => {
+    if (activeTab !== 'documents' || !verification) return;
+    let cancelled = false;
+    setDocsLoading(true);
+    apiClient.getVerificationDocuments(verification.id)
+      .then(docs => { if (!cancelled) setUploadedDocs(docs); })
+      .catch(() => { if (!cancelled) setUploadedDocs([]); })
+      .finally(() => { if (!cancelled) setDocsLoading(false); });
+    return () => { cancelled = true; };
+  }, [activeTab, verification?.id]);
 
   const handleStatusUpdate = async (newStatus: VerificationSessionStatus) => {
     if (!verification) return;
@@ -148,6 +166,7 @@ export function VerificationDetailsModal({ verification, isOpen, onClose, onStat
         <nav className="flex space-x-8">
           {[
             { id: 'overview', label: 'Overview', icon: User },
+            { id: 'documents', label: 'Documents', icon: Image },
             { id: 'scores', label: 'Score Analysis', icon: CheckCircle },
             { id: 'analysis', label: 'Detailed Analysis', icon: AlertTriangle },
             { id: 'raw', label: 'Raw Data', icon: FileText }
@@ -365,6 +384,115 @@ export function VerificationDetailsModal({ verification, isOpen, onClose, onStat
                 </div>
               )}
             </div>
+          </div>
+        )}
+
+        {activeTab === 'documents' && (
+          <div className="space-y-6">
+            <div className="bg-sky-500/12 border border-sky-500/25 rounded-lg p-4">
+              <h4 className="font-semibold text-sky-200 mb-2">Verification Documents</h4>
+              <p className="text-sm text-sky-300">
+                Documents and images submitted during the verification process.
+              </p>
+            </div>
+
+            {docsLoading ? (
+              <div className="flex items-center justify-center py-12 text-slate-400">
+                <Loader2 className="w-5 h-5 animate-spin mr-2" />
+                Loading documents...
+              </div>
+            ) : (
+              <>
+                {/* Uploaded documents from vaas_verification_documents */}
+                {uploadedDocs.length > 0 && (
+                  <div>
+                    <p className={`${sectionLabel} mb-4`}>Uploaded Files</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {uploadedDocs.map((doc: any) => {
+                        const typeLabel =
+                          doc.document_type === 'front' ? 'Front of ID' :
+                          doc.document_type === 'back' ? 'Back of ID' :
+                          doc.document_type === 'selfie' ? 'Live Capture' :
+                          doc.document_type || 'Document';
+                        const TypeIcon =
+                          doc.document_type === 'selfie' ? Camera :
+                          doc.document_type === 'front' || doc.document_type === 'back' ? CreditCard :
+                          FileText;
+                        const accentColor =
+                          doc.document_type === 'front' ? 'cyan' :
+                          doc.document_type === 'back' ? 'violet' :
+                          doc.document_type === 'selfie' ? 'amber' : 'slate';
+
+                        return (
+                          <div key={doc.id} className={`${cardSurface} p-4`}>
+                            <div className="flex items-start gap-3">
+                              <div className={`flex-shrink-0 w-12 h-12 rounded-lg bg-${accentColor}-500/15 border border-${accentColor}-500/25 flex items-center justify-center`}>
+                                <TypeIcon className={`w-6 h-6 text-${accentColor}-400`} />
+                              </div>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-medium text-slate-100 text-sm">{typeLabel}</p>
+                                <p className={`${monoXs} text-slate-500 truncate`} title={doc.filename}>{doc.filename}</p>
+                                <div className="flex items-center gap-3 mt-2 text-xs text-slate-500">
+                                  <span>{doc.mimetype}</span>
+                                  <span>{(doc.size / 1024).toFixed(1)} KB</span>
+                                </div>
+                                {doc.uploaded_at && (
+                                  <p className={`${monoXs} text-slate-600 mt-1`}>
+                                    Uploaded {new Date(doc.uploaded_at).toLocaleString()}
+                                  </p>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
+
+                {/* Document analysis from results.documents (synced from main API) */}
+                {results.documents && results.documents.length > 0 && (
+                  <div>
+                    <p className={`${sectionLabel} mb-4`}>Document Analysis</p>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {results.documents.map((doc: any, index: number) => (
+                        <div key={index} className={`${cardSurface} p-4`}>
+                          <div className="flex items-center mb-3">
+                            <FileText className="w-5 h-5 text-cyan-400 mr-2" />
+                            <span className="font-medium text-slate-100 text-sm">{doc.type || `Document ${index + 1}`}</span>
+                            {doc.quality_score != null && (
+                              <span className={`ml-auto text-xs font-medium ${doc.quality_score > 0.7 ? 'text-green-400' : 'text-red-400'}`}>
+                                Quality: {(doc.quality_score * 100).toFixed(0)}%
+                              </span>
+                            )}
+                          </div>
+                          {doc.ocr_data && (
+                            <div className="space-y-1 text-sm text-slate-400">
+                              {doc.ocr_data.full_name && <p>Name: <span className="text-slate-200">{doc.ocr_data.full_name}</span></p>}
+                              {doc.ocr_data.document_number && <p>Doc #: <span className="text-slate-200">{doc.ocr_data.document_number}</span></p>}
+                              {doc.ocr_data.date_of_birth && <p>DOB: <span className="text-slate-200">{doc.ocr_data.date_of_birth}</span></p>}
+                              {doc.ocr_data.expiry_date && <p>Expires: <span className="text-slate-200">{doc.ocr_data.expiry_date}</span></p>}
+                              {doc.ocr_data.issuing_country && <p>Country: <span className="text-slate-200">{doc.ocr_data.issuing_country}</span></p>}
+                            </div>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Empty state */}
+                {uploadedDocs.length === 0 && (!results.documents || results.documents.length === 0) && (
+                  <div className="text-center py-12">
+                    <Image className="w-12 h-12 text-slate-600 mx-auto mb-3" />
+                    <p className="text-slate-400 font-medium">No documents available</p>
+                    <p className="text-sm text-slate-600 mt-1">
+                      Documents will appear here once uploaded during the verification process.
+                    </p>
+                  </div>
+                )}
+              </>
+            )}
           </div>
         )}
 

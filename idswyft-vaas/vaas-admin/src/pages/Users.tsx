@@ -14,6 +14,8 @@ import { showToast } from '../lib/toast';
 import type { EndUser } from '../types.js';
 import { sectionLabel, statNumber, monoXs, monoSm, cardSurface, statusPill, tableHeaderClass, infoPanel, getStatusAccent } from '../styles/tokens';
 import Modal from '../components/ui/Modal';
+import { VerificationDetailsModal } from '../components/VerificationDetailsModal';
+import type { VerificationSessionStatus } from '../components/VerificationDetailsModal';
 
 // Type alias for EndUser verification status
 type VerificationStatus = EndUser['verification_status'];
@@ -732,6 +734,8 @@ interface UserDetailsModalProps {
 function UserDetailsModal({ user, onClose, onUserUpdated }: UserDetailsModalProps) {
   const [verifications, setVerifications] = useState<any[]>([]);
   const [loadingVerifications, setLoadingVerifications] = useState(true);
+  const [selectedVerification, setSelectedVerification] = useState<any | null>(null);
+  const [showVerificationDetails, setShowVerificationDetails] = useState(false);
 
   useEffect(() => {
     loadUserVerifications();
@@ -746,6 +750,28 @@ function UserDetailsModal({ user, onClose, onUserUpdated }: UserDetailsModalProp
       console.error('Failed to load user verifications:', error);
     } finally {
       setLoadingVerifications(false);
+    }
+  };
+
+  const handleVerificationStatusUpdate = async (verificationId: string, newStatus: VerificationSessionStatus, reason?: string) => {
+    try {
+      if (newStatus === 'completed' || newStatus === 'verified') {
+        await apiClient.approveVerification(verificationId, reason);
+      } else if (newStatus === 'failed') {
+        await apiClient.rejectVerification(verificationId, reason || 'Rejected', reason);
+      } else {
+        await apiClient.patch(`/verifications/${verificationId}/status`, { status: newStatus, reason });
+      }
+      // Update local list
+      setVerifications(prev =>
+        prev.map(v => v.id === verificationId ? { ...v, status: newStatus, updated_at: new Date().toISOString() } : v)
+      );
+      if (selectedVerification?.id === verificationId) {
+        setSelectedVerification((prev: any) => prev ? { ...prev, status: newStatus } : null);
+      }
+      onUserUpdated();
+    } catch (err: unknown) {
+      showToast.error(`Status update failed: ${err instanceof Error ? err.message : 'Unknown error'}`);
     }
   };
 
@@ -862,7 +888,15 @@ function UserDetailsModal({ user, onClose, onUserUpdated }: UserDetailsModalProp
           ) : (
             <div className="space-y-3 max-h-96 overflow-y-auto">
               {verifications.map((verification, index) => (
-                <div key={index} className={`${cardSurface} border-l-[3px] ${getStatusAccent(verification.status).border} p-3`}>
+                <button
+                  key={index}
+                  type="button"
+                  onClick={() => {
+                    setSelectedVerification(verification);
+                    setShowVerificationDetails(true);
+                  }}
+                  className={`${cardSurface} border-l-[3px] ${getStatusAccent(verification.status).border} p-3 w-full text-left cursor-pointer hover:bg-slate-800/40 transition-colors`}
+                >
                   <div className="flex items-center justify-between mb-2">
                     <span className={`${monoSm} text-slate-200`}>
                       #{verification.id?.substring(0, 8)}...
@@ -874,12 +908,23 @@ function UserDetailsModal({ user, onClose, onUserUpdated }: UserDetailsModalProp
                   <div className={`${monoXs} text-slate-500`}>
                     {new Date(verification.created_at).toLocaleDateString()}
                   </div>
-                </div>
+                </button>
               ))}
             </div>
           )}
         </div>
       </div>
+
+      {/* Verification Details Modal */}
+      <VerificationDetailsModal
+        verification={selectedVerification}
+        isOpen={showVerificationDetails && !!selectedVerification}
+        onClose={() => {
+          setShowVerificationDetails(false);
+          setSelectedVerification(null);
+        }}
+        onStatusUpdate={handleVerificationStatusUpdate}
+      />
     </Modal>
   );
 }
