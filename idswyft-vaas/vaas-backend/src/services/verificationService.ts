@@ -383,6 +383,66 @@ export class VerificationService {
     return updatedSession;
   }
   
+  async overrideVerification(
+    organizationId: string,
+    sessionId: string,
+    reviewerId: string,
+    reason: string,
+    notes?: string
+  ): Promise<VaasVerificationSession> {
+    const session = await this.getVerification(organizationId, sessionId);
+    if (!session) {
+      throw new Error('Verification session not found');
+    }
+
+    const terminalStatuses = ['failed', 'verified', 'completed', 'terminated'];
+    if (!terminalStatuses.includes(session.status)) {
+      throw new Error(`Cannot override verification in '${session.status}' status. Only terminal states can be overridden.`);
+    }
+
+    const previousStatus = session.status;
+
+    // Update VaaS session to manual_review with override metadata
+    const { data: updatedSession, error } = await vaasSupabase
+      .from('vaas_verification_sessions')
+      .update({
+        status: 'manual_review',
+        results: {
+          ...session.results,
+          override_reason: reason,
+          override_by: reviewerId,
+          override_at: new Date().toISOString(),
+          override_from_status: previousStatus,
+          override_notes: notes || null
+        }
+      })
+      .eq('id', sessionId)
+      .eq('organization_id', organizationId)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to override verification: ${error.message}`);
+    }
+
+    // Update end user status
+    await vaasSupabase
+      .from('vaas_end_users')
+      .update({ verification_status: 'manual_review' })
+      .eq('id', session.end_user_id);
+
+    // Send webhook (fire-and-forget)
+    webhookService.sendWebhook(organizationId, 'verification.overridden', {
+      verification_session: updatedSession,
+      override_reason: reason,
+      override_notes: notes,
+      previous_status: previousStatus,
+      reviewer_id: reviewerId
+    }).catch(err => console.error('[VerificationService] Override webhook failed:', err.message));
+
+    return updatedSession;
+  }
+
   private async sendVerificationEmail(
     organizationId: string,
     endUser: VaasEndUser,

@@ -160,6 +160,14 @@ export interface VerificationResults {
   reviewer_id?: string;
   reviewed_at?: string;
   review_notes?: string;
+  override_reason?: string;
+  override_by?: string;
+  override_at?: string;
+  override_from_status?: string;
+  override_notes?: string | null;
+  // OCR / cross-validation data synced from main API
+  ocr_data?: Record<string, any>;
+  cross_validation_results?: Record<string, any>;
 }
 
 export interface VerificationSession {
@@ -168,7 +176,7 @@ export interface VerificationSession {
   end_user_id: string;
   idswyft_verification_id: string;
   idswyft_user_id: string;
-  status: 'pending' | 'document_uploaded' | 'processing' | 'completed' | 'verified' | 'failed' | 'expired' | 'manual_review';
+  status: 'pending' | 'document_uploaded' | 'processing' | 'completed' | 'verified' | 'failed' | 'expired' | 'manual_review' | 'terminated';
   session_token?: string;
   issuing_country?: string;
   expires_at?: string;

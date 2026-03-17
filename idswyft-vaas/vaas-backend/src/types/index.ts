@@ -167,6 +167,13 @@ export interface VaasVerificationResults {
   reviewer_id?: string;
   reviewed_at?: string;
   review_notes?: string;
+
+  // Override data (terminal state → manual_review)
+  override_reason?: string;
+  override_by?: string;
+  override_at?: string;
+  override_from_status?: string;
+  override_notes?: string | null;
 }
 
 export interface VaasUsageRecord {
