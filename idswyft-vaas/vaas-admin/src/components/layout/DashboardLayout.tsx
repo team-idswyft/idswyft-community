@@ -235,7 +235,7 @@ export default function DashboardLayout() {
                   <Menu className="h-5 w-5" />
                 </button>
                 <div className="min-w-0">
-                  <h1 className="truncate text-xl font-semibold text-slate-100 lg:text-2xl">{currentPage?.name || 'Dashboard'}</h1>
+                  <h1 className="truncate text-lg font-semibold text-slate-100 lg:text-xl">{currentPage?.name || 'Dashboard'}</h1>
                   {organization && (
                     <div className="mt-1 inline-flex max-w-full items-center gap-1 text-xs text-slate-400">
                       <Building className="h-3.5 w-3.5" />

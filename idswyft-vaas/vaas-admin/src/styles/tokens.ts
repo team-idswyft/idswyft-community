@@ -6,7 +6,7 @@
 export const sectionLabel = 'font-mono text-[0.65rem] font-semibold uppercase tracking-[0.08em] text-slate-500';
 
 /** Large monospace number — stat card values */
-export const statNumber = 'font-mono text-2xl font-bold';
+export const statNumber = 'font-mono text-xl font-bold';
 
 /** Monospace extra-small — IDs, timestamps, IPs, secondary data */
 export const monoXs = 'font-mono text-xs';

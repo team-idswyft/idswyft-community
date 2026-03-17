@@ -32,15 +32,3 @@ export const C = {
 } as const;
 
 export type ColorTokens = typeof C;
-
-/** Inject IBM Plex Mono + DM Sans from Google Fonts once per page. */
-export function injectFonts() {
-  const id = 'idswyft-fonts';
-  if (document.getElementById(id)) return;
-  const link = document.createElement('link');
-  link.id = id;
-  link.rel = 'stylesheet';
-  link.href =
-    'https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=DM+Sans:wght@400;500;600&display=swap';
-  document.head.appendChild(link);
-}

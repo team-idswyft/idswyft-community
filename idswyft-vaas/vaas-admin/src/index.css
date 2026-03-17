@@ -1,7 +1,8 @@
 @import "tailwindcss";
-@import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&family=DM+Sans:wght@400;500;600;700&family=Syne:wght@600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Syne:wght@600;700;800&family=DM+Sans:ital,opsz,wght@0,9..40,300;0,9..40,400;0,9..40,500;0,9..40,600;0,9..40,700;1,9..40,400&family=IBM+Plex+Mono:wght@400;500;600&display=swap');
 
 @theme {
+  --font-display: 'Syne', sans-serif;
   --font-sans: 'DM Sans', system-ui, sans-serif;
   --font-mono: 'IBM Plex Mono', 'Fira Code', monospace;
 
@@ -56,11 +57,11 @@
 html,
 body {
   overflow-x: hidden;
+  font-family: var(--font-sans);
 }
 
 body {
   margin: 0;
-  font-family: var(--font-sans);
   font-feature-settings: "rlig" 1, "calt" 1;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
@@ -68,14 +69,14 @@ body {
   color: var(--text-main);
 }
 
-* {
-  font-family: var(--font-sans);
-}
-
 code,
 pre,
 .font-mono {
   font-family: var(--font-mono);
+}
+
+.font-display {
+  font-family: var(--font-display);
 }
 
 .bg-white {
@@ -747,18 +748,9 @@ thead.bg-white\/50 {
   box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.14);
 }
 
-input,
-textarea,
-select,
-button {
-  font: inherit;
-}
 
 /* ── Login page illustration animations ── */
 
-.font-display {
-  font-family: 'Syne', system-ui, sans-serif;
-}
 
 @keyframes loginScanSweep {
   0% { transform: translateY(-100%); opacity: 0; }
