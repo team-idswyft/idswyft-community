@@ -1,43 +1,20 @@
 import { Router, Request, Response } from 'express';
 import multer from 'multer';
-import { z } from 'zod';
+import { fileTypeFromBuffer } from 'file-type';
 import { vaasSupabase } from '../config/database.js';
 import { VaasApiResponse } from '../types/index.js';
+import { livenessDataSchema, resultSchema } from '../schemas/verification.schema.js';
 
-// --- Zod schemas for public endpoint validation ---
-
-const livenessDataSchema = z.object({
-  challenge_id: z.string().max(256).optional(),
-  frames: z.array(z.object({
-    timestamp: z.number().optional(),
-    data: z.string().max(10_000).optional(), // base64 frame data per frame
-  }).passthrough()).max(30).optional(),
-  confidence: z.number().min(0).max(1).optional(),
-  passed: z.boolean().optional(),
-  metadata: z.record(z.unknown()).optional(),
-}).passthrough().refine(
-  // Defense-in-depth: overall payload size cap (field limits alone could allow ~300KB)
-  (data) => JSON.stringify(data).length <= 100_000,
-  { message: 'Liveness data payload must be under 100KB' }
-);
-
-const resultSchema = z.object({
-  final_result: z.enum(['verified', 'failed', 'manual_review']),
-  confidence_score: z.number().min(0).max(1).optional(),
-  face_match_results: z.object({
-    similarity_score: z.number().min(0).max(1).optional(),
-    score: z.number().min(0).max(1).optional(),
-    matched: z.boolean().optional(),
-  }).passthrough().optional(),
-  liveness_results: z.object({
-    confidence: z.number().min(0).max(1).optional(),
-    passed: z.boolean().optional(),
-  }).passthrough().optional(),
-  ocr_data: z.record(z.unknown()).optional(),
-  cross_validation_results: z.record(z.unknown()).optional(),
-  failure_reason: z.string().max(1000).optional(),
-  manual_review_reason: z.string().max(1000).optional(),
-});
+// MIME types we accept, mapped from file-type magic-byte detection
+const ALLOWED_MIME_TYPES = new Set([
+  'image/jpeg',
+  'image/png',
+  'image/webp',
+  'image/gif',
+  'image/bmp',
+  'image/tiff',
+  'application/pdf',
+]);
 
 const router = Router();
 
@@ -70,6 +47,19 @@ router.post('/sessions/:sessionToken/documents', upload.single('document') as an
         error: {
           code: 'NO_FILE_UPLOADED',
           message: 'No file was uploaded'
+        }
+      };
+      return res.status(400).json(response);
+    }
+
+    // Validate magic bytes match claimed MIME type
+    const detected = await fileTypeFromBuffer(file.buffer);
+    if (!detected || !ALLOWED_MIME_TYPES.has(detected.mime)) {
+      const response: VaasApiResponse = {
+        success: false,
+        error: {
+          code: 'INVALID_FILE_CONTENT',
+          message: `File content does not match an allowed image or PDF type${detected ? ` (detected: ${detected.mime})` : ''}`,
         }
       };
       return res.status(400).json(response);

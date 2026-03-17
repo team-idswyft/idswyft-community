@@ -4,14 +4,15 @@ import { organizationService } from '../services/organizationService.js';
 import { emailService } from '../services/emailService.js';
 import config from '../config/index.js';
 import { VaasApiResponse, VaasCreateOrganizationRequest, VaasEnterpriseSignupRequest } from '../types/index.js';
-import { validateCreateOrganization, validateEnterpriseSignup } from '../middleware/validation.js';
+import { validateBody } from '../schemas/validate.js';
+import { createOrganizationSchema, updateOrganizationSchema, enterpriseSignupSchema } from '../schemas/organization.schema.js';
 import { requireAuth, requireSuperAdmin } from '../middleware/auth.js';
 import { auditService } from '../services/auditService.js';
 
 const router = Router();
 
 // Enterprise signup - public endpoint
-router.post('/signup', validateEnterpriseSignup, async (req, res) => {
+router.post('/signup', validateBody(enterpriseSignupSchema), async (req, res) => {
   try {
     const signupData: VaasEnterpriseSignupRequest = req.body;
     const result = await organizationService.createEnterpriseSignup(signupData);
@@ -85,7 +86,7 @@ router.post('/signup', validateEnterpriseSignup, async (req, res) => {
 });
 
 // Create new organization (super admin only)
-router.post('/', requireSuperAdmin, validateCreateOrganization, async (req, res) => {
+router.post('/', requireSuperAdmin, validateBody(createOrganizationSchema), async (req, res) => {
   try {
     const organizationData: VaasCreateOrganizationRequest = req.body;
     const organization = await organizationService.createOrganization(organizationData);
@@ -162,7 +163,7 @@ router.get('/:id', requireAuth, async (req, res) => {
 });
 
 // Update organization (owner/admin only)
-router.put('/:id', requireAuth, async (req, res) => {
+router.put('/:id', requireAuth, validateBody(updateOrganizationSchema), async (req, res) => {
   try {
     const { id } = req.params;
     const admin = (req as any).admin;

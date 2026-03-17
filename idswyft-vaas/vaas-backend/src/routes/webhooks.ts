@@ -3,7 +3,8 @@ import crypto from 'crypto';
 import { webhookService } from '../services/webhookService.js';
 import { verificationService } from '../services/verificationService.js';
 import { requireAuth, requirePermission, AuthenticatedRequest } from '../middleware/auth.js';
-import { validateWebhookConfig } from '../middleware/validation.js';
+import { validateBody } from '../schemas/validate.js';
+import { webhookConfigSchema } from '../schemas/webhook.schema.js';
 import { VaasApiResponse } from '../types/index.js';
 import { vaasSupabase } from '../config/database.js';
 import config from '../config/index.js';
@@ -12,15 +13,14 @@ import { auditService } from '../services/auditService.js';
 const router = Router();
 
 // Create webhook (admin only)
-router.post('/', requireAuth, requirePermission('manage_webhooks'), validateWebhookConfig, async (req: AuthenticatedRequest, res) => {
+router.post('/', requireAuth, requirePermission('manage_webhooks'), validateBody(webhookConfigSchema), async (req: AuthenticatedRequest, res) => {
   try {
     const organizationId = req.admin!.organization_id;
-    const { url, events, secret_key } = req.body;
-    
+    const { url, events } = req.body;
+
     const webhook = await webhookService.createWebhook(organizationId, {
       url,
       events,
-      secret_key
     });
 
     auditService.logAuditEvent({

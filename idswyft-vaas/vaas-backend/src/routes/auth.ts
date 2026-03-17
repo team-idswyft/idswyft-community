@@ -5,7 +5,8 @@ import jwt from 'jsonwebtoken';
 import { vaasSupabase } from '../config/database.js';
 import config from '../config/index.js';
 import { VaasApiResponse, VaasLoginRequest, VaasLoginResponse } from '../types/index.js';
-import { validateLoginRequest } from '../middleware/validation.js';
+import { validateBody } from '../schemas/validate.js';
+import { loginSchema, forgotPasswordSchema, resetPasswordSchema } from '../schemas/auth.schema.js';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
 import { auditService } from '../services/auditService.js';
 
@@ -31,7 +32,7 @@ function generateRefreshToken(): { token: string; hash: string } {
 const router = Router();
 
 // Admin login
-router.post('/login', validateLoginRequest, async (req, res) => {
+router.post('/login', validateBody(loginSchema), async (req, res) => {
   try {
     const { email, password, organization_slug }: VaasLoginRequest = req.body;
     
@@ -467,22 +468,10 @@ router.get('/me', requireAuth, async (req: AuthenticatedRequest, res) => {
 });
 
 // Request password reset
-router.post('/forgot-password', async (req, res) => {
+router.post('/forgot-password', validateBody(forgotPasswordSchema), async (req, res) => {
   try {
     const { email, organization_slug } = req.body;
-    
-    if (!email) {
-      const response: VaasApiResponse = {
-        success: false,
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Email is required'
-        }
-      };
-      
-      return res.status(400).json(response);
-    }
-    
+
     // Find admin
     let query = vaasSupabase
       .from('vaas_admins')
@@ -548,34 +537,10 @@ router.post('/forgot-password', async (req, res) => {
 });
 
 // Reset password with token
-router.post('/reset-password', async (req, res) => {
+router.post('/reset-password', validateBody(resetPasswordSchema), async (req, res) => {
   try {
     const { token, new_password } = req.body;
-    
-    if (!token || !new_password) {
-      const response: VaasApiResponse = {
-        success: false,
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Token and new password are required'
-        }
-      };
-      
-      return res.status(400).json(response);
-    }
-    
-    if (new_password.length < 8) {
-      const response: VaasApiResponse = {
-        success: false,
-        error: {
-          code: 'VALIDATION_ERROR',
-          message: 'Password must be at least 8 characters'
-        }
-      };
-      
-      return res.status(400).json(response);
-    }
-    
+
     // Verify reset token
     const decoded = jwt.verify(token, config.jwtSecret) as any;
     

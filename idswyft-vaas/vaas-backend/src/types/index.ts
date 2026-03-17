@@ -114,6 +114,10 @@ export interface VaasEndUser {
   tags: string[];
   verification_status: 'pending' | 'in_progress' | 'verified' | 'failed' | 'manual_review' | 'expired';
   verification_completed_at?: string;
+  consent_given_at?: string;
+  consent_version?: string;
+  consent_purpose?: string;
+  data_deletion_requested_at?: string;
   created_at: string;
   updated_at: string;
 }

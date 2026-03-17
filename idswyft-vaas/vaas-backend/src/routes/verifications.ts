@@ -1,7 +1,8 @@
 import { Router } from 'express';
 import { verificationService } from '../services/verificationService.js';
 import { requireAuth, requireApiKey, requirePermission, AuthenticatedRequest } from '../middleware/auth.js';
-import { validateStartVerification, validatePagination } from '../middleware/validation.js';
+import { validatePagination } from '../middleware/validation.js';
+import { startVerificationSchema } from '../schemas/verification.schema.js';
 import { apiKeyRateLimit } from '../middleware/rateLimit.js';
 import { VaasApiResponse, VaasStartVerificationRequest } from '../types/index.js';
 import { vaasSupabase } from '../config/database.js';
@@ -45,7 +46,7 @@ router.post('/start', async (req: AuthenticatedRequest, res) => {
       organizationId = req.admin!.organization_id;
       
       // Check permissions
-      if (!req.admin!.permissions.manage_verifications && !req.admin!.permissions.view_verifications) {
+      if (!req.admin!.permissions.review_verifications && !req.admin!.permissions.view_verifications) {
         const response: VaasApiResponse = {
           success: false,
           error: {
@@ -59,14 +60,19 @@ router.post('/start', async (req: AuthenticatedRequest, res) => {
     }
     
     // Validate request body
-    await new Promise<void>((resolve, reject) => {
-      validateStartVerification(req, res, (error) => {
-        if (error) reject(error);
-        else resolve();
+    const parseResult = startVerificationSchema.safeParse(req.body);
+    if (!parseResult.success) {
+      return res.status(400).json({
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Validation failed',
+          details: parseResult.error.issues.map((i) => ({ field: i.path.join('.'), message: i.message })),
+        },
       });
-    });
-    
-    const verificationRequest: VaasStartVerificationRequest = req.body;
+    }
+
+    const verificationRequest: VaasStartVerificationRequest = parseResult.data;
     const result = await verificationService.startVerification(organizationId, verificationRequest);
     
     const response: VaasApiResponse = {
