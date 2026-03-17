@@ -276,12 +276,15 @@ export class VerificationService {
       throw new Error('Verification session not found');
     }
     
-    // Approve in main Idswyft API
-    const idswyftVerification = await idswyftApiService.approveVerification(
-      session.idswyft_verification_id,
-      notes
-    );
-    
+    // Approve in main Idswyft API (best-effort — VaaS sessions work independently)
+    if (session.idswyft_verification_id) {
+      try {
+        await idswyftApiService.approveVerification(session.idswyft_verification_id, notes);
+      } catch (err: any) {
+        console.warn('[VerificationService] Main API approve failed (non-blocking):', err.message);
+      }
+    }
+
     // Update VaaS session
     const { data: updatedSession, error } = await vaasSupabase
       .from('vaas_verification_sessions')
@@ -329,13 +332,15 @@ export class VerificationService {
       throw new Error('Verification session not found');
     }
     
-    // Reject in main Idswyft API
-    const idswyftVerification = await idswyftApiService.rejectVerification(
-      session.idswyft_verification_id,
-      reason,
-      notes
-    );
-    
+    // Reject in main Idswyft API (best-effort — VaaS sessions work independently)
+    if (session.idswyft_verification_id) {
+      try {
+        await idswyftApiService.rejectVerification(session.idswyft_verification_id, reason, notes);
+      } catch (err: any) {
+        console.warn('[VerificationService] Main API reject failed (non-blocking):', err.message);
+      }
+    }
+
     // Update VaaS session
     const { data: updatedSession, error } = await vaasSupabase
       .from('vaas_verification_sessions')
