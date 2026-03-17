@@ -178,6 +178,7 @@ export default function DashboardLayout() {
             <Link
               key={item.name}
               to={item.href}
+              aria-current={item.current ? 'page' : undefined}
               className={`sidebar-nav-item ${item.current ? 'sidebar-nav-active' : 'sidebar-nav-inactive'}`}
             >
               <Icon className={`mr-3 h-4 w-4 ${item.current ? 'text-cyan-200' : 'text-slate-500'}`} />

@@ -573,15 +573,10 @@ function AppearanceSettingsSection({ settings, onSave, isLoading, canEdit }: Set
             <label className="block text-sm font-medium text-slate-300 mb-2">
               Theme
             </label>
-            <select
-              value={formData.theme}
-              onChange={(e) => handleChange('theme', e.target.value as 'light' | 'dark')}
-              disabled={!canEdit}
-              className="w-full px-3 py-2 border border-white/10 rounded-md bg-slate-900/70 text-slate-100 focus:outline-none focus:ring-cyan-400 focus:border-cyan-400 disabled:bg-slate-900/40"
-            >
-              <option value="light">Light</option>
-              <option value="dark">Dark</option>
-            </select>
+            <div className="w-full px-3 py-2 border border-white/10 rounded-md bg-slate-900/40 text-slate-400 text-sm">
+              Dark (default)
+            </div>
+            <p className="mt-1 text-xs text-slate-500">Light theme coming soon</p>
           </div>
 
           <div>

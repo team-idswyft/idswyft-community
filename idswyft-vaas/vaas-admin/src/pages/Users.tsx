@@ -49,6 +49,7 @@ export default function Users() {
   const [showEditForm, setShowEditForm] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null);
   const [showInvitationModal, setShowInvitationModal] = useState(false);
   const [sendingInvitation, setSendingInvitation] = useState(false);
@@ -84,11 +85,13 @@ export default function Users() {
                         result.meta?.pages ||
                         Math.ceil((result.meta?.total || 0) / 20) || 1;
       setTotalPages(totalPages);
+      setTotalRecords(result.meta?.total || 0);
     } catch (err: unknown) {
       console.error('Failed to load users:', err);
       setError(err instanceof Error ? err.message : 'Failed to load users');
       setUsers([]);
       setTotalPages(1);
+      setTotalRecords(0);
     } finally {
       setLoading(false);
     }
@@ -437,6 +440,7 @@ export default function Users() {
                           }}
                           className="p-1.5 text-slate-400 hover:text-cyan-300 hover:bg-slate-800/40 rounded transition-colors"
                           title="View Details"
+                          aria-label="View details"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
@@ -447,6 +451,7 @@ export default function Users() {
                           }}
                           className="p-1.5 text-slate-400 hover:text-cyan-300 hover:bg-slate-800/40 rounded transition-colors"
                           title="Edit User"
+                          aria-label="Edit user"
                         >
                           <Edit2 className="w-4 h-4" />
                         </button>
@@ -458,6 +463,7 @@ export default function Users() {
                             }}
                             className="p-1.5 text-emerald-400 hover:text-emerald-300 hover:bg-emerald-500/10 rounded transition-colors"
                             title="Send Verification Link"
+                            aria-label="Send verification link"
                           >
                             <Send className="w-4 h-4" />
                           </button>
@@ -471,6 +477,7 @@ export default function Users() {
                           onClick={() => setDeleteConfirm(user.id)}
                           className="p-1.5 text-slate-400 hover:text-rose-400 hover:bg-rose-500/10 rounded transition-colors"
                           title="Delete User"
+                          aria-label="Delete user"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
@@ -505,6 +512,7 @@ export default function Users() {
             <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
               <div>
                 <p className={`${monoXs} text-slate-500`}>
+                  {totalRecords > 0 && <><span className="text-slate-300">{totalRecords}</span> records &middot; </>}
                   Page <span className="text-slate-300">{currentPage}</span> of{' '}
                   <span className="text-slate-300">{totalPages}</span>
                 </p>

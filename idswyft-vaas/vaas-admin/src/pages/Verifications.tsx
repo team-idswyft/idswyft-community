@@ -78,6 +78,7 @@ export default function Verifications() {
   const [showDetails, setShowDetails] = useState(false);
   const [currentPage, setCurrentPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  const [totalRecords, setTotalRecords] = useState(0);
 
   useEffect(() => {
     loadVerifications();
@@ -113,11 +114,13 @@ export default function Verifications() {
                         result.meta?.pages ||
                         Math.ceil((result.meta?.total || 0) / 20) || 1;
       setTotalPages(totalPages);
+      setTotalRecords(result.meta?.total || 0);
     } catch (err: unknown) {
       console.error('Failed to load verifications:', err);
       setError(err instanceof Error ? err.message : 'Failed to load verifications');
       setVerifications([]);
       setTotalPages(1);
+      setTotalRecords(0);
     } finally {
       setLoading(false);
     }
@@ -405,6 +408,7 @@ export default function Verifications() {
                             setShowDetails(true);
                           }}
                           className="text-primary-600 hover:text-primary-900"
+                          aria-label="View details"
                         >
                           <Eye className="w-4 h-4" />
                         </button>
@@ -415,6 +419,7 @@ export default function Verifications() {
                               onClick={() => handleStatusUpdate(verification.id, 'verified')}
                               className="text-green-600 hover:text-green-900"
                               title="Approve"
+                              aria-label="Approve verification"
                             >
                               <CheckCircle className="w-4 h-4" />
                             </button>
@@ -422,6 +427,7 @@ export default function Verifications() {
                               onClick={() => handleStatusUpdate(verification.id, 'failed', 'Rejected during review')}
                               className="text-red-600 hover:text-red-900"
                               title="Reject"
+                              aria-label="Reject verification"
                             >
                               <XCircle className="w-4 h-4" />
                             </button>
@@ -458,6 +464,7 @@ export default function Verifications() {
             <div className="hidden sm:flex-1 sm:flex sm:items-center sm:justify-between">
               <div>
                 <p className={`${monoXs} text-slate-500`}>
+                  {totalRecords > 0 && <><span className="font-medium">{totalRecords}</span> records &middot; </>}
                   Page <span className="font-medium">{currentPage}</span> of{' '}
                   <span className="font-medium">{totalPages}</span>
                 </p>

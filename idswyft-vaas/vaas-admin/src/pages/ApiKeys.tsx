@@ -410,6 +410,7 @@ export default function ApiKeys() {
                           onClick={() => handleViewUsage(apiKey)}
                           className="text-cyan-400 hover:text-cyan-300 transition-colors"
                           title="View usage"
+                          aria-label="View usage"
                         >
                           <Activity className="w-4 h-4" />
                         </button>
@@ -421,6 +422,7 @@ export default function ApiKeys() {
                           }}
                           className="text-slate-400 hover:text-slate-100 transition-colors"
                           title="Edit"
+                          aria-label="Edit API key"
                         >
                           <Edit className="w-4 h-4" />
                         </button>
@@ -429,6 +431,7 @@ export default function ApiKeys() {
                           onClick={() => handleRotateApiKey(apiKey.id)}
                           className="text-orange-600 hover:text-orange-900 transition-colors"
                           title="Rotate key"
+                          aria-label="Rotate key"
                         >
                           <RotateCcw className="w-4 h-4" />
                         </button>
@@ -437,6 +440,7 @@ export default function ApiKeys() {
                           onClick={() => handleDeleteApiKey(apiKey.id)}
                           className="text-red-600 hover:text-red-900 transition-colors"
                           title="Delete"
+                          aria-label="Delete API key"
                         >
                           <Trash2 className="w-4 h-4" />
                         </button>
