@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   Search,
   Filter,
@@ -54,13 +54,37 @@ export default function Users() {
   const [showInvitationModal, setShowInvitationModal] = useState(false);
   const [sendingInvitation, setSendingInvitation] = useState(false);
 
+  const loadingRef = useRef(false);
+
   useEffect(() => {
     loadUsers();
   }, [currentPage, filters]);
 
-  const loadUsers = async () => {
+  // Polling: auto-refresh every 15s with visibility awareness
+  useEffect(() => {
+    const interval = setInterval(() => {
+      if (document.visibilityState === 'hidden' || loadingRef.current) return;
+      loadUsers(true);
+    }, 15000);
+
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible' && !loadingRef.current) {
+        loadUsers(true);
+      }
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+
+    return () => {
+      clearInterval(interval);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
+  }, [currentPage, filters]);
+
+  const loadUsers = async (silent = false) => {
+    if (loadingRef.current) return;
+    loadingRef.current = true;
     try {
-      setLoading(true);
+      if (!silent) setLoading(true);
       setError(null);
       const params: any = {
         page: currentPage,
@@ -87,13 +111,16 @@ export default function Users() {
       setTotalPages(totalPages);
       setTotalRecords(result.meta?.total || 0);
     } catch (err: unknown) {
-      console.error('Failed to load users:', err);
-      setError(err instanceof Error ? err.message : 'Failed to load users');
-      setUsers([]);
-      setTotalPages(1);
-      setTotalRecords(0);
+      if (!silent) {
+        console.error('Failed to load users:', err);
+        setError(err instanceof Error ? err.message : 'Failed to load users');
+        setUsers([]);
+        setTotalPages(1);
+        setTotalRecords(0);
+      }
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
+      loadingRef.current = false;
     }
   };
 

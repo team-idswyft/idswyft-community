@@ -115,6 +115,14 @@ class CustomerPortalAPI {
     });
   }
 
+  // Restart a failed verification session (allows user to retry)
+  async restartSession(sessionToken: string): Promise<void> {
+    const response = await this.client.post(`/verifications/session/${sessionToken}/restart`);
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to restart session');
+    }
+  }
+
   // Terminate verification session (make link inactive)
   async terminateVerificationSession(sessionToken: string): Promise<void> {
     await this.client.post(`/verifications/session/${sessionToken}/terminate`);

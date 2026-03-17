@@ -145,6 +145,7 @@
     "heading": "Vérification échouée",
     "message": "Votre vérification n'a pas pu être complétée.",
     "helpText": "Veuillez revoir les détails et réessayer, ou contactez le support pour obtenir de l'aide.",
+    "maxRetries": "Vous avez utilisé toutes vos tentatives. Veuillez demander un nouveau lien de vérification.",
     "checklist": {
       "documentNotRead": "Le document n'a pas pu être lu",
       "detailsMismatch": "Les informations ne correspondent pas",
