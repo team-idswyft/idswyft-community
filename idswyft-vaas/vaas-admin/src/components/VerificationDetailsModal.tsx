@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Eye,
   CheckCircle,
@@ -46,6 +46,7 @@ export function mapStatus(status: string): string {
     case 'pending': return 'pending';
     case 'expired': return 'expired';
     case 'manual_review': return 'manual_review';
+    case 'terminated': return 'failed';
     default: return 'default';
   }
 }
@@ -69,34 +70,40 @@ export interface VerificationDetailsModalProps {
 
 export function VerificationDetailsModal({ verification, isOpen, onClose, onStatusUpdate }: VerificationDetailsModalProps) {
   const [reason, setReason] = useState('');
-  const [documents, setDocuments] = useState<any[]>([]);
-  const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'overview' | 'scores' | 'analysis' | 'raw'>('overview');
-
-  useEffect(() => {
-    if (verification) {
-      loadVerificationDetails();
-    }
-  }, [verification?.id]);
-
-  const loadVerificationDetails = async () => {
-    if (!verification) return;
-    try {
-      setLoading(true);
-      const response = await apiClient.get(`/verifications/${verification.id}/documents`);
-      setDocuments(response.data.documents);
-    } catch (error) {
-      console.error('Failed to load verification details:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+  const [showOverrideForm, setShowOverrideForm] = useState(false);
+  const [overrideReason, setOverrideReason] = useState('');
+  const [overrideNotes, setOverrideNotes] = useState('');
+  const [overrideLoading, setOverrideLoading] = useState(false);
 
   const handleStatusUpdate = async (newStatus: VerificationSessionStatus) => {
     if (!verification) return;
     await onStatusUpdate(verification.id, newStatus, reason);
     onClose();
   };
+
+  const handleOverride = async () => {
+    if (!verification || !overrideReason.trim()) return;
+    try {
+      setOverrideLoading(true);
+      await apiClient.post(`/verifications/${verification.id}/override`, {
+        reason: overrideReason.trim(),
+        notes: overrideNotes.trim() || undefined
+      });
+      setShowOverrideForm(false);
+      setOverrideReason('');
+      setOverrideNotes('');
+      onClose();
+    } catch (error: any) {
+      console.error('Failed to override verification:', error);
+      alert(error.message || 'Failed to override verification');
+    } finally {
+      setOverrideLoading(false);
+    }
+  };
+
+  const isTerminalStatus = (status: string) =>
+    ['failed', 'verified', 'completed', 'terminated'].includes(status);
 
   // Helper functions for score analysis
   const getScoreColor = (score: number, threshold: number) => {
@@ -250,34 +257,108 @@ export function VerificationDetailsModal({ verification, isOpen, onClose, onStat
               </div>
             </div>
 
-            {/* Documents */}
+            {/* Evidence from Results */}
             <div className="lg:col-span-2">
-              <p className={`${sectionLabel} mb-4`}>Documents & Evidence</p>
-              {loading ? (
-                <div className="flex items-center justify-center py-8">
-                  <div className="w-5 h-5 border-2 border-primary-600 border-t-transparent rounded-full animate-spin mr-2"></div>
-                  Loading documents...
-                </div>
-              ) : documents.length === 0 ? (
-                <p className="text-slate-500 text-center py-8">No documents available</p>
+              <p className={`${sectionLabel} mb-4`}>Evidence & Analysis</p>
+              {!results.documents?.length && !results.ocr_data && !results.face_analysis && !results.liveness_analysis && !results.cross_validation_results ? (
+                <p className="text-slate-500 text-center py-8">No evidence data available</p>
               ) : (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  {documents.map((doc, index) => (
-                    <div key={index} className="border border-white/10 rounded-lg p-4">
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center">
-                          <FileText className="w-5 h-5 text-slate-500 mr-2" />
-                          <span className="font-medium">{doc.type || 'Document'}</span>
-                        </div>
-                        <button
-                          onClick={() => window.open(doc.url, '_blank')}
-                          className="text-primary-600 hover:text-primary-800 text-sm"
-                        >
-                          View
-                        </button>
+                  {/* OCR Data Card */}
+                  {results.ocr_data && (
+                    <div className="border border-white/10 rounded-lg p-4">
+                      <div className="flex items-center mb-3">
+                        <FileText className="w-5 h-5 text-cyan-400 mr-2" />
+                        <span className="font-medium text-slate-100">OCR Extracted Data</span>
                       </div>
-                      {doc.analysis && (
-                        <p className="text-sm text-slate-400">{doc.analysis}</p>
+                      <div className="space-y-1 text-sm text-slate-400">
+                        {results.ocr_data.full_name && <p>Name: <span className="text-slate-200">{results.ocr_data.full_name}</span></p>}
+                        {results.ocr_data.document_number && <p>Doc #: <span className="text-slate-200">{results.ocr_data.document_number}</span></p>}
+                        {results.ocr_data.date_of_birth && <p>DOB: <span className="text-slate-200">{results.ocr_data.date_of_birth}</span></p>}
+                        {results.ocr_data.expiry_date && <p>Expires: <span className="text-slate-200">{results.ocr_data.expiry_date}</span></p>}
+                        {results.ocr_data.issuing_country && <p>Country: <span className="text-slate-200">{results.ocr_data.issuing_country}</span></p>}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Cross-Validation Card */}
+                  {results.cross_validation_results && (
+                    <div className="border border-white/10 rounded-lg p-4">
+                      <div className="flex items-center mb-3">
+                        <CheckCircle className="w-5 h-5 text-green-400 mr-2" />
+                        <span className="font-medium text-slate-100">Cross-Validation</span>
+                      </div>
+                      <div className="space-y-1 text-sm text-slate-400">
+                        {Object.entries(results.cross_validation_results).map(([key, value]) => (
+                          <p key={key}>
+                            <span className="capitalize">{key.replace(/_/g, ' ')}: </span>
+                            <span className={`font-medium ${value === 'match' || value === true ? 'text-green-400' : value === 'mismatch' || value === false ? 'text-red-400' : 'text-slate-200'}`}>
+                              {typeof value === 'boolean' ? (value ? 'Match' : 'Mismatch') : String(value)}
+                            </span>
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Face Analysis Card */}
+                  {results.face_analysis && (
+                    <div className="border border-white/10 rounded-lg p-4">
+                      <div className="flex items-center mb-3">
+                        <User className="w-5 h-5 text-violet-400 mr-2" />
+                        <span className="font-medium text-slate-100">Face Analysis</span>
+                      </div>
+                      <div className="space-y-1 text-sm text-slate-400">
+                        {Object.entries(results.face_analysis).map(([key, value]) => (
+                          <p key={key}>
+                            <span className="capitalize">{key.replace(/_/g, ' ')}: </span>
+                            <span className="text-slate-200 font-medium">
+                              {typeof value === 'object' && value !== null ? JSON.stringify(value) : typeof value === 'number' && value < 1 ? `${(value * 100).toFixed(1)}%` : typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value)}
+                            </span>
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Liveness Card */}
+                  {results.liveness_analysis && (
+                    <div className="border border-white/10 rounded-lg p-4">
+                      <div className="flex items-center mb-3">
+                        <Eye className="w-5 h-5 text-amber-400 mr-2" />
+                        <span className="font-medium text-slate-100">Liveness Detection</span>
+                      </div>
+                      <div className="space-y-1 text-sm text-slate-400">
+                        {Object.entries(results.liveness_analysis).map(([key, value]) => (
+                          <p key={key}>
+                            <span className="capitalize">{key.replace(/_/g, ' ')}: </span>
+                            <span className="text-slate-200 font-medium">
+                              {typeof value === 'object' && value !== null ? JSON.stringify(value) : typeof value === 'number' && value < 1 ? `${(value * 100).toFixed(1)}%` : typeof value === 'boolean' ? (value ? 'Yes' : 'No') : String(value)}
+                            </span>
+                          </p>
+                        ))}
+                      </div>
+                    </div>
+                  )}
+
+                  {/* Document list from results (if synced from main API) */}
+                  {results.documents?.map((doc: any, index: number) => (
+                    <div key={index} className="border border-white/10 rounded-lg p-4">
+                      <div className="flex items-center mb-3">
+                        <FileText className="w-5 h-5 text-slate-400 mr-2" />
+                        <span className="font-medium text-slate-100">{doc.type || `Document ${index + 1}`}</span>
+                      </div>
+                      {doc.ocr_data && (
+                        <div className="space-y-1 text-sm text-slate-400">
+                          {doc.ocr_data.full_name && <p>Name: <span className="text-slate-200">{doc.ocr_data.full_name}</span></p>}
+                          {doc.ocr_data.document_number && <p>Doc #: <span className="text-slate-200">{doc.ocr_data.document_number}</span></p>}
+                          {doc.ocr_data.date_of_birth && <p>DOB: <span className="text-slate-200">{doc.ocr_data.date_of_birth}</span></p>}
+                        </div>
+                      )}
+                      {doc.quality_score && (
+                        <p className="mt-2 text-sm">
+                          Quality: <span className={`font-medium ${doc.quality_score > 0.7 ? 'text-green-400' : 'text-red-400'}`}>{(doc.quality_score * 100).toFixed(1)}%</span>
+                        </p>
                       )}
                     </div>
                   ))}
@@ -550,6 +631,70 @@ export function VerificationDetailsModal({ verification, isOpen, onClose, onStat
               </div>
             </div>
           </div>
+        </div>
+      )}
+
+      {/* Override Button — terminal states only */}
+      {isTerminalStatus(verification.status) && (
+        <div className="mt-6 pt-4 border-t border-white/10">
+          {!showOverrideForm ? (
+            <button
+              onClick={() => setShowOverrideForm(true)}
+              className="flex items-center px-4 py-2 text-sm font-medium text-amber-300 bg-amber-500/12 border border-amber-500/25 rounded-lg hover:bg-amber-500/20 transition-colors"
+            >
+              <AlertTriangle className="w-4 h-4 mr-2" />
+              Override to Manual Review
+            </button>
+          ) : (
+            <div className="bg-amber-500/12 border border-amber-500/25 p-4 rounded-lg">
+              <h4 className="font-medium text-amber-200 mb-1">Override Verification</h4>
+              <p className="text-xs text-amber-300/70 mb-3">
+                This will move the verification from <strong>{verification.status}</strong> back to <strong>manual review</strong>. This action is audit-logged.
+              </p>
+              <div className="space-y-3">
+                <div>
+                  <label className="form-label">Reason <span className="text-red-400">*</span></label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="Why is this verification being overridden?"
+                    value={overrideReason}
+                    onChange={(e) => setOverrideReason(e.target.value)}
+                  />
+                </div>
+                <div>
+                  <label className="form-label">Notes (Optional)</label>
+                  <textarea
+                    className="form-input"
+                    rows={2}
+                    placeholder="Additional context..."
+                    value={overrideNotes}
+                    onChange={(e) => setOverrideNotes(e.target.value)}
+                  />
+                </div>
+                <div className="flex space-x-3">
+                  <button
+                    onClick={handleOverride}
+                    disabled={!overrideReason.trim() || overrideLoading}
+                    className="flex items-center px-4 py-2 text-sm font-medium text-amber-200 bg-amber-600/30 border border-amber-500/40 rounded-lg hover:bg-amber-600/50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {overrideLoading ? (
+                      <div className="w-4 h-4 border-2 border-amber-300 border-t-transparent rounded-full animate-spin mr-2" />
+                    ) : (
+                      <AlertTriangle className="w-4 h-4 mr-2" />
+                    )}
+                    Confirm Override
+                  </button>
+                  <button
+                    onClick={() => { setShowOverrideForm(false); setOverrideReason(''); setOverrideNotes(''); }}
+                    className="px-4 py-2 text-sm text-slate-400 hover:text-slate-200 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </Modal>

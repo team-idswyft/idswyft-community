@@ -304,6 +304,57 @@ router.post('/:id/reject', requireAuth, requirePermission('approve_verifications
   }
 });
 
+// Override terminal verification → manual_review (admin only)
+router.post('/:id/override', requireAuth, requirePermission('approve_verifications'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const { id } = req.params;
+    const { reason, notes } = req.body;
+    const organizationId = req.admin!.organization_id;
+    const reviewerId = req.admin!.id;
+
+    if (!reason) {
+      const response: VaasApiResponse = {
+        success: false,
+        error: {
+          code: 'VALIDATION_ERROR',
+          message: 'Override reason is required'
+        }
+      };
+
+      return res.status(400).json(response);
+    }
+
+    const verification = await verificationService.overrideVerification(organizationId, id, reviewerId, reason, notes);
+
+    auditService.logAuditEvent({
+      organizationId,
+      adminId: reviewerId,
+      action: 'verification.overridden',
+      resourceType: 'verification',
+      resourceId: id,
+      details: { reason, notes, previous_status: verification.results?.override_from_status, new_status: 'manual_review' },
+      req,
+    });
+
+    const response: VaasApiResponse = {
+      success: true,
+      data: verification
+    };
+
+    res.json(response);
+  } catch (error: any) {
+    const response: VaasApiResponse = {
+      success: false,
+      error: {
+        code: 'OVERRIDE_VERIFICATION_FAILED',
+        message: error.message
+      }
+    };
+
+    res.status(400).json(response);
+  }
+});
+
 // Sync verification status from main Idswyft API (admin only)
 router.post('/:id/sync', requireAuth, requirePermission('view_verifications'), async (req: AuthenticatedRequest, res) => {
   try {
