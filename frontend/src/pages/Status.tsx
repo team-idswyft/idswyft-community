@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
+import { API_BASE_URL } from '../config/api'
 
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 const VAAS_API_BASE = import.meta.env.VITE_VAAS_API_URL || 'http://localhost:3002'
 
 // ── Types ───────────────────────────────────────────────────────────────────
@@ -220,7 +220,7 @@ export function Status() {
   const fetchStatus = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true)
     try {
-      const response = await fetch(`${API_BASE}/status`)
+      const response = await fetch(`${API_BASE_URL}/api/status`)
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const json: StatusResponse = await response.json()
       setData(json)
