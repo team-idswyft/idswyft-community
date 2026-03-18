@@ -1,6 +1,8 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+
+// ── Types ───────────────────────────────────────────────────────────────────
 
 interface ServiceStatus {
   name: string
@@ -14,172 +16,222 @@ interface StatusResponse {
   checked_at: string
 }
 
-const STATUS_CONFIG = {
+// ── Status config ───────────────────────────────────────────────────────────
+
+const STATUS = {
   operational: {
     label: 'Operational',
-    bannerLabel: 'All Systems Operational',
-    dotColor: '#34d399',
-    bgColor: 'rgba(52,211,153,0.08)',
-    borderColor: 'rgba(52,211,153,0.25)',
-    textColor: '#34d399',
+    dot: '#34d399',
+    text: '#34d399',
+    bannerBg: 'rgba(52, 211, 153, 0.06)',
+    bannerBorder: 'rgba(52, 211, 153, 0.18)',
   },
   degraded: {
-    label: 'Degraded',
-    bannerLabel: 'Some Systems Experiencing Issues',
-    dotColor: '#fbbf24',
-    bgColor: 'rgba(251,191,36,0.08)',
-    borderColor: 'rgba(251,191,36,0.25)',
-    textColor: '#fbbf24',
+    label: 'Degraded Performance',
+    dot: '#fbbf24',
+    text: '#fbbf24',
+    bannerBg: 'rgba(251, 191, 36, 0.06)',
+    bannerBorder: 'rgba(251, 191, 36, 0.18)',
   },
   down: {
-    label: 'Down',
-    bannerLabel: 'Major Outage Detected',
-    dotColor: '#f87171',
-    bgColor: 'rgba(248,113,113,0.08)',
-    borderColor: 'rgba(248,113,113,0.25)',
-    textColor: '#f87171',
+    label: 'Major Outage',
+    dot: '#f87171',
+    text: '#f87171',
+    bannerBg: 'rgba(248, 113, 113, 0.06)',
+    bannerBorder: 'rgba(248, 113, 113, 0.18)',
   },
 } as const
 
-function formatTimestamp(iso: string): string {
-  try {
-    const date = new Date(iso)
-    return date.toLocaleString(undefined, {
-      month: 'short',
-      day: 'numeric',
-      year: 'numeric',
-      hour: '2-digit',
-      minute: '2-digit',
-      second: '2-digit',
-    })
-  } catch {
-    return iso
-  }
+const BANNER_LABELS: Record<string, string> = {
+  operational: 'All Systems Operational',
+  degraded: 'Experiencing Issues',
+  down: 'Major Outage',
 }
 
-function formatLatency(ms: number): string {
-  if (ms < 1000) return `${Math.round(ms)} ms`
-  return `${(ms / 1000).toFixed(2)} s`
+// ── Helpers ─────────────────────────────────────────────────────────────────
+
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const secs = Math.floor(diff / 1000)
+  if (secs < 60) return 'just now'
+  const mins = Math.floor(secs / 60)
+  if (mins < 60) return `${mins}m ago`
+  const hrs = Math.floor(mins / 60)
+  return `${hrs}h ago`
 }
+
+// ── Component ───────────────────────────────────────────────────────────────
 
 export function Status() {
   const [data, setData] = useState<StatusResponse | null>(null)
   const [error, setError] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
-  const [lastFetched, setLastFetched] = useState<Date | null>(null)
+  const [refreshing, setRefreshing] = useState(false)
+  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
-  const fetchStatus = async () => {
+  const fetchStatus = async (isRefresh = false) => {
+    if (isRefresh) setRefreshing(true)
     try {
       const response = await fetch(`${API_BASE}/status`)
       if (!response.ok) throw new Error(`HTTP ${response.status}`)
       const json: StatusResponse = await response.json()
       setData(json)
       setError(null)
-      setLastFetched(new Date())
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to fetch status')
     } finally {
       setLoading(false)
+      setRefreshing(false)
     }
   }
 
   useEffect(() => {
     fetchStatus()
-    const interval = setInterval(fetchStatus, 60_000)
-    return () => clearInterval(interval)
+    intervalRef.current = setInterval(() => fetchStatus(true), 60_000)
+    return () => { if (intervalRef.current) clearInterval(intervalRef.current) }
   }, [])
 
-  const overallConfig = data ? STATUS_CONFIG[data.overall] : null
+  const overall = data ? STATUS[data.overall] : null
 
   return (
-    <div className="min-h-screen bg-[#080c14] text-white" style={{ fontFamily: '"DM Sans",system-ui,sans-serif' }}>
-      <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6 sm:py-24">
+    <div style={{ minHeight: '80vh', fontFamily: '"DM Sans", system-ui, sans-serif' }}>
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '48px 24px 80px' }}>
 
-        {/* Header */}
-        <div className="mb-10 text-center">
-          <h1 className="mb-2 text-3xl font-semibold tracking-tight sm:text-4xl">
+        {/* ── Header ─────────────────────────────────────────────────── */}
+        <div style={{ textAlign: 'center', marginBottom: 48 }}>
+          <img
+            src="/idswyft-logo.png"
+            alt="Idswyft"
+            style={{ height: 32, margin: '0 auto 20px' }}
+          />
+          <h1 style={{
+            fontSize: 28,
+            fontWeight: 600,
+            color: '#f1f5f9',
+            letterSpacing: '-0.02em',
+            margin: 0,
+          }}>
             System Status
           </h1>
-          <p className="text-sm text-slate-400">
-            Real-time health of Idswyft services
+          <p style={{ fontSize: 14, color: '#64748b', marginTop: 6 }}>
+            Current status of Idswyft services
           </p>
         </div>
 
-        {/* Loading state */}
+        {/* ── Loading skeleton ───────────────────────────────────────── */}
         {loading && (
-          <div className="flex items-center justify-center py-20">
-            <div className="h-6 w-6 animate-spin rounded-full border-2 border-slate-600 border-t-cyan-400" />
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {[1, 2].map((i) => (
+              <div key={i} style={{
+                height: 68,
+                borderRadius: 12,
+                background: 'rgba(255,255,255,0.03)',
+                border: '1px solid rgba(255,255,255,0.06)',
+                animation: 'pulse 2s infinite',
+              }} />
+            ))}
           </div>
         )}
 
-        {/* Error state */}
+        {/* ── Error fallback ─────────────────────────────────────────── */}
         {!loading && error && !data && (
-          <div
-            className="mb-8 rounded-lg border px-5 py-4 text-center text-sm"
-            style={{
-              background: 'rgba(248,113,113,0.08)',
-              borderColor: 'rgba(248,113,113,0.25)',
-              color: '#f87171',
-            }}
-          >
-            Unable to reach the status API. {error}
+          <div style={{
+            padding: '16px 20px',
+            borderRadius: 12,
+            background: 'rgba(248, 113, 113, 0.06)',
+            border: '1px solid rgba(248, 113, 113, 0.18)',
+            color: '#f87171',
+            fontSize: 14,
+            textAlign: 'center',
+          }}>
+            Unable to reach the status API — {error}
           </div>
         )}
 
-        {/* Overall status banner */}
-        {!loading && data && overallConfig && (
+        {/* ── Status content ─────────────────────────────────────────── */}
+        {!loading && data && overall && (
           <>
-            <div
-              className="mb-8 flex items-center justify-center gap-3 rounded-lg border px-5 py-4"
-              style={{
-                background: overallConfig.bgColor,
-                borderColor: overallConfig.borderColor,
-              }}
-            >
-              <span
-                className="inline-block h-3 w-3 rounded-full"
-                style={{ backgroundColor: overallConfig.dotColor }}
-              />
-              <span
-                className="text-sm font-medium"
-                style={{ color: overallConfig.textColor }}
-              >
-                {overallConfig.bannerLabel}
+            {/* Overall banner */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 12,
+              padding: '16px 20px',
+              borderRadius: 12,
+              background: overall.bannerBg,
+              border: `1px solid ${overall.bannerBorder}`,
+              marginBottom: 32,
+            }}>
+              <span style={{
+                width: 12,
+                height: 12,
+                borderRadius: '50%',
+                backgroundColor: overall.dot,
+                flexShrink: 0,
+              }} />
+              <span style={{ fontSize: 15, fontWeight: 600, color: overall.text }}>
+                {BANNER_LABELS[data.overall]}
               </span>
+              {refreshing && (
+                <span style={{ marginLeft: 'auto', fontSize: 11, color: '#64748b' }}>
+                  updating…
+                </span>
+              )}
             </div>
 
-            {/* Service cards */}
-            <div className="space-y-3">
-              {data.services.map((service) => {
-                const cfg = STATUS_CONFIG[service.status]
+            {/* Service list */}
+            <div style={{
+              borderRadius: 12,
+              border: '1px solid rgba(255,255,255,0.07)',
+              overflow: 'hidden',
+            }}>
+              {data.services.map((svc, i) => {
+                const cfg = STATUS[svc.status]
+                const isLast = i === data.services.length - 1
                 return (
                   <div
-                    key={service.name}
-                    className="flex items-center justify-between rounded-lg border px-5 py-4"
+                    key={svc.name}
                     style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      padding: '18px 20px',
                       background: '#0b0f19',
-                      borderColor: 'rgba(255,255,255,0.07)',
+                      borderBottom: isLast ? 'none' : '1px solid rgba(255,255,255,0.05)',
                     }}
                   >
-                    <span className="text-sm font-medium text-white">
-                      {service.name}
+                    {/* Service name */}
+                    <span style={{ fontSize: 14, fontWeight: 500, color: '#e2e8f0' }}>
+                      {svc.name}
                     </span>
-                    <div className="flex items-center gap-4">
-                      <span
-                        className="text-xs tabular-nums"
-                        style={{ color: '#8896aa', fontFamily: '"IBM Plex Mono","Fira Code",monospace' }}
-                      >
-                        {formatLatency(service.latency_ms)}
+
+                    {/* Right side: latency + status */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
+                      {/* Latency */}
+                      <span style={{
+                        fontSize: 12,
+                        fontFamily: '"IBM Plex Mono", monospace',
+                        color: '#64748b',
+                        minWidth: 52,
+                        textAlign: 'right',
+                      }}>
+                        {svc.latency_ms > 0 ? `${svc.latency_ms} ms` : '—'}
                       </span>
-                      <div className="flex items-center gap-2">
-                        <span
-                          className="inline-block h-2 w-2 rounded-full"
-                          style={{ backgroundColor: cfg.dotColor }}
-                        />
-                        <span
-                          className="text-xs font-medium"
-                          style={{ color: cfg.textColor }}
-                        >
+
+                      {/* Status indicator */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8, minWidth: 120 }}>
+                        <span style={{
+                          width: 8,
+                          height: 8,
+                          borderRadius: '50%',
+                          backgroundColor: cfg.dot,
+                          flexShrink: 0,
+                        }} />
+                        <span style={{
+                          fontSize: 13,
+                          fontWeight: 500,
+                          color: cfg.text,
+                        }}>
                           {cfg.label}
                         </span>
                       </div>
@@ -189,15 +241,40 @@ export function Status() {
               })}
             </div>
 
-            {/* Last updated footer */}
-            <div className="mt-8 text-center text-xs text-slate-500">
-              {lastFetched && (
-                <span>Last updated {formatTimestamp(lastFetched.toISOString())}</span>
-              )}
-              <span className="mx-2">·</span>
-              <span>Checked at {formatTimestamp(data.checked_at)}</span>
-              <span className="mx-2">·</span>
-              <span>Auto-refreshes every 60s</span>
+            {/* Legend */}
+            <div style={{
+              display: 'flex',
+              flexWrap: 'wrap',
+              justifyContent: 'center',
+              gap: '4px 20px',
+              marginTop: 24,
+              padding: '12px 0',
+            }}>
+              {(['operational', 'degraded', 'down'] as const).map((key) => (
+                <div key={key} style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                  <span style={{
+                    width: 8,
+                    height: 8,
+                    borderRadius: 2,
+                    backgroundColor: STATUS[key].dot,
+                  }} />
+                  <span style={{ fontSize: 11, color: '#64748b' }}>
+                    {STATUS[key].label}
+                  </span>
+                </div>
+              ))}
+            </div>
+
+            {/* Footer info */}
+            <div style={{
+              marginTop: 32,
+              paddingTop: 20,
+              borderTop: '1px solid rgba(255,255,255,0.05)',
+              textAlign: 'center',
+            }}>
+              <p style={{ fontSize: 12, color: '#475569' }}>
+                Last checked {relativeTime(data.checked_at)} · Auto-refreshes every 60 seconds
+              </p>
             </div>
           </>
         )}
