@@ -27,6 +27,7 @@ import handoffRoutes from './routes/handoff.js';
 import batchRoutes from './routes/batch.js';
 import addressVerificationRoutes from './routes/addressVerification.js';
 import monitoringRoutes from './routes/monitoring.js';
+import statusRoutes from './routes/status.js';
 
 const app = express();
 
@@ -107,6 +108,7 @@ app.use('/api/vaas', vaasRoutes);
 app.use('/api/v2/batch', batchRoutes);
 app.use('/api/v2/verify', addressVerificationRoutes);
 app.use('/api/v2/monitoring', monitoringRoutes);
+app.use('/api/status', statusRoutes);
 
 // Local file serving — authenticated with API key, path traversal blocked in serveLocalFile
 if (config.storage.provider === 'local') {

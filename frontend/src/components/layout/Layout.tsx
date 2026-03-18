@@ -41,7 +41,8 @@ export function Layout({ children }: LayoutProps) {
     location.pathname === '/' ||
     location.pathname.startsWith('/docs') ||
     location.pathname.startsWith('/developer') ||
-    location.pathname.startsWith('/demo')
+    location.pathname.startsWith('/demo') ||
+    location.pathname.startsWith('/status')
 
   if (isAdminRoute && location.pathname !== '/admin/login') {
     // Admin layout will be handled separately
@@ -258,6 +259,7 @@ export function Layout({ children }: LayoutProps) {
                 {[
                   { label: 'API Documentation', href: '/docs' },
                   { label: 'Get API Key', href: '/developer' },
+                  { label: 'System Status', href: '/status' },
                   { label: 'GitHub', href: 'https://github.com/doobee46/idswyft' },
                 ].map(({ label, href }) => (
                   <li key={label}>
