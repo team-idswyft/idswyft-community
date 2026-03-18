@@ -162,7 +162,7 @@ export default function Organization() {
       {activeTab === 'storage' && (
         <StorageSettings
           organizationId={orgData.id}
-          canManageStorage={(admin?.role === 'owner' || admin?.role === 'super_admin') || false}
+          canManageStorage={admin?.role === 'owner' || false}
         />
       )}
 
