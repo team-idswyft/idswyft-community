@@ -54,6 +54,11 @@ const patterns = [
     className: 'pattern-shield',
     description: 'Hexagonal security grid — protective mesh',
   },
+  {
+    name: 'Diagonal Wave',
+    className: 'pattern-diagonal-wave',
+    description: 'Flowing diagonal lines — rising from bottom-left to top-right',
+  },
 ];
 
 const intensities = [

@@ -527,53 +527,6 @@ svg {
   isolation: isolate;
 }
 
-.landing-hero-geometry {
-  position: absolute;
-  inset: 0;
-  pointer-events: none;
-  z-index: 0;
-}
-
-.landing-hero > *:not(.landing-hero-geometry) {
-  position: relative;
-  z-index: 1;
-}
-
-.landing-hero-geometry .geo {
-  position: absolute;
-  border: 1px solid rgba(34, 211, 238, 0.14);
-  background: transparent;
-  will-change: transform, opacity;
-  animation: heroGeoDrift 24s ease-in-out infinite;
-  filter: blur(0.2px);
-}
-
-.landing-hero-geometry .geo-square {
-  width: 120px;
-  height: 120px;
-  top: 16%;
-  left: 12%;
-}
-
-.landing-hero-geometry .geo-diamond {
-  width: 92px;
-  height: 92px;
-  right: 14%;
-  top: 24%;
-  transform: rotate(45deg);
-  animation-delay: -8s;
-  animation-name: heroGeoDriftDiamond;
-}
-
-.landing-hero-geometry .geo-circle {
-  width: 132px;
-  height: 132px;
-  border-radius: 999px;
-  right: 20%;
-  bottom: 16%;
-  animation-delay: -12s;
-}
-
 .landing-card {
   opacity: 1;
   transform: translateY(0);
@@ -610,28 +563,6 @@ svg {
   animation-delay: 2200ms;
 }
 
-@keyframes heroGeoDrift {
-  0%, 100% {
-    transform: translate3d(0, 0, 0) rotate(0deg);
-    opacity: 0.18;
-  }
-  50% {
-    transform: translate3d(0, -4px, 0) rotate(1deg);
-    opacity: 0.3;
-  }
-}
-
-@keyframes heroGeoDriftDiamond {
-  0%, 100% {
-    transform: translate3d(0, 0, 0) rotate(45deg);
-    opacity: 0.18;
-  }
-  50% {
-    transform: translate3d(0, -4px, 0) rotate(46deg);
-    opacity: 0.3;
-  }
-}
-
 @keyframes landingCardFloat {
   0%, 100% {
     transform: translateY(0);
@@ -639,78 +570,6 @@ svg {
   50% {
     transform: translateY(-2px);
   }
-}
-
-/* ===== ENHANCED GEOMETRIC ANIMATION SYSTEM ===== */
-
-/* Additional hero shapes */
-.landing-hero-geometry .geo-dot {
-  border: none;
-  border-radius: 50%;
-  background: rgba(34, 211, 238, 0.3);
-  animation: geoBreath 4.5s ease-in-out infinite;
-}
-
-.landing-hero-geometry .geo-ring {
-  border-radius: 50%;
-  animation: geoRingSpin 50s linear infinite;
-  opacity: 0.1;
-}
-
-.landing-hero-geometry .geo-cross {
-  border: none;
-  background: transparent;
-}
-
-.landing-hero-geometry .geo-cross::before,
-.landing-hero-geometry .geo-cross::after {
-  content: '';
-  position: absolute;
-  background: rgba(34, 211, 238, 0.2);
-}
-
-.landing-hero-geometry .geo-cross::before {
-  width: 100%;
-  height: 1px;
-  top: 50%;
-  left: 0;
-}
-
-.landing-hero-geometry .geo-cross::after {
-  width: 1px;
-  height: 100%;
-  left: 50%;
-  top: 0;
-}
-
-.landing-hero-geometry .geo-line {
-  border: none;
-  height: 1px;
-  background: linear-gradient(90deg, transparent, rgba(34, 211, 238, 0.15), transparent);
-  animation: geoLineShimmer 8s ease-in-out infinite;
-}
-
-/* Section-level floating accents */
-.geo-accent {
-  position: absolute;
-  pointer-events: none;
-  will-change: transform, opacity;
-}
-
-.geo-accent--float {
-  animation: geoAccentFloat 20s ease-in-out infinite;
-}
-
-.geo-accent--float-alt {
-  animation: geoAccentFloat 26s ease-in-out infinite reverse;
-}
-
-.geo-accent--breath {
-  animation: geoBreath 5.5s ease-in-out infinite;
-}
-
-.geo-accent--diamond {
-  animation: geoAccentDiamond 22s ease-in-out infinite;
 }
 
 /* Scroll-triggered reveal */
@@ -743,32 +602,6 @@ svg {
   animation: connectorFlow 3.5s ease-in-out infinite;
 }
 
-@keyframes geoBreath {
-  0%, 100% { transform: scale(1); opacity: 0.2; }
-  50% { transform: scale(1.5); opacity: 0.45; }
-}
-
-@keyframes geoRingSpin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
-}
-
-@keyframes geoAccentFloat {
-  0%, 100% { transform: translate3d(0, 0, 0); opacity: 0.5; }
-  33% { transform: translate3d(5px, -10px, 0); opacity: 0.8; }
-  66% { transform: translate3d(-3px, -5px, 0); opacity: 0.6; }
-}
-
-@keyframes geoAccentDiamond {
-  0%, 100% { transform: rotate(45deg) translate3d(0, 0, 0); opacity: 0.4; }
-  50% { transform: rotate(45deg) translate3d(0, -8px, 0); opacity: 0.7; }
-}
-
-@keyframes geoLineShimmer {
-  0%, 100% { opacity: 0.2; transform: scaleX(0.6); }
-  50% { opacity: 0.6; transform: scaleX(1); }
-}
-
 @keyframes connectorFlow {
   0% { left: -30%; opacity: 0; }
   15% { opacity: 1; }
@@ -777,15 +610,10 @@ svg {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .landing-hero-geometry .geo,
-  .geo-accent,
   .landing-card,
   .pipeline-connector::after {
     animation: none !important;
     opacity: 1;
-  }
-  .landing-hero-geometry .geo-diamond {
-    transform: rotate(45deg);
   }
   .scroll-reveal {
     opacity: 1;

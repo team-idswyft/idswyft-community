@@ -222,26 +222,15 @@ export function HomePage() {
   useScrollReveal()
 
   return (
-    <div style={{ background: C.bg, color: C.text, fontFamily: C.sans }}>
+    <div className="pattern-diagonal-wave pattern-faint pattern-animate-diagonal pattern-full" style={{ background: C.bg, color: C.text, fontFamily: C.sans }}>
 
       {/* 1. HERO */}
-      <section className="landing-hero pattern-fingerprint pattern-faint pattern-animate-slow pattern-full" style={{
+      <section className="landing-hero" style={{
         minHeight: '100vh',
         display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
         padding: '96px 24px 64px', textAlign: 'center',
       }}>
-        <div className="landing-hero-geometry" aria-hidden="true">
-          <div className="geo geo-square" />
-          <div className="geo geo-diamond" />
-          <div className="geo geo-circle" />
-          <div className="geo geo-dot" style={{ width: 5, height: 5, top: '38%', left: '28%', animationDelay: '-2s' }} />
-          <div className="geo geo-dot" style={{ width: 4, height: 4, bottom: '25%', left: '16%', animationDelay: '-4s' }} />
-          <div className="geo geo-dot" style={{ width: 6, height: 6, top: '20%', right: '35%', animationDelay: '-1s' }} />
-          <div className="geo geo-ring" style={{ width: 180, height: 180, top: '25%', left: '50%', marginLeft: -90 }} />
-          <div className="geo geo-cross" style={{ width: 22, height: 22, bottom: '32%', right: '28%', animationDelay: '-6s' }} />
-          <div className="geo geo-line" style={{ width: 80, top: '55%', left: '6%', animationDelay: '-3s' }} />
-        </div>
         <div style={{ fontFamily: C.mono, fontSize: 12, color: C.muted, letterSpacing: '0.08em', marginBottom: 32 }}>
           idswyft / identity-verification
         </div>
@@ -286,10 +275,6 @@ export function HomePage() {
 
       {/* 2. PIPELINE */}
       <section className="scroll-reveal pattern-topographic pattern-faint pattern-fade-edges pattern-full" style={{ padding: '80px 24px', maxWidth: 960, margin: '0 auto', position: 'relative', overflow: 'hidden' }}>
-        <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-          <div className="geo-accent geo-accent--float" style={{ width: 36, height: 36, border: '1px solid rgba(34,211,238,0.06)', top: '12%', right: '5%', animationDelay: '-3s' }} />
-          <div className="geo-accent geo-accent--breath" style={{ width: 4, height: 4, borderRadius: '50%', background: 'rgba(34,211,238,0.15)', bottom: '18%', left: '6%', animationDelay: '-2s' }} />
-        </div>
         <div style={{ textAlign: 'center', marginBottom: 48 }}>
           <div style={{ fontFamily: C.mono, fontSize: 11, color: C.muted, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>
             The verification flow
@@ -410,11 +395,6 @@ export function HomePage() {
 
       {/* 4. FEATURES */}
       <section className="scroll-reveal pattern-crosshatch pattern-faint pattern-fade-edges pattern-full" style={{ padding: '80px 24px', maxWidth: 960, margin: '0 auto', position: 'relative', overflow: 'hidden' }}>
-        <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-          <div className="geo-accent geo-accent--diamond" style={{ width: 28, height: 28, border: '1px solid rgba(34,211,238,0.05)', top: '10%', left: '4%', animationDelay: '-5s' }} />
-          <div className="geo-accent geo-accent--float-alt" style={{ width: 44, height: 44, border: '1px solid rgba(34,211,238,0.04)', borderRadius: '50%', bottom: '12%', right: '6%', animationDelay: '-8s' }} />
-          <div className="geo-accent geo-accent--breath" style={{ width: 5, height: 5, borderRadius: '50%', background: 'rgba(34,211,238,0.12)', top: '50%', right: '3%', animationDelay: '-1s' }} />
-        </div>
         <div style={{ textAlign: 'center', marginBottom: 48 }}>
           <h2 style={{ fontFamily: C.mono, fontSize: 28, fontWeight: 600, color: C.text }}>
             Built-in capabilities
@@ -502,10 +482,6 @@ export function HomePage() {
 
       {/* 7. CTA */}
       <section className="scroll-reveal pattern-guilloche pattern-subtle pattern-animate-slow pattern-full" style={{ padding: '80px 24px', textAlign: 'center', background: C.panel, borderTop: `1px solid ${C.border}`, position: 'relative', overflow: 'hidden' }}>
-        <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
-          <div className="geo-accent geo-accent--float" style={{ width: 50, height: 50, border: '1px solid rgba(34,211,238,0.05)', borderRadius: '50%', top: '15%', left: '8%', animationDelay: '-7s' }} />
-          <div className="geo-accent geo-accent--breath" style={{ width: 4, height: 4, borderRadius: '50%', background: 'rgba(34,211,238,0.18)', bottom: '25%', right: '12%', animationDelay: '-3s' }} />
-        </div>
         <h2 style={{ fontFamily: C.mono, fontSize: 28, fontWeight: 600, color: C.text, marginBottom: 16 }}>
           Ready to integrate?
         </h2>
