@@ -30,15 +30,21 @@ export const config = {
   port: parseInt(process.env.VAAS_PORT || '3002'),
   nodeEnv: process.env.NODE_ENV || 'development',
   
-  // CORS Origins
-  corsOrigins: process.env.VAAS_CORS_ORIGINS?.split(',') || [
-    'http://localhost:3000',
-    'http://localhost:3001',
-    'http://localhost:5173',
-    'https://app.idswyft.app',
-    'https://platform.idswyft.app',
-    'https://customer.idswyft.app',
-    'https://enterprise.idswyft.app'
+  // CORS Origins — always include production domains, merge with env var extras
+  corsOrigins: [
+    ...new Set([
+      // Production domains (always allowed)
+      'https://app.idswyft.app',
+      'https://platform.idswyft.app',
+      'https://customer.idswyft.app',
+      'https://enterprise.idswyft.app',
+      // Local development
+      'http://localhost:3000',
+      'http://localhost:3001',
+      'http://localhost:5173',
+      // Extra origins from env (e.g. Railway preview URLs)
+      ...(process.env.VAAS_CORS_ORIGINS?.split(',').map(s => s.trim()).filter(Boolean) || []),
+    ])
   ],
   
   // VaaS Database (separate from main Idswyft)
