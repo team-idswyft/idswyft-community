@@ -2,6 +2,7 @@ import { useEffect, useState, useCallback, useRef } from 'react';
 import { RefreshCw, Clock, Server, Wifi, Database, Activity } from 'lucide-react';
 import { platformApi } from '../services/api';
 import { sectionLabel, monoXs, monoSm } from '../styles/tokens';
+import { UptimeBar, type UptimeDayData, type DayStatus } from '../components/UptimeBar';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -19,6 +20,15 @@ interface SystemStatusResponse {
   services: ServiceInfo[];
   overall: ServiceStatusType;
   checked_at: string;
+}
+
+interface DailySummaryRow {
+  day: string;
+  service: string;
+  total: number;
+  operational: number;
+  degraded: number;
+  down_count: number;
 }
 
 // ── Status config (Claude status page style) ─────────────────────────────────
@@ -81,6 +91,42 @@ function getLatencyBadgeColor(ms: number): string {
   return '#f87171';
 }
 
+/** Aggregate daily summary rows into a per-day overall status for the uptime bar */
+function buildUptimeDays(rows: DailySummaryRow[], days: number = 30): UptimeDayData[] {
+  // Build a map of day → status
+  const dayMap = new Map<string, DayStatus>();
+
+  for (const row of rows) {
+    const existing = dayMap.get(row.day);
+    let rowStatus: DayStatus = 'operational';
+    if (row.down_count > 0) rowStatus = 'down';
+    else if (row.degraded > 0) rowStatus = 'degraded';
+
+    // Worst-case wins for the day across all services
+    if (!existing || severity(rowStatus) > severity(existing)) {
+      dayMap.set(row.day, rowStatus);
+    }
+  }
+
+  // Pad to `days` entries, oldest first
+  const result: UptimeDayData[] = [];
+  const today = new Date();
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today);
+    d.setDate(d.getDate() - i);
+    const key = d.toISOString().slice(0, 10);
+    result.push({ day: key, status: dayMap.get(key) ?? 'no-data' });
+  }
+  return result;
+}
+
+function severity(s: DayStatus): number {
+  if (s === 'down') return 3;
+  if (s === 'degraded') return 2;
+  if (s === 'operational') return 1;
+  return 0;
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 
 export default function SystemStatus() {
@@ -90,6 +136,7 @@ export default function SystemStatus() {
   const [countdown, setCountdown] = useState(AUTO_REFRESH_SECONDS);
   const countdownRef = useRef(AUTO_REFRESH_SECONDS);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const [uptimeDays, setUptimeDays] = useState<UptimeDayData[]>([]);
 
   const fetchStatus = useCallback(async () => {
     try {
@@ -103,6 +150,19 @@ export default function SystemStatus() {
       countdownRef.current = AUTO_REFRESH_SECONDS;
       setCountdown(AUTO_REFRESH_SECONDS);
     }
+  }, []);
+
+  // Fetch 30-day history once on mount
+  useEffect(() => {
+    (async () => {
+      try {
+        const history: DailySummaryRow[] = await platformApi.getStatusHistory();
+        setUptimeDays(buildUptimeDays(history, 30));
+      } catch {
+        // Non-critical — just show empty bar
+        setUptimeDays(buildUptimeDays([], 30));
+      }
+    })();
   }, []);
 
   useEffect(() => {
@@ -119,6 +179,11 @@ export default function SystemStatus() {
   }, [fetchStatus]);
 
   const overall = data ? STATUS[data.overall] : null;
+
+  // Compute uptime percentage from the days data
+  const operationalDays = uptimeDays.filter((d) => d.status === 'operational').length;
+  const totalWithData = uptimeDays.filter((d) => d.status !== 'no-data').length;
+  const uptimePct = totalWithData > 0 ? ((operationalDays / totalWithData) * 100).toFixed(2) : null;
 
   return (
     <div className="p-6" style={{ maxWidth: 800, margin: '0 auto' }}>
@@ -201,6 +266,41 @@ export default function SystemStatus() {
             <span className={`${monoXs} text-slate-600`}>
               {relativeTime(data.checked_at)}
             </span>
+          </div>
+
+          {/* ── 30-day uptime bar ──────────────────────────────────── */}
+          <div style={{
+            padding: '20px',
+            borderRadius: 12,
+            border: '1px solid rgba(255,255,255,0.07)',
+            background: '#0d1117',
+            marginBottom: 24,
+          }}>
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'baseline',
+              marginBottom: 12,
+            }}>
+              <span style={{
+                fontSize: 13,
+                fontWeight: 600,
+                color: '#e2e8f0',
+              }}>
+                Uptime
+              </span>
+              {uptimePct && (
+                <span style={{
+                  fontSize: 13,
+                  fontWeight: 600,
+                  color: '#34d399',
+                  fontFamily: '"IBM Plex Mono", monospace',
+                }}>
+                  {uptimePct}%
+                </span>
+              )}
+            </div>
+            <UptimeBar data={uptimeDays} />
           </div>
 
           {/* Service list — unified card like Claude status page */}

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
+const VAAS_API_BASE = import.meta.env.VITE_VAAS_API_URL || 'http://localhost:3002'
 
 // ── Types ───────────────────────────────────────────────────────────────────
 
@@ -14,6 +15,22 @@ interface StatusResponse {
   overall: 'operational' | 'degraded' | 'down'
   services: ServiceStatus[]
   checked_at: string
+}
+
+type DayStatus = 'operational' | 'degraded' | 'down' | 'no-data'
+
+interface UptimeDayData {
+  day: string
+  status: DayStatus
+}
+
+interface DailySummaryRow {
+  day: string
+  service: string
+  total: number
+  operational: number
+  degraded: number
+  down_count: number
 }
 
 // ── Status config ───────────────────────────────────────────────────────────
@@ -48,6 +65,20 @@ const BANNER_LABELS: Record<string, string> = {
   down: 'Major Outage',
 }
 
+const BAR_COLOR: Record<DayStatus, string> = {
+  operational: '#34d399',
+  degraded: '#fbbf24',
+  down: '#f87171',
+  'no-data': '#374151',
+}
+
+const BAR_LABEL: Record<DayStatus, string> = {
+  operational: 'Operational',
+  degraded: 'Degraded',
+  down: 'Outage',
+  'no-data': 'No data',
+}
+
 // ── Helpers ─────────────────────────────────────────────────────────────────
 
 function relativeTime(iso: string): string {
@@ -60,6 +91,122 @@ function relativeTime(iso: string): string {
   return `${hrs}h ago`
 }
 
+function daySeverity(s: DayStatus): number {
+  if (s === 'down') return 3
+  if (s === 'degraded') return 2
+  if (s === 'operational') return 1
+  return 0
+}
+
+function buildUptimeDays(rows: DailySummaryRow[], days: number = 30): UptimeDayData[] {
+  const dayMap = new Map<string, DayStatus>()
+  for (const row of rows) {
+    let rowStatus: DayStatus = 'operational'
+    if (row.down_count > 0) rowStatus = 'down'
+    else if (row.degraded > 0) rowStatus = 'degraded'
+    const existing = dayMap.get(row.day)
+    if (!existing || daySeverity(rowStatus) > daySeverity(existing)) {
+      dayMap.set(row.day, rowStatus)
+    }
+  }
+  const result: UptimeDayData[] = []
+  const today = new Date()
+  for (let i = days - 1; i >= 0; i--) {
+    const d = new Date(today)
+    d.setDate(d.getDate() - i)
+    const key = d.toISOString().slice(0, 10)
+    result.push({ day: key, status: dayMap.get(key) ?? 'no-data' })
+  }
+  return result
+}
+
+function formatDate(iso: string) {
+  const d = new Date(iso + 'T00:00:00')
+  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
+// ── Inline UptimeBar ────────────────────────────────────────────────────────
+
+function UptimeBar({ data }: { data: UptimeDayData[] }) {
+  const [tooltip, setTooltip] = useState<{ x: number; y: number; day: string; status: DayStatus } | null>(null)
+
+  const handleMouseEnter = (e: React.MouseEvent, day: string, status: DayStatus) => {
+    const rect = (e.target as HTMLElement).getBoundingClientRect()
+    setTooltip({ x: rect.left + rect.width / 2, y: rect.top - 8, day, status })
+  }
+
+  return (
+    <div style={{ position: 'relative' }}>
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: `repeat(${data.length}, 1fr)`,
+        gap: 2,
+        height: 32,
+      }}>
+        {data.map((d, i) => (
+          <div
+            key={d.day || i}
+            style={{
+              backgroundColor: BAR_COLOR[d.status],
+              borderRadius: 2,
+              cursor: 'pointer',
+              transition: 'opacity 0.15s',
+              opacity: tooltip && tooltip.day !== d.day ? 0.5 : 1,
+            }}
+            onMouseEnter={(e) => handleMouseEnter(e, d.day, d.status)}
+            onMouseLeave={() => setTooltip(null)}
+          />
+        ))}
+      </div>
+
+      <div style={{
+        display: 'flex',
+        justifyContent: 'space-between',
+        marginTop: 6,
+        fontSize: 11,
+        color: '#475569',
+        fontFamily: '"IBM Plex Mono", monospace',
+      }}>
+        <span>{data.length} days ago</span>
+        <span>Today</span>
+      </div>
+
+      {tooltip && (
+        <div style={{
+          position: 'fixed',
+          left: tooltip.x,
+          top: tooltip.y,
+          transform: 'translate(-50%, -100%)',
+          background: '#1e293b',
+          border: '1px solid rgba(255,255,255,0.12)',
+          borderRadius: 8,
+          padding: '8px 12px',
+          zIndex: 9999,
+          pointerEvents: 'none',
+          whiteSpace: 'nowrap',
+          boxShadow: '0 4px 12px rgba(0,0,0,0.4)',
+        }}>
+          <div style={{ fontSize: 12, fontWeight: 600, color: '#e2e8f0', marginBottom: 2 }}>
+            {formatDate(tooltip.day)}
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+            <span style={{
+              width: 8,
+              height: 8,
+              borderRadius: '50%',
+              backgroundColor: BAR_COLOR[tooltip.status],
+              flexShrink: 0,
+            }} />
+            <span style={{ fontSize: 11, color: BAR_COLOR[tooltip.status], fontWeight: 500 }}>
+              {BAR_LABEL[tooltip.status]}
+            </span>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Component ───────────────────────────────────────────────────────────────
 
 export function Status() {
@@ -68,6 +215,7 @@ export function Status() {
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [uptimeDays, setUptimeDays] = useState<UptimeDayData[]>([])
 
   const fetchStatus = async (isRefresh = false) => {
     if (isRefresh) setRefreshing(true)
@@ -85,6 +233,20 @@ export function Status() {
     }
   }
 
+  // Fetch 30-day history from VaaS public endpoint
+  useEffect(() => {
+    (async () => {
+      try {
+        const res = await fetch(`${VAAS_API_BASE}/api/public/status/history`)
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const json = await res.json()
+        setUptimeDays(buildUptimeDays(json.data || [], 30))
+      } catch {
+        setUptimeDays(buildUptimeDays([], 30))
+      }
+    })()
+  }, [])
+
   useEffect(() => {
     fetchStatus()
     intervalRef.current = setInterval(() => fetchStatus(true), 60_000)
@@ -92,6 +254,11 @@ export function Status() {
   }, [])
 
   const overall = data ? STATUS[data.overall] : null
+
+  // Compute uptime percentage
+  const operationalDays = uptimeDays.filter((d) => d.status === 'operational').length
+  const totalWithData = uptimeDays.filter((d) => d.status !== 'no-data').length
+  const uptimePct = totalWithData > 0 ? ((operationalDays / totalWithData) * 100).toFixed(2) : null
 
   return (
     <div style={{ minHeight: '80vh', fontFamily: '"DM Sans", system-ui, sans-serif' }}>
@@ -178,6 +345,39 @@ export function Status() {
                 </span>
               )}
             </div>
+
+            {/* ── 30-day uptime bar ──────────────────────────────────── */}
+            {uptimeDays.length > 0 && (
+              <div style={{
+                padding: '20px',
+                borderRadius: 12,
+                border: '1px solid rgba(255,255,255,0.07)',
+                background: '#0b0f19',
+                marginBottom: 32,
+              }}>
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'space-between',
+                  alignItems: 'baseline',
+                  marginBottom: 12,
+                }}>
+                  <span style={{ fontSize: 13, fontWeight: 600, color: '#e2e8f0' }}>
+                    Uptime
+                  </span>
+                  {uptimePct && (
+                    <span style={{
+                      fontSize: 13,
+                      fontWeight: 600,
+                      color: '#34d399',
+                      fontFamily: '"IBM Plex Mono", monospace',
+                    }}>
+                      {uptimePct}%
+                    </span>
+                  )}
+                </div>
+                <UptimeBar data={uptimeDays} />
+              </div>
+            )}
 
             {/* Service list */}
             <div style={{

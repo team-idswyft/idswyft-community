@@ -8,6 +8,7 @@ import rateLimit from 'express-rate-limit';
 import config from './config/index.js';
 import { connectVaasDB, vaasSupabase } from './config/database.js';
 import { sessionExpirationService } from './services/sessionExpirationService.js';
+import { healthCheckService } from './services/healthCheckService.js';
 import { seedPlatformAdmin } from './scripts/seedPlatformAdmin.js';
 import { authRateLimit } from './middleware/rateLimit.js';
 import { logger } from './utils/logger.js';
@@ -35,6 +36,7 @@ import platformProviderMetricsRoutes from './routes/platformProviderMetrics.js';
 import platformAuditLogsRoutes from './routes/platformAuditLogs.js';
 import platformThresholdsRoutes from './routes/platformThresholds.js';
 import platformStatusRoutes from './routes/platformStatus.js';
+import publicStatusRoutes from './routes/publicStatus.js';
 import samlRoutes from './routes/saml.js';
 import notificationRoutes from './routes/notifications.js';
 import searchRoutes from './routes/search.js';
@@ -375,6 +377,7 @@ app.use('/api/search', searchRoutes);
 // Mount public routes for customer portal (no authentication required)
 console.log('🌐 Mounting public routes...');
 app.use('/api/public', publicRoutes);
+app.use('/api/public/status', publicStatusRoutes);
 console.log('✅ Public routes mounted successfully');
 
 console.log('📧 Mounting email routes...');
@@ -476,6 +479,11 @@ const startVaasServer = async () => {
     sessionExpirationService.startExpirationJob(5); // Check every 5 minutes
     sessionExpirationService.startCleanupJob(24, 30); // Clean up daily, 30-day retention
     console.log('✅ Session expiration service started');
+
+    // Start persistent health check service (every 5 min, writes to DB)
+    console.log('🩺 Starting health check service...');
+    healthCheckService.start();
+    console.log('✅ Health check service started');
     
     // Start HTTP server
     const server = app.listen(config.port, () => {
