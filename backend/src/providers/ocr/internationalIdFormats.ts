@@ -259,6 +259,33 @@ export const INTERNATIONAL_ID_FORMATS: Record<string, CountryIdFormat> = {
     ],
   },
 
+  // ── Balkans ─────────────────────────────────────────
+
+  AL: {
+    country: 'AL',
+    document_types: [
+      {
+        type: 'national_id', // Letërnjoftim / Kartë Identiteti
+        id_number_regex: /^[A-Z0-9]{8,10}$/,
+        field_labels: {
+          // Use full bilingual label patterns so findField skips the label and reads the next line
+          name: [/mbiemri\/surname/i, /emri\/given\s*name/i, /surname/i, /given\s*name/i, /name/i],
+          date_of_birth: [/dat[ëe]lindja\/date\s*of\s*birth/i, /date\s*of\s*birth/i, /dob/i, /born/i],
+          expiry_date: [/skadimit\/date\s*of\s*expiry/i, /date\s*of\s*expiry/i, /skadimit/i, /expiry/i, /expires/i],
+          // Personal number is the primary ID for Albanian national IDs
+          // Note: card no (leternjoftim) is excluded — findField iterates lines top-to-bottom,
+          // and card no appears on an earlier line than personal no, causing the wrong ID to be extracted
+          id_number: [/nr\.?\s*personal\/personal\s*no/i, /personal\s*no/i, /id\s*no/i],
+          nationality: [/shtet[ëe]sia\/nationality/i, /nationality/i, /citizenship/i],
+          address: [/vendbanimi\/place/i, /adresa/i, /address/i],
+          issuing_authority: [/autoriteti\s*leshues\/authority/i, /authority/i],
+        },
+        date_format: 'DMY',
+        has_mrz: true,
+      },
+    ],
+  },
+
   // ── Latin America ──────────────────────────────────────
 
   BR: {
@@ -518,6 +545,8 @@ export const INTERNATIONAL_HEADER_NOISE = new Set([
   'carteira nacional de habilitação', 'carta de condução',
   // Dutch
   'identiteitskaart', 'rijbewijs',
+  // Albanian
+  'republika e shqipërisë', 'letërnjoftim', 'kartë identiteti',
   // Japanese
   '運転免許証', 'マイナンバーカード',
   // Korean

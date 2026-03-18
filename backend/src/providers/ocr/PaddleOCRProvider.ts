@@ -20,6 +20,35 @@ interface FlatLine {
   width:      number;   // bounding box width
 }
 
+// ── Month-name lookup for date parsing ────────────────────────
+
+const MONTH_NAMES: Record<string, string> = {
+  JAN: '01', FEB: '02', MAR: '03', APR: '04', MAY: '05', JUN: '06',
+  JUL: '07', AUG: '08', SEP: '09', OCT: '10', NOV: '11', DEC: '12',
+};
+
+/** Parse a month-name date like "1 JAN 1981" or "12 August 1990" → YYYY-MM-DD */
+function parseMonthNameDate(text: string): string | null {
+  const m = text.match(/(\d{1,2})\s+(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\w*\s+(\d{4})/i);
+  if (m) {
+    const day = m[1].padStart(2, '0');
+    const month = MONTH_NAMES[m[2].slice(0, 3).toUpperCase()];
+    if (month) return `${m[3]}-${month}-${day}`;
+  }
+  // Also handle "JAN 1 1981" (month-first)
+  const m2 = text.match(/(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\w*\s+(\d{1,2}),?\s+(\d{4})/i);
+  if (m2) {
+    const day = m2[2].padStart(2, '0');
+    const month = MONTH_NAMES[m2[1].slice(0, 3).toUpperCase()];
+    if (month) return `${m2[3]}-${month}-${day}`;
+  }
+  return null;
+}
+
+// ── Specimen / noise label filter ─────────────────────────────
+
+const SPECIMEN_LABELS = /\b(EXEMPLAR|SPECIMEN|MUSTER|MOD[ÈE]LE|MODELO|MUESTRA|ESEMPIO|EKSEMPLAR|ESIMERKKIKAPPALE|WZÓR)\b/i;
+
 // ── Constants ─────────────────────────────────────────────────
 
 const HEADER_NOISE = new Set([
@@ -108,14 +137,26 @@ function parseAamvaDate(s: string): string | null {
   return null;
 }
 
-/** Extract ALL date strings from text */
+/** Extract ALL date strings from text (numeric and month-name formats) */
 function findAllDates(text: string): string[] {
   const results: string[] = [];
+  // Numeric dates: DD/MM/YYYY etc.
   const re = /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
     const norm = standardizeDateFormat(m[0]);
     if (norm) results.push(norm);
+  }
+  // Month-name dates: "1 JAN 1981", "JAN 1, 1981"
+  const mnRe = /(\d{1,2})\s+(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\w*\s+(\d{4})/gi;
+  while ((m = mnRe.exec(text)) !== null) {
+    const parsed = parseMonthNameDate(m[0]);
+    if (parsed) results.push(parsed);
+  }
+  const mnRe2 = /(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\w*\s+(\d{1,2}),?\s+(\d{4})/gi;
+  while ((m = mnRe2.exec(text)) !== null) {
+    const parsed = parseMonthNameDate(m[0]);
+    if (parsed) results.push(parsed);
   }
   return results;
 }
@@ -152,7 +193,7 @@ function sanitizeName(name: string): string {
   const cleaned = tokens.filter(t => {
     const lower = t.toLowerCase();
     if (DL_FIELD_TOKENS.has(lower)) return false;
-    if (t.length === 1)             return false;
+    if (t.length === 1 && !/^[A-Z]$/.test(t)) return false;
     // Remove standalone numbers (AAMVA field markers like "1", "2", "3")
     if (/^\d+$/.test(t))           return false;
     return true;
@@ -439,14 +480,14 @@ export class PaddleOCRProvider implements OCRProvider {
     const map = new Map<string, FlatLine & { lineIndex: number }>();
 
     const labelPatterns: Array<[string, RegExp]> = [
-      ['dl_number',   /(?:4d\b|DLn?\b|DL\s*#|LIC\s*#|LICENSE\s*(?:NO|NUMBER|#)|OPERATOR\s*(?:LICENSE|LIC)\s*(?:NO|#)?|PERMIT\s*NO|CUSTOMER\s*ID|CID\b|ID\s*NO|ID(?=\s*\d)|(?:^|\s)I(?=\d{3}\s*\d{3}))/i],
+      ['dl_number',   /(?:4d\b|DLn?\b|DL\s*(?:NO\.?|#)|LIC(?:ENSE)?\s*(?:NO\.?|NUMBER|#)|OL\s*NO\.?|OPERATOR\s*(?:LICENSE|LIC)\s*(?:NO|#)?|PERMIT\s*NO|CUSTOMER\s*ID|CID\b|ID\s*NO\.?|ID(?=\s*\d)|(?:^|\s)I(?=\d{3}\s*\d{3}))/i],
       ['last_name',   /\b(?:LN|LAST\s*NAME|FAMILY\s*NAME|SURNAME)\b/i],
       ['first_name',  /\b(?:FN|FIRST\s*NAME|GIVEN\s*NAME)\b/i],
       ['full_name',   /\b(?:FULL\s*)?NAME\b/i],
       ['dob',         /(?:\bD[O0]B\b|D[O0]B(?=\d)|DATE\s*OF\s*BIRTH|BIRTH\s*DATE|\bBORN\b|3\s+DATE)/i],
       ['expiry',      /\b(?:EXP(?:IRY|IRES)?|EXPIRATION|VALID\s*UNTIL|4b\b)\b/i],
       ['issued',      /\b(?:ISS(?:UED)?|ISSUE\s*DATE|4a\b)\b/i],
-      ['address',     /\bADDR(?:ESS)?\b/i],
+      ['address',     /\bADDR(?:ESS)?\b|^8\s+\d{1,5}\s+[A-Z]/i],
       ['sex',         /\bSEX\b/i],
       ['height',      /\b(?:HEIGHT|HGT|HT)\b/i],
       ['eyes',        /\bEYES?\b/i],
@@ -476,10 +517,22 @@ export class PaddleOCRProvider implements OCRProvider {
     // Strategy A: From labeled line
     const labelLine = labelMap.get('dl_number');
     if (labelLine) {
+      // Try space-separated digit groups first (e.g., "DLN: 99 999 999")
+      // Note: skip looksLikeDate for spaced values — dates never have internal spaces
+      const spacedM = labelLine.text.match(
+        /(?:4d\s*)?(?:DLn?|DL\s*(?:NO\.?|#?)|LIC(?:ENSE)?\s*(?:NO\.?|#?)|OL\s*NO\.?)\s*[:\s]*(\d[\d\s]{5,18}\d)\b/i,
+      );
+      if (spacedM && /\s/.test(spacedM[1])) {
+        const cleaned = spacedM[1].replace(/\s+/g, '');
+        if (cleaned.length >= 5 && cleaned.length <= 15) {
+          return cleaned;
+        }
+      }
+
       // Try full alphanumeric DL number after label (handles states with
       // letter prefix/suffix: CA, NJ, WI, ID, VT, ME, MO, etc.)
       const fullAlphaM = labelLine.text.match(
-        /(?:4d\s*)?(?:DLn?|DL\s*#?|LIC\s*#?)\s*([A-Z]{0,3}\d[\dA-Z]{4,14})\b/i,
+        /(?:4d\s*)?(?:DLn?|DL\s*(?:NO\.?|#?)|LIC(?:ENSE)?\s*(?:NO\.?|#?)|OL\s*NO\.?)\s*([A-Z]{0,3}\d[\dA-Z]{4,14})\b/i,
       );
       if (fullAlphaM) {
         const cleaned = fullAlphaM[1].replace(/[\s\-]/g, '');
@@ -510,7 +563,7 @@ export class PaddleOCRProvider implements OCRProvider {
       // and LIC\s*#? would match just "Lic" from "License" if tried first.
       const candidate = this.valueAfterLabel(
         labelLine.text,
-        /(?:LICENSE\s*(?:NO|NUMBER|#)|ID\s*NO\.?|ID(?=\s*\d)|4d|DLn?|DL\s*#?|LIC\s*#?)/i,
+        /(?:LICENSE\s*(?:NO\.?|NUMBER|#)|OL\s*NO\.?|ID\s*NO\.?|ID(?=\s*\d)|4d|DLn?|DL\s*(?:NO\.?|#?)|LIC\s*(?:NO\.?|#?))/i,
       );
       const dlNum = this.parseDlNumber(candidate ?? labelLine.text);
       if (dlNum) return dlNum;
@@ -561,13 +614,10 @@ export class PaddleOCRProvider implements OCRProvider {
       /\bI[D]?\s*(\d[\d\s]{5,16}\d)\b/i,
     ];
 
-    // Scan with priority: lines containing "4d" or "DL" label get tried first
-    const priorityLines = lines.filter(l =>
-      /\b(?:4d|DLn?|DL\s*#|LIC\s*#)\b/i.test(l.text)
-    );
-    const otherLines = lines.filter(l =>
-      !/\b(?:4d|DLn?|DL\s*#|LIC\s*#)\b/i.test(l.text)
-    );
+    // Scan with priority: lines containing DL-related labels get tried first
+    const DL_LABEL_RE = /\b(?:4d|DLn?|DL\s*(?:NO\.?|#)|LIC(?:ENSE)?\s*(?:NO\.?|#)|OL\s*NO)\b/i;
+    const priorityLines = lines.filter(l => DL_LABEL_RE.test(l.text));
+    const otherLines = lines.filter(l => !DL_LABEL_RE.test(l.text));
 
     for (const line of [...priorityLines, ...otherLines]) {
       // Skip lines that are clearly dates or names
@@ -593,7 +643,7 @@ export class PaddleOCRProvider implements OCRProvider {
     // Remove leading label if still attached
     // NOTE: LICENSE must come BEFORE LIC to avoid partial "Lic" match
     const withoutLabel = cleaned.replace(
-      /^(?:LICENSE\s*(?:NO|NUMBER|#)|ID\s*NO\.?|ID(?=\s*\d)|4d|DLn?|DL\s*#?|LIC\s*#?)\s*/i, ''
+      /^(?:LICENSE\s*(?:NO\.?|NUMBER|#)|OL\s*NO\.?|ID\s*NO\.?|ID(?=\s*\d)|4d|DLn?|DL\s*(?:NO\.?|#?)|LIC\s*(?:NO\.?|#?))\s*/i, ''
     ).trim();
 
     // Try matching spaced digit groups first: "793 398 654" → "793398654"
@@ -609,11 +659,20 @@ export class PaddleOCRProvider implements OCRProvider {
     // (lowered from 6 to 5 to support Kansas alternating format: K1A2B)
     const m = withoutLabel.match(/^([A-Z0-9\-]{5,15})/i);
     if (!m) return null;
-    const candidate = m[1].replace(/\-/g, '');
+    let candidate = m[1].replace(/\-/g, '');
     if (this.looksLikeDate(candidate)) return null;
     if (isHeaderNoise(candidate))      return null;
     // A DL number must contain at least one digit — reject pure-alpha like "Expires"
     if (!/\d/.test(candidate))         return null;
+
+    // Boundary absorption fix: if the text immediately after the match starts with
+    // an uppercase letter (suggesting an AAMVA field like "9FRANKLIN" or "1SMITH"),
+    // and the last digit of our candidate could be the AAMVA field marker, trim it.
+    const afterMatch = withoutLabel.slice(m[0].length);
+    if (/^[A-Z]/i.test(afterMatch) && /\d$/.test(candidate) && candidate.length > 5) {
+      candidate = candidate.slice(0, -1);
+    }
+
     return candidate.length >= 5 ? candidate : null;
   }
 
@@ -649,9 +708,30 @@ export class PaddleOCRProvider implements OCRProvider {
     // Strategy B: Full name / Name label
     const fullNameLine = labelMap.get('full_name');
     if (fullNameLine) {
-      const candidate = this.valueAfterLabel(fullNameLine.text, /(?:FULL\s*)?NAME/i)
-        ?? this.nextLineText(lines, fullNameLine.lineIndex);
+      const afterLabel = this.valueAfterLabel(fullNameLine.text, /(?:FULL\s*)?NAME/i);
+      let candidateIdx = fullNameLine.lineIndex;
+      let candidate = afterLabel;
+      if (!candidate) {
+        candidate = this.nextLineText(lines, fullNameLine.lineIndex);
+        candidateIdx = fullNameLine.lineIndex + 1;
+      }
       if (candidate) {
+        // Check if the next line is also part of the name (multi-line: surname + given names)
+        const nextLine = lines[candidateIdx + 1];
+        if (nextLine && !isHeaderNoise(nextLine.text) && !/\d{3,}/.test(nextLine.text) &&
+            nameScore(nextLine.text.replace(/^[12]\s*/, '')) > 0.3) {
+          const nextName = sanitizeName(nextLine.text.replace(/^[12]\s*/, ''));
+          const currName = sanitizeName(candidate);
+          // Single word likely surname → put given names first
+          const isSurnameFirst = currName.split(/\s+/).length === 1 && nextName.split(/\s+/).length >= 1;
+          const combined = isSurnameFirst
+            ? sanitizeName(`${nextName} ${currName}`)
+            : sanitizeName(`${currName} ${nextName}`);
+          if (nameScore(combined) > 0.3) {
+            return { value: combined, confidence: fullNameLine.confidence };
+          }
+        }
+
         // Handle "LAST, FIRST MIDDLE" comma format
         const commaM = candidate.match(/^([A-Z'\-]+),\s*(.+)$/i);
         const full   = commaM
@@ -664,16 +744,19 @@ export class PaddleOCRProvider implements OCRProvider {
     }
 
     // Strategy C: AAMVA field number prefixes ("1MARTINEZ", "2ELENA")
+    // Relaxed regex: allows commas (Jr/Sr suffixes) and periods in name text.
+    const AAMVA_NAME_RE = /^[12]\s*([A-Z][A-Z'\-,.\s]+)$/;
     for (const line of lines) {
-      const m = line.text.match(/^[12]\s*([A-Z][A-Z'\-\s]+)$/);
-      if (m && nameScore(m[1]) > 0.4) {
+      const m = line.text.match(AAMVA_NAME_RE);
+      if (m && nameScore(m[1].replace(/[,.]/g, '')) > 0.4) {
         const isLast  = line.text.startsWith('1');
         const partner = lines.find(l =>
+          l !== line &&
           l.y > line.y - 5 && l.y < line.y + 60 &&
           l.text.match(isLast ? /^2\s*[A-Z]/ : /^1\s*[A-Z]/)
         );
         if (partner) {
-          const partnerM = partner.text.match(/^[12]\s*([A-Z][A-Z'\-\s]+)$/);
+          const partnerM = partner.text.match(AAMVA_NAME_RE);
           const parts = isLast
             ? [partnerM?.[1]?.trim(), m[1].trim()]
             : [m[1].trim(), partnerM?.[1]?.trim()];
@@ -709,6 +792,51 @@ export class PaddleOCRProvider implements OCRProvider {
         if (nameScore(full) > 0.4) {
           return { value: full, confidence: line.confidence };
         }
+      }
+    }
+
+    // Strategy C.2: Standalone AAMVA prefix ("1" or "2" alone on its own line)
+    for (let i = 0; i < lines.length; i++) {
+      const trimmed = lines[i].text.trim();
+      if (trimmed !== '1' && trimmed !== '2') continue;
+      const isLastPrefix = trimmed === '1';
+
+      // Find the name value on adjacent line (above or below the standalone prefix)
+      let nameValue: string | null = null;
+      let nameConf = 0;
+      for (const adj of [lines[i - 1], lines[i + 1]]) {
+        if (!adj) continue;
+        const adjText = adj.text.trim();
+        if (/^[12]\s/.test(adjText) || /^[12]$/.test(adjText)) continue;
+        if (isHeaderNoise(adjText) || /\d{3,}/.test(adjText)) continue;
+        if (/^[A-Z][A-Z'\-\s]+$/.test(adjText) && nameScore(adjText) > 0.3) {
+          nameValue = adjText;
+          nameConf = adj.confidence;
+          break;
+        }
+      }
+      if (!nameValue) continue;
+
+      // Look for the numbered partner (e.g., "2 JANICE" when current is standalone "1")
+      const partnerPrefix = isLastPrefix ? /^2\s*([A-Z][A-Z'\-,.\s]+)$/ : /^1\s*([A-Z][A-Z'\-,.\s]+)$/;
+      const partner = lines.find(l => partnerPrefix.test(l.text));
+      if (partner) {
+        const partnerM = partner.text.match(partnerPrefix);
+        if (partnerM) {
+          const parts = isLastPrefix
+            ? [partnerM[1].trim(), nameValue]   // given names + surname
+            : [nameValue, partnerM[1].trim()];  // given names + surname
+          const full = sanitizeName(parts.join(' '));
+          if (nameScore(full) > 0.4) {
+            return { value: full, confidence: (nameConf + partner.confidence) / 2 };
+          }
+        }
+      }
+
+      // No partner — use just this name
+      const full = sanitizeName(nameValue);
+      if (nameScore(full) > 0.4) {
+        return { value: full, confidence: nameConf };
       }
     }
 
@@ -916,25 +1044,78 @@ export class PaddleOCRProvider implements OCRProvider {
     lines:    FlatLine[],
     labelMap: Map<string, FlatLine & { lineIndex: number }>,
   ): { value: string; confidence: number } | null {
-    // Strategy A: Label-based ("Address: value")
+    // City/state pattern: "CITY ST 12345" or "CITY, ST 12345" (with optional AAMVA prefix, leading whitespace)
+    const CITY_STATE_RE = /[A-Z][A-Z\s]+,?\s+[A-Z]{2}[,\s]+\d{5}/;
+    const normalizeAddr = (s: string) =>
+      s.replace(/^[89]\s+/, '')        // strip AAMVA "8"/"9" prefix from city line
+       .replace(/,/g, ' ')
+       .replace(/\s+/g, ' ')
+       .trim();
+
+    // Helper: look up to 3 lines ahead from startIdx for a city/state line
+    // (handles APT/UNIT lines between street and city)
+    const findCityLine = (startIdx: number): string | null => {
+      for (let offset = 1; offset <= 3 && startIdx + offset < lines.length; offset++) {
+        const candidate = lines[startIdx + offset].text.trim().replace(/^[89]\s+/, '');
+        if (CITY_STATE_RE.test(candidate)) return candidate;
+      }
+      return null;
+    };
+
+    // Strategy A: Label-based ("Address: value" or AAMVA "8 street...")
     const labelLine = labelMap.get('address');
     if (labelLine) {
+      // Try text-based label first ("Address: value")
       const afterLabel = this.valueAfterLabel(labelLine.text, /\bADDR(?:ESS)?\b/i);
       if (afterLabel && afterLabel.length > 5) {
-        return { value: afterLabel.replace(/\s+/g, ' ').trim(), confidence: labelLine.confidence };
+        let address = afterLabel;
+        const city = findCityLine(labelLine.lineIndex);
+        if (city) address += ' ' + city;
+        return { value: normalizeAddr(address), confidence: labelLine.confidence };
       }
+
+      // Try AAMVA "8" prefix: strip "8 " and use remaining as street
+      const aamvaM = labelLine.text.match(/^8\s+(.+)/);
+      if (aamvaM) {
+        const aamvaVal = aamvaM[1].trim();
+        // If value after "8" is just a label ("Address", "Address R"), look at next line instead
+        const isLabel = /\baddr(?:ess)?\b/i.test(aamvaVal);
+        if (!isLabel && aamvaVal.length > 5) {
+          let address = aamvaVal;
+          const city = findCityLine(labelLine.lineIndex);
+          if (city) address += ' ' + city;
+          return { value: normalizeAddr(address), confidence: labelLine.confidence };
+        }
+        // AAMVA "8 Address" label — value is on next line(s)
+        if (isLabel) {
+          const streetLine = lines[labelLine.lineIndex + 1];
+          if (streetLine && streetLine.text.trim().length > 5) {
+            let address = streetLine.text.trim();
+            const city = findCityLine(labelLine.lineIndex + 1);
+            if (city) address += ' ' + city;
+            return { value: normalizeAddr(address), confidence: streetLine.confidence };
+          }
+        }
+      }
+
+      // Value on next line
       const nextText = this.nextLineText(lines, labelLine.lineIndex);
       if (nextText && nextText.length > 5) {
-        return { value: nextText.replace(/\s+/g, ' ').trim(), confidence: labelLine.confidence };
+        let address = nextText;
+        const city = findCityLine(labelLine.lineIndex + 1);
+        if (city) address += ' ' + city;
+        return { value: normalizeAddr(address), confidence: labelLine.confidence };
       }
     }
 
     // Strategy B: Line matching street address pattern
-    const STREET_SUFFIXES = /\b(?:ST|AVE|BLVD|DR|RD|LN|WAY|CT|PL|TER|CIR|HWY|PKWY|SQ)\b/i;
+    const STREET_SUFFIXES = /\b(?:ST(?:REET)?|AVE(?:NUE)?|BLVD|BOULEVARD|DR(?:IVE)?|RD|ROAD|LN|LANE|WAY|CT|COURT|PL(?:ACE)?|TER(?:RACE)?|CIR(?:CLE)?|HWY|HIGHWAY|PKWY|PARKWAY|SQ(?:UARE)?|TPKE|TURNPIKE|TRL|TRAIL)\b/i;
     const addrLines: FlatLine[] = [];
 
     for (const line of lines) {
-      if (/^\d{1,5}\s+[A-Z]/.test(line.text) && STREET_SUFFIXES.test(line.text)) {
+      // Match normal "123 MAIN ST" or strip AAMVA "8" prefix first
+      const text = line.text.replace(/^8\s+/, '');
+      if (/^\d{1,5}\s+[A-Z]/.test(text) && STREET_SUFFIXES.test(text)) {
         addrLines.push(line);
       }
     }
@@ -944,14 +1125,12 @@ export class PaddleOCRProvider implements OCRProvider {
     // Try to join multi-line addresses (city/state line follows street line)
     const firstLine = addrLines[0];
     const firstIdx  = lines.indexOf(firstLine);
-    const cityLine  = lines[firstIdx + 1];
 
-    let address = firstLine.text;
-    if (cityLine && /^[A-Z][A-Z\s]+,?\s+[A-Z]{2}\s+\d{5}/.test(cityLine.text)) {
-      address += ', ' + cityLine.text;
-    }
+    let address = firstLine.text.replace(/^8\s+/, '');
+    const city = findCityLine(firstIdx);
+    if (city) address += ' ' + city;
 
-    return { value: address.replace(/\s+/g, ' ').trim(), confidence: firstLine.confidence };
+    return { value: normalizeAddr(address), confidence: firstLine.confidence };
   }
 
   // ── Physical descriptors ───────────────────────────────────
@@ -989,9 +1168,38 @@ export class PaddleOCRProvider implements OCRProvider {
         }
       }
     }
+
+    // Second pass: cross-line sex — label on one line, M/F value on next
+    if (!ocrData.sex) {
+      for (let i = 0; i < lines.length - 1; i++) {
+        if (/\b(?:SEX|GENDER)\b/i.test(lines[i].text)) {
+          const nextText = lines[i + 1].text;
+          const m = nextText.match(/^\s*([MF])\b/i);
+          if (m) {
+            ocrData.sex = m[1].toUpperCase();
+            ocrData.confidence_scores!.sex = lines[i + 1].confidence;
+            break;
+          }
+        }
+      }
+    }
   }
 
   // ── Shared helpers ─────────────────────────────────────────
+
+  /** Check if a value looks like a label fragment, noise, or non-name text */
+  private isLabelOrNoise(value: string): boolean {
+    const v = value.trim();
+    // Pure numbers or very short
+    if (/^\d+$/.test(v) || v.length < 2) return true;
+    // Starts with "/" (bilingual label remnant like "/surname")
+    if (v.startsWith('/')) return true;
+    // Known label fragments
+    if (/\b(surname|given\s*name|first\s*name|last\s*name|family\s*name|date\s*of\s*birth|nationality|passport|card\s*no|document|expiry|number)\b/i.test(v)) return true;
+    // Passport/card field markers (e.g., "***" or "* text *")
+    if (/^\*+/.test(v)) return true;
+    return false;
+  }
 
   /** Extract text appearing after a label match on the same line */
   private valueAfterLabel(text: string, labelRegex: RegExp): string | null {
@@ -1013,35 +1221,122 @@ export class PaddleOCRProvider implements OCRProvider {
   private extractPassportData(lines: RecognitionResult[][], ocrData: OCRData): void {
     const flatLines = this.flattenLines(lines);
 
-    this.findField(flatLines, [/name/i, /surname/i, /given\s*names?/i], (value, conf) => {
-      if (!isHeaderNoise(value)) {
-        ocrData.name = value;
-        ocrData.confidence_scores!.name = conf;
+    // Extract name: try separate surname + given name, then fall back
+    {
+      let surname = '';
+      let givenName = '';
+      let nameConf = 0;
+      this.findField(flatLines, [/surname/i, /family\s*name/i, /last\s*name/i], (value, conf) => {
+        if (!isHeaderNoise(value) && !SPECIMEN_LABELS.test(value) && !this.isLabelOrNoise(value)) {
+          surname = value;
+          nameConf = Math.max(nameConf, conf);
+          return; // accepted
+        }
+        return false; // rejected — keep searching
+      });
+      this.findField(flatLines, [/given\s*names?/i, /first\s*name/i, /forename/i], (value, conf) => {
+        if (!isHeaderNoise(value) && !SPECIMEN_LABELS.test(value) && !this.isLabelOrNoise(value)) {
+          givenName = value;
+          nameConf = Math.max(nameConf, conf);
+          return; // accepted
+        }
+        return false; // rejected — keep searching
+      });
+
+      if (surname || givenName) {
+        // Clean each name part: remove leading digits, single-char noise words
+        const cleanName = (s: string) =>
+          s.replace(/^\d+\s+/, '')  // leading digits ("3 HAPPY" → "HAPPY")
+           .split(/\s+/)
+           .filter(w => w.length > 1 || /^[A-Z]$/i.test(w) && false) // remove single chars
+           .join(' ');
+        const cleanedGiven = cleanName(givenName);
+        const cleanedSurname = cleanName(surname);
+        ocrData.name = [cleanedGiven, cleanedSurname].filter(Boolean).join(' ');
+        ocrData.confidence_scores!.name = nameConf;
+      } else {
+        // Fall back to generic name pattern
+        this.findField(flatLines, [/name/i], (value, conf) => {
+          if (!isHeaderNoise(value) && !SPECIMEN_LABELS.test(value) && !this.isLabelOrNoise(value)) {
+            ocrData.name = value;
+            ocrData.confidence_scores!.name = conf;
+            return;
+          }
+          return false;
+        });
       }
-    });
+    }
 
     this.findDateField(flatLines, [/date\s*of\s*birth/i, /birth/i, /dob/i], (value, conf) => {
       ocrData.date_of_birth = value;
       ocrData.confidence_scores!.date_of_birth = conf;
     });
 
-    this.findField(flatLines, [/passport\s*no/i, /document\s*no/i, /number/i], (value, conf) => {
+    this.findField(flatLines, [/passport\s*no/i, /card\s*no/i, /document\s*no/i, /number/i], (value, conf) => {
       const cleaned = value.replace(/\s+/g, '');
-      if (/^[A-Z0-9]{6,9}$/i.test(cleaned)) {
+      // Passport: 9 alphanumeric; Passport card: letter + 8 digits
+      if (/^[A-Z0-9]{6,9}$/i.test(cleaned) || /^[A-Z]\d{8}$/i.test(cleaned)) {
         ocrData.document_number = cleaned;
         ocrData.confidence_scores!.document_number = conf;
       }
     });
 
-    this.findDateField(flatLines, [/date\s*of\s*expiry/i, /expiry/i, /expires/i, /exp/i], (value, conf) => {
+    // Fallback: scan for passport card number (letter + 8 digits) if not found
+    if (!ocrData.document_number) {
+      for (const line of flatLines) {
+        const m = line.text.match(/\b([A-Z]\d{8})\b/);
+        if (m) {
+          ocrData.document_number = m[1];
+          ocrData.confidence_scores!.document_number = line.confidence;
+          break;
+        }
+      }
+    }
+
+    this.findLastDateField(flatLines, [/date\s*of\s*expiry/i, /expiry/i, /expires/i, /exp/i], (value, conf) => {
       ocrData.expiration_date = value;
       ocrData.confidence_scores!.expiration_date = conf;
     });
 
-    this.findField(flatLines, [/nationality/i, /country/i], (value, conf) => {
-      ocrData.nationality = value;
-      ocrData.confidence_scores!.nationality = conf;
+    this.findField(flatLines, [/nationality/i], (value, conf) => {
+      // Filter out values that look like labels or noise
+      const cleaned = value.replace(/^\*+\s*/, '').trim();
+      if (cleaned.length >= 2 && !this.isLabelOrNoise(cleaned) && !/\*/.test(cleaned)) {
+        // If value contains mixed content (e.g., "USA C03005988"), take only the alpha part
+        const alphaOnly = cleaned.match(/^([A-Z]{2,})\b/i);
+        ocrData.nationality = alphaOnly ? alphaOnly[1] : cleaned;
+        ocrData.confidence_scores!.nationality = conf;
+        return;
+      }
+      return false;
     });
+
+    // Extract sex from passport/passport card
+    if (!ocrData.sex) {
+      // Try same-line first
+      for (const line of flatLines) {
+        const sexM = line.text.match(/\b(?:SEX|GENDER)\s*[:\s\/]\s*([MF])\b/i)
+          ?? line.text.match(/\bSEX\s+([MF])\b/i);
+        if (sexM) {
+          ocrData.sex = sexM[1].toUpperCase();
+          ocrData.confidence_scores!.sex = line.confidence;
+          break;
+        }
+      }
+      // Fallback: "Sex" label on one line, M/F at start of next line
+      if (!ocrData.sex) {
+        for (let i = 0; i < flatLines.length; i++) {
+          if (/\bSEX\b/i.test(flatLines[i].text) && i + 1 < flatLines.length) {
+            const nextM = flatLines[i + 1].text.match(/^([MF])\b/);
+            if (nextM) {
+              ocrData.sex = nextM[1].toUpperCase();
+              ocrData.confidence_scores!.sex = flatLines[i + 1].confidence;
+              break;
+            }
+          }
+        }
+      }
+    }
   }
 
   private extractNationalIdData(lines: RecognitionResult[][], ocrData: OCRData): void {
@@ -1100,13 +1395,59 @@ export class PaddleOCRProvider implements OCRProvider {
       lineCount: flatLines.length,
     });
 
-    // Extract name using country-specific labels
-    this.findField(flatLines, labels.name, (value, conf) => {
-      if (!isHeaderNoise(value)) {
-        ocrData.name = value;
-        ocrData.confidence_scores!.name = conf;
+    // EU DL numbered-field format: use specialized parser
+    if (this.isEUDriversLicense(flatLines, format)) {
+      this.extractEUDriversLicenseData(flatLines, ocrData, format);
+      ocrData.issuing_country = country;
+      return;
+    }
+
+    // Extract name: try separate surname + given name, then fall back to combined label
+    {
+      let surname = '';
+      let givenName = '';
+      let nameConf = 0;
+      // Filter patterns by their regex source to split surname vs given
+      // Use word-boundary-aware matching to avoid "mbiemri" matching the "emri" given filter
+      const surnamePatterns = labels.name.filter(p => /surname|family|last|appell|cognom|nachnam|achternaam|^mbiemri/i.test(p.source));
+      const givenPatterns = labels.name.filter(p => /given|first|prénom|vornam|voornaam|^emri$/i.test(p.source));
+
+      if (surnamePatterns.length > 0) {
+        this.findField(flatLines, surnamePatterns, (value, conf) => {
+          if (!isHeaderNoise(value) && !SPECIMEN_LABELS.test(value) && !this.isLabelOrNoise(value)) {
+            surname = value;
+            nameConf = Math.max(nameConf, conf);
+            return; // accepted
+          }
+          return false; // rejected — keep searching
+        });
       }
-    });
+      if (givenPatterns.length > 0) {
+        this.findField(flatLines, givenPatterns, (value, conf) => {
+          if (!isHeaderNoise(value) && !SPECIMEN_LABELS.test(value) && !this.isLabelOrNoise(value)) {
+            givenName = value;
+            nameConf = Math.max(nameConf, conf);
+            return; // accepted
+          }
+          return false; // rejected — keep searching
+        });
+      }
+
+      if (surname || givenName) {
+        ocrData.name = [givenName, surname].filter(Boolean).join(' ');
+        ocrData.confidence_scores!.name = nameConf;
+      } else {
+        // Fall back to combined name patterns
+        this.findField(flatLines, labels.name, (value, conf) => {
+          if (!isHeaderNoise(value) && !SPECIMEN_LABELS.test(value) && !this.isLabelOrNoise(value)) {
+            ocrData.name = value;
+            ocrData.confidence_scores!.name = conf;
+            return;
+          }
+          return false;
+        });
+      }
+    }
 
     // Extract date of birth with country date format hint
     this.findDateField(flatLines, labels.date_of_birth, (value, conf) => {
@@ -1117,22 +1458,43 @@ export class PaddleOCRProvider implements OCRProvider {
     // Extract ID number
     this.findField(flatLines, labels.id_number, (value, conf) => {
       const cleaned = value.replace(/\s+/g, '');
-      if (/^[A-Z0-9\-]{4,25}$/i.test(cleaned)) {
+      if (/^[A-Z0-9\-]{4,15}$/i.test(cleaned) && !this.isLabelOrNoise(cleaned) && /\d/.test(cleaned)) {
         ocrData.document_number = cleaned;
         ocrData.confidence_scores!.document_number = conf;
+        return;
       }
+      // Try to extract an ID-like token from the value (handles concatenated text)
+      const idM = value.match(/\b([A-Z]\d{7,12}[A-Z0-9]?)\b/i) ?? value.match(/\b(\d{6,12})\b/);
+      if (idM) {
+        ocrData.document_number = idM[1];
+        ocrData.confidence_scores!.document_number = conf * 0.9;
+        return;
+      }
+      return false;
     });
 
-    // Extract expiry date
-    this.findDateField(flatLines, labels.expiry_date, (value, conf) => {
+    // Extract expiry date — use findLastDateField to disambiguate issue vs expiry
+    this.findLastDateField(flatLines, labels.expiry_date, (value, conf) => {
       ocrData.expiration_date = this.normalizeDateWithHint(value, format.date_format);
       ocrData.confidence_scores!.expiration_date = conf;
     });
 
     // Extract nationality
     this.findField(flatLines, labels.nationality, (value, conf) => {
-      ocrData.nationality = value;
-      ocrData.confidence_scores!.nationality = conf;
+      let cleaned = value.replace(/^\*+\s*/, '').replace(/\s*\*+$/, '').trim();
+      // Strip trailing numbers/IDs (e.g., "Shqiptare/Albanian 200000907" → "Shqiptare/Albanian")
+      cleaned = cleaned.replace(/\s+\d{5,}$/, '').trim();
+      // For bilingual values like "Shqiptare/Albanian", take the English part (after /)
+      const slashParts = cleaned.split('/');
+      if (slashParts.length === 2 && slashParts[1].trim().length >= 2) {
+        cleaned = slashParts[1].trim();
+      }
+      if (cleaned.length >= 2 && cleaned.length <= 30 && !this.isLabelOrNoise(cleaned)) {
+        ocrData.nationality = cleaned;
+        ocrData.confidence_scores!.nationality = conf;
+        return;
+      }
+      return false;
     });
 
     // Extract address
@@ -1147,6 +1509,19 @@ export class PaddleOCRProvider implements OCRProvider {
       ocrData.confidence_scores!.issuing_authority = conf;
     });
 
+    // Extract sex
+    if (!ocrData.sex) {
+      for (const line of flatLines) {
+        const sexM = line.text.match(/\b(?:SEX|GENDER|GJINIA|SEXE|GESCHLECHT|SESSO)\s*[:\s\/]\s*([MFmf])\b/i)
+          ?? line.text.match(/\b(?:SEX|GJINIA)\s+([MF])\b/i);
+        if (sexM) {
+          ocrData.sex = sexM[1].toUpperCase();
+          ocrData.confidence_scores!.sex = line.confidence;
+          break;
+        }
+      }
+    }
+
     ocrData.issuing_country = country;
   }
 
@@ -1155,6 +1530,10 @@ export class PaddleOCRProvider implements OCRProvider {
    * Resolves ambiguous dates like 01/02/2020 using the country's convention.
    */
   private normalizeDateWithHint(dateStr: string, hint: 'DMY' | 'MDY' | 'YMD'): string {
+    // Handle month-name dates first (e.g., "1 JAN 1981")
+    const monthNameResult = parseMonthNameDate(dateStr);
+    if (monthNameResult) return monthNameResult;
+
     const m = dateStr.match(/(\d{1,4})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
     if (!m) return dateStr;
 
@@ -1176,6 +1555,142 @@ export class PaddleOCRProvider implements OCRProvider {
       case 'DMY': return `${p3}-${p2.padStart(2, '0')}-${p1.padStart(2, '0')}`;
       case 'MDY': return `${p3}-${p1.padStart(2, '0')}-${p2.padStart(2, '0')}`;
       case 'YMD': return `${p1}-${p2.padStart(2, '0')}-${p3.padStart(2, '0')}`;
+    }
+  }
+
+  // ── EU Driving License numbered-field extraction ────────────
+
+  private static EU_DL_HEADER = /FÜHRERSCHEIN|F(?:Ü|U)HRERSCHEIN|PERMIS\s*DE\s*CONDUIRE|DRIVING\s*LICEN[CS]E|PATENTE|RIJBEWIJS|CARTA\s*DE\s*CONDU[CÇ][AÃ]O|PERMISO\s*DE\s*CONDUCIR|KÖRKORT|AJOKORTTI|PRAWO\s*JAZDY|ŘIDIČSKÝ\s*PRŮKAZ|VODIČSKÝ\s*PREUKAZ/i;
+
+  /** Detect whether the document is an EU-style numbered driving license */
+  private isEUDriversLicense(flatLines: FlatLine[], format: CountryDocFormat): boolean {
+    if (format.type !== 'drivers_license') return false;
+    const fullText = flatLines.map(l => l.text).join(' ');
+    // Check for EU DL header keywords
+    if (PaddleOCRProvider.EU_DL_HEADER.test(fullText)) return true;
+    // Check for numbered field pattern: at least 2 lines starting with "N." or "Na."
+    let numberedCount = 0;
+    for (const line of flatLines) {
+      if (/^\s*(\d[abc]?)[\.\s]\s*.+/.test(line.text)) numberedCount++;
+    }
+    return numberedCount >= 3;
+  }
+
+  /**
+   * Extract fields from EU DL using numbered field prefixes (1., 2., 3., 4a., 4b., 5.)
+   * per EU Directive 2006/126/EC.
+   */
+  private extractEUDriversLicenseData(
+    flatLines: FlatLine[],
+    ocrData: OCRData,
+    format: CountryDocFormat,
+  ): void {
+    const fields = new Map<string, string>();
+
+    for (const line of flatLines) {
+      // Match patterns like "1. Mustermann", "4b. 01.01.2030", "4b 01.01.2030", "3 12.08.64"
+      // Try anchored match first (most reliable)
+      const m = line.text.match(/^\s*(\d[abc]?)[\.\s]\s*(.+)/);
+      if (m) {
+        const fieldNum = m[1].toLowerCase();
+        const value = m[2].trim();
+        if (!fields.has(fieldNum) && value.length > 0) {
+          fields.set(fieldNum, value);
+        }
+      }
+      // Also try mid-line match for field 1 (surname) — handles specimen watermarks like "***** * 1 Mustermann 20"
+      if (!fields.has('1')) {
+        const m1 = line.text.match(/\b1[\.\s]\s*([A-Z][A-Za-zÀ-ÖØ-öø-ÿ\-'\s]+)/);
+        if (m1) {
+          const val = m1[1].trim();
+          if (val.length >= 2 && !SPECIMEN_LABELS.test(val)) {
+            fields.set('1', val);
+          }
+        }
+      }
+    }
+
+    logger.info('EU DL numbered fields extracted', { fields: Object.fromEntries(fields) });
+
+    // Helper: strip trailing date patterns and numbers from name values
+    const stripTrailingNoise = (s: string) =>
+      s.replace(/\s+\d{1,2}[\.\-\/]\d{1,2}[\.\-\/]\d{2,4}.*$/, '')  // trailing dates
+       .replace(/\s+\d{2,}$/, '')                                     // trailing numbers
+       .trim();
+
+    // 1. Surname + 2. Given name → combined name
+    const surname = stripTrailingNoise(fields.get('1') ?? '');
+    const givenName = stripTrailingNoise(fields.get('2') ?? '');
+    if (surname || givenName) {
+      const name = [givenName, surname].filter(Boolean).join(' ');
+      if (!SPECIMEN_LABELS.test(name)) {
+        ocrData.name = name;
+        ocrData.confidence_scores!.name = 0.9;
+      }
+    }
+
+    // 3. Date of birth — extract just the date portion
+    const dobRaw = fields.get('3');
+    if (dobRaw) {
+      const dob = this.normalizeDateWithHint(dobRaw, format.date_format)
+        ?? this.extractDate(dobRaw);
+      if (dob) {
+        ocrData.date_of_birth = dob;
+        ocrData.confidence_scores!.date_of_birth = 0.9;
+      }
+    }
+
+    // 4b. Expiry date — extract date, and also look for license number after it
+    const expiryRaw = fields.get('4b');
+    if (expiryRaw) {
+      const expiry = this.normalizeDateWithHint(expiryRaw, format.date_format)
+        ?? this.extractDate(expiryRaw);
+      if (expiry) {
+        ocrData.expiration_date = expiry;
+        ocrData.confidence_scores!.expiration_date = 0.9;
+      }
+    }
+
+    // 4c. Issuing authority
+    const authority = fields.get('4c');
+    if (authority) {
+      ocrData.issuing_authority = authority;
+      ocrData.confidence_scores!.issuing_authority = 0.9;
+    }
+
+    // 5. License number
+    const licNum = fields.get('5');
+    if (licNum) {
+      const cleaned = licNum.replace(/\s+/g, '');
+      if (/^[A-Z0-9]{4,20}$/i.test(cleaned)) {
+        ocrData.document_number = cleaned;
+        ocrData.confidence_scores!.document_number = 0.9;
+      }
+    }
+
+    // Fallback: if no field 5. found, try to extract license number from 4b line
+    // (OCR often concatenates "4b.21.01.30 B072RRE2I55" as one line)
+    if (!ocrData.document_number && expiryRaw) {
+      // Look for alphanumeric token after the date in field 4b
+      const afterDate = expiryRaw.replace(/^\d{1,2}[\.\-\/]\d{1,2}[\.\-\/]\d{2,4}\s*/, '');
+      const docM = afterDate.match(/\b([A-Z0-9]{6,15})\b/i);
+      if (docM && /[A-Z]/i.test(docM[1]) && /\d/.test(docM[1])) {
+        ocrData.document_number = docM[1];
+        ocrData.confidence_scores!.document_number = 0.85;
+      }
+    }
+
+    // 9. Vehicle categories (informational, not stored but could be useful)
+    // Additional: sex field if present in text
+    for (const line of flatLines) {
+      if (!ocrData.sex) {
+        const sexM = line.text.match(/\b(?:SEX|GESCHLECHT|SEXE)\s*[:\s]\s*([MFmf])\b/i)
+          ?? line.text.match(/\b([MF])\s*$/);
+        if (sexM) {
+          ocrData.sex = sexM[1].toUpperCase();
+          ocrData.confidence_scores!.sex = 0.85;
+        }
+      }
     }
   }
 
@@ -1225,8 +1740,9 @@ export class PaddleOCRProvider implements OCRProvider {
         const afterLabel = line.text.slice(match.index! + match[0].length).trim();
         if (afterLabel.length > 0 && onMatch(afterLabel, line.confidence) !== false) return;
 
-        if (i + 1 < lines.length) {
-          const nextLine = lines[i + 1];
+        // Try next line, then one more if the first was rejected
+        for (let offset = 1; offset <= 2 && i + offset < lines.length; offset++) {
+          const nextLine = lines[i + offset];
           if (nextLine.text.trim().length > 0 &&
               onMatch(nextLine.text.trim(), nextLine.confidence) !== false) return;
         }
@@ -1247,7 +1763,43 @@ export class PaddleOCRProvider implements OCRProvider {
   }
 
   private extractDate(text: string): string | null {
+    // Try month-name dates first (e.g., "1 JAN 1981")
+    const monthName = parseMonthNameDate(text);
+    if (monthName) return monthName;
+    // Numeric dates (e.g., "01/01/1981")
     const m = text.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
     return m ? standardizeDateFormat(m[0]) : null;
+  }
+
+  /**
+   * Like findDateField(), but picks the LAST date found in the matched region.
+   * Useful for expiry extraction where issue and expiry dates may appear
+   * side-by-side on the same line or adjacent lines.
+   */
+  private findLastDateField(
+    lines:    Array<{ text: string; confidence: number }>,
+    patterns: RegExp[],
+    onMatch:  (value: string, confidence: number) => void,
+  ): void {
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i];
+      for (const pattern of patterns) {
+        const match = line.text.match(pattern);
+        if (!match) continue;
+
+        // Collect dates from the matched line + the next line
+        const textToSearch = line.text.slice(match.index! + match[0].length);
+        const nextText = (i + 1 < lines.length) ? lines[i + 1].text : '';
+        const combined = textToSearch + ' ' + nextText;
+
+        const dates = findAllDates(combined);
+        if (dates.length > 0) {
+          // Pick the last (chronologically latest) date
+          const sorted = [...dates].sort();
+          onMatch(sorted[sorted.length - 1], line.confidence);
+          return;
+        }
+      }
+    }
   }
 }
