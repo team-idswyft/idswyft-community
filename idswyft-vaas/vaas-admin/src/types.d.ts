@@ -168,6 +168,13 @@ export interface VerificationResults {
   // OCR / cross-validation data synced from main API
   ocr_data?: Record<string, any>;
   cross_validation_results?: Record<string, any>;
+  // AML screening results (opt-in per verification)
+  aml_screening?: {
+    risk_level: string;
+    match_found: boolean;
+    match_count: number;
+    screened_at: string;
+  } | null;
 }
 
 export interface VerificationSession {
@@ -203,6 +210,10 @@ export interface StartVerificationRequest {
     callback_url?: string;
     success_redirect_url?: string;
     failure_redirect_url?: string;
+    addons?: {
+      aml_screening?: boolean;
+      address_verification?: boolean;
+    };
   };
 }
 

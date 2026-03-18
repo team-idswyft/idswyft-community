@@ -58,24 +58,30 @@ router.post('/users', authenticateServiceToken, catchAsync(async (req: Request, 
 
 // VaaS service endpoint - submit verification request
 router.post('/verify', authenticateServiceToken, catchAsync(async (req: Request, res: Response) => {
-  const { user_id, document_url, selfie_url, organization_id } = req.body;
-  
+  const { user_id, document_url, selfie_url, organization_id, addons } = req.body;
+
   logger.info('VaaS verification request received', {
     user_id,
     organization_id,
     has_document: !!document_url,
-    has_selfie: !!selfie_url
+    has_selfie: !!selfie_url,
+    addons: addons || null,
   });
-  
+
   // Create verification request in main Idswyft system
+  const insertData: Record<string, unknown> = {
+    user_id,
+    status: 'pending',
+    created_at: new Date().toISOString(),
+    updated_at: new Date().toISOString(),
+  };
+  if (addons && typeof addons === 'object') {
+    insertData.addons = addons;
+  }
+
   const { data: verification, error } = await supabase
     .from('verification_requests')
-    .insert({
-      user_id,
-      status: 'pending',
-      created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
-    })
+    .insert(insertData)
     .select()
     .single();
   

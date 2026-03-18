@@ -76,8 +76,14 @@ async function loadSessionState(verificationId: string): Promise<SessionState | 
   return typeof data.context === 'string' ? JSON.parse(data.context) : data.context;
 }
 
+/** Addons that can be requested per-verification */
+interface VerificationAddons {
+  aml_screening?: boolean;
+  address_verification?: boolean;
+}
+
 /** Create a VerificationSession with real service deps, optionally hydrated from DB */
-function createSession(isSandbox: boolean, hydration?: SessionHydration): VerificationSession {
+function createSession(isSandbox: boolean, hydration?: SessionHydration, addons?: VerificationAddons): VerificationSession {
   const deps: SessionDeps = {
     extractFront: async (buffer: Buffer): Promise<FrontExtractionResult> => {
       // Save buffer to temp storage, run OCR, extract face
@@ -92,7 +98,7 @@ function createSession(isSandbox: boolean, hydration?: SessionHydration): Verifi
     },
     computeFaceMatch,
     faceMatchThreshold: getFaceMatchingThresholdSync(isSandbox),
-    screenAML: amlProvider
+    screenAML: (addons?.aml_screening && amlProvider)
       ? async (fullName, dob, nationality) => amlProvider.screen({ full_name: fullName, date_of_birth: dob, nationality })
       : undefined,
   };
@@ -120,7 +126,18 @@ async function hydrateSession(verificationId: string, isSandbox: boolean): Promi
     session_id: verificationId,
   };
 
-  return createSession(isSandbox, hydration);
+  // Read addons from the verification_requests row to preserve per-request flags
+  let addons: VerificationAddons | undefined;
+  const { data: row } = await supabase
+    .from('verification_requests')
+    .select('addons')
+    .eq('id', verificationId)
+    .single();
+  if (row?.addons && typeof row.addons === 'object') {
+    addons = row.addons as VerificationAddons;
+  }
+
+  return createSession(isSandbox, hydration, addons);
 }
 
 // ─── Step adapters: Run extraction and then delegate to session ──
@@ -466,6 +483,9 @@ router.post('/initialize',
     body('issuing_country').optional().isLength({ min: 2, max: 2 }).isAlpha().withMessage('Issuing country must be a 2-letter ISO code'),
     body('sandbox').optional().isBoolean().withMessage('Sandbox must be a boolean'),
     body('source').optional().isIn(['api', 'vaas', 'demo']).withMessage('Source must be api, vaas, or demo'),
+    body('addons').optional().isObject().withMessage('Addons must be an object'),
+    body('addons.aml_screening').optional().isBoolean().withMessage('aml_screening must be a boolean'),
+    body('addons.address_verification').optional().isBoolean().withMessage('address_verification must be a boolean'),
   ],
   catchAsync(async (req: Request, res: Response) => {
     const errors = validationResult(req);
@@ -474,6 +494,7 @@ router.post('/initialize',
     }
 
     const { user_id, document_type = 'drivers_license', issuing_country } = req.body;
+    const addons: VerificationAddons = req.body.addons || {};
     const source: VerificationSource = req.body.source || 'api';
 
     req.body.user_id = user_id;
@@ -493,6 +514,7 @@ router.post('/initialize',
       developer_id: developerId,
       is_sandbox: isSandbox,
       source,
+      addons: Object.keys(addons).length > 0 ? addons as Record<string, unknown> : undefined,
     });
 
     // Set session start timestamp for processing-time analytics
@@ -502,7 +524,7 @@ router.post('/initialize',
 
     // Create session and save initial state
     const issuingCountryUpper = issuing_country?.toUpperCase() || null;
-    const session = createSession(isSandbox, { session_id: verificationRecord.id, issuing_country: issuingCountryUpper });
+    const session = createSession(isSandbox, { session_id: verificationRecord.id, issuing_country: issuingCountryUpper }, addons);
     await saveSessionState(verificationRecord.id, session.getState());
 
     logVerificationEvent('verification_initialized', verificationRecord.id, {

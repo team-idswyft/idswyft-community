@@ -21,6 +21,10 @@ export const startVerificationSchema = z.object({
     failure_redirect_url: z.string().url().optional(),
     require_liveness: z.boolean().optional(),
     require_back_of_id: z.boolean().optional(),
+    addons: z.object({
+      aml_screening: z.boolean().optional(),
+      address_verification: z.boolean().optional(),
+    }).optional(),
   }).optional(),
 });
 
@@ -61,4 +65,10 @@ export const resultSchema = z.object({
   cross_validation_results: z.record(z.unknown()).nullable().optional(),
   failure_reason: z.string().max(1000).nullable().optional(),
   manual_review_reason: z.string().max(1000).nullable().optional(),
+  aml_screening: z.object({
+    risk_level: z.string(),
+    match_found: z.boolean(),
+    match_count: z.number(),
+    screened_at: z.string(),
+  }).nullable().optional(),
 }).passthrough();

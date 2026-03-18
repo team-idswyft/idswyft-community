@@ -7,7 +7,9 @@ import {
   ExternalLink,
   ArrowLeft,
   AlertTriangle,
-  CheckCircle
+  CheckCircle,
+  Shield,
+  MapPin
 } from 'lucide-react';
 import { sectionLabel, cardSurface, monoXs, monoSm } from '../styles/tokens';
 import { apiClient } from '../services/api';
@@ -32,6 +34,7 @@ const StartVerification: React.FC = () => {
     external_id: '',
     custom_message: ''
   });
+  const [addons, setAddons] = useState({ aml_screening: false, address_verification: false });
   const [loading, setLoading] = useState(false);
   const [step, setStep] = useState<'form' | 'success' | 'error'>('form');
   const [verificationUrl, setVerificationUrl] = useState<string>('');
@@ -71,7 +74,8 @@ const StartVerification: React.FC = () => {
             require_back_of_id: true,
             callback_url: undefined,
             success_redirect_url: undefined,
-            failure_redirect_url: undefined
+            failure_redirect_url: undefined,
+            addons: (addons.aml_screening || addons.address_verification) ? addons : undefined,
           }
         });
 
@@ -191,6 +195,7 @@ const StartVerification: React.FC = () => {
       external_id: '',
       custom_message: ''
     });
+    setAddons({ aml_screening: false, address_verification: false });
     setCreatedUser(null);
     setVerificationUrl('');
     setError('');
@@ -414,6 +419,47 @@ const StartVerification: React.FC = () => {
             />
           </div>
 
+          {/* Add-ons */}
+          <div>
+            <label className="form-label mb-3">Add-ons</label>
+            <div className="space-y-3">
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={addons.aml_screening}
+                  onChange={(e) => setAddons(prev => ({ ...prev, aml_screening: e.target.checked }))}
+                  className="mt-0.5 w-4 h-4 rounded border-white/20 bg-white/5 text-cyan-500 focus:ring-cyan-500/50"
+                />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <Shield className="w-4 h-4 text-cyan-400" />
+                    <span className="text-sm font-medium text-slate-200 group-hover:text-white">AML/Sanctions Screening</span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Screen against global sanctions, PEP, and watchlists after document verification
+                  </p>
+                </div>
+              </label>
+              <label className="flex items-start gap-3 cursor-pointer group">
+                <input
+                  type="checkbox"
+                  checked={addons.address_verification}
+                  onChange={(e) => setAddons(prev => ({ ...prev, address_verification: e.target.checked }))}
+                  className="mt-0.5 w-4 h-4 rounded border-white/20 bg-white/5 text-cyan-500 focus:ring-cyan-500/50"
+                />
+                <div>
+                  <div className="flex items-center gap-2">
+                    <MapPin className="w-4 h-4 text-cyan-400" />
+                    <span className="text-sm font-medium text-slate-200 group-hover:text-white">Address Verification</span>
+                  </div>
+                  <p className="text-xs text-slate-500 mt-0.5">
+                    Verify extracted address against postal databases (coming soon)
+                  </p>
+                </div>
+              </label>
+            </div>
+          </div>
+
           <div className="bg-cyan-500/12 border border-cyan-500/25 rounded-lg p-4">
             <h3 className="font-medium text-cyan-100 mb-2">What will happen:</h3>
             <ul className="text-sm text-cyan-200 space-y-1">
@@ -421,6 +467,9 @@ const StartVerification: React.FC = () => {
               <li>2. Verification invitation email will be sent automatically</li>
               <li>3. User will receive a link to your branded verification portal</li>
               <li>4. You'll be notified when verification is complete</li>
+              {addons.aml_screening && (
+                <li>5. AML/Sanctions screening will run after document verification</li>
+              )}
             </ul>
           </div>
 

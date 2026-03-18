@@ -17,16 +17,20 @@ export class VerificationService {
     developer_id: string;
     is_sandbox?: boolean;
     source?: VerificationSource;
+    addons?: Record<string, unknown>;
   }): Promise<VerificationRequest> {
+    const insertData: Record<string, unknown> = {
+      user_id: data.user_id,
+      developer_id: data.developer_id,
+      status: 'pending',
+      is_sandbox: data.is_sandbox ?? false,
+      source: data.source ?? 'api',
+    };
+    if (data.addons) insertData.addons = data.addons;
+
     const { data: verification, error } = await supabase
       .from('verification_requests')
-      .insert({
-        user_id: data.user_id,
-        developer_id: data.developer_id,
-        status: 'pending',
-        is_sandbox: data.is_sandbox ?? false,
-        source: data.source ?? 'api',
-      })
+      .insert(insertData)
       .select('*')
       .single();
     

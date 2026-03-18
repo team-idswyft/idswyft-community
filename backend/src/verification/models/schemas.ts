@@ -108,6 +108,15 @@ const FieldScoreSchema = z.object({
   weight: confidence,
 });
 
+// ─── DL Format Validation (supplementary, weight 0) ───
+const DlFormatValidationSchema = z.object({
+  valid: z.boolean(),
+  verdict: z.enum(['PASS', 'FAIL', 'REVIEW', 'SKIP']),
+  matched_pattern: z.string().nullable(),
+  issuing_state: z.string().nullable(),
+  detail: z.string(),
+});
+
 // ─── Cross-Validation Result ───
 export const CrossValidationResultSchema = z.object({
   overall_score: confidence,
@@ -115,6 +124,7 @@ export const CrossValidationResultSchema = z.object({
   has_critical_failure: z.boolean(),
   document_expired: z.boolean(),
   verdict: z.enum(['PASS', 'REVIEW', 'REJECT']),
+  dl_format_validation: DlFormatValidationSchema.optional(),
 });
 
 export type CrossValidationResult = z.infer<typeof CrossValidationResultSchema>;

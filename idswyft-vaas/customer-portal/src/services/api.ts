@@ -112,6 +112,7 @@ class CustomerPortalAPI {
       cross_validation_results: results.cross_validation_results,
       failure_reason: results.failure_reason,
       manual_review_reason: results.manual_review_reason,
+      aml_screening: results.aml_screening,
     });
   }
 

@@ -10,6 +10,8 @@ import type { FrontExtractionResult, BackExtractionResult, CrossValidationResult
 import { FIELD_WEIGHTS, THRESHOLD_PASS, THRESHOLD_REVIEW } from './config.js';
 import { compareIdNumber, compareName, compareDate, compareNationality } from './comparators.js';
 import { normalizeDate } from './normalizers.js';
+import { validateDlNumber } from './dlNumberValidator.js';
+import type { DlValidationResult } from './dlNumberValidator.js';
 
 /** Map field names to their comparator functions */
 const COMPARATORS: Record<string, (front: string, back: string) => number> = {
@@ -144,6 +146,19 @@ export function crossValidate(
     console.log(`     front: "${frontValue}" | back: "${backValue}"`);
   }
 
+  // ── DL Number Format Validation (weight 0 — supplementary signal) ──
+  const frontIdNumber = extractFrontField(frontOcr, 'id_number');
+  const issuingCountry = (frontOcr.issuing_country as string) || null;
+  // Try to detect issuing state from address or other OCR fields
+  const issuingState = (frontOcr.issuing_state as string) || null;
+  const dlValidation: DlValidationResult = validateDlNumber(frontIdNumber, issuingCountry, issuingState);
+
+  if (dlValidation.verdict !== 'SKIP') {
+    const dlIcon = dlValidation.verdict === 'PASS' ? '✅' : dlValidation.verdict === 'FAIL' ? '⚠️' : '🔍';
+    console.log(`${dlIcon} dl_format_validation (w=0, supplementary): verdict=${dlValidation.verdict}`);
+    console.log(`     id_number: "${frontIdNumber}" | detail: ${dlValidation.detail}`);
+  }
+
   // Normalize score: only count fields that were actually compared
   const overallScore = matchedWeight > 0
     ? Math.round((weightedScore / matchedWeight) * 100) / 100
@@ -164,6 +179,12 @@ export function crossValidate(
     verdict = 'REVIEW';
   }
 
+  // DL format nudge: if format validation FAILED and we're borderline PASS, nudge to REVIEW
+  if (dlValidation.verdict === 'FAIL' && verdict === 'PASS' && overallScore < THRESHOLD_PASS + 0.05) {
+    verdict = 'REVIEW';
+    console.log('⚠️  DL format validation FAIL nudged verdict from PASS → REVIEW');
+  }
+
   console.log('🔎 ── Cross-Validation Result ─────────────────────');
   console.log(`   Matched weight: ${matchedWeight.toFixed(2)} / 1.00 (${Object.keys(fieldScores).filter(f => fieldScores[f].score > 0 || FIELD_WEIGHTS[f]?.critical).length} fields compared)`);
   console.log(`   Overall score: ${overallScore} (PASS >= ${THRESHOLD_PASS}, REVIEW >= ${THRESHOLD_REVIEW})`);
@@ -177,5 +198,6 @@ export function crossValidate(
     has_critical_failure: hasCriticalFailure,
     document_expired: documentExpired,
     verdict,
+    dl_format_validation: dlValidation.verdict !== 'SKIP' ? dlValidation : undefined,
   };
 }

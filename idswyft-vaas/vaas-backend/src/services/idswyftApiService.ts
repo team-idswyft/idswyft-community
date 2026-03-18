@@ -37,6 +37,10 @@ interface IdswyftStartVerificationRequest {
   success_redirect_url?: string;
   failure_redirect_url?: string;
   metadata?: Record<string, any>;
+  addons?: {
+    aml_screening?: boolean;
+    address_verification?: boolean;
+  };
 }
 
 interface IdswyftStartVerificationResponse {
@@ -119,10 +123,13 @@ export class IdswyftApiService {
   async startVerification(request: IdswyftStartVerificationRequest): Promise<IdswyftStartVerificationResponse> {
     try {
       // Uses /api/vaas/verify which accepts service token auth
-      const response = await this.client.post('/api/vaas/verify', {
+      const payload: Record<string, unknown> = {
         user_id: request.user_id,
         organization_id: request.organization_id,
-      });
+      };
+      if (request.addons) payload.addons = request.addons;
+
+      const response = await this.client.post('/api/vaas/verify', payload);
 
       if (!response.data.success) {
         throw new Error('Failed to start verification in main Idswyft API');

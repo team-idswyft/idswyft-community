@@ -459,6 +459,40 @@ export function VerificationDetailsModal({ verification, isOpen, onClose, onStat
                     </div>
                   )}
 
+                  {/* AML Screening Card */}
+                  {results.aml_screening && (
+                    <div className="border border-white/10 rounded-lg p-4">
+                      <div className="flex items-center mb-3">
+                        <AlertTriangle className={`w-5 h-5 mr-2 ${
+                          results.aml_screening.match_found ? 'text-red-400' : 'text-green-400'
+                        }`} />
+                        <span className="font-medium text-slate-100">AML/Sanctions Screening</span>
+                      </div>
+                      <div className="space-y-1 text-sm text-slate-400">
+                        <p>
+                          Risk Level:{' '}
+                          <span className={`font-medium ${
+                            results.aml_screening.risk_level === 'clear' ? 'text-green-400' :
+                            results.aml_screening.risk_level === 'potential_match' ? 'text-amber-400' :
+                            'text-red-400'
+                          }`}>
+                            {results.aml_screening.risk_level.replace(/_/g, ' ')}
+                          </span>
+                        </p>
+                        <p>
+                          Match Found:{' '}
+                          <span className={`font-medium ${results.aml_screening.match_found ? 'text-red-400' : 'text-green-400'}`}>
+                            {results.aml_screening.match_found ? 'Yes' : 'No'}
+                          </span>
+                        </p>
+                        {results.aml_screening.match_count > 0 && (
+                          <p>Match Count: <span className="text-slate-200 font-medium">{results.aml_screening.match_count}</span></p>
+                        )}
+                        <p>Screened At: <span className="text-slate-200 font-medium">{new Date(results.aml_screening.screened_at).toLocaleString()}</span></p>
+                      </div>
+                    </div>
+                  )}
+
                   {/* Document list from results (if synced from main API) */}
                   {results.documents?.map((doc: any, index: number) => (
                     <div key={index} className="border border-white/10 rounded-lg p-4">

@@ -457,6 +457,7 @@ router.post('/sessions/:sessionToken/result', async (req: Request, res: Response
       cross_validation_results,
       failure_reason,
       manual_review_reason,
+      aml_screening,
     } = parseResult.data;
 
     // Find session by token
@@ -498,6 +499,7 @@ router.post('/sessions/:sessionToken/result', async (req: Request, res: Response
       face_analysis: face_match_results ?? null,
       liveness_analysis: liveness_results ?? null,
       failure_reasons: failureReasons.length > 0 ? failureReasons : [],
+      aml_screening: aml_screening ?? null,
     };
 
     const now = new Date().toISOString();
