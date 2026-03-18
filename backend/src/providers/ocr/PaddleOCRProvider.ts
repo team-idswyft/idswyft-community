@@ -523,7 +523,13 @@ export class PaddleOCRProvider implements OCRProvider {
         /(?:4d\s*)?(?:DLn?|DL\s*(?:NO\.?|#?)|LIC(?:ENSE)?\s*(?:NO\.?|#?)|OL\s*NO\.?)\s*[:\s]*(\d[\d\s]{5,18}\d)\b/i,
       );
       if (spacedM && /\s/.test(spacedM[1])) {
-        const cleaned = spacedM[1].replace(/\s+/g, '');
+        // Strip trailing single-digit groups — they're AAMVA field markers
+        // (e.g., "000046688716 9" → "9" is field 9 for vehicle class, not part of DLN)
+        const groups = spacedM[1].trim().split(/\s+/);
+        while (groups.length > 1 && groups[groups.length - 1].length === 1) {
+          groups.pop();
+        }
+        const cleaned = groups.join('');
         if (cleaned.length >= 5 && cleaned.length <= 15) {
           return cleaned;
         }
@@ -649,7 +655,12 @@ export class PaddleOCRProvider implements OCRProvider {
     // Try matching spaced digit groups first: "793 398 654" → "793398654"
     const spacedM = withoutLabel.match(/^(\d[\d\s]{5,16}\d)/);
     if (spacedM) {
-      const collapsed = spacedM[1].replace(/\s/g, '');
+      // Strip trailing single-digit groups (AAMVA field markers, not DLN)
+      const groups = spacedM[1].trim().split(/\s+/);
+      while (groups.length > 1 && groups[groups.length - 1].length === 1) {
+        groups.pop();
+      }
+      const collapsed = groups.join('');
       if (collapsed.length >= 6 && collapsed.length <= 15 && !this.looksLikeDate(collapsed)) {
         return collapsed;
       }
