@@ -474,6 +474,11 @@ const startVaasServer = async () => {
     // Seed first platform admin if table is empty
     await seedPlatformAdmin();
 
+    // Ensure default document storage bucket exists
+    const { orgStorageService } = await import('./services/orgStorageService.js');
+    await orgStorageService.ensureDefaultBucket();
+    console.log('✅ Default document storage bucket verified');
+
     // Start session expiration background jobs
     console.log('⏰ Starting session expiration service...');
     sessionExpirationService.startExpirationJob(5); // Check every 5 minutes

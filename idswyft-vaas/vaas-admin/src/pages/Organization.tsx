@@ -162,7 +162,7 @@ export default function Organization() {
       {activeTab === 'storage' && (
         <StorageSettings
           organizationId={orgData.id}
-          canManageStorage={admin?.permissions.manage_organization || false}
+          canManageStorage={(admin?.role === 'owner' || admin?.role === 'super_admin') || false}
         />
       )}
 
@@ -813,8 +813,18 @@ interface StorageSettingsProps {
   canManageStorage: boolean;
 }
 
+const DATA_REGIONS = [
+  { value: 'us-east-1', label: 'US East (N. Virginia)' },
+  { value: 'us-west-2', label: 'US West (Oregon)' },
+  { value: 'eu-west-1', label: 'Europe (Ireland)' },
+  { value: 'eu-central-1', label: 'Europe (Frankfurt)' },
+  { value: 'ap-southeast-1', label: 'Asia Pacific (Singapore)' },
+  { value: 'ap-northeast-1', label: 'Asia Pacific (Tokyo)' },
+  { value: 'ca-central-1', label: 'Canada (Central)' },
+  { value: 'sa-east-1', label: 'South America (S\u00e3o Paulo)' },
+] as const;
+
 function StorageSettings({ organizationId, canManageStorage }: StorageSettingsProps) {
-  const [storageConfig, setStorageConfig] = useState<any>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState<string | null>(null);
@@ -822,6 +832,7 @@ function StorageSettings({ organizationId, canManageStorage }: StorageSettingsPr
 
   // Storage configuration state
   const [storageType, setStorageType] = useState<'default' | 'supabase' | 's3' | 'gcs'>('default');
+  const [dataRegion, setDataRegion] = useState('us-east-1');
   const [config, setConfig] = useState({
     // Supabase Storage
     supabase_url: '',
@@ -857,13 +868,17 @@ function StorageSettings({ organizationId, canManageStorage }: StorageSettingsPr
 
       if (response.data.success) {
         const data = response.data.data;
-        setStorageConfig(data);
         setStorageType(data.storage_type || 'default');
-        setConfig({ ...config, ...data.config });
+        setDataRegion(data.data_region || 'us-east-1');
+        setConfig(prev => ({ ...prev, ...data.config,
+          retention_days: data.retention_days ?? 365,
+          auto_delete_completed: data.auto_delete_completed ?? false,
+          encryption_enabled: data.encryption_enabled ?? true,
+        }));
       }
     } catch (err: any) {
       // If no config exists yet, that's okay - use defaults
-      if (err.response?.status !== 404) {
+      if (err.status !== 404) {
         console.error('Failed to fetch storage config:', err);
         setError(err.message || 'Failed to fetch storage configuration');
       }
@@ -881,9 +896,25 @@ function StorageSettings({ organizationId, canManageStorage }: StorageSettingsPr
     setSuccess(null);
 
     try {
+      // Only send the fields relevant to the selected provider
+      const providerFields: Record<string, string[]> = {
+        s3: ['s3_region', 's3_bucket', 's3_access_key', 's3_secret_key'],
+        supabase: ['supabase_url', 'supabase_service_key', 'supabase_bucket'],
+        gcs: ['gcs_bucket', 'gcs_project_id', 'gcs_key_file'],
+      };
+      const relevantKeys = providerFields[storageType] || [];
+      const filteredConfig: Record<string, any> = {};
+      for (const key of relevantKeys) {
+        filteredConfig[key] = (config as any)[key];
+      }
+
       const payload = {
         storage_type: storageType,
-        config: storageType === 'default' ? {} : config
+        data_region: dataRegion,
+        config: storageType === 'default' ? {} : filteredConfig,
+        retention_days: config.retention_days,
+        auto_delete_completed: config.auto_delete_completed,
+        encryption_enabled: config.encryption_enabled,
       };
 
       const response: AxiosResponse<ApiResponse> = await apiClient.post(`/organizations/${organizationId}/storage-config`, payload);
@@ -957,10 +988,162 @@ function StorageSettings({ organizationId, canManageStorage }: StorageSettingsPr
               <option value="s3">Amazon S3</option>
               <option value="gcs">Google Cloud Storage</option>
             </select>
+          </div>
+
+          {/* Data Region Selection */}
+          <div>
+            <label className={`block mb-2 ${sectionLabel}`}>
+              Data Region
+            </label>
+            <select
+              value={dataRegion}
+              onChange={(e) => setDataRegion(e.target.value)}
+              disabled={!canManageStorage}
+              className="w-full px-3 py-2 bg-slate-900/60 border border-white/10 rounded-lg font-mono text-sm text-slate-100 focus:ring-cyan-400 focus:border-cyan-400 disabled:bg-slate-900/40 disabled:text-slate-500"
+            >
+              {DATA_REGIONS.map((r) => (
+                <option key={r.value} value={r.value}>{r.label}</option>
+              ))}
+            </select>
             <p className={`${monoXs} text-slate-500 mt-1`}>
-              Custom storage providers will be configured in the next phase
+              Choose the region where identity documents will be stored for data sovereignty compliance
             </p>
           </div>
+
+          {/* Provider-Specific Credential Fields */}
+          {storageType === 's3' && (
+            <div className="border-t border-white/10 pt-6">
+              <p className={`${sectionLabel} mb-4`}>Amazon S3 Configuration</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className={`block mb-2 ${sectionLabel}`}>S3 Region</label>
+                  <input
+                    type="text"
+                    value={config.s3_region}
+                    onChange={(e) => setConfig({ ...config, s3_region: e.target.value })}
+                    disabled={!canManageStorage}
+                    placeholder="us-east-1"
+                    className="w-full px-3 py-2 bg-slate-900/60 border border-white/10 rounded-lg font-mono text-sm text-slate-100 focus:ring-cyan-400 focus:border-cyan-400 disabled:bg-slate-900/40 disabled:text-slate-500"
+                  />
+                </div>
+                <div>
+                  <label className={`block mb-2 ${sectionLabel}`}>S3 Bucket</label>
+                  <input
+                    type="text"
+                    value={config.s3_bucket}
+                    onChange={(e) => setConfig({ ...config, s3_bucket: e.target.value })}
+                    disabled={!canManageStorage}
+                    placeholder="my-idswyft-documents"
+                    className="w-full px-3 py-2 bg-slate-900/60 border border-white/10 rounded-lg font-mono text-sm text-slate-100 focus:ring-cyan-400 focus:border-cyan-400 disabled:bg-slate-900/40 disabled:text-slate-500"
+                  />
+                </div>
+                <div>
+                  <label className={`block mb-2 ${sectionLabel}`}>Access Key ID</label>
+                  <input
+                    type="text"
+                    value={config.s3_access_key}
+                    onChange={(e) => setConfig({ ...config, s3_access_key: e.target.value })}
+                    disabled={!canManageStorage}
+                    placeholder="AKIA..."
+                    className="w-full px-3 py-2 bg-slate-900/60 border border-white/10 rounded-lg font-mono text-sm text-slate-100 focus:ring-cyan-400 focus:border-cyan-400 disabled:bg-slate-900/40 disabled:text-slate-500"
+                  />
+                </div>
+                <div>
+                  <label className={`block mb-2 ${sectionLabel}`}>Secret Access Key</label>
+                  <input
+                    type="password"
+                    value={config.s3_secret_key}
+                    onChange={(e) => setConfig({ ...config, s3_secret_key: e.target.value })}
+                    disabled={!canManageStorage}
+                    placeholder="Enter secret key"
+                    className="w-full px-3 py-2 bg-slate-900/60 border border-white/10 rounded-lg font-mono text-sm text-slate-100 focus:ring-cyan-400 focus:border-cyan-400 disabled:bg-slate-900/40 disabled:text-slate-500"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {storageType === 'supabase' && (
+            <div className="border-t border-white/10 pt-6">
+              <p className={`${sectionLabel} mb-4`}>Supabase Storage Configuration</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="md:col-span-2">
+                  <label className={`block mb-2 ${sectionLabel}`}>Supabase Project URL</label>
+                  <input
+                    type="text"
+                    value={config.supabase_url}
+                    onChange={(e) => setConfig({ ...config, supabase_url: e.target.value })}
+                    disabled={!canManageStorage}
+                    placeholder="https://your-project.supabase.co"
+                    className="w-full px-3 py-2 bg-slate-900/60 border border-white/10 rounded-lg font-mono text-sm text-slate-100 focus:ring-cyan-400 focus:border-cyan-400 disabled:bg-slate-900/40 disabled:text-slate-500"
+                  />
+                </div>
+                <div>
+                  <label className={`block mb-2 ${sectionLabel}`}>Service Role Key</label>
+                  <input
+                    type="password"
+                    value={config.supabase_service_key}
+                    onChange={(e) => setConfig({ ...config, supabase_service_key: e.target.value })}
+                    disabled={!canManageStorage}
+                    placeholder="Enter service role key"
+                    className="w-full px-3 py-2 bg-slate-900/60 border border-white/10 rounded-lg font-mono text-sm text-slate-100 focus:ring-cyan-400 focus:border-cyan-400 disabled:bg-slate-900/40 disabled:text-slate-500"
+                  />
+                </div>
+                <div>
+                  <label className={`block mb-2 ${sectionLabel}`}>Storage Bucket</label>
+                  <input
+                    type="text"
+                    value={config.supabase_bucket}
+                    onChange={(e) => setConfig({ ...config, supabase_bucket: e.target.value })}
+                    disabled={!canManageStorage}
+                    placeholder="documents"
+                    className="w-full px-3 py-2 bg-slate-900/60 border border-white/10 rounded-lg font-mono text-sm text-slate-100 focus:ring-cyan-400 focus:border-cyan-400 disabled:bg-slate-900/40 disabled:text-slate-500"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
+
+          {storageType === 'gcs' && (
+            <div className="border-t border-white/10 pt-6">
+              <p className={`${sectionLabel} mb-4`}>Google Cloud Storage Configuration</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div>
+                  <label className={`block mb-2 ${sectionLabel}`}>GCS Bucket</label>
+                  <input
+                    type="text"
+                    value={config.gcs_bucket}
+                    onChange={(e) => setConfig({ ...config, gcs_bucket: e.target.value })}
+                    disabled={!canManageStorage}
+                    placeholder="my-idswyft-bucket"
+                    className="w-full px-3 py-2 bg-slate-900/60 border border-white/10 rounded-lg font-mono text-sm text-slate-100 focus:ring-cyan-400 focus:border-cyan-400 disabled:bg-slate-900/40 disabled:text-slate-500"
+                  />
+                </div>
+                <div>
+                  <label className={`block mb-2 ${sectionLabel}`}>Project ID</label>
+                  <input
+                    type="text"
+                    value={config.gcs_project_id}
+                    onChange={(e) => setConfig({ ...config, gcs_project_id: e.target.value })}
+                    disabled={!canManageStorage}
+                    placeholder="my-gcp-project"
+                    className="w-full px-3 py-2 bg-slate-900/60 border border-white/10 rounded-lg font-mono text-sm text-slate-100 focus:ring-cyan-400 focus:border-cyan-400 disabled:bg-slate-900/40 disabled:text-slate-500"
+                  />
+                </div>
+                <div className="md:col-span-2">
+                  <label className={`block mb-2 ${sectionLabel}`}>Service Account Key File Path</label>
+                  <input
+                    type="text"
+                    value={config.gcs_key_file}
+                    onChange={(e) => setConfig({ ...config, gcs_key_file: e.target.value })}
+                    disabled={!canManageStorage}
+                    placeholder="/path/to/service-account-key.json"
+                    className="w-full px-3 py-2 bg-slate-900/60 border border-white/10 rounded-lg font-mono text-sm text-slate-100 focus:ring-cyan-400 focus:border-cyan-400 disabled:bg-slate-900/40 disabled:text-slate-500"
+                  />
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Data Retention Settings */}
           <div className="border-t border-white/10 pt-6">
@@ -1032,14 +1215,14 @@ function StorageSettings({ organizationId, canManageStorage }: StorageSettingsPr
 
       {/* Information Card */}
       <div className={infoPanel}>
-        <p className={sectionLabel}>About Custom Storage</p>
+        <p className={sectionLabel}>About Custom Storage & Data Sovereignty</p>
         <div className={`mt-2 ${monoXs} text-cyan-300`}>
           <ul className="list-disc list-inside space-y-1">
             <li>Custom storage allows you to store identity documents in your own cloud storage</li>
-            <li>This ensures data sovereignty and compliance with your organization's data policies</li>
+            <li>Data region selection ensures documents are stored in the geographic region required by your compliance policies (GDPR, CCPA, LGPD, etc.)</li>
             <li>All documents are encrypted in transit and at rest (when enabled)</li>
             <li>Storage credentials are encrypted and stored securely</li>
-            <li>Coming soon: Full configuration for Supabase, AWS S3, and Google Cloud Storage</li>
+            <li>Supported providers: Amazon S3, Supabase Storage, and Google Cloud Storage</li>
           </ul>
         </div>
       </div>
