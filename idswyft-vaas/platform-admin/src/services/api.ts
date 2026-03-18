@@ -352,6 +352,85 @@ class PlatformApiClient {
     return response.data;
   }
 
+  // ── Verification Thresholds (per-org) ─────────────────────────────────
+  async listOrgThresholds(): Promise<any[]> {
+    const response: AxiosResponse<ApiResponse<any[]>> =
+      await this.client.get('/thresholds');
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to list org thresholds');
+    }
+
+    return response.data.data!;
+  }
+
+  async getOrgThresholds(orgId: string): Promise<any> {
+    const response: AxiosResponse<ApiResponse> =
+      await this.client.get(`/thresholds/${orgId}`);
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to get org thresholds');
+    }
+
+    return response.data.data!;
+  }
+
+  async updateOrgThresholds(orgId: string, settings: Record<string, any>): Promise<any> {
+    const response: AxiosResponse<ApiResponse> =
+      await this.client.put(`/thresholds/${orgId}`, settings);
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to update org thresholds');
+    }
+
+    return response.data.data!;
+  }
+
+  async resetOrgThresholds(orgId: string): Promise<any> {
+    const response: AxiosResponse<ApiResponse> =
+      await this.client.post(`/thresholds/${orgId}/reset`);
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to reset org thresholds');
+    }
+
+    return response.data.data!;
+  }
+
+  async previewOrgThresholds(orgId: string, settings: Record<string, any>): Promise<any> {
+    const response: AxiosResponse<ApiResponse> =
+      await this.client.post(`/thresholds/${orgId}/preview`, settings);
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to preview thresholds');
+    }
+
+    return response.data.data!;
+  }
+
+  // ── System Status ─────────────────────────────────────────────────────
+  async getSystemStatus(): Promise<any> {
+    const response: AxiosResponse<ApiResponse> =
+      await this.client.get('/status');
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to get system status');
+    }
+
+    return response.data.data!;
+  }
+
+  async getStatusHistory(): Promise<any[]> {
+    const response: AxiosResponse<ApiResponse<any[]>> =
+      await this.client.get('/status/history');
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to get status history');
+    }
+
+    return response.data.data!;
+  }
+
   // ── Utility ──────────────────────────────────────────────────────────────
   isAuthenticated(): boolean {
     return !!this.token;

@@ -10,6 +10,7 @@ import { AdminPage } from './pages/AdminPage'
 import { AdminLogin } from './pages/AdminLogin'
 import { DocsPage } from './pages/DocsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { Status } from './pages/Status'
 
 function App() {
   return (
@@ -23,6 +24,7 @@ function App() {
         <Route path="/live-capture" element={<LiveCapturePage />} />
         <Route path="/verify/mobile" element={<MobileVerificationPage />} />
         <Route path="/docs" element={<DocsPage />} />
+        <Route path="/status" element={<Status />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin/*" element={<AdminPage />} />
         <Route path="*" element={<NotFoundPage />} />

@@ -15,6 +15,8 @@ import Sessions from './pages/Sessions';
 import ProviderMetrics from './pages/ProviderMetrics';
 import AuditLogs from './pages/AuditLogs';
 import Settings from './pages/Settings';
+import VerificationSettings from './pages/VerificationSettings';
+import SystemStatus from './pages/SystemStatus';
 
 // ── Dynamic favicon from platform branding ───────────────────────────────────
 function usePlatformFavicon() {
@@ -60,6 +62,8 @@ export default function App() {
             <Route path="sessions" element={<Sessions />} />
             <Route path="provider-metrics" element={<ProviderMetrics />} />
             <Route path="audit-logs" element={<AuditLogs />} />
+            <Route path="verification-settings" element={<VerificationSettings />} />
+            <Route path="system-status" element={<SystemStatus />} />
             <Route path="settings" element={<Settings />} />
           </Route>
 
