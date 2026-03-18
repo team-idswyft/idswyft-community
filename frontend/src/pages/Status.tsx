@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { API_BASE_URL } from '../config/api'
+import '../styles/patterns.css'
 
 const VAAS_API_BASE = import.meta.env.VITE_VAAS_API_URL || 'http://localhost:3002'
 
@@ -261,7 +262,7 @@ export function Status() {
   const uptimePct = totalWithData > 0 ? ((operationalDays / totalWithData) * 100).toFixed(2) : null
 
   return (
-    <div style={{ minHeight: '80vh', fontFamily: '"DM Sans", system-ui, sans-serif' }}>
+    <div className="pattern-shield pattern-faint pattern-fade-edges pattern-full" style={{ minHeight: '80vh', fontFamily: '"DM Sans", system-ui, sans-serif' }}>
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '48px 24px 80px' }}>
 
         {/* ── Header ─────────────────────────────────────────────────── */}

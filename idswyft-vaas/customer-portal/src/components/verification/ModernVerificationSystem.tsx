@@ -12,6 +12,7 @@ import LiveCaptureComponent from '../LiveCaptureComponent';
 import type { LivenessMetadata } from '../../hooks/useActiveLiveness';
 import LanguageSelector from '../LanguageSelector';
 import { useTranslation } from 'react-i18next';
+import '../../patterns.css';
 
 interface ModernVerificationSystemProps {
   sessionToken: string;
@@ -433,7 +434,7 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
   // ── Loading state ──────────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div className={`min-h-screen ${t.bg} flex items-center justify-center p-4`}>
+      <div className={`min-h-screen ${t.bg} flex items-center justify-center p-4 pattern-fingerprint pattern-faint pattern-fade-edges pattern-full`}>
         <div className="w-full max-w-lg">
           <div className={`portal-card p-8 text-center animate-fade-in`}>
             <div className="w-14 h-14 mx-auto mb-5 bg-gradient-to-br from-cyan-400 to-cyan-500 rounded-full flex items-center justify-center">
@@ -453,7 +454,7 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
   // ── Stale link state ───────────────────────────────────────────────────────
   if (staleMessage) {
     return (
-      <div className={`min-h-screen ${t.bg} flex items-center justify-center p-4`}>
+      <div className={`min-h-screen ${t.bg} flex items-center justify-center p-4 pattern-fingerprint pattern-faint pattern-fade-edges pattern-full`}>
         <div className="w-full max-w-lg">
           <BrandedHeader className="mb-6" />
           <div className="portal-card p-8 text-center animate-fade-in">
@@ -478,7 +479,7 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
   // ── Error-only state ───────────────────────────────────────────────────────
   if (error && !session) {
     return (
-      <div className={`min-h-screen ${t.bg} flex items-center justify-center p-4`}>
+      <div className={`min-h-screen ${t.bg} flex items-center justify-center p-4 pattern-fingerprint pattern-faint pattern-fade-edges pattern-full`}>
         <div className="w-full max-w-lg">
           <div className="portal-card p-8 text-center animate-fade-in">
             <div className="text-4xl mb-4">!</div>
@@ -764,7 +765,7 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
 
   // ── Root render ────────────────────────────────────────────────────────────
   return (
-    <div className={`min-h-screen ${t.bg} flex items-center justify-center p-4`}>
+    <div className={`min-h-screen ${t.bg} flex items-center justify-center p-4 pattern-fingerprint pattern-faint pattern-fade-edges pattern-full`}>
       <div className="w-full max-w-lg">
         {/* Language selector */}
         <div className="flex justify-end mb-3">

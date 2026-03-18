@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom'
 import { Player } from '@remotion/player'
 import { VerificationShowcase } from '../remotion/VerificationShowcase'
 import { C, injectFonts } from '../theme'
+import '../styles/patterns.css'
 
 const JS_CODE = `const BASE = 'https://api.idswyft.app'
 const KEY  = 'your-api-key'
@@ -224,7 +225,7 @@ export function HomePage() {
     <div style={{ background: C.bg, color: C.text, fontFamily: C.sans }}>
 
       {/* 1. HERO */}
-      <section className="landing-hero" style={{
+      <section className="landing-hero pattern-fingerprint pattern-faint pattern-animate-slow pattern-full" style={{
         minHeight: '100vh',
         display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
@@ -284,7 +285,7 @@ export function HomePage() {
       </section>
 
       {/* 2. PIPELINE */}
-      <section className="scroll-reveal" style={{ padding: '80px 24px', maxWidth: 960, margin: '0 auto', position: 'relative', overflow: 'hidden' }}>
+      <section className="scroll-reveal pattern-topographic pattern-faint pattern-fade-edges pattern-full" style={{ padding: '80px 24px', maxWidth: 960, margin: '0 auto', position: 'relative', overflow: 'hidden' }}>
         <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
           <div className="geo-accent geo-accent--float" style={{ width: 36, height: 36, border: '1px solid rgba(34,211,238,0.06)', top: '12%', right: '5%', animationDelay: '-3s' }} />
           <div className="geo-accent geo-accent--breath" style={{ width: 4, height: 4, borderRadius: '50%', background: 'rgba(34,211,238,0.15)', bottom: '18%', left: '6%', animationDelay: '-2s' }} />
@@ -330,7 +331,7 @@ export function HomePage() {
       </section>
 
       {/* 2.5. VERIFICATION SHOWCASE VIDEO */}
-      <section className="scroll-reveal" style={{ background: C.bg, padding: '96px 24px', borderTop: `1px solid ${C.border}` }}>
+      <section className="scroll-reveal pattern-shield pattern-faint pattern-full" style={{ background: C.bg, padding: '96px 24px', borderTop: `1px solid ${C.border}` }}>
         <div style={{ maxWidth: 1100, margin: '0 auto', display: 'flex', alignItems: 'center', gap: 64, flexWrap: 'wrap', justifyContent: 'center' }}>
 
           {/* Left column: marketing copy */}
@@ -408,7 +409,7 @@ export function HomePage() {
       <CodeStrip />
 
       {/* 4. FEATURES */}
-      <section className="scroll-reveal" style={{ padding: '80px 24px', maxWidth: 960, margin: '0 auto', position: 'relative', overflow: 'hidden' }}>
+      <section className="scroll-reveal pattern-crosshatch pattern-faint pattern-fade-edges pattern-full" style={{ padding: '80px 24px', maxWidth: 960, margin: '0 auto', position: 'relative', overflow: 'hidden' }}>
         <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
           <div className="geo-accent geo-accent--diamond" style={{ width: 28, height: 28, border: '1px solid rgba(34,211,238,0.05)', top: '10%', left: '4%', animationDelay: '-5s' }} />
           <div className="geo-accent geo-accent--float-alt" style={{ width: 44, height: 44, border: '1px solid rgba(34,211,238,0.04)', borderRadius: '50%', bottom: '12%', right: '6%', animationDelay: '-8s' }} />
@@ -500,7 +501,7 @@ export function HomePage() {
       </section>
 
       {/* 7. CTA */}
-      <section className="scroll-reveal" style={{ padding: '80px 24px', textAlign: 'center', background: C.panel, borderTop: `1px solid ${C.border}`, position: 'relative', overflow: 'hidden' }}>
+      <section className="scroll-reveal pattern-guilloche pattern-subtle pattern-animate-slow pattern-full" style={{ padding: '80px 24px', textAlign: 'center', background: C.panel, borderTop: `1px solid ${C.border}`, position: 'relative', overflow: 'hidden' }}>
         <div aria-hidden="true" style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }}>
           <div className="geo-accent geo-accent--float" style={{ width: 50, height: 50, border: '1px solid rgba(34,211,238,0.05)', borderRadius: '50%', top: '15%', left: '8%', animationDelay: '-7s' }} />
           <div className="geo-accent geo-accent--breath" style={{ width: 4, height: 4, borderRadius: '50%', background: 'rgba(34,211,238,0.18)', bottom: '25%', right: '12%', animationDelay: '-3s' }} />

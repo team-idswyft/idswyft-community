@@ -8,6 +8,7 @@ import {
 } from 'lucide-react'
 import { Player } from '@remotion/player'
 import { VaaSMarketing } from './remotion/VaaSMarketing'
+import './patterns.css'
 
 // ── Code preview content (3 language tabs) ────────────────────────────────
 type CodeTab = 'curl' | 'js' | 'python'
@@ -796,7 +797,7 @@ function App() {
       {/* ════════════════════════════════════════
           HOW IT WORKS — 3 steps
           ════════════════════════════════════════ */}
-      <section className="py-24">
+      <section className="py-24 pattern-crosshatch pattern-faint pattern-fade-edges pattern-full">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
           <div className="text-center mb-16">
             <h2
@@ -905,6 +906,7 @@ function App() {
           ════════════════════════════════════════ */}
       <section
         id="features"
+        className="pattern-shield pattern-faint pattern-fade-edges pattern-full"
         style={{
           padding: '96px 0',
           background: 'rgba(255,255,255,0.012)',
@@ -1213,6 +1215,7 @@ function App() {
           ════════════════════════════════════════ */}
       <section
         id="pricing"
+        className="pattern-microprint pattern-faint pattern-fade-edges pattern-full"
         style={{
           padding: '96px 0',
           background: 'rgba(255,255,255,0.012)',
@@ -1381,7 +1384,7 @@ function App() {
       {/* ════════════════════════════════════════
           FINAL CTA
           ════════════════════════════════════════ */}
-      <section className="py-32 relative overflow-hidden">
+      <section className="py-32 relative overflow-hidden pattern-guilloche pattern-subtle pattern-animate-slow pattern-full">
         {/* Bottom radial glow */}
         <div
           className="absolute bottom-0 left-1/2 -translate-x-1/2"

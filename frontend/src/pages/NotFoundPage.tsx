@@ -1,12 +1,13 @@
 import React, { useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { C, injectFonts } from '../theme';
+import '../styles/patterns.css';
 
 export const NotFoundPage: React.FC = () => {
   useEffect(() => { injectFonts(); }, []);
 
   return (
-    <div style={{ background: C.bg, fontFamily: C.sans, color: C.text, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
+    <div className="pattern-topographic pattern-faint pattern-fade-edges pattern-full" style={{ background: C.bg, fontFamily: C.sans, color: C.text, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '40px 24px' }}>
       <div style={{ textAlign: 'center', maxWidth: 480 }}>
         <div style={{ fontFamily: C.mono, fontSize: 'clamp(80px, 16vw, 128px)', fontWeight: 600, color: C.surface, lineHeight: 1, marginBottom: 8, userSelect: 'none' }}>
           404

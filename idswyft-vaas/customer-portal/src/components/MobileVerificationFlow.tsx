@@ -16,6 +16,7 @@ import { ActiveLivenessCapture } from './ActiveLivenessCapture';
 import type { LivenessMetadata } from '../hooks/useActiveLiveness';
 import { useTranslation } from 'react-i18next';
 import LanguageSelector from './LanguageSelector';
+import '../patterns.css';
 
 // ─── Design system CSS ─────────────────────────────────────────────────────
 const css = `
@@ -800,7 +801,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
   // ─── Loading state ────────────────────────────────────────────────────
   if (loading) {
     return (
-      <div style={shellStyle}>
+      <div className="pattern-fingerprint pattern-faint pattern-full" style={shellStyle}>
         <style>{css}</style>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
           <div style={{
@@ -820,7 +821,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
   // ─── Stale link state ───────────────────────────────────────────────
   if (staleMessage) {
     return (
-      <div style={shellStyle}>
+      <div className="pattern-fingerprint pattern-faint pattern-full" style={shellStyle}>
         <style>{css}</style>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 32px', gap: 16, textAlign: 'center' }}>
           <div style={{
@@ -847,7 +848,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
   // ─── Error state ──────────────────────────────────────────────────────
   if (error) {
     return (
-      <div style={shellStyle}>
+      <div className="pattern-fingerprint pattern-faint pattern-full" style={shellStyle}>
         <style>{css}</style>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 32px', gap: 16, textAlign: 'center' }}>
           <div style={{
@@ -870,7 +871,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
 
   // ─── Verification flow ────────────────────────────────────────────────
   return (
-    <div style={shellStyle}>
+    <div className="pattern-fingerprint pattern-faint pattern-full" style={shellStyle}>
       <style>{css}</style>
 
       {/* Status bar */}

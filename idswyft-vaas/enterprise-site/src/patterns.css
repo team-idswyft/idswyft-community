@@ -1,0 +1,149 @@
+/*
+ * Security Document Pattern Library
+ *
+ * Subtle background patterns inspired by government ID guilloche,
+ * crosshatch, and microprint textures. Designed for Idswyft's dark
+ * theme (#080c14) with cyan (#22d3ee) accents.
+ *
+ * Usage:
+ *   <div className="pattern-guilloche">      — flowing sine-wave mesh
+ *   <div className="pattern-crosshatch">     — diagonal fine-line grid
+ *   <div className="pattern-topographic">    — concentric contour lines
+ *   <div className="pattern-fingerprint">    — concentric loops (brand icon)
+ *   <div className="pattern-microprint">     — fine horizontal parallel lines
+ *   <div className="pattern-wave">           — horizontal wavy bands
+ *
+ * Combine with existing backgrounds:
+ *   <div style={{ background: C.bg }} className="pattern-guilloche">
+ *
+ * Intensity modifiers:
+ *   .pattern-faint      — barely visible (0.02 opacity)
+ *   .pattern-subtle     — default (0.04 opacity)
+ *   .pattern-visible    — noticeable (0.08 opacity)
+ */
+
+/* ── Base layer ─────────────────────────────────────────── */
+
+[class*="pattern-"] {
+  position: relative;
+}
+
+[class*="pattern-"]::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: var(--pattern-opacity, 0.04);
+  mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
+  -webkit-mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
+}
+
+/* Ensure content stays above the pattern layer */
+[class*="pattern-"] > * {
+  position: relative;
+  z-index: 1;
+}
+
+/* ── Intensity modifiers ────────────────────────────────── */
+
+.pattern-faint   { --pattern-opacity: 0.02; }
+.pattern-subtle  { --pattern-opacity: 0.04; }
+.pattern-visible { --pattern-opacity: 0.08; }
+
+/* No vignette fade — pattern fills the entire area */
+.pattern-full::before {
+  mask-image: none;
+  -webkit-mask-image: none;
+}
+
+/* ── 1. Guilloche — flowing sine-wave mesh ──────────────── */
+
+.pattern-guilloche::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='200' height='200'%3E%3Cdefs%3E%3Cpattern id='g' width='200' height='200' patternUnits='userSpaceOnUse'%3E%3Cpath d='M0 40 Q50 10 100 40 T200 40' fill='none' stroke='%2322d3ee' stroke-width='0.5'/%3E%3Cpath d='M0 80 Q50 50 100 80 T200 80' fill='none' stroke='%2322d3ee' stroke-width='0.5'/%3E%3Cpath d='M0 120 Q50 90 100 120 T200 120' fill='none' stroke='%2322d3ee' stroke-width='0.5'/%3E%3Cpath d='M0 160 Q50 130 100 160 T200 160' fill='none' stroke='%2322d3ee' stroke-width='0.5'/%3E%3Cpath d='M0 60 Q50 90 100 60 T200 60' fill='none' stroke='%2322d3ee' stroke-width='0.3'/%3E%3Cpath d='M0 100 Q50 130 100 100 T200 100' fill='none' stroke='%2322d3ee' stroke-width='0.3'/%3E%3Cpath d='M0 140 Q50 170 100 140 T200 140' fill='none' stroke='%2322d3ee' stroke-width='0.3'/%3E%3Cpath d='M0 180 Q50 210 100 180 T200 180' fill='none' stroke='%2322d3ee' stroke-width='0.3'/%3E%3C/pattern%3E%3C/defs%3E%3Crect width='200' height='200' fill='url(%23g)'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
+}
+
+/* ── 2. Crosshatch — diagonal fine-line grid ────────────── */
+
+.pattern-crosshatch::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cline x1='0' y1='0' x2='60' y2='60' stroke='%2322d3ee' stroke-width='0.4'/%3E%3Cline x1='60' y1='0' x2='0' y2='60' stroke='%2322d3ee' stroke-width='0.4'/%3E%3Cline x1='0' y1='30' x2='30' y2='60' stroke='%2322d3ee' stroke-width='0.25'/%3E%3Cline x1='30' y1='0' x2='60' y2='30' stroke='%2322d3ee' stroke-width='0.25'/%3E%3Cline x1='60' y1='30' x2='30' y2='60' stroke='%2322d3ee' stroke-width='0.25'/%3E%3Cline x1='30' y1='0' x2='0' y2='30' stroke='%2322d3ee' stroke-width='0.25'/%3E%3C/svg%3E");
+  background-size: 60px 60px;
+}
+
+/* ── 3. Topographic — concentric contour lines ──────────── */
+
+.pattern-topographic::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='300' height='300'%3E%3Cellipse cx='150' cy='150' rx='40' ry='30' fill='none' stroke='%2322d3ee' stroke-width='0.5'/%3E%3Cellipse cx='150' cy='150' rx='70' ry='55' fill='none' stroke='%2322d3ee' stroke-width='0.4'/%3E%3Cellipse cx='150' cy='150' rx='100' ry='80' fill='none' stroke='%2322d3ee' stroke-width='0.4'/%3E%3Cellipse cx='150' cy='150' rx='130' ry='105' fill='none' stroke='%2322d3ee' stroke-width='0.35'/%3E%3Cellipse cx='150' cy='150' rx='160' ry='130' fill='none' stroke='%2322d3ee' stroke-width='0.3'/%3E%3Cellipse cx='60' cy='60' rx='35' ry='25' fill='none' stroke='%2322d3ee' stroke-width='0.3'/%3E%3Cellipse cx='60' cy='60' rx='60' ry='48' fill='none' stroke='%2322d3ee' stroke-width='0.25'/%3E%3Cellipse cx='260' cy='240' rx='30' ry='22' fill='none' stroke='%2322d3ee' stroke-width='0.3'/%3E%3Cellipse cx='260' cy='240' rx='55' ry='42' fill='none' stroke='%2322d3ee' stroke-width='0.25'/%3E%3C/svg%3E");
+  background-size: 300px 300px;
+}
+
+/* ── 4. Fingerprint — concentric loops (brand icon) ─────── */
+
+.pattern-fingerprint::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cg fill='none' stroke='%2322d3ee'%3E%3Cellipse cx='120' cy='120' rx='15' ry='20' stroke-width='0.5'/%3E%3Cellipse cx='120' cy='120' rx='25' ry='33' stroke-width='0.45'/%3E%3Cellipse cx='120' cy='120' rx='35' ry='46' stroke-width='0.4'/%3E%3Cellipse cx='120' cy='120' rx='45' ry='59' stroke-width='0.4'/%3E%3Cellipse cx='120' cy='120' rx='55' ry='72' stroke-width='0.35'/%3E%3Cellipse cx='120' cy='120' rx='65' ry='85' stroke-width='0.35'/%3E%3Cellipse cx='120' cy='120' rx='76' ry='98' stroke-width='0.3'/%3E%3Cellipse cx='120' cy='120' rx='88' ry='112' stroke-width='0.3'/%3E%3Cpath d='M120 8 Q160 60 120 120 Q80 180 120 232' stroke-width='0.3'/%3E%3Cpath d='M85 12 Q130 70 95 120 Q60 170 90 228' stroke-width='0.25'/%3E%3Cpath d='M155 12 Q110 70 145 120 Q180 170 150 228' stroke-width='0.25'/%3E%3C/g%3E%3C/svg%3E");
+  background-size: 240px 240px;
+}
+
+/* ── 5. Microprint — fine horizontal parallel lines ─────── */
+
+.pattern-microprint::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='100' height='40'%3E%3Cline x1='0' y1='4' x2='100' y2='4' stroke='%2322d3ee' stroke-width='0.3'/%3E%3Cline x1='0' y1='12' x2='100' y2='12' stroke='%2322d3ee' stroke-width='0.5'/%3E%3Cline x1='0' y1='20' x2='100' y2='20' stroke='%2322d3ee' stroke-width='0.3'/%3E%3Cline x1='0' y1='28' x2='100' y2='28' stroke='%2322d3ee' stroke-width='0.5'/%3E%3Cline x1='0' y1='36' x2='100' y2='36' stroke='%2322d3ee' stroke-width='0.3'/%3E%3C/svg%3E");
+  background-size: 100px 40px;
+}
+
+/* ── 6. Wave — horizontal wavy bands ────────────────────── */
+
+.pattern-wave::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='80'%3E%3Cpath d='M0 20 Q30 5 60 20 T120 20 T180 20 T240 20' fill='none' stroke='%2322d3ee' stroke-width='0.5'/%3E%3Cpath d='M0 40 Q30 25 60 40 T120 40 T180 40 T240 40' fill='none' stroke='%2322d3ee' stroke-width='0.4'/%3E%3Cpath d='M0 60 Q30 45 60 60 T120 60 T180 60 T240 60' fill='none' stroke='%2322d3ee' stroke-width='0.5'/%3E%3C/svg%3E");
+  background-size: 240px 80px;
+}
+
+/* ── 7. Shield mesh — hexagonal security grid ───────────── */
+
+.pattern-shield::before {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='56' height='100'%3E%3Cpath d='M28 66L0 50L0 16L28 0L56 16L56 50L28 66L28 100' fill='none' stroke='%2322d3ee' stroke-width='0.4'/%3E%3Cpath d='M28 0L28 34L0 50L0 84L28 100L56 84L56 50L28 34' fill='none' stroke='%2322d3ee' stroke-width='0.25'/%3E%3C/svg%3E");
+  background-size: 56px 100px;
+}
+
+/* ── Animated variants ──────────────────────────────────── */
+
+.pattern-animate::before {
+  animation: patternDrift 60s linear infinite;
+}
+
+.pattern-animate-slow::before {
+  animation: patternDrift 120s linear infinite;
+}
+
+@keyframes patternDrift {
+  0%   { background-position: 0 0; }
+  100% { background-position: 400px 200px; }
+}
+
+/* ── Gradient overlays — combine with patterns ──────────── */
+
+.pattern-fade-bottom::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: linear-gradient(to bottom, transparent 60%, var(--pattern-bg, #05080f) 100%);
+}
+
+.pattern-fade-edges::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  background: radial-gradient(ellipse at center, transparent 30%, var(--pattern-bg, #05080f) 80%);
+}
+
+/* ── Color variants ─────────────────────────────────────── */
+
+/* White patterns for light-theme pages */
+.pattern-light::before {
+  filter: hue-rotate(180deg) saturate(0) brightness(0.3);
+}

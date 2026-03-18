@@ -13,6 +13,7 @@ import { ContinueOnPhone } from '../components/ContinueOnPhone';
 import { ActiveLivenessCapture } from '../components/liveness/ActiveLivenessCapture';
 import type { LivenessMetadata } from '../hooks/useActiveLiveness';
 import { C, injectFonts } from '../theme';
+import '../styles/patterns.css';
 
 // OpenCV types
 declare global {
@@ -2100,7 +2101,7 @@ const DemoPage: React.FC = () => {
   };
 
   return (
-    <div style={{ background: C.bg, fontFamily: C.sans, color: C.text, minHeight: '100vh' }}>
+    <div className="pattern-guilloche pattern-faint pattern-fade-edges pattern-full" style={{ background: C.bg, fontFamily: C.sans, color: C.text, minHeight: '100vh' }}>
       <div style={{ maxWidth: 680, margin: '0 auto', padding: '48px 24px' }}>
         <div style={{ fontFamily: C.mono, fontSize: 11, color: C.muted, letterSpacing: '0.08em', marginBottom: 24 }}>
           idswyft / live-demo

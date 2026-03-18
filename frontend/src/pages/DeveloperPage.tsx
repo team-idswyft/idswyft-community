@@ -3,6 +3,7 @@ import toast from 'react-hot-toast'
 import { Link } from 'react-router-dom'
 import { API_BASE_URL } from '../config/api'
 import { C, injectFonts } from '../theme'
+import '../styles/patterns.css'
 import {
   TrashIcon,
   PlusIcon,
@@ -162,7 +163,7 @@ function AuthGate({ onAuth }: { onAuth: (token: string) => void }) {
   }
 
   return (
-    <div style={{ minHeight: 'calc(100vh - 120px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+    <div className="pattern-shield pattern-faint pattern-full" style={{ minHeight: 'calc(100vh - 120px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
       <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 40, width: '100%', maxWidth: 400 }}>
         <div style={{ fontFamily: C.mono, fontSize: 11, color: C.muted, letterSpacing: '0.08em', marginBottom: 24 }}>
           idswyft / developer-portal
@@ -612,7 +613,7 @@ export function DeveloperPage() {
   -d '{"mode":"sandbox"}'`
 
   return (
-    <div style={{ background: C.bg, fontFamily: C.sans, color: C.text, minHeight: '100vh' }}>
+    <div className="pattern-microprint pattern-faint pattern-fade-edges pattern-full" style={{ background: C.bg, fontFamily: C.sans, color: C.text, minHeight: '100vh' }}>
       <div style={{ maxWidth: 960, margin: '0 auto', padding: '48px 24px' }}>
 
         {/* Header */}
