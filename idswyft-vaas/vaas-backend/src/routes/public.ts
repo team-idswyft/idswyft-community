@@ -491,7 +491,7 @@ router.post('/sessions/:sessionToken/result', async (req: Request, res: Response
       verification_status: final_result,
       confidence_score: confidence_score ?? null,
       face_match_score: face_match_results?.similarity_score ?? face_match_results?.score ?? null,
-      liveness_score: liveness_results?.liveness_score ?? liveness_results?.confidence ?? null,
+      liveness_score: liveness_results?.liveness_score ?? liveness_results?.score ?? liveness_results?.confidence ?? null,
       liveness_passed: liveness_results?.liveness_passed ?? liveness_results?.passed ?? null,
       ocr_data: ocr_data ?? null,
       cross_validation_results: cross_validation_results ?? null,
