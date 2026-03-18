@@ -53,7 +53,9 @@ export const resultSchema = z.object({
   }).passthrough().nullable().optional(),
   liveness_results: z.object({
     confidence: z.number().min(0).max(1).nullable().optional(),
+    liveness_score: z.number().min(0).max(1).nullable().optional(),
     passed: z.boolean().nullable().optional(),
+    liveness_passed: z.boolean().nullable().optional(),
   }).passthrough().nullable().optional(),
   ocr_data: z.record(z.unknown()).nullable().optional(),
   cross_validation_results: z.record(z.unknown()).nullable().optional(),

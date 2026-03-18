@@ -124,6 +124,19 @@ describe('verification schemas', () => {
     expect(result.success).toBe(true);
   });
 
+  it('resultSchema accepts liveness_score and liveness_passed field names', () => {
+    const result = resultSchema.safeParse({
+      final_result: 'verified',
+      liveness_results: {
+        liveness_score: 0.88,
+        liveness_passed: true,
+      },
+    });
+    expect(result.success).toBe(true);
+    expect(result.data!.liveness_results!.liveness_score).toBe(0.88);
+    expect(result.data!.liveness_results!.liveness_passed).toBe(true);
+  });
+
   it('resultSchema rejects invalid final_result enum', () => {
     const result = resultSchema.safeParse({ final_result: 'unknown_status' });
     expect(result.success).toBe(false);

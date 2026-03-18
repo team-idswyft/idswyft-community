@@ -307,15 +307,76 @@ export function VerificationDetailsModal({ verification, isOpen, onClose, onStat
                         <CheckCircle className="w-5 h-5 text-green-400 mr-2" />
                         <span className="font-medium text-slate-100">Cross-Validation</span>
                       </div>
-                      <div className="space-y-1 text-sm text-slate-400">
-                        {Object.entries(results.cross_validation_results).map(([key, value]) => (
-                          <p key={key}>
-                            <span className="capitalize">{key.replace(/_/g, ' ')}: </span>
-                            <span className={`font-medium ${value === 'match' || value === true ? 'text-green-400' : value === 'mismatch' || value === false ? 'text-red-400' : 'text-slate-200'}`}>
-                              {typeof value === 'boolean' ? (value ? 'Match' : 'Mismatch') : String(value)}
+                      <div className="space-y-2 text-sm text-slate-400">
+                        {/* Verdict badge */}
+                        {results.cross_validation_results.verdict && (
+                          <p>
+                            <span>Verdict: </span>
+                            <span className={`inline-block px-2 py-0.5 rounded text-xs font-semibold ${
+                              results.cross_validation_results.verdict === 'PASS' ? 'bg-green-500/20 text-green-400' :
+                              results.cross_validation_results.verdict === 'FAIL' ? 'bg-red-500/20 text-red-400' :
+                              'bg-amber-500/20 text-amber-400'
+                            }`}>
+                              {results.cross_validation_results.verdict}
                             </span>
                           </p>
-                        ))}
+                        )}
+                        {/* Overall score */}
+                        {results.cross_validation_results.overall_score != null && (
+                          <p>
+                            <span>Overall Score: </span>
+                            <span className={`font-medium ${results.cross_validation_results.overall_score >= 0.8 ? 'text-green-400' : results.cross_validation_results.overall_score >= 0.6 ? 'text-amber-400' : 'text-red-400'}`}>
+                              {(results.cross_validation_results.overall_score * 100).toFixed(1)}%
+                            </span>
+                          </p>
+                        )}
+                        {/* Inverted booleans: false = good for negative-named fields */}
+                        {results.cross_validation_results.document_expired != null && (
+                          <p>
+                            <span>Document Expired: </span>
+                            <span className={`font-medium ${results.cross_validation_results.document_expired ? 'text-red-400' : 'text-green-400'}`}>
+                              {results.cross_validation_results.document_expired ? 'Yes' : 'No'}
+                            </span>
+                          </p>
+                        )}
+                        {results.cross_validation_results.has_critical_failure != null && (
+                          <p>
+                            <span>Has Critical Failure: </span>
+                            <span className={`font-medium ${results.cross_validation_results.has_critical_failure ? 'text-red-400' : 'text-green-400'}`}>
+                              {results.cross_validation_results.has_critical_failure ? 'Yes' : 'No'}
+                            </span>
+                          </p>
+                        )}
+                        {/* Field scores — nested object rendered as rows */}
+                        {results.cross_validation_results.field_scores && typeof results.cross_validation_results.field_scores === 'object' && (
+                          <div className="mt-2">
+                            <span className="text-slate-300 font-medium text-xs uppercase tracking-wide">Field Scores</span>
+                            <div className="mt-1 space-y-1">
+                              {Object.entries(results.cross_validation_results.field_scores).map(([field, detail]: [string, any]) => (
+                                <div key={field} className="flex items-center justify-between">
+                                  <span className="capitalize text-slate-400">{field.replace(/_/g, ' ')}</span>
+                                  <span className={`font-medium ${detail?.passed ? 'text-green-400' : 'text-red-400'}`}>
+                                    {detail?.score != null ? `${(detail.score * 100).toFixed(0)}%` : ''} {detail?.passed ? 'PASS' : 'FAIL'}
+                                  </span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+                        {/* Remaining simple fields (skip already-rendered keys) */}
+                        {Object.entries(results.cross_validation_results)
+                          .filter(([key]) => !['verdict', 'overall_score', 'document_expired', 'has_critical_failure', 'field_scores'].includes(key))
+                          .map(([key, value]) => {
+                            if (value == null || typeof value === 'object') return null;
+                            return (
+                              <p key={key}>
+                                <span className="capitalize">{key.replace(/_/g, ' ')}: </span>
+                                <span className={`font-medium ${value === true ? 'text-green-400' : value === false ? 'text-red-400' : 'text-slate-200'}`}>
+                                  {typeof value === 'boolean' ? (value ? 'Yes' : 'No') : typeof value === 'number' && value <= 1 ? `${(value * 100).toFixed(1)}%` : String(value)}
+                                </span>
+                              </p>
+                            );
+                          })}
                       </div>
                     </div>
                   )}
