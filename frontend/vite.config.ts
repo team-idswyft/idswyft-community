@@ -35,6 +35,7 @@ export default defineConfig({
     outDir: 'dist',
     sourcemap: true,
     minify: 'terser',
+    chunkSizeWarningLimit: 1000,
   },
   define: {
     'process.env': {},
