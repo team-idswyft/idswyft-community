@@ -7,6 +7,7 @@ import { apiKeyRateLimit } from '../middleware/rateLimit.js';
 import { VaasApiResponse, VaasStartVerificationRequest } from '../types/index.js';
 import { vaasSupabase } from '../config/database.js';
 import { auditService } from '../services/auditService.js';
+import { orgStorageService } from '../services/orgStorageService.js';
 
 const router = Router();
 
@@ -239,7 +240,7 @@ router.get('/:id/documents', requireAuth, requirePermission('view_verifications'
     // Fetch uploaded documents from vaas_verification_documents
     const { data: documents, error: docError } = await vaasSupabase
       .from('vaas_verification_documents')
-      .select('id, document_type, filename, mimetype, size, file_path, uploaded_at')
+      .select('id, document_type, filename, mimetype, size, uploaded_at')
       .eq('verification_session_id', id)
       .order('uploaded_at', { ascending: true });
 
@@ -256,6 +257,77 @@ router.get('/:id/documents', requireAuth, requirePermission('view_verifications'
     const response: VaasApiResponse = {
       success: false,
       error: { code: 'GET_DOCUMENTS_FAILED', message: error.message }
+    };
+    res.status(500).json(response);
+  }
+});
+
+// Get a signed URL for a specific document (admin auth required)
+router.get('/:id/documents/:documentId/url', requireAuth, requirePermission('view_verifications'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const { id, documentId } = req.params;
+    const organizationId = req.admin!.organization_id;
+
+    // Verify the session belongs to this org
+    const { data: session, error: sessionError } = await vaasSupabase
+      .from('vaas_verification_sessions')
+      .select('id, organization_id')
+      .eq('id', id)
+      .eq('organization_id', organizationId)
+      .single();
+
+    if (sessionError || !session) {
+      const response: VaasApiResponse = {
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Verification not found' }
+      };
+      return res.status(404).json(response);
+    }
+
+    // Fetch the document record
+    const { data: doc, error: docError } = await vaasSupabase
+      .from('vaas_verification_documents')
+      .select('id, file_path, mimetype')
+      .eq('id', documentId)
+      .eq('verification_session_id', id)
+      .single();
+
+    if (docError || !doc) {
+      const response: VaasApiResponse = {
+        success: false,
+        error: { code: 'NOT_FOUND', message: 'Document not found' }
+      };
+      return res.status(404).json(response);
+    }
+
+    // Guard against legacy temp:// paths
+    if (doc.file_path.startsWith('temp://')) {
+      const response: VaasApiResponse = {
+        success: false,
+        error: {
+          code: 'FILE_NOT_AVAILABLE',
+          message: 'This document was uploaded before file storage was configured. The file data is not available.'
+        }
+      };
+      return res.status(404).json(response);
+    }
+
+    const url = await orgStorageService.getFileUrl(organizationId, doc.file_path);
+
+    const response: VaasApiResponse = {
+      success: true,
+      data: {
+        url,
+        expires_in: 3600,
+        mimetype: doc.mimetype,
+      }
+    };
+    res.json(response);
+  } catch (error: any) {
+    console.error('[VerificationRoutes] Get document URL failed:', error);
+    const response: VaasApiResponse = {
+      success: false,
+      error: { code: 'GET_DOCUMENT_URL_FAILED', message: error.message }
     };
     res.status(500).json(response);
   }

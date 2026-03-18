@@ -2,6 +2,7 @@ import { Router, Request, Response } from 'express';
 import multer from 'multer';
 import { fileTypeFromBuffer } from 'file-type';
 import { vaasSupabase } from '../config/database.js';
+import { orgStorageService } from '../services/orgStorageService.js';
 import { VaasApiResponse } from '../types/index.js';
 import { livenessDataSchema, resultSchema } from '../schemas/verification.schema.js';
 
@@ -106,16 +107,36 @@ router.post('/sessions/:sessionToken/documents', upload.single('document') as an
       return res.status(400).json(response);
     }
 
-    // For now, store file metadata in database (in production, upload to S3)
-    // This is a simplified implementation for the MVP
+    // Upload file to org's configured storage provider
+    let storagePath: string;
+    try {
+      storagePath = await orgStorageService.storeDocument(
+        session.organization_id,
+        file.buffer,
+        file.originalname,
+        detected.mime, // Use magic-byte MIME, not claimed MIME
+        session.id,
+        type
+      );
+    } catch (storageError: any) {
+      console.error('[PublicRoutes] Storage upload failed:', storageError);
+      const response: VaasApiResponse = {
+        success: false,
+        error: {
+          code: 'STORAGE_UPLOAD_FAILED',
+          message: 'Failed to store document file'
+        }
+      };
+      return res.status(500).json(response);
+    }
+
     const documentData = {
       verification_session_id: session.id,
       document_type: type,
       filename: file.originalname,
-      mimetype: file.mimetype,
+      mimetype: detected.mime,
       size: file.size,
-      // In production, this would be the S3 URL
-      file_path: `temp://${session.id}/${type}/${file.originalname}`,
+      file_path: storagePath,
       uploaded_at: new Date().toISOString()
     };
 

@@ -18,6 +18,8 @@
     "migrate:run": "tsx src/scripts/run-migration.ts"
   },
   "dependencies": {
+    "@aws-sdk/client-s3": "^3.1011.0",
+    "@aws-sdk/s3-request-presigner": "^3.1011.0",
     "@node-saml/node-saml": "^5.1.0",
     "@supabase/supabase-js": "^2.39.0",
     "@types/bcrypt": "^6.0.0",
