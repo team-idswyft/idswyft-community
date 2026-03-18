@@ -10,7 +10,10 @@ import {
   Image,
   Camera,
   CreditCard,
-  Loader2
+  Loader2,
+  X,
+  Download,
+  ZoomIn
 } from 'lucide-react';
 import { apiClient } from '../services/api';
 import type { VerificationSession } from '../types.js';
@@ -81,6 +84,27 @@ export function VerificationDetailsModal({ verification, isOpen, onClose, onStat
   const [overrideLoading, setOverrideLoading] = useState(false);
   const [uploadedDocs, setUploadedDocs] = useState<any[]>([]);
   const [docsLoading, setDocsLoading] = useState(false);
+  const [previewDoc, setPreviewDoc] = useState<{ url: string; mimetype: string; name: string } | null>(null);
+  const [previewLoadingId, setPreviewLoadingId] = useState<string | null>(null);
+
+  // Clear preview state when modal closes or verification changes
+  useEffect(() => {
+    setPreviewDoc(null);
+    setPreviewLoadingId(null);
+  }, [isOpen, verification?.id]);
+
+  // Escape key: close lightbox first, then let modal handle second press
+  useEffect(() => {
+    if (!previewDoc) return;
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopImmediatePropagation();
+        setPreviewDoc(null);
+      }
+    };
+    document.addEventListener('keydown', handler, true); // capture phase
+    return () => document.removeEventListener('keydown', handler, true);
+  }, [previewDoc]);
 
   // Fetch uploaded documents when Documents tab is selected
   useEffect(() => {
@@ -93,6 +117,20 @@ export function VerificationDetailsModal({ verification, isOpen, onClose, onStat
       .finally(() => { if (!cancelled) setDocsLoading(false); });
     return () => { cancelled = true; };
   }, [activeTab, verification?.id]);
+
+  const handlePreview = async (docId: string, filename: string) => {
+    if (!verification) return;
+    try {
+      setPreviewLoadingId(docId);
+      const { url, mimetype } = await apiClient.getVerificationDocumentUrl(verification.id, docId);
+      setPreviewDoc({ url, mimetype, name: filename });
+    } catch (err: any) {
+      console.error('Failed to load document preview:', err);
+      alert(err.message || 'Failed to load document preview');
+    } finally {
+      setPreviewLoadingId(null);
+    }
+  };
 
   const handleStatusUpdate = async (newStatus: VerificationSessionStatus) => {
     if (!verification) return;
@@ -502,6 +540,18 @@ export function VerificationDetailsModal({ verification, isOpen, onClose, onStat
                                     Uploaded {new Date(doc.uploaded_at).toLocaleString()}
                                   </p>
                                 )}
+                                <button
+                                  onClick={() => handlePreview(doc.id, doc.filename || typeLabel)}
+                                  disabled={previewLoadingId === doc.id}
+                                  className="mt-2 flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-cyan-300 bg-cyan-500/10 border border-cyan-500/25 rounded-lg hover:bg-cyan-500/20 transition-colors disabled:opacity-50"
+                                >
+                                  {previewLoadingId === doc.id ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                  ) : (
+                                    <ZoomIn className="w-3.5 h-3.5" />
+                                  )}
+                                  Preview
+                                </button>
                               </div>
                             </div>
                           </div>
@@ -884,6 +934,64 @@ export function VerificationDetailsModal({ verification, isOpen, onClose, onStat
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Document Preview Lightbox */}
+      {previewDoc && (
+        <div
+          className="fixed inset-0 z-[130] bg-black/80 backdrop-blur-sm flex items-center justify-center p-4"
+          onClick={() => setPreviewDoc(null)}
+        >
+          <div
+            className="relative max-w-4xl max-h-[90vh] w-full flex flex-col items-center"
+            onClick={e => e.stopPropagation()}
+          >
+            {/* Close button */}
+            <button
+              onClick={() => setPreviewDoc(null)}
+              className="absolute -top-2 -right-2 z-10 p-2 bg-slate-800 border border-white/10 rounded-full text-slate-300 hover:text-white hover:bg-slate-700 transition-colors"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            {/* Header */}
+            <div className="w-full flex items-center justify-between mb-3">
+              <p className="text-sm font-medium text-slate-200 truncate">{previewDoc.name}</p>
+              <a
+                href={previewDoc.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-cyan-300 bg-cyan-500/10 border border-cyan-500/25 rounded-lg hover:bg-cyan-500/20 transition-colors"
+              >
+                <Download className="w-3.5 h-3.5" />
+                Download
+              </a>
+            </div>
+
+            {/* Content */}
+            {previewDoc.mimetype.startsWith('image/') ? (
+              <img
+                src={previewDoc.url}
+                alt={previewDoc.name}
+                className="max-h-[80vh] max-w-full object-contain rounded-lg border border-white/10"
+              />
+            ) : previewDoc.mimetype === 'application/pdf' ? (
+              <div className="w-full h-[80vh] rounded-lg overflow-hidden border border-white/10">
+                <iframe
+                  src={previewDoc.url}
+                  className="w-full h-full"
+                  title={previewDoc.name}
+                />
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center py-12 text-slate-400">
+                <FileText className="w-12 h-12 mb-3" />
+                <p className="font-medium">Preview not available for this file type</p>
+                <p className="text-sm text-slate-500 mt-1">{previewDoc.mimetype}</p>
+              </div>
+            )}
+          </div>
         </div>
       )}
     </Modal>

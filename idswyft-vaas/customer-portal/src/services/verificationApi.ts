@@ -1,5 +1,6 @@
 import { VerificationSession } from '../types';
 import newVerificationApi from './newVerificationApi';
+import customerPortalAPI from './api';
 
 interface VerificationResults {
   verification_id: string;
@@ -44,6 +45,12 @@ interface VerificationResults {
 }
 
 class VerificationAPI {
+  private sessionToken: string | null = null;
+
+  setSessionToken(token: string) {
+    this.sessionToken = token;
+  }
+
   async startVerification(session: VerificationSession, issuingCountry?: string): Promise<string> {
     return newVerificationApi.startVerification(session, issuingCountry);
   }
@@ -57,6 +64,10 @@ class VerificationAPI {
     issuingCountry?: string,
   ): Promise<void> {
     await newVerificationApi.uploadFrontDocument(session, verificationId, file, documentType, issuingCountry);
+    // Fire-and-forget: sync document to VaaS storage for admin preview
+    if (this.sessionToken) {
+      customerPortalAPI.uploadDocument(this.sessionToken, file, 'front').catch(() => {});
+    }
     const results = await this.getResults(session, verificationId);
     if (results.status === 'failed' || results.status === 'manual_review') {
       throw new Error(results.failure_reason || results.manual_review_reason || results.rejection_detail || 'Front document verification failed');
@@ -73,6 +84,10 @@ class VerificationAPI {
     issuingCountry?: string,
   ): Promise<void> {
     await newVerificationApi.uploadBackDocument(session, verificationId, file, documentType, issuingCountry);
+    // Fire-and-forget: sync document to VaaS storage for admin preview
+    if (this.sessionToken) {
+      customerPortalAPI.uploadDocument(this.sessionToken, file, 'back').catch(() => {});
+    }
     const results = await this.getResults(session, verificationId);
     if (results.status === 'failed' || results.status === 'manual_review') {
       throw new Error(results.failure_reason || results.manual_review_reason || results.rejection_detail || 'Back document verification failed');
@@ -87,6 +102,10 @@ class VerificationAPI {
     onProgress?: (progress: number) => void,
     livenessMetadata?: unknown,
   ): Promise<void> {
+    // Fire-and-forget: sync selfie to VaaS storage for admin preview
+    if (this.sessionToken) {
+      customerPortalAPI.uploadDocument(this.sessionToken, file, 'selfie').catch(() => {});
+    }
     const imageData = await this.fileToDataUrl(file);
     await newVerificationApi.captureLiveSelfie(session, verificationId, imageData, livenessMetadata);
     const results = await this.getResults(session, verificationId);
@@ -103,6 +122,16 @@ class VerificationAPI {
     onProgress?: (progress: number) => void,
     livenessMetadata?: unknown,
   ): Promise<void> {
+    // Fire-and-forget: sync selfie to VaaS storage for admin preview
+    if (this.sessionToken) {
+      fetch(imageData)
+        .then(r => r.blob())
+        .then(blob => {
+          const file = new File([blob], 'selfie.jpg', { type: 'image/jpeg' });
+          return customerPortalAPI.uploadDocument(this.sessionToken!, file, 'selfie');
+        })
+        .catch(() => {});
+    }
     await newVerificationApi.captureLiveSelfie(session, verificationId, imageData, livenessMetadata);
     const results = await this.getResults(session, verificationId);
     if (results.status === 'failed' || results.status === 'manual_review') {

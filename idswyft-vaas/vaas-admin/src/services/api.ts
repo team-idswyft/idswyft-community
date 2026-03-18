@@ -255,6 +255,17 @@ class ApiClient {
     return response.data.data || [];
   }
 
+  async getVerificationDocumentUrl(verificationId: string, documentId: string): Promise<{ url: string; mimetype: string }> {
+    const response: AxiosResponse<ApiResponse<{ url: string; expires_in: number; mimetype: string }>> =
+      await this.client.get(`/verifications/${verificationId}/documents/${documentId}/url`);
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to get document URL');
+    }
+
+    return response.data.data!;
+  }
+
   async startVerification(request: StartVerificationRequest): Promise<StartVerificationResponse> {
     const response: AxiosResponse<ApiResponse<StartVerificationResponse>> = await this.client.post('/verifications/start', request);
     

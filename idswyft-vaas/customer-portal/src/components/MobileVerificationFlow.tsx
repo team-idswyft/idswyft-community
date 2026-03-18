@@ -446,6 +446,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
         const sessionData = await customerPortalAPI.getVerificationSession(sessionToken);
         if (!mountedRef.current) return;
         setSession(sessionData);
+        verificationAPI.setSessionToken(sessionToken);
 
         // Apply org branding
         if (sessionData.organization?.branding) {
@@ -1294,7 +1295,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
                       fontSize: 44, animation: 'sPulse 2.4s ease infinite',
                       marginBottom: 20,
-                    }}>\u2713</div>
+                    }}>{'\u2713'}</div>
 
                     <span style={{
                       fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
@@ -1318,7 +1319,7 @@ const MobileVerificationFlow: React.FC<MobileVerificationFlowProps> = ({ session
                           borderRadius: 11, padding: '11px 14px',
                           animation: `slideIn 0.3s ease ${i * 90}ms both`,
                         }}>
-                          <span style={{ color: 'var(--teal)', fontSize: 14, flexShrink: 0 }}>\u2713</span>
+                          <span style={{ color: 'var(--teal)', fontSize: 14, flexShrink: 0 }}>{'\u2713'}</span>
                           <span style={{ fontSize: 13, color: 'rgba(232,244,248,0.72)' }}>{item}</span>
                         </div>
                       ))}

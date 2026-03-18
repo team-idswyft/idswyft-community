@@ -86,6 +86,7 @@ export const ModernVerificationSystem: React.FC<ModernVerificationSystemProps> =
         const sessionData = await customerPortalAPI.getVerificationSession(sessionToken);
         if (!mountedRef.current) return;
         setSession(sessionData);
+        verificationAPI.setSessionToken(sessionToken);
 
         if (sessionData.organization?.branding) {
           setBranding(sessionData.organization.branding);
