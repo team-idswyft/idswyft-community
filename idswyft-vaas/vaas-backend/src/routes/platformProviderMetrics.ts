@@ -12,9 +12,61 @@ const PROVIDER_NAMES: Record<string, string> = {
 };
 
 /**
+ * Extracts per-provider metrics from a session's `results` JSONB.
+ *
+ * OCR:      session reached OCR when results.ocr_data is present
+ * Face:     session reached face matching when results.face_match_score is present
+ * Liveness: session reached liveness when results.liveness_score is present
+ *
+ * Returns null if the session never reached this provider stage.
+ */
+function extractProviderData(
+  provider: string,
+  session: any
+): { success: boolean; confidence: number | null } | null {
+  const results = session.results;
+  if (!results) return null;
+
+  switch (provider) {
+    case 'ocr': {
+      if (results.ocr_data == null) return null;
+      // OCR succeeded if data was extracted (ocr_data exists and session didn't fail on OCR)
+      const ocrFailed = Array.isArray(results.failure_reasons) &&
+        results.failure_reasons.some((r: string) => /ocr|document|unreadable/i.test(r));
+      return {
+        success: !ocrFailed,
+        confidence: results.confidence_score ?? null,
+      };
+    }
+
+    case 'face': {
+      const score = results.face_match_score;
+      if (score == null) return null;
+      return {
+        success: Number(score) >= 0.6,
+        confidence: Number(score),
+      };
+    }
+
+    case 'liveness': {
+      const livenessScore = results.liveness_score;
+      if (livenessScore == null) return null;
+      return {
+        success: results.liveness_passed === true || Number(livenessScore) >= 0.7,
+        confidence: Number(livenessScore),
+      };
+    }
+
+    default:
+      return null;
+  }
+}
+
+/**
  * GET /api/platform/provider-metrics?provider=ocr|face|liveness&days=7&organization_id=UUID
  *
  * Cross-org aggregate metrics for the requested provider.
+ * Derives per-provider stats from the results JSONB on each session.
  * Optional `organization_id` query param to filter by a single org.
  */
 router.get('/', requirePlatformAdmin as any, async (req: PlatformAdminRequest, res) => {
@@ -27,7 +79,7 @@ router.get('/', requirePlatformAdmin as any, async (req: PlatformAdminRequest, r
 
     let query = vaasSupabase
       .from('vaas_verification_sessions')
-      .select('id, status, confidence_score, created_at, completed_at')
+      .select('id, status, confidence_score, results, submitted_at, completed_at, created_at')
       .gte('created_at', since);
 
     if (organizationId) {
@@ -40,28 +92,34 @@ router.get('/', requirePlatformAdmin as any, async (req: PlatformAdminRequest, r
       throw new Error(error.message);
     }
 
-    const rows = sessions || [];
-    const totalRequests = rows.length;
-
-    const successCount = rows.filter(
-      (r: any) => r.status === 'verified' || r.status === 'completed'
-    ).length;
-    const successRate = totalRequests > 0 ? successCount / totalRequests : 0;
-
-    let avgLatencyMs = 0;
-    const completedRows = rows.filter((r: any) => r.completed_at && r.created_at);
-    if (completedRows.length > 0) {
-      const totalMs = completedRows.reduce((sum: number, r: any) => {
-        return sum + (new Date(r.completed_at).getTime() - new Date(r.created_at).getTime());
-      }, 0);
-      avgLatencyMs = Math.round(totalMs / completedRows.length);
+    // Filter to sessions that actually reached this provider stage
+    const providerRows: { success: boolean; confidence: number | null; session: any }[] = [];
+    for (const s of sessions || []) {
+      const pd = extractProviderData(provider, s);
+      if (pd) providerRows.push({ ...pd, session: s });
     }
 
+    const totalRequests = providerRows.length;
+    const successCount = providerRows.filter(r => r.success).length;
+    const successRate = totalRequests > 0 ? successCount / totalRequests : 0;
+
+    // Latency: use submitted_at → completed_at (processing time after user submitted).
+    // Falls back to created_at → completed_at if submitted_at is missing.
+    let avgLatencyMs = 0;
+    const latencyRows = providerRows.filter(r => r.session.completed_at);
+    if (latencyRows.length > 0) {
+      const totalMs = latencyRows.reduce((sum, r) => {
+        const start = r.session.submitted_at || r.session.created_at;
+        return sum + (new Date(r.session.completed_at).getTime() - new Date(start).getTime());
+      }, 0);
+      avgLatencyMs = Math.round(totalMs / latencyRows.length);
+    }
+
+    // Confidence: use per-provider confidence where available, fall back to session-level
     let avgConfidence = 0;
-    const scoredRows = rows.filter((r: any) => r.confidence_score != null);
-    if (scoredRows.length > 0) {
-      const totalScore = scoredRows.reduce((sum: number, r: any) => sum + Number(r.confidence_score), 0);
-      avgConfidence = totalScore / scoredRows.length;
+    const scored = providerRows.filter(r => r.confidence != null);
+    if (scored.length > 0) {
+      avgConfidence = scored.reduce((sum, r) => sum + r.confidence!, 0) / scored.length;
     }
 
     const result = {
