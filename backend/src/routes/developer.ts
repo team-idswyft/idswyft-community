@@ -14,6 +14,14 @@ import { WebhookService, createWebhookSignature } from '@/services/webhook.js';
 import axios from 'axios';
 import { config } from '@/config/index.js';
 import { encryptSecret, decryptSecret, maskApiKey } from '@/utils/encryption.js';
+import {
+  getConversionFunnel,
+  getGateRejectionBreakdown,
+  getDailyVerificationVolume,
+  getDailyResponseTimes,
+  getDailyWebhookDeliveries,
+  getDefaultPeriod,
+} from '@/services/analyticsService.js';
 
 const webhookService = new WebhookService();
 
@@ -1225,6 +1233,53 @@ router.get('/verifications/:verificationId',
           : null,
       created_at: state.created_at,
       updated_at: state.updated_at,
+    });
+  })
+);
+
+// ─── Developer Analytics ────────────────────────────────────
+
+router.get('/analytics',
+  apiKeyRateLimit,
+  authenticateDeveloperJWT,
+  catchAsync(async (req: Request, res: Response) => {
+    const developer = req.developer;
+    if (!developer) {
+      throw new AuthenticationError('Developer authentication required');
+    }
+
+    const period = getDefaultPeriod();
+
+    const [daily_volume, rejection_breakdown, daily_latency, funnel, daily_webhooks] =
+      await Promise.all([
+        getDailyVerificationVolume(period, developer.id),
+        getGateRejectionBreakdown(period, developer.id),
+        getDailyResponseTimes(period, developer.id),
+        getConversionFunnel(period, developer.id),
+        getDailyWebhookDeliveries(period, developer.id),
+      ]);
+
+    // Quota: count verification_requests this month
+    const monthStart = new Date();
+    monthStart.setDate(1);
+    monthStart.setHours(0, 0, 0, 0);
+
+    const { count } = await supabase
+      .from('verification_requests')
+      .select('*', { count: 'exact', head: true })
+      .eq('developer_id', developer.id)
+      .gte('created_at', monthStart.toISOString());
+
+    const used = count ?? 0;
+    const limit = 1000;
+
+    res.json({
+      daily_volume,
+      rejection_breakdown,
+      daily_latency,
+      quota: { used, limit },
+      funnel,
+      daily_webhooks,
     });
   })
 );

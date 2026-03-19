@@ -133,4 +133,40 @@ export class DataRetentionService {
 
     return ids.length;
   }
+
+  /**
+   * Delete api_activity_logs older than `retentionDays`.
+   * These are high-volume analytics rows (one per API call) with no audit
+   * requirement — safe to hard-delete after the retention window.
+   */
+  async runActivityLogCleanup(retentionDays: number = 7): Promise<number> {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - retentionDays);
+
+    // Count first, then delete — Supabase doesn't return count on delete reliably
+    const { count } = await supabase
+      .from('api_activity_logs')
+      .select('*', { count: 'exact', head: true })
+      .lt('timestamp', cutoff.toISOString());
+
+    const toDelete = count ?? 0;
+    if (toDelete === 0) return 0;
+
+    const { error } = await supabase
+      .from('api_activity_logs')
+      .delete()
+      .lt('timestamp', cutoff.toISOString());
+
+    if (error) {
+      logger.error('Activity log cleanup failed', { error });
+      return 0;
+    }
+
+    logger.info(`Activity log cleanup: ${toDelete} rows deleted`, {
+      retentionDays,
+      cutoff: cutoff.toISOString(),
+    });
+
+    return toDelete;
+  }
 }

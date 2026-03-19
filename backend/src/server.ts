@@ -315,6 +315,26 @@ const startServer = async () => {
         });
       }
 
+      // Activity log cleanup — runs daily at 1 AM UTC, deletes logs older than 7 days
+      {
+        const cron = await import('node-cron');
+        const { DataRetentionService } = await import('@/services/dataRetention.js');
+        const activityRetentionService = new DataRetentionService();
+
+        cron.schedule('0 1 * * *', async () => {
+          try {
+            await activityRetentionService.runActivityLogCleanup(7);
+          } catch (err) {
+            logger.error('Activity log cleanup cron failed', { error: err });
+          }
+        });
+
+        logger.info('Activity log cleanup scheduler started', {
+          retentionDays: 7,
+          schedule: '0 1 * * * (daily at 1 AM UTC)',
+        });
+      }
+
       // Monitoring cron — daily at 3 AM UTC: check expiring documents + process due re-verifications
       if (config.nodeEnv === 'production') {
         const cron = await import('node-cron');

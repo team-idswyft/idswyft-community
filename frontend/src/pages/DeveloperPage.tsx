@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom'
 import { API_BASE_URL } from '../config/api'
 import { C, injectFonts } from '../theme'
 import '../styles/patterns.css'
+import { AnalyticsCharts } from '../components/developer/AnalyticsCharts'
 import {
   TrashIcon,
   PlusIcon,
@@ -1117,6 +1118,8 @@ export function DeveloperPage() {
             ))}
           </div>
         )}
+
+        {token && <AnalyticsCharts token={token} />}
 
         {/* API Keys table */}
         <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 32 }}>
