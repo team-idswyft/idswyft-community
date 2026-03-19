@@ -545,7 +545,7 @@ function CreateKeyModal({ onClose, onCreated, token }: {
               disabled={loading}
               style={{ flex: 1, background: C.cyan, color: C.bg, border: 'none', borderRadius: 8, padding: '10px 0', fontWeight: 600, cursor: loading ? 'not-allowed' : 'pointer', fontSize: 14, opacity: loading ? 0.7 : 1 }}
             >
-              {loading ? 'Creatingâ€¦' : 'Create Key'}
+              {loading ? 'Creating...' : 'Create Key'}
             </button>
           </div>
         </form>
@@ -599,7 +599,7 @@ export function DeveloperPage() {
       })
       if (res.status === 401) { localStorage.removeItem('developer_token'); setToken(null); return }
       if (res.ok) setApiKeys((await res.json()).api_keys ?? [])
-    } catch { /* network error â€" backend offline, show empty state */ }
+    } catch { /* network error - backend offline, show empty state */ }
   }
 
   const fetchStats = async (t: string) => {
@@ -789,7 +789,7 @@ export function DeveloperPage() {
       }
       toast.success('Copied to clipboard')
     } catch {
-      toast.error('Failed to copy — try selecting and copying manually')
+      toast.error('Failed to copy - try selecting and copying manually')
     }
   }
 
@@ -845,7 +845,7 @@ export function DeveloperPage() {
       setWebhookUrl('')
       setWebhookApiKeyId(null)
       setSelectedWebhookEvents([...WEBHOOK_EVENT_NAMES])
-      toast.success('Webhook added — copy your signing secret now')
+      toast.success('Webhook added - copy your signing secret now')
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Failed to add webhook')
     } finally {
@@ -890,7 +890,7 @@ export function DeveloperPage() {
     } catch (err: unknown) {
       clearTimeout(timer)
       const isAbort = err instanceof DOMException && err.name === 'AbortError'
-      toast.error(isAbort ? 'Test timed out — check that the webhook URL is reachable' : 'Failed to send test webhook')
+      toast.error(isAbort ? 'Test timed out - check that the webhook URL is reachable' : 'Failed to send test webhook')
     } finally {
       setTestingWebhookId(null)
     }
@@ -1010,7 +1010,7 @@ export function DeveloperPage() {
         {newFullKey && (
           <div style={{ background: C.greenDim, border: `1px solid ${C.green}`, borderRadius: 8, padding: '14px 18px', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 12 }}>
             <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 12, color: C.green, fontWeight: 600, marginBottom: 4 }}>Key created â€" copy it now, it won't be shown again</div>
+              <div style={{ fontSize: 12, color: C.green, fontWeight: 600, marginBottom: 4 }}>Key created - copy it now, it won't be shown again</div>
               <code style={{ fontFamily: C.mono, fontSize: 13, color: C.text, wordBreak: 'break-all' }}>{newFullKey}</code>
             </div>
             <button
@@ -1023,7 +1023,7 @@ export function DeveloperPage() {
               onClick={() => setNewFullKey(null)}
               style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: 18, padding: '0 4px' }}
             >
-              Ã—
+              &times;
             </button>
           </div>
         )}
@@ -1102,7 +1102,7 @@ export function DeveloperPage() {
                         {new Date(key.created_at).toLocaleDateString()}
                       </td>
                       <td style={{ padding: '12px 16px', color: C.muted, fontSize: 13 }}>
-                        {key.last_used_at ? new Date(key.last_used_at).toLocaleDateString() : 'â€"'}
+                        {key.last_used_at ? new Date(key.last_used_at).toLocaleDateString() : '-'}
                       </td>
                       <td style={{ padding: '12px 16px' }}>
                         {deleteId === key.id ? (
@@ -1148,7 +1148,7 @@ export function DeveloperPage() {
                       <tr style={{ borderBottom: `1px solid ${C.border}` }}>
                         <td colSpan={6} style={{ padding: '0 16px 14px 16px', background: C.panel }}>
                           {logsLoadingForKey === key.id ? (
-                            <div style={{ color: C.muted, fontSize: 12, paddingTop: 4 }}>Loading logsâ€¦</div>
+                            <div style={{ color: C.muted, fontSize: 12, paddingTop: 4 }}>Loading logs...</div>
                           ) : (keyLogs[key.id] ?? []).length === 0 ? (
                             <div style={{ color: C.muted, fontSize: 12, paddingTop: 4 }}>No recent API calls for this key.</div>
                           ) : (
@@ -1365,7 +1365,7 @@ export function DeveloperPage() {
                 <option value="">All keys (fires for every verification)</option>
                 {apiKeys.filter(k => k.status === 'active').map(k => (
                   <option key={k.id} value={k.id}>
-                    {k.key_preview} — {k.name}
+                    {k.key_preview} - {k.name}
                   </option>
                 ))}
               </select>
@@ -1965,7 +1965,7 @@ if (expected !== req.headers['x-idswyft-signature']) {
                           {Object.entries(verificationDetail.ocr_data as Record<string, unknown>).map(([field, value]) => (
                             <div key={field}>
                               <div style={{ color: C.muted, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{field.replace(/_/g, ' ')}</div>
-                              <div style={{ fontFamily: C.mono, fontSize: 12, color: C.text, marginTop: 2 }}>{value != null ? String(value) : '—'}</div>
+                              <div style={{ fontFamily: C.mono, fontSize: 12, color: C.text, marginTop: 2 }}>{value != null ? String(value) : '-'}</div>
                             </div>
                           ))}
                         </div>
