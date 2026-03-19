@@ -163,11 +163,12 @@ export class WebhookService {
           'X-Idswyft-Delivery-Attempt': attempt.toString()
         };
         
-        // Add signature if secret token is provided
-        if (webhook.secret_token) {
+        // Add signature if signing secret is provided
+        const signingSecret = webhook.secret_key || webhook.secret_token;
+        if (signingSecret) {
           const signature = this.generateSignature(
             JSON.stringify(delivery.payload),
-            webhook.secret_token
+            signingSecret
           );
           headers['X-Idswyft-Signature'] = signature;
         }
@@ -338,20 +339,28 @@ export class WebhookService {
   }
   
   /**
-   * Fetch all active webhooks for a developer, filtered by sandbox mode.
+   * Fetch all active webhooks for a developer, filtered by sandbox mode
+   * and optionally by event type subscription.
    * Returns [] on error — webhook failure must never block verification.
    */
   async getActiveWebhooksForDeveloper(
     developerId: string,
-    isSandbox: boolean
+    isSandbox: boolean,
+    eventType?: string
   ): Promise<Webhook[]> {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('webhooks')
         .select('*')
         .eq('developer_id', developerId)
         .eq('is_active', true)
         .eq('is_sandbox', isSandbox);
+
+      if (eventType) {
+        query = query.contains('events', [eventType]);
+      }
+
+      const { data, error } = await query;
 
       if (error) {
         logger.error('Failed to fetch active webhooks for developer:', error);

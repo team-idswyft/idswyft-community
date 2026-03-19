@@ -9,6 +9,11 @@ import { getRecentActivities } from '@/middleware/apiLogger.js';
 import rateLimit from 'express-rate-limit';
 import crypto from 'crypto';
 import { loadSessionState, mapStatusForResponse, fetchRiskScore } from '@/verification/statusReader.js';
+import { WEBHOOK_EVENT_NAMES } from '@/constants/webhookEvents.js';
+import { WebhookService, createWebhookSignature } from '@/services/webhook.js';
+import axios from 'axios';
+
+const webhookService = new WebhookService();
 
 const router = express.Router();
 
@@ -540,7 +545,7 @@ router.get('/webhooks',
 
     const { data: webhooks, error } = await supabase
       .from('webhooks')
-      .select('id, url, is_sandbox, is_active, created_at, events')
+      .select('id, url, is_sandbox, is_active, created_at, events, secret_key')
       .eq('developer_id', developer.id)
       .order('created_at', { ascending: false });
 
@@ -549,7 +554,15 @@ router.get('/webhooks',
       throw new Error('Failed to list webhooks');
     }
 
-    res.json({ webhooks: webhooks || [] });
+    // Mask secret keys in list response
+    const masked = (webhooks || []).map(w => ({
+      ...w,
+      secret_key: w.secret_key
+        ? `${w.secret_key.slice(0, 6)}${'*'.repeat(8)}${w.secret_key.slice(-4)}`
+        : null,
+    }));
+
+    res.json({ webhooks: masked });
   })
 );
 
@@ -564,7 +577,15 @@ router.post('/webhooks',
     body('is_sandbox')
       .optional()
       .isBoolean()
-      .withMessage('is_sandbox must be a boolean')
+      .withMessage('is_sandbox must be a boolean'),
+    body('events')
+      .optional()
+      .isArray()
+      .withMessage('events must be an array'),
+    body('secret')
+      .optional()
+      .isString()
+      .withMessage('secret must be a string'),
   ],
   catchAsync(async (req: Request, res: Response) => {
     const errors = validationResult(req);
@@ -577,7 +598,15 @@ router.post('/webhooks',
       throw new AuthenticationError('Developer authentication required');
     }
 
-    const { url, is_sandbox = false } = req.body;
+    const { url, is_sandbox = false, events, secret } = req.body;
+
+    // Validate events are from the allowed set
+    if (events && events.length > 0) {
+      const invalid = events.filter((e: string) => !WEBHOOK_EVENT_NAMES.includes(e));
+      if (invalid.length > 0) {
+        throw new ValidationError('Invalid webhook events', 'events', invalid);
+      }
+    }
 
     const { data: existing, error: existingError } = await supabase
       .from('webhooks')
@@ -596,14 +625,19 @@ router.post('/webhooks',
       throw new ValidationError('Webhook already exists for this URL', 'url', url);
     }
 
+    // Auto-generate signing secret if not provided
+    const secretKey = secret || `whsec_${crypto.randomBytes(24).toString('hex')}`;
+
     const { data: webhook, error } = await supabase
       .from('webhooks')
       .insert({
         developer_id: developer.id,
         url,
         is_sandbox,
+        events: events && events.length > 0 ? events : WEBHOOK_EVENT_NAMES,
+        secret_key: secretKey,
       })
-      .select('id, url, is_sandbox, is_active, created_at')
+      .select('id, url, is_sandbox, is_active, created_at, events, secret_key')
       .single();
 
     if (error || !webhook) {
@@ -612,9 +646,130 @@ router.post('/webhooks',
     }
 
     res.status(201).json({
-      webhook,
-      message: 'Webhook created successfully'
+      webhook: {
+        ...webhook,
+        secret_key: secretKey, // Return full secret on creation only
+      },
+      message: 'Webhook created successfully. Store your signing secret securely.'
     });
+  })
+);
+
+// Reveal full webhook signing secret
+router.get('/webhooks/:webhookId/secret',
+  apiKeyRateLimit,
+  authenticateDeveloperJWT,
+  [
+    param('webhookId')
+      .isUUID()
+      .withMessage('Invalid webhook ID format')
+  ],
+  catchAsync(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw new ValidationError('Validation failed', 'multiple', errors.array());
+    }
+
+    const developer = req.developer;
+    if (!developer) {
+      throw new AuthenticationError('Developer authentication required');
+    }
+
+    const { webhookId } = req.params;
+
+    const { data: webhook, error } = await supabase
+      .from('webhooks')
+      .select('id, secret_key')
+      .eq('id', webhookId)
+      .eq('developer_id', developer.id)
+      .single();
+
+    if (error || !webhook) {
+      throw new NotFoundError('Webhook');
+    }
+
+    logger.info('Webhook secret revealed', {
+      developerId: developer.id,
+      webhookId,
+    });
+
+    res.json({ secret_key: webhook.secret_key });
+  })
+);
+
+// Send a test webhook delivery
+router.post('/webhooks/:webhookId/test',
+  apiKeyRateLimit,
+  authenticateDeveloperJWT,
+  [
+    param('webhookId')
+      .isUUID()
+      .withMessage('Invalid webhook ID format')
+  ],
+  catchAsync(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw new ValidationError('Validation failed', 'multiple', errors.array());
+    }
+
+    const developer = req.developer;
+    if (!developer) {
+      throw new AuthenticationError('Developer authentication required');
+    }
+
+    const { webhookId } = req.params;
+
+    const { data: webhook, error: whError } = await supabase
+      .from('webhooks')
+      .select('*')
+      .eq('id', webhookId)
+      .eq('developer_id', developer.id)
+      .single();
+
+    if (whError || !webhook) {
+      throw new NotFoundError('Webhook');
+    }
+
+    const testPayload = {
+      user_id: 'test_user_000',
+      verification_id: 'test_000',
+      status: 'verified' as const,
+      timestamp: new Date().toISOString(),
+      data: {},
+    };
+
+    // Fire directly — no DB record, avoids FK constraint on webhook_deliveries
+    try {
+      const body = JSON.stringify(testPayload);
+      const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+        'User-Agent': 'Idswyft-Webhooks/1.0',
+        'X-Idswyft-Test': 'true',
+      };
+
+      const signingSecret = webhook.secret_key || webhook.secret_token;
+      if (signingSecret) {
+        headers['X-Idswyft-Signature'] = createWebhookSignature(body, signingSecret);
+      }
+
+      const response = await axios.post(webhook.url, testPayload, {
+        headers,
+        timeout: 5000,
+        validateStatus: () => true,
+      });
+
+      res.json({
+        success: response.status < 500,
+        status_code: response.status,
+      });
+    } catch (err) {
+      logger.error('Webhook test failed:', err);
+      res.json({
+        success: false,
+        status_code: null,
+        error: err instanceof Error ? err.message : 'Test delivery failed',
+      });
+    }
   })
 );
 
@@ -838,6 +993,57 @@ router.post('/api-key/:id/rotate',
       grace_period_hours: gracePeriodHours,
       message: `Old key will remain active until ${expiresAt.toISOString()}. Update your integration before then.`,
     });
+  })
+);
+
+// Delete developer account (GDPR compliant)
+router.delete('/account',
+  apiKeyRateLimit,
+  authenticateDeveloperJWT,
+  [
+    body('confirm_email')
+      .isEmail()
+      .normalizeEmail()
+      .withMessage('You must confirm your email to delete your account'),
+  ],
+  catchAsync(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw new ValidationError('Validation failed', 'multiple', errors.array());
+    }
+
+    const developer = req.developer;
+    if (!developer) {
+      throw new AuthenticationError('Developer authentication required');
+    }
+
+    const { confirm_email } = req.body;
+    if (confirm_email !== developer.email) {
+      throw new ValidationError(
+        'Email does not match your account email',
+        'confirm_email',
+        confirm_email
+      );
+    }
+
+    // CASCADE handles api_keys, webhooks, webhook_deliveries,
+    // verification_requests, documents, selfies
+    const { error } = await supabase
+      .from('developers')
+      .delete()
+      .eq('id', developer.id);
+
+    if (error) {
+      logger.error('Failed to delete developer account:', error);
+      throw new Error('Failed to delete account');
+    }
+
+    logger.info('Developer account deleted', {
+      developerId: developer.id,
+      email: developer.email,
+    });
+
+    res.json({ message: 'Account deleted' });
   })
 );
 

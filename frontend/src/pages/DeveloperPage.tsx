@@ -11,6 +11,9 @@ import {
   ChevronRightIcon,
   ChevronDownIcon,
   CodeBracketIcon,
+  EyeIcon,
+  EyeSlashIcon,
+  ExclamationTriangleIcon,
 } from '@heroicons/react/24/outline'
 
 // â"€â"€â"€ Types â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
@@ -78,17 +81,21 @@ interface DeveloperWebhook {
   id: string
   url: string
   events?: string[]
+  secret_key?: string | null
   is_sandbox: boolean
   is_active: boolean
   created_at: string
 }
 
-const WEBHOOK_EVENTS = [
-  'verification.started',
-  'verification.completed',
-  'verification.failed',
-  'verification.manual_review',
-]
+const WEBHOOK_EVENTS: Record<string, string> = {
+  'verification.started':            'Verification session created',
+  'verification.document_processed': 'Document step completed (front or back)',
+  'verification.completed':          'Verification passed',
+  'verification.failed':             'Verification rejected',
+  'verification.manual_review':      'Flagged for manual review',
+}
+
+const WEBHOOK_EVENT_NAMES = Object.keys(WEBHOOK_EVENTS)
 
 // â"€â"€â"€ Shared styles â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
@@ -542,7 +549,13 @@ export function DeveloperPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [newFullKey, setNewFullKey] = useState<string | null>(null)
   const [webhookUrl, setWebhookUrl] = useState('')
-  const [selectedWebhookEvents, setSelectedWebhookEvents] = useState<string[]>([...WEBHOOK_EVENTS])
+  const [selectedWebhookEvents, setSelectedWebhookEvents] = useState<string[]>([...WEBHOOK_EVENT_NAMES])
+  const [revealedSecrets, setRevealedSecrets] = useState<Record<string, string>>({})
+  const [testingWebhookId, setTestingWebhookId] = useState<string | null>(null)
+  const [showDeleteAccount, setShowDeleteAccount] = useState(false)
+  const [deleteAccountEmail, setDeleteAccountEmail] = useState('')
+  const [deleteAccountLoading, setDeleteAccountLoading] = useState(false)
+  const [showPayloadExample, setShowPayloadExample] = useState(false)
   const [webhooks, setWebhooks] = useState<DeveloperWebhook[]>([])
   const [webhookLoading, setWebhookLoading] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -631,6 +644,7 @@ export function DeveloperPage() {
     setApiKeys([])
     setStats(null)
     setWebhooks([])
+    setRevealedSecrets({})
     setExpandedKeyId(null)
     setKeyLogs({})
     setKeySessionOutcomes({})
@@ -803,9 +817,13 @@ export function DeveloperPage() {
       const data = await res.json()
       if (!res.ok) throw new Error(data.message || 'Failed to add webhook')
       setWebhooks(prev => [data.webhook, ...prev])
+      // Store the full secret so the user can copy it right after creation
+      if (data.webhook?.secret_key) {
+        setRevealedSecrets(prev => ({ ...prev, [data.webhook.id]: data.webhook.secret_key }))
+      }
       setWebhookUrl('')
-      setSelectedWebhookEvents([...WEBHOOK_EVENTS])
-      toast.success('Webhook added')
+      setSelectedWebhookEvents([...WEBHOOK_EVENT_NAMES])
+      toast.success('Webhook added — copy your signing secret now')
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Failed to add webhook')
     } finally {
@@ -822,9 +840,78 @@ export function DeveloperPage() {
       })
       if (!res.ok) throw new Error('Failed to remove webhook')
       setWebhooks(prev => prev.filter(w => w.id !== id))
+      setRevealedSecrets(prev => { const copy = { ...prev }; delete copy[id]; return copy })
       toast.success('Webhook removed')
     } catch {
       toast.error('Failed to remove webhook')
+    }
+  }
+
+  const testWebhook = async (id: string) => {
+    if (!token) return
+    setTestingWebhookId(id)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/webhooks/${id}/test`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      if (data.success) {
+        toast.success(`Test delivered (HTTP ${data.status_code})`)
+      } else {
+        toast.error(data.error || `Test failed${data.status_code ? ` (HTTP ${data.status_code})` : ''}`)
+      }
+    } catch {
+      toast.error('Failed to send test webhook')
+    } finally {
+      setTestingWebhookId(null)
+    }
+  }
+
+  const revealSecret = async (id: string) => {
+    if (revealedSecrets[id]) {
+      setRevealedSecrets(prev => { const copy = { ...prev }; delete copy[id]; return copy })
+      return
+    }
+    if (!token) return
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/webhooks/${id}/secret`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const data = await res.json()
+      if (res.ok && data.secret_key) {
+        setRevealedSecrets(prev => ({ ...prev, [id]: data.secret_key }))
+      } else {
+        toast.error('Failed to reveal secret')
+      }
+    } catch {
+      toast.error('Failed to reveal secret')
+    }
+  }
+
+  const deleteAccount = async () => {
+    if (!token) return
+    setDeleteAccountLoading(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/account`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ confirm_email: deleteAccountEmail }),
+      })
+      const data = await res.json()
+      if (!res.ok) throw new Error(data.message || 'Failed to delete account')
+      localStorage.removeItem('developer_token')
+      setToken(null)
+      toast.success('Account deleted')
+    } catch (err: unknown) {
+      toast.error(err instanceof Error ? err.message : 'Failed to delete account')
+    } finally {
+      setDeleteAccountLoading(false)
+      setShowDeleteAccount(false)
+      setDeleteAccountEmail('')
     }
   }
 
@@ -1190,101 +1277,162 @@ export function DeveloperPage() {
           </div>
         </div>
 
-        {/* Webhook */}
+        {/* Webhooks */}
         <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 10, padding: 24 }}>
-          <div style={{ fontWeight: 600, fontSize: 14, color: C.text, marginBottom: 4 }}>Webhook</div>
+          <div style={{ fontWeight: 600, fontSize: 14, color: C.text, marginBottom: 4 }}>Webhooks</div>
           <div style={{ color: C.muted, fontSize: 13, marginBottom: 16 }}>
-            Receive POST callbacks when verification status changes.
+            Receive signed POST callbacks when verification status changes. Each webhook gets a unique signing secret for HMAC verification.
           </div>
-          <div style={{ display: 'flex', gap: 10 }}>
-            <input
-              style={{ ...inputStyle, flex: 1 }}
-              type="url"
-              value={webhookUrl}
-              onChange={e => setWebhookUrl(e.target.value)}
-              placeholder="https://yourapp.com/webhook"
-            />
+
+          {/* Add webhook form */}
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 16, marginBottom: 16 }}>
+            <div style={{ marginBottom: 12 }}>
+              <label style={labelStyle}>Endpoint URL</label>
+              <input
+                style={{ ...inputStyle }}
+                type="url"
+                value={webhookUrl}
+                onChange={e => setWebhookUrl(e.target.value)}
+                placeholder="https://yourapp.com/webhook"
+              />
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                <label style={{ ...labelStyle, marginBottom: 0 }}>Events</label>
+                <div style={{ display: 'flex', gap: 8 }}>
+                  <button
+                    style={{ background: 'none', border: 'none', color: C.cyan, fontSize: 11, cursor: 'pointer', padding: 0 }}
+                    onClick={() => setSelectedWebhookEvents([...WEBHOOK_EVENT_NAMES])}
+                  >
+                    Select All
+                  </button>
+                  <span style={{ color: C.border }}>|</span>
+                  <button
+                    style={{ background: 'none', border: 'none', color: C.cyan, fontSize: 11, cursor: 'pointer', padding: 0 }}
+                    onClick={() => setSelectedWebhookEvents([])}
+                  >
+                    Deselect All
+                  </button>
+                </div>
+              </div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {WEBHOOK_EVENT_NAMES.map(eventName => {
+                  const checked = selectedWebhookEvents.includes(eventName)
+                  return (
+                    <label key={eventName} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, cursor: 'pointer' }}>
+                      <input
+                        type="checkbox"
+                        checked={checked}
+                        onChange={e => {
+                          const isChecked = e.target.checked
+                          setSelectedWebhookEvents(prev => (
+                            isChecked
+                              ? [...prev, eventName]
+                              : prev.filter(item => item !== eventName)
+                          ))
+                        }}
+                        style={{ accentColor: C.cyan, width: 14, height: 14, marginTop: 2, flexShrink: 0 }}
+                      />
+                      <div>
+                        <span style={{ color: C.text, fontSize: 12, fontFamily: C.mono }}>{eventName}</span>
+                        <div style={{ color: C.muted, fontSize: 11, marginTop: 1 }}>{WEBHOOK_EVENTS[eventName]}</div>
+                      </div>
+                    </label>
+                  )
+                })}
+              </div>
+            </div>
+
             <button
-              style={{ background: C.surface, border: `1px solid ${C.border}`, color: C.text, borderRadius: 6, padding: '10px 18px', cursor: 'pointer', fontSize: 13, flexShrink: 0 }}
+              style={{ background: C.cyan, border: 'none', color: C.bg, borderRadius: 6, padding: '10px 20px', cursor: 'pointer', fontSize: 13, fontWeight: 600, opacity: webhookLoading ? 0.6 : 1 }}
               onClick={addWebhook}
               disabled={webhookLoading}
             >
-              {webhookLoading ? 'Adding...' : 'Add'}
+              {webhookLoading ? 'Adding...' : 'Add Webhook'}
             </button>
           </div>
-          <div style={{ marginTop: 12, background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12 }}>
-            <div style={{ color: C.muted, fontSize: 12, marginBottom: 8 }}>Events to send</div>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 8 }}>
-              {WEBHOOK_EVENTS.map(eventName => {
-                const checked = selectedWebhookEvents.includes(eventName)
-                return (
-                  <label key={eventName} style={{ display: 'flex', alignItems: 'center', gap: 8, cursor: 'pointer' }}>
-                    <input
-                      type="checkbox"
-                      checked={checked}
-                      onChange={e => {
-                        const isChecked = e.target.checked
-                        setSelectedWebhookEvents(prev => (
-                          isChecked
-                            ? [...prev, eventName]
-                            : prev.filter(item => item !== eventName)
-                        ))
-                      }}
-                      style={{ accentColor: C.cyan, width: 14, height: 14 }}
-                    />
-                    <span style={{ color: C.text, fontSize: 12, fontFamily: C.mono }}>{eventName}</span>
-                  </label>
-                )
-              })}
-            </div>
-          </div>
+
+          {/* Active webhooks list */}
           {webhooks.length > 0 && (
-            <div style={{ marginTop: 12, border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
-              {webhooks.map((hook, i) => (
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 12, marginBottom: 16 }}>
+              {webhooks.map(hook => (
                 <div
                   key={hook.id}
                   style={{
-                    display: 'flex',
-                    alignItems: 'center',
-                    justifyContent: 'space-between',
-                    gap: 10,
-                    padding: '10px 12px',
-                    borderBottom: i < webhooks.length - 1 ? `1px solid ${C.border}` : 'none',
                     background: C.surface,
+                    border: `1px solid ${C.border}`,
+                    borderRadius: 8,
+                    padding: 14,
                   }}
                 >
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6, minWidth: 0 }}>
-                    <code style={{ fontFamily: C.mono, fontSize: 12, color: C.text, wordBreak: 'break-all' }}>{hook.url}</code>
-                    {hook.events && hook.events.length > 0 && (
-                      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                        {hook.events.map(eventName => (
-                          <span
-                            key={`${hook.id}-${eventName}`}
-                            style={{
-                              background: C.panel,
-                              border: `1px solid ${C.border}`,
-                              borderRadius: 999,
-                              padding: '2px 8px',
-                              color: C.muted,
-                              fontSize: 10,
-                              fontFamily: C.mono,
-                            }}
-                          >
-                            {eventName}
-                          </span>
-                        ))}
-                      </div>
+                  {/* URL + status */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <div style={{ width: 8, height: 8, borderRadius: '50%', background: hook.is_active ? C.green : C.muted, flexShrink: 0 }} />
+                    <code style={{ fontFamily: C.mono, fontSize: 12, color: C.text, wordBreak: 'break-all', flex: 1 }}>{hook.url}</code>
+                    <span style={{ color: C.muted, fontSize: 10 }}>{new Date(hook.created_at).toLocaleDateString()}</span>
+                  </div>
+
+                  {/* Event pills */}
+                  {hook.events && hook.events.length > 0 && (
+                    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 10 }}>
+                      {hook.events.map(eventName => (
+                        <span
+                          key={`${hook.id}-${eventName}`}
+                          style={{
+                            background: C.panel,
+                            border: `1px solid ${C.border}`,
+                            borderRadius: 999,
+                            padding: '2px 8px',
+                            color: C.muted,
+                            fontSize: 10,
+                            fontFamily: C.mono,
+                          }}
+                        >
+                          {eventName}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+
+                  {/* Secret key */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                    <span style={{ color: C.muted, fontSize: 11, flexShrink: 0 }}>Secret:</span>
+                    <code style={{ fontFamily: C.mono, fontSize: 11, color: C.text, flex: 1, wordBreak: 'break-all' }}>
+                      {revealedSecrets[hook.id] || hook.secret_key || 'n/a'}
+                    </code>
+                    <button
+                      onClick={() => revealSecret(hook.id)}
+                      style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 2 }}
+                      title={revealedSecrets[hook.id] ? 'Hide' : 'Reveal'}
+                    >
+                      {revealedSecrets[hook.id]
+                        ? <EyeSlashIcon style={{ width: 14, height: 14 }} />
+                        : <EyeIcon style={{ width: 14, height: 14 }} />
+                      }
+                    </button>
+                    {revealedSecrets[hook.id] && (
+                      <button
+                        onClick={() => copyKey(revealedSecrets[hook.id])}
+                        style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 2 }}
+                        title="Copy secret"
+                      >
+                        <ClipboardDocumentIcon style={{ width: 14, height: 14 }} />
+                      </button>
                     )}
                   </div>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+
+                  {/* Actions */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <button
-                      style={{ background: 'none', border: `1px solid ${C.border}`, color: C.muted, borderRadius: 6, padding: '6px 10px', cursor: 'pointer', fontSize: 12 }}
-                      onClick={() => toast.success('Webhook test sent')}
+                      style={{ background: 'none', border: `1px solid ${C.border}`, color: C.muted, borderRadius: 6, padding: '5px 10px', cursor: 'pointer', fontSize: 12, opacity: testingWebhookId === hook.id ? 0.6 : 1 }}
+                      onClick={() => testWebhook(hook.id)}
+                      disabled={testingWebhookId === hook.id}
                     >
-                      Test
+                      {testingWebhookId === hook.id ? 'Sending...' : 'Test'}
                     </button>
                     <button
-                      style={{ background: 'none', border: `1px solid ${C.border}`, color: C.red, borderRadius: 6, padding: '6px 10px', cursor: 'pointer', fontSize: 12 }}
+                      style={{ background: 'none', border: `1px solid ${C.border}`, color: C.red, borderRadius: 6, padding: '5px 10px', cursor: 'pointer', fontSize: 12 }}
                       onClick={() => removeWebhook(hook.id)}
                     >
                       Remove
@@ -1294,6 +1442,65 @@ export function DeveloperPage() {
               ))}
             </div>
           )}
+
+          {/* Payload example */}
+          <div style={{ border: `1px solid ${C.border}`, borderRadius: 8, overflow: 'hidden' }}>
+            <button
+              style={{ width: '100%', background: C.surface, border: 'none', padding: '10px 14px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}
+              onClick={() => setShowPayloadExample(prev => !prev)}
+            >
+              <span style={{ color: C.muted, fontSize: 12, fontWeight: 500 }}>Example Payload</span>
+              {showPayloadExample
+                ? <ChevronDownIcon style={{ width: 14, height: 14, color: C.muted }} />
+                : <ChevronRightIcon style={{ width: 14, height: 14, color: C.muted }} />
+              }
+            </button>
+            {showPayloadExample && (
+              <pre style={{ background: C.codeBg, margin: 0, padding: '14px 16px', fontFamily: C.mono, fontSize: 11, color: C.code, lineHeight: 1.7, overflowX: 'auto' }}>
+{`{
+  "user_id": "a1b2c3d4-...",
+  "verification_id": "e5f6g7h8-...",
+  "status": "verification.completed",
+  "timestamp": "2026-03-19T12:00:00.000Z",
+  "data": {
+    "ocr_data": {
+      "full_name": "Jane Doe",
+      "date_of_birth": "1990-01-15",
+      "id_number": "D1234567"
+    },
+    "face_match_score": 0.94
+  }
+}
+
+// Verify signature (Node.js)
+const crypto = require('crypto');
+const expected = 'sha256=' + crypto
+  .createHmac('sha256', YOUR_WEBHOOK_SECRET)
+  .update(rawBody, 'utf8')
+  .digest('hex');
+if (expected !== req.headers['x-idswyft-signature']) {
+  throw new Error('Invalid signature');
+}`}
+              </pre>
+            )}
+          </div>
+        </div>
+
+        {/* Danger Zone */}
+        <div style={{ background: C.panel, border: `1px solid ${C.red}33`, borderRadius: 10, padding: 24, marginTop: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+            <ExclamationTriangleIcon style={{ width: 16, height: 16, color: C.red }} />
+            <div style={{ fontWeight: 600, fontSize: 14, color: C.red }}>Danger Zone</div>
+          </div>
+          <div style={{ color: C.muted, fontSize: 13, marginBottom: 16 }}>
+            Permanently delete your developer account and all associated data including API keys, webhooks, and verification records. This action cannot be undone.
+          </div>
+          <button
+            style={{ background: 'none', border: `1px solid ${C.red}`, color: C.red, borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}
+            onClick={() => setShowDeleteAccount(true)}
+          >
+            Delete Account
+          </button>
         </div>
 
       </div>
@@ -1378,6 +1585,50 @@ export function DeveloperPage() {
               <div style={{ color: C.muted, fontSize: 12, marginTop: 8 }}>
                 Request/response body payloads are not currently captured in this log stream.
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Delete account confirmation modal */}
+      {showDeleteAccount && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 80 }}
+          onClick={() => setShowDeleteAccount(false)}
+        >
+          <div
+            style={{ width: '100%', maxWidth: 440, background: C.panel, border: `1px solid ${C.red}33`, borderRadius: 12, padding: 24 }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+              <ExclamationTriangleIcon style={{ width: 20, height: 20, color: C.red }} />
+              <div style={{ fontWeight: 600, fontSize: 16, color: C.red }}>Delete Account</div>
+            </div>
+            <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
+              This will permanently delete your developer account and all associated data. Type your email address to confirm.
+            </div>
+            <input
+              style={{ ...inputStyle, marginBottom: 16 }}
+              type="email"
+              value={deleteAccountEmail}
+              onChange={e => setDeleteAccountEmail(e.target.value)}
+              placeholder="your@email.com"
+              autoFocus
+            />
+            <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
+              <button
+                style={{ background: 'none', border: `1px solid ${C.border}`, color: C.muted, borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13 }}
+                onClick={() => { setShowDeleteAccount(false); setDeleteAccountEmail('') }}
+              >
+                Cancel
+              </button>
+              <button
+                style={{ background: C.red, border: 'none', color: '#fff', borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600, opacity: deleteAccountEmail ? 1 : 0.5 }}
+                onClick={deleteAccount}
+                disabled={!deleteAccountEmail || deleteAccountLoading}
+              >
+                {deleteAccountLoading ? 'Deleting...' : 'Delete My Account'}
+              </button>
             </div>
           </div>
         </div>

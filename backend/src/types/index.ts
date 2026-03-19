@@ -129,6 +129,8 @@ export interface Webhook {
   url: string;
   is_sandbox: boolean;
   secret_token?: string;
+  secret_key?: string;
+  events?: string[];
   is_active: boolean;
   created_at: Date;
 }
@@ -148,6 +150,7 @@ export interface WebhookDelivery {
 }
 
 export interface WebhookPayload {
+  event?: string;
   user_id: string;
   verification_id: string;
   status: VerificationStatus;

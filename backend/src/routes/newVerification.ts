@@ -427,11 +427,17 @@ async function fireWebhooksIfTerminal(
 ): Promise<void> {
   if (mapped.final_result === null) return; // not terminal yet
 
+  // Map terminal result to webhook event type
+  const eventType = mapped.final_result === 'verified' ? 'verification.completed'
+    : mapped.final_result === 'failed' ? 'verification.failed'
+    : 'verification.manual_review';
+
   try {
-    const webhooks = await webhookService.getActiveWebhooksForDeveloper(developerId, isSandbox);
+    const webhooks = await webhookService.getActiveWebhooksForDeveloper(developerId, isSandbox, eventType);
     if (webhooks.length === 0) return;
 
     const payload: WebhookPayload = {
+      event: eventType,
       user_id: userId,
       verification_id: verificationId,
       status: mapped.final_result as any,
@@ -455,6 +461,59 @@ async function fireWebhooksIfTerminal(
   } catch (err) {
     logger.error('fireWebhooksIfTerminal failed:', {
       verificationId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
+
+/**
+ * Fire a specific webhook event (non-terminal).
+ * Called AFTER res.json() so it never delays the HTTP response.
+ * Errors are caught and logged — never thrown.
+ */
+async function fireWebhookEvent(
+  eventType: string,
+  verificationId: string,
+  developerId: string,
+  userId: string,
+  state: SessionState,
+  isSandbox: boolean
+): Promise<void> {
+  try {
+    const webhooks = await webhookService.getActiveWebhooksForDeveloper(developerId, isSandbox, eventType);
+    if (webhooks.length === 0) return;
+
+    // Resolve the current verification status for the payload
+    const mapped = mapStatusForResponse(state);
+    const currentStatus = mapped.final_result || 'processing';
+
+    const payload: WebhookPayload = {
+      event: eventType,
+      user_id: userId,
+      verification_id: verificationId,
+      status: currentStatus as any,
+      timestamp: new Date().toISOString(),
+      data: {
+        ocr_data: state.front_extraction?.ocr ?? undefined,
+        face_match_score: state.face_match?.similarity_score ?? undefined,
+        failure_reason: state.rejection_detail ?? undefined,
+      },
+    };
+
+    for (const webhook of webhooks) {
+      webhookService.sendWebhook(webhook, verificationId, payload).catch(err => {
+        logger.error('Webhook delivery error (fire-and-forget):', {
+          webhookId: webhook.id,
+          verificationId,
+          event: eventType,
+          error: err instanceof Error ? err.message : String(err),
+        });
+      });
+    }
+  } catch (err) {
+    logger.error('fireWebhookEvent failed:', {
+      verificationId,
+      event: eventType,
       error: err instanceof Error ? err.message : String(err),
     });
   }
@@ -544,6 +603,13 @@ router.post('/initialize',
       total_steps: mapped.total_steps,
       message: 'Verification initialized successfully - ready to upload front document',
     });
+
+    // Fire verification.started webhook (after response is sent)
+    fireWebhookEvent(
+      'verification.started',
+      verificationRecord.id, developerId, user_id,
+      session.getState(), isSandbox
+    );
   })
 );
 
@@ -655,6 +721,13 @@ router.post('/:verification_id/front-document',
       verification_id, mapped.status, mapped.current_step,
       mapped.final_result, state.rejection_reason,
     ).catch(() => {});
+
+    // Fire verification.document_processed webhook (after response is sent)
+    fireWebhookEvent(
+      'verification.document_processed',
+      verification_id, (req as any).developer.id, verification.user_id,
+      state, isSandbox
+    );
 
     // Fire webhooks if Gate 1 hard-rejected (after response is sent)
     fireWebhooksIfTerminal(
@@ -785,6 +858,13 @@ router.post('/:verification_id/back-document',
       verification_id, mapped.status, mapped.current_step,
       mapped.final_result, state.rejection_reason,
     ).catch(() => {});
+
+    // Fire verification.document_processed webhook (after response is sent)
+    fireWebhookEvent(
+      'verification.document_processed',
+      verification_id, (req as any).developer.id, verification.user_id,
+      state, isSandbox
+    );
 
     // Fire webhooks if cross-validation hard-rejected (after response is sent)
     fireWebhooksIfTerminal(
