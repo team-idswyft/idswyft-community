@@ -545,7 +545,7 @@ router.get('/webhooks',
 
     const { data: webhooks, error } = await supabase
       .from('webhooks')
-      .select('id, url, is_sandbox, is_active, created_at, events, secret_key')
+      .select('id, url, is_sandbox, is_active, created_at, events, secret_key, api_key_id, api_key:api_keys!api_key_id(key_prefix, name)')
       .eq('developer_id', developer.id)
       .order('created_at', { ascending: false });
 
@@ -554,12 +554,15 @@ router.get('/webhooks',
       throw new Error('Failed to list webhooks');
     }
 
-    // Mask secret keys in list response
-    const masked = (webhooks || []).map(w => ({
+    // Mask secret keys and flatten api_key join
+    const masked = (webhooks || []).map((w: any) => ({
       ...w,
       secret_key: w.secret_key
         ? `${w.secret_key.slice(0, 6)}${'*'.repeat(8)}${w.secret_key.slice(-4)}`
         : null,
+      api_key_preview: w.api_key ? `${w.api_key.key_prefix}...` : null,
+      api_key_name: w.api_key?.name ?? null,
+      api_key: undefined,
     }));
 
     res.json({ webhooks: masked });
@@ -586,6 +589,10 @@ router.post('/webhooks',
       .optional()
       .isString()
       .withMessage('secret must be a string'),
+    body('api_key_id')
+      .optional({ values: 'null' })
+      .isUUID()
+      .withMessage('api_key_id must be a valid UUID'),
   ],
   catchAsync(async (req: Request, res: Response) => {
     const errors = validationResult(req);
@@ -598,7 +605,22 @@ router.post('/webhooks',
       throw new AuthenticationError('Developer authentication required');
     }
 
-    const { url, is_sandbox = false, events, secret } = req.body;
+    const { url, is_sandbox = false, events, secret, api_key_id } = req.body;
+
+    // If api_key_id is provided, validate it belongs to this developer
+    if (api_key_id) {
+      const { data: ownedKey, error: keyError } = await supabase
+        .from('api_keys')
+        .select('id')
+        .eq('id', api_key_id)
+        .eq('developer_id', developer.id)
+        .eq('is_active', true)
+        .single();
+
+      if (keyError || !ownedKey) {
+        throw new ValidationError('API key not found or does not belong to this developer', 'api_key_id', api_key_id);
+      }
+    }
 
     // Validate events are from the allowed set
     if (events && events.length > 0) {
@@ -608,13 +630,21 @@ router.post('/webhooks',
       }
     }
 
-    const { data: existing, error: existingError } = await supabase
+    // Check for duplicate: same URL + sandbox mode + API key scope
+    let dupQuery = supabase
       .from('webhooks')
       .select('id')
       .eq('developer_id', developer.id)
       .eq('url', url)
-      .eq('is_sandbox', is_sandbox)
-      .single();
+      .eq('is_sandbox', is_sandbox);
+
+    if (api_key_id) {
+      dupQuery = dupQuery.eq('api_key_id', api_key_id);
+    } else {
+      dupQuery = dupQuery.is('api_key_id', null);
+    }
+
+    const { data: existing, error: existingError } = await dupQuery.single();
 
     if (existingError && existingError.code !== 'PGRST116') {
       logger.error('Failed to check existing webhook:', existingError);
@@ -622,7 +652,7 @@ router.post('/webhooks',
     }
 
     if (existing) {
-      throw new ValidationError('Webhook already exists for this URL', 'url', url);
+      throw new ValidationError('Webhook already exists for this URL and scope', 'url', url);
     }
 
     // Auto-generate signing secret if not provided
@@ -636,8 +666,9 @@ router.post('/webhooks',
         is_sandbox,
         events: events && events.length > 0 ? events : WEBHOOK_EVENT_NAMES,
         secret_key: secretKey,
+        api_key_id: api_key_id || null,
       })
-      .select('id, url, is_sandbox, is_active, created_at, events, secret_key')
+      .select('id, url, is_sandbox, is_active, created_at, events, secret_key, api_key_id')
       .single();
 
     if (error || !webhook) {

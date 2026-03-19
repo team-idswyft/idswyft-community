@@ -131,6 +131,7 @@ export interface Webhook {
   secret_token?: string;
   secret_key?: string;
   events?: string[];
+  api_key_id?: string | null;
   is_active: boolean;
   created_at: Date;
 }

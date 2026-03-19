@@ -423,7 +423,8 @@ async function fireWebhooksIfTerminal(
   userId: string,
   state: SessionState,
   mapped: { final_result: string | null },
-  isSandbox: boolean
+  isSandbox: boolean,
+  apiKeyId?: string
 ): Promise<void> {
   if (mapped.final_result === null) return; // not terminal yet
 
@@ -433,7 +434,7 @@ async function fireWebhooksIfTerminal(
     : 'verification.manual_review';
 
   try {
-    const webhooks = await webhookService.getActiveWebhooksForDeveloper(developerId, isSandbox, eventType);
+    const webhooks = await webhookService.getActiveWebhooksForDeveloper(developerId, isSandbox, eventType, apiKeyId);
     if (webhooks.length === 0) return;
 
     const payload: WebhookPayload = {
@@ -477,10 +478,11 @@ async function fireWebhookEvent(
   developerId: string,
   userId: string,
   state: SessionState,
-  isSandbox: boolean
+  isSandbox: boolean,
+  apiKeyId?: string
 ): Promise<void> {
   try {
-    const webhooks = await webhookService.getActiveWebhooksForDeveloper(developerId, isSandbox, eventType);
+    const webhooks = await webhookService.getActiveWebhooksForDeveloper(developerId, isSandbox, eventType, apiKeyId);
     if (webhooks.length === 0) return;
 
     // Resolve the current verification status for the payload
@@ -608,7 +610,7 @@ router.post('/initialize',
     fireWebhookEvent(
       'verification.started',
       verificationRecord.id, developerId, user_id,
-      session.getState(), isSandbox
+      session.getState(), isSandbox, (req as any).apiKey?.id
     );
   })
 );
@@ -726,13 +728,13 @@ router.post('/:verification_id/front-document',
     fireWebhookEvent(
       'verification.document_processed',
       verification_id, (req as any).developer.id, verification.user_id,
-      state, isSandbox
+      state, isSandbox, (req as any).apiKey?.id
     );
 
     // Fire webhooks if Gate 1 hard-rejected (after response is sent)
     fireWebhooksIfTerminal(
       verification_id, (req as any).developer.id, verification.user_id,
-      state, mapped, isSandbox
+      state, mapped, isSandbox, (req as any).apiKey?.id
     );
   })
 );
@@ -863,13 +865,13 @@ router.post('/:verification_id/back-document',
     fireWebhookEvent(
       'verification.document_processed',
       verification_id, (req as any).developer.id, verification.user_id,
-      state, isSandbox
+      state, isSandbox, (req as any).apiKey?.id
     );
 
     // Fire webhooks if cross-validation hard-rejected (after response is sent)
     fireWebhooksIfTerminal(
       verification_id, (req as any).developer.id, verification.user_id,
-      state, mapped, isSandbox
+      state, mapped, isSandbox, (req as any).apiKey?.id
     );
   })
 );
@@ -1102,7 +1104,7 @@ router.post('/:verification_id/live-capture',
     // Fire webhooks on COMPLETE or HARD_REJECTED (after response is sent)
     fireWebhooksIfTerminal(
       verification_id, (req as any).developer.id, verification.user_id,
-      state, mapped, isSandbox
+      state, mapped, isSandbox, (req as any).apiKey?.id
     );
   })
 );

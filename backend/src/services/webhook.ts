@@ -346,7 +346,8 @@ export class WebhookService {
   async getActiveWebhooksForDeveloper(
     developerId: string,
     isSandbox: boolean,
-    eventType?: string
+    eventType?: string,
+    apiKeyId?: string
   ): Promise<Webhook[]> {
     try {
       let query = supabase
@@ -358,6 +359,12 @@ export class WebhookService {
 
       if (eventType) {
         query = query.contains('events', [eventType]);
+      }
+
+      // Filter by API key scope: return webhooks that are either unscoped (NULL)
+      // or scoped to the specific API key that triggered the verification
+      if (apiKeyId) {
+        query = query.or(`api_key_id.is.null,api_key_id.eq.${apiKeyId}`);
       }
 
       const { data, error } = await query;

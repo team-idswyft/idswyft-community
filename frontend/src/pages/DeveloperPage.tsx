@@ -82,6 +82,9 @@ interface DeveloperWebhook {
   url: string
   events?: string[]
   secret_key?: string | null
+  api_key_id?: string | null
+  api_key_preview?: string | null
+  api_key_name?: string | null
   is_sandbox: boolean
   is_active: boolean
   created_at: string
@@ -549,6 +552,7 @@ export function DeveloperPage() {
   const [showCreate, setShowCreate] = useState(false)
   const [newFullKey, setNewFullKey] = useState<string | null>(null)
   const [webhookUrl, setWebhookUrl] = useState('')
+  const [webhookApiKeyId, setWebhookApiKeyId] = useState<string | null>(null)
   const [selectedWebhookEvents, setSelectedWebhookEvents] = useState<string[]>([...WEBHOOK_EVENT_NAMES])
   const [revealedSecrets, setRevealedSecrets] = useState<Record<string, string>>({})
   const [testingWebhookId, setTestingWebhookId] = useState<string | null>(null)
@@ -812,7 +816,7 @@ export function DeveloperPage() {
           Authorization: `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({ url, events: selectedWebhookEvents }),
+        body: JSON.stringify({ url, events: selectedWebhookEvents, api_key_id: webhookApiKeyId }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.message || 'Failed to add webhook')
@@ -822,6 +826,7 @@ export function DeveloperPage() {
         setRevealedSecrets(prev => ({ ...prev, [data.webhook.id]: data.webhook.secret_key }))
       }
       setWebhookUrl('')
+      setWebhookApiKeyId(null)
       setSelectedWebhookEvents([...WEBHOOK_EVENT_NAMES])
       toast.success('Webhook added — copy your signing secret now')
     } catch (err: unknown) {
@@ -1304,6 +1309,22 @@ export function DeveloperPage() {
             </div>
 
             <div style={{ marginBottom: 12 }}>
+              <label style={labelStyle}>Scope to API Key</label>
+              <select
+                style={{ ...inputStyle, cursor: 'pointer' }}
+                value={webhookApiKeyId ?? ''}
+                onChange={e => setWebhookApiKeyId(e.target.value || null)}
+              >
+                <option value="">All keys (fires for every verification)</option>
+                {apiKeys.filter(k => k.status === 'active').map(k => (
+                  <option key={k.id} value={k.id}>
+                    {k.key_preview} — {k.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div style={{ marginBottom: 12 }}>
               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                 <label style={{ ...labelStyle, marginBottom: 0 }}>Events</label>
                 <div style={{ display: 'flex', gap: 8 }}>
@@ -1377,6 +1398,20 @@ export function DeveloperPage() {
                     <div style={{ width: 8, height: 8, borderRadius: '50%', background: hook.is_active ? C.green : C.muted, flexShrink: 0 }} />
                     <code style={{ fontFamily: C.mono, fontSize: 12, color: C.text, wordBreak: 'break-all', flex: 1 }}>{hook.url}</code>
                     <span style={{ color: C.muted, fontSize: 10 }}>{new Date(hook.created_at).toLocaleDateString()}</span>
+                  </div>
+
+                  {/* API key scope */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 10 }}>
+                    <span style={{ color: C.muted, fontSize: 11, flexShrink: 0 }}>Scope:</span>
+                    <span style={{
+                      fontFamily: C.mono,
+                      fontSize: 11,
+                      color: hook.api_key_id ? C.cyan : C.muted,
+                    }}>
+                      {hook.api_key_id
+                        ? `${hook.api_key_preview || hook.api_key_id}${hook.api_key_name ? ` (${hook.api_key_name})` : ''}`
+                        : 'All keys'}
+                    </span>
                   </div>
 
                   {/* Event pills */}
