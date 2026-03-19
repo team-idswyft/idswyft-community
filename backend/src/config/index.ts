@@ -79,7 +79,7 @@ export const config: AppConfig = {
 
   email: {
     resendApiKey: process.env.RESEND_API_KEY || '',
-    fromAddress: process.env.EMAIL_FROM || 'Idswyft <noreply@mail.idswyft.app>',
+    fromAddress: process.env.EMAIL_FROM || 'Idswyft <team@mail.idswyft.app>',
   },
 
   github: {
