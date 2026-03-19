@@ -85,7 +85,7 @@ export const config: AppConfig = {
   github: {
     clientId: process.env.GITHUB_CLIENT_ID || '',
     clientSecret: process.env.GITHUB_CLIENT_SECRET || '',
-    redirectUri: process.env.GITHUB_REDIRECT_URI || 'https://idswyft.app/developer',
+    redirectUri: process.env.GITHUB_REDIRECT_URI || 'https://www.idswyft.app/developer',
   }
 };
 
