@@ -783,6 +783,8 @@ router.get('/webhooks/:webhookId/deliveries',
         attempts: d.attempts,
         created_at: d.created_at,
         delivered_at: d.delivered_at,
+        payload: d.payload ?? null,
+        response_body: d.response_body ?? null,
       })),
       total,
     });

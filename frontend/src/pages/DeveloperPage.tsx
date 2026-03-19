@@ -100,6 +100,8 @@ interface WebhookDeliveryLog {
   attempts: number
   created_at: string
   delivered_at: string | null
+  payload: Record<string, any> | null
+  response_body: string | null
 }
 
 const WEBHOOK_EVENTS: Record<string, string> = {
@@ -580,6 +582,7 @@ export function DeveloperPage() {
   const [expandedWebhookLog, setExpandedWebhookLog] = useState<string | null>(null)
   const [webhookDeliveries, setWebhookDeliveries] = useState<Record<string, WebhookDeliveryLog[]>>({})
   const [deliveriesLoading, setDeliveriesLoading] = useState<string | null>(null)
+  const [expandedDeliveryId, setExpandedDeliveryId] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [expandedKeyId, setExpandedKeyId] = useState<string | null>(null)
   const [keyLogs, setKeyLogs] = useState<Record<string, ApiActivity[]>>({})
@@ -1620,29 +1623,51 @@ export function DeveloperPage() {
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 240, overflowY: 'auto' }}>
                           {webhookDeliveries[hook.id].map(d => {
                             const statusColor = d.status === 'delivered' ? C.green : d.status === 'failed' ? C.red : C.muted
+                            const isExpanded = expandedDeliveryId === d.id
                             return (
-                              <div
-                                key={d.id}
-                                style={{
-                                  display: 'flex',
-                                  alignItems: 'center',
-                                  gap: 8,
-                                  padding: '6px 8px',
-                                  background: C.panel,
-                                  borderRadius: 4,
-                                  fontSize: 11,
-                                }}
-                              >
-                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: statusColor, flexShrink: 0 }} />
-                                <span style={{ fontFamily: C.mono, color: C.text, minWidth: 160 }}>
-                                  {d.event || 'unknown'}
-                                </span>
-                                <span style={{ color: statusColor, fontWeight: 500, minWidth: 60 }}>
-                                  {d.status === 'delivered' ? `${d.response_status}` : d.status}
-                                </span>
-                                <span style={{ color: C.muted, fontSize: 10, marginLeft: 'auto', whiteSpace: 'nowrap' }}>
-                                  {new Date(d.created_at).toLocaleString()}
-                                </span>
+                              <div key={d.id}>
+                                <div
+                                  onClick={() => setExpandedDeliveryId(isExpanded ? null : d.id)}
+                                  style={{
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                    gap: 8,
+                                    padding: '6px 8px',
+                                    background: isExpanded ? C.surface : C.panel,
+                                    borderRadius: isExpanded ? '4px 4px 0 0' : 4,
+                                    fontSize: 11,
+                                    cursor: 'pointer',
+                                    transition: 'background 0.15s',
+                                  }}
+                                >
+                                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: statusColor, flexShrink: 0 }} />
+                                  <span style={{ fontFamily: C.mono, color: C.text, minWidth: 160 }}>
+                                    {d.event || 'unknown'}
+                                  </span>
+                                  <span style={{ color: statusColor, fontWeight: 500, minWidth: 60 }}>
+                                    {d.status === 'delivered' ? `${d.response_status}` : d.status}
+                                  </span>
+                                  <span style={{ color: C.muted, fontSize: 10, marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+                                    {new Date(d.created_at).toLocaleString()}
+                                  </span>
+                                  <span style={{ color: C.muted, fontSize: 10, marginLeft: 4, transition: 'transform 0.15s', transform: isExpanded ? 'rotate(90deg)' : 'none' }}>&#9656;</span>
+                                </div>
+                                {isExpanded && (
+                                  <div style={{ background: C.surface, borderRadius: '0 0 4px 4px', padding: '8px 10px', borderTop: `1px solid ${C.border}` }}>
+                                    {d.payload && (
+                                      <div style={{ marginBottom: 8 }}>
+                                        <div style={{ fontSize: 10, fontWeight: 600, color: C.muted, marginBottom: 4 }}>Request Payload</div>
+                                        <pre style={{ margin: 0, padding: 8, background: C.bg, borderRadius: 4, fontSize: 10, fontFamily: C.mono, color: C.text, overflowX: 'auto', maxHeight: 200, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{JSON.stringify(d.payload, null, 2)}</pre>
+                                      </div>
+                                    )}
+                                    <div>
+                                      <div style={{ fontSize: 10, fontWeight: 600, color: C.muted, marginBottom: 4 }}>
+                                        Response {d.response_status ? `(${d.response_status})` : ''}
+                                      </div>
+                                      <pre style={{ margin: 0, padding: 8, background: C.bg, borderRadius: 4, fontSize: 10, fontFamily: C.mono, color: C.muted, overflowX: 'auto', maxHeight: 120, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{d.response_body ? d.response_body.slice(0, 500) : 'No response captured'}</pre>
+                                    </div>
+                                  </div>
+                                )}
                               </div>
                             )
                           })}

@@ -3,6 +3,7 @@ import { body, validationResult } from 'express-validator';
 import { authenticateAPIKey } from '@/middleware/auth.js';
 import { catchAsync, ValidationError, NotFoundError } from '@/middleware/errorHandler.js';
 import { WebhookService } from '@/services/webhook.js';
+import { WEBHOOK_EVENT_NAMES } from '@/constants/webhookEvents.js';
 import { logger } from '@/utils/logger.js';
 import { WebhookPayload } from '@/types/index.js';
 
@@ -45,7 +46,8 @@ router.post('/register',
       developer_id: developerId,
       url,
       is_sandbox,
-      secret_token
+      secret_token,
+      events: WEBHOOK_EVENT_NAMES,
     });
     
     logger.info('Webhook registered', {

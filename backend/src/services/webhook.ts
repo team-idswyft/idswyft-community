@@ -11,6 +11,7 @@ export class WebhookService {
     url: string;
     is_sandbox: boolean;
     secret_token?: string;
+    events?: string[];
   }): Promise<Webhook> {
     const { data: webhook, error } = await supabase
       .from('webhooks')
@@ -357,8 +358,10 @@ export class WebhookService {
         .eq('is_active', true)
         .eq('is_sandbox', isSandbox);
 
+      // Each .or() produces an independent parenthesized group ANDed with the rest.
+      // When both are present: WHERE ... AND (events filter) AND (api_key filter)
       if (eventType) {
-        query = query.contains('events', [eventType]);
+        query = query.or(`events.cs.{${eventType}},events.is.null`);
       }
 
       // Filter by API key scope: return webhooks that are either unscoped (NULL)
