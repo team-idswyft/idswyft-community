@@ -14,6 +14,7 @@ import {
   EyeIcon,
   EyeSlashIcon,
   ExclamationTriangleIcon,
+  Cog6ToothIcon,
 } from '@heroicons/react/24/outline'
 
 // â"€â"€â"€ Types â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
@@ -96,6 +97,8 @@ const WEBHOOK_EVENTS: Record<string, string> = {
   'verification.completed':          'Verification passed',
   'verification.failed':             'Verification rejected',
   'verification.manual_review':      'Flagged for manual review',
+  'document.expiry_warning':         'Document nearing or past expiry date',
+  'verification.reverification_due': 'Scheduled re-verification is due',
 }
 
 const WEBHOOK_EVENT_NAMES = Object.keys(WEBHOOK_EVENTS)
@@ -556,6 +559,7 @@ export function DeveloperPage() {
   const [selectedWebhookEvents, setSelectedWebhookEvents] = useState<string[]>([...WEBHOOK_EVENT_NAMES])
   const [revealedSecrets, setRevealedSecrets] = useState<Record<string, string>>({})
   const [testingWebhookId, setTestingWebhookId] = useState<string | null>(null)
+  const [showSettings, setShowSettings] = useState(false)
   const [showDeleteAccount, setShowDeleteAccount] = useState(false)
   const [deleteAccountEmail, setDeleteAccountEmail] = useState('')
   const [deleteAccountLoading, setDeleteAccountLoading] = useState(false)
@@ -951,12 +955,21 @@ export function DeveloperPage() {
             </div>
             <h1 style={{ fontFamily: C.mono, fontSize: 24, fontWeight: 600, color: C.text }}>API Keys</h1>
           </div>
-          <button
-            onClick={handleLogout}
-            style={{ background: 'none', border: `1px solid ${C.border}`, color: C.muted, borderRadius: 6, padding: '8px 14px', cursor: 'pointer', fontSize: 13 }}
-          >
-            Sign out
-          </button>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <button
+              onClick={() => setShowSettings(true)}
+              style={{ background: 'none', border: `1px solid ${C.border}`, color: C.muted, borderRadius: 6, padding: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+              title="Settings"
+            >
+              <Cog6ToothIcon style={{ width: 16, height: 16 }} />
+            </button>
+            <button
+              onClick={handleLogout}
+              style={{ background: 'none', border: `1px solid ${C.border}`, color: C.muted, borderRadius: 6, padding: '8px 14px', cursor: 'pointer', fontSize: 13 }}
+            >
+              Sign out
+            </button>
+          </div>
         </div>
 
         {/* New key banner */}
@@ -1527,23 +1540,6 @@ if (expected !== req.headers['x-idswyft-signature']) {
           </div>
         </div>
 
-        {/* Danger Zone */}
-        <div style={{ background: C.panel, border: `1px solid ${C.red}33`, borderRadius: 10, padding: 24, marginTop: 24 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-            <ExclamationTriangleIcon style={{ width: 16, height: 16, color: C.red }} />
-            <div style={{ fontWeight: 600, fontSize: 14, color: C.red }}>Danger Zone</div>
-          </div>
-          <div style={{ color: C.muted, fontSize: 13, marginBottom: 16 }}>
-            Permanently delete your developer account and all associated data including API keys, webhooks, and verification records. This action cannot be undone.
-          </div>
-          <button
-            style={{ background: 'none', border: `1px solid ${C.red}`, color: C.red, borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}
-            onClick={() => setShowDeleteAccount(true)}
-          >
-            Delete Account
-          </button>
-        </div>
-
       </div>
 
       {/* Create key modal */}
@@ -1626,6 +1622,49 @@ if (expected !== req.headers['x-idswyft-signature']) {
               <div style={{ color: C.muted, fontSize: 12, marginTop: 8 }}>
                 Request/response body payloads are not currently captured in this log stream.
               </div>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Settings modal */}
+      {showSettings && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 80 }}
+          onClick={() => setShowSettings(false)}
+        >
+          <div
+            style={{ width: '100%', maxWidth: 480, background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 24 }}
+            onClick={e => e.stopPropagation()}
+          >
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <Cog6ToothIcon style={{ width: 18, height: 18, color: C.text }} />
+                <div style={{ fontWeight: 600, fontSize: 16, color: C.text }}>Settings</div>
+              </div>
+              <button
+                onClick={() => setShowSettings(false)}
+                style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: 20, padding: '0 4px' }}
+              >
+                &times;
+              </button>
+            </div>
+
+            {/* Danger Zone */}
+            <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 20 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <ExclamationTriangleIcon style={{ width: 16, height: 16, color: C.red }} />
+                <div style={{ fontWeight: 600, fontSize: 14, color: C.red }}>Danger Zone</div>
+              </div>
+              <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
+                Permanently delete your developer account and all associated data including API keys, webhooks, and verification records. This action cannot be undone.
+              </div>
+              <button
+                style={{ background: 'none', border: `1px solid ${C.red}`, color: C.red, borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}
+                onClick={() => { setShowSettings(false); setShowDeleteAccount(true) }}
+              >
+                Delete Account
+              </button>
             </div>
           </div>
         </div>

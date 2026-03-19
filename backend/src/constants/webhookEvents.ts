@@ -9,6 +9,8 @@ export const WEBHOOK_EVENTS: Record<string, string> = {
   'verification.completed':          'Verification passed',
   'verification.failed':             'Verification rejected',
   'verification.manual_review':      'Flagged for manual review',
+  'document.expiry_warning':         'Document nearing or past expiry date',
+  'verification.reverification_due': 'Scheduled re-verification is due',
 } as const;
 
 /** All valid event names as a typed array */
