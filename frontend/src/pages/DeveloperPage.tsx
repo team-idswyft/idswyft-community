@@ -117,7 +117,7 @@ const labelStyle: React.CSSProperties = {
 
 type AuthStep = 'enter_email' | 'verify_otp' | 'complete_registration'
 
-function AuthGate({ onAuth }: { onAuth: (token: string) => void }) {
+function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) => void }) {
   const [step, setStep] = useState<AuthStep>('enter_email')
   const [email, setEmail] = useState('')
   const [otpDigits, setOtpDigits] = useState<string[]>(['', '', '', '', '', ''])
@@ -167,10 +167,7 @@ function AuthGate({ onAuth }: { onAuth: (token: string) => void }) {
         window.history.replaceState({}, '', window.location.pathname)
         if (!ok) throw new Error(data.message || 'GitHub login failed')
         localStorage.setItem('developer_token', data.token)
-        if (data.api_key?.key) {
-          toast.success('Account created! Your API key has been generated.')
-        }
-        onAuth(data.token)
+        onAuth(data.token, data.api_key?.key)
       })
       .catch((err: unknown) => {
         window.history.replaceState({}, '', window.location.pathname)
@@ -287,10 +284,7 @@ function AuthGate({ onAuth }: { onAuth: (token: string) => void }) {
       const data = await res.json()
       if (!res.ok) throw new Error(data.message || 'Registration failed')
       localStorage.setItem('developer_token', data.token)
-      if (data.api_key?.key) {
-        toast.success('Account created! Your API key has been generated.')
-      }
-      onAuth(data.token)
+      onAuth(data.token, data.api_key?.key)
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Registration failed')
     } finally {
@@ -603,7 +597,10 @@ export function DeveloperPage() {
     }
   }, [token])
 
-  const handleAuth = (t: string) => setToken(t)
+  const handleAuth = (t: string, apiKey?: string) => {
+    setToken(t)
+    if (apiKey) setNewFullKey(apiKey)
+  }
 
   const handleCreated = (key: ApiKey, fullKey: string) => {
     setApiKeys(prev => [...prev, key])
