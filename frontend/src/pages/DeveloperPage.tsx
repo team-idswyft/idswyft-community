@@ -91,6 +91,16 @@ interface DeveloperWebhook {
   created_at: string
 }
 
+interface WebhookDeliveryLog {
+  id: string
+  event: string | null
+  status: 'pending' | 'delivered' | 'failed'
+  response_status: number | null
+  attempts: number
+  created_at: string
+  delivered_at: string | null
+}
+
 const WEBHOOK_EVENTS: Record<string, string> = {
   'verification.started':            'Verification session created',
   'verification.document_processed': 'Document step completed (front or back)',
@@ -566,6 +576,9 @@ export function DeveloperPage() {
   const [showPayloadExample, setShowPayloadExample] = useState(false)
   const [webhooks, setWebhooks] = useState<DeveloperWebhook[]>([])
   const [webhookLoading, setWebhookLoading] = useState(false)
+  const [expandedWebhookLog, setExpandedWebhookLog] = useState<string | null>(null)
+  const [webhookDeliveries, setWebhookDeliveries] = useState<Record<string, WebhookDeliveryLog[]>>({})
+  const [deliveriesLoading, setDeliveriesLoading] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [expandedKeyId, setExpandedKeyId] = useState<string | null>(null)
   const [keyLogs, setKeyLogs] = useState<Record<string, ApiActivity[]>>({})
@@ -902,6 +915,27 @@ export function DeveloperPage() {
     } catch {
       toast.error('Failed to reveal secret')
     }
+  }
+
+  const toggleDeliveryLog = async (webhookId: string) => {
+    if (expandedWebhookLog === webhookId) {
+      setExpandedWebhookLog(null)
+      return
+    }
+    setExpandedWebhookLog(webhookId)
+    if (webhookDeliveries[webhookId]) return // already fetched
+    if (!token) return
+    setDeliveriesLoading(webhookId)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/webhooks/${webhookId}/deliveries`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setWebhookDeliveries(prev => ({ ...prev, [webhookId]: data.deliveries ?? [] }))
+      }
+    } catch { /* network error */ }
+    finally { setDeliveriesLoading(null) }
   }
 
   const deleteAccount = async () => {
@@ -1486,12 +1520,59 @@ export function DeveloperPage() {
                       {testingWebhookId === hook.id ? 'Sending...' : 'Test'}
                     </button>
                     <button
+                      style={{ background: 'none', border: `1px solid ${C.border}`, color: expandedWebhookLog === hook.id ? C.cyan : C.muted, borderRadius: 6, padding: '5px 10px', cursor: 'pointer', fontSize: 12 }}
+                      onClick={() => toggleDeliveryLog(hook.id)}
+                    >
+                      {deliveriesLoading === hook.id ? 'Loading...' : 'Logs'}
+                    </button>
+                    <button
                       style={{ background: 'none', border: `1px solid ${C.border}`, color: C.red, borderRadius: 6, padding: '5px 10px', cursor: 'pointer', fontSize: 12 }}
                       onClick={() => removeWebhook(hook.id)}
                     >
                       Remove
                     </button>
                   </div>
+
+                  {/* Delivery log */}
+                  {expandedWebhookLog === hook.id && (
+                    <div style={{ marginTop: 10, borderTop: `1px solid ${C.border}`, paddingTop: 10 }}>
+                      <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 8 }}>Recent Deliveries</div>
+                      {(!webhookDeliveries[hook.id] || webhookDeliveries[hook.id].length === 0) ? (
+                        <div style={{ fontSize: 12, color: C.muted, fontStyle: 'italic' }}>No deliveries yet</div>
+                      ) : (
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 240, overflowY: 'auto' }}>
+                          {webhookDeliveries[hook.id].map(d => {
+                            const statusColor = d.status === 'delivered' ? C.green : d.status === 'failed' ? C.red : C.muted
+                            return (
+                              <div
+                                key={d.id}
+                                style={{
+                                  display: 'flex',
+                                  alignItems: 'center',
+                                  gap: 8,
+                                  padding: '6px 8px',
+                                  background: C.panel,
+                                  borderRadius: 4,
+                                  fontSize: 11,
+                                }}
+                              >
+                                <span style={{ width: 6, height: 6, borderRadius: '50%', background: statusColor, flexShrink: 0 }} />
+                                <span style={{ fontFamily: C.mono, color: C.text, minWidth: 160 }}>
+                                  {d.event || 'unknown'}
+                                </span>
+                                <span style={{ color: statusColor, fontWeight: 500, minWidth: 60 }}>
+                                  {d.status === 'delivered' ? `${d.response_status}` : d.status}
+                                </span>
+                                <span style={{ color: C.muted, fontSize: 10, marginLeft: 'auto', whiteSpace: 'nowrap' }}>
+                                  {new Date(d.created_at).toLocaleString()}
+                                </span>
+                              </div>
+                            )
+                          })}
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               ))}
             </div>

@@ -21,6 +21,7 @@ interface ServiceCheck {
  * Public endpoint — no auth required
  */
 router.get('/', async (req: Request, res: Response) => {
+  const requestStart = Date.now();
   const services: ServiceCheck[] = [];
 
   // Check Main API database connectivity
@@ -43,11 +44,11 @@ router.get('/', async (req: Request, res: Response) => {
     });
   }
 
-  // Check verification service (self-health — if we can respond, the API is up)
+  // API self-check: measure total request processing time
   services.unshift({
     name: 'API',
     status: 'operational',
-    latency_ms: 0,
+    latency_ms: Date.now() - requestStart,
   });
 
   // Determine overall status

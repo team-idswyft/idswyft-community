@@ -267,11 +267,6 @@ export function Status() {
 
         {/* ── Header ─────────────────────────────────────────────────── */}
         <div style={{ textAlign: 'center', marginBottom: 48 }}>
-          <img
-            src="/idswyft-logo.png"
-            alt="Idswyft"
-            style={{ height: 32, margin: '0 auto 20px' }}
-          />
           <h1 style={{
             fontSize: 28,
             fontWeight: 600,

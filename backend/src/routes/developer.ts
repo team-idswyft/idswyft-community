@@ -728,6 +728,57 @@ router.get('/webhooks/:webhookId/secret',
   })
 );
 
+// List recent webhook deliveries for a specific webhook
+router.get('/webhooks/:webhookId/deliveries',
+  apiKeyRateLimit,
+  authenticateDeveloperJWT,
+  [
+    param('webhookId')
+      .isUUID()
+      .withMessage('Invalid webhook ID format')
+  ],
+  catchAsync(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw new ValidationError('Validation failed', 'multiple', errors.array());
+    }
+
+    const developer = req.developer;
+    if (!developer) {
+      throw new AuthenticationError('Developer authentication required');
+    }
+
+    const { webhookId } = req.params;
+
+    // Verify webhook belongs to this developer
+    const { data: webhook, error: whError } = await supabase
+      .from('webhooks')
+      .select('id')
+      .eq('id', webhookId)
+      .eq('developer_id', developer.id)
+      .single();
+
+    if (whError || !webhook) {
+      throw new NotFoundError('Webhook');
+    }
+
+    const { deliveries, total } = await webhookService.getWebhookDeliveries(webhookId, 1, 25);
+
+    res.json({
+      deliveries: deliveries.map(d => ({
+        id: d.id,
+        event: (d.payload as any)?.event ?? null,
+        status: d.status,
+        response_status: d.response_status,
+        attempts: d.attempts,
+        created_at: d.created_at,
+        delivered_at: d.delivered_at,
+      })),
+      total,
+    });
+  })
+);
+
 // Send a test webhook delivery
 router.post('/webhooks/:webhookId/test',
   apiKeyRateLimit,
