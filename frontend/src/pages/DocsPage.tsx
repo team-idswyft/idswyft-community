@@ -286,6 +286,7 @@ const NAV = [
   { id: 'analysis', label: 'Analysis Engine', depth: 0 },
   { id: 'batch', label: 'Batch API', depth: 0 },
   { id: 'address', label: 'Address Verification', depth: 0 },
+  { id: 'aml', label: 'AML / Sanctions', depth: 0 },
   { id: 'monitoring', label: 'Monitoring', depth: 0 },
   { id: 'statuses', label: 'Statuses', depth: 0 },
   { id: 'rate-limits', label: 'Rate Limits', depth: 0 },
@@ -523,19 +524,27 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
             <div style={{ marginBottom: 12 }}>
               <FieldRow name="user_id" type="UUID string" req={true} desc="Your unique identifier for the user being verified." />
               <FieldRow name="sandbox" type="boolean" req={false} desc="Set true to use sandbox mode. Defaults to false." />
+              <FieldRow name="addons" type="object" req={false} desc="Optional add-on features to enable for this session." />
+              <FieldRow name="addons.aml_screening" type="boolean" req={false} desc="Enable AML/sanctions screening against OFAC, EU & UN lists. Runs automatically after identity verification completes." />
             </div>
             <CodeTabs tab={tab} onChange={setTab}
               curl={`curl -X POST ${apiUrl}/api/v2/verify/initialize \\
   -H "X-API-Key: your-key" \\
   -H "Content-Type: application/json" \\
-  -d '{"user_id": "550e8400-e29b-41d4-a716-446655440000"}'`}
+  -d '{
+    "user_id": "550e8400-e29b-41d4-a716-446655440000",
+    "addons": { "aml_screening": true }
+  }'`}
               js={`const res = await fetch(\`${apiUrl}/api/v2/verify/initialize\`, {
   method: 'POST',
   headers: {
     'X-API-Key': 'your-key',
     'Content-Type': 'application/json',
   },
-  body: JSON.stringify({ user_id: '550e8400-e29b-41d4-a716-446655440000' }),
+  body: JSON.stringify({
+    user_id: '550e8400-e29b-41d4-a716-446655440000',
+    addons: { aml_screening: true },
+  }),
 });
 const data = await res.json();`}
               python={`import requests
@@ -543,7 +552,10 @@ const data = await res.json();`}
 res = requests.post(
     '${apiUrl}/api/v2/verify/initialize',
     headers={ 'X-API-Key': 'your-key' },
-    json={ 'user_id': '550e8400-e29b-41d4-a716-446655440000' },
+    json={
+        'user_id': '550e8400-e29b-41d4-a716-446655440000',
+        'addons': { 'aml_screening': True },
+    },
 )
 data = res.json()`} />
             <Pre label="Response  —  HTTP 201" code={`{
@@ -869,6 +881,15 @@ data = res.json()`} />
   "liveness_results": {
     "passed": true,
     "score": 0.96
+  },
+
+  // ── AML / Sanctions (when addons.aml_screening is enabled) ──
+  "aml_screening": {
+    "risk_level": "clear",           // "clear" | "potential_match" | "confirmed_match"
+    "match_found": false,
+    "match_count": 0,
+    "lists_checked": ["us_ofac_sdn", "eu_sanctions", "un_sanctions"],
+    "screened_at": "2026-03-06T12:05:28Z"
   },
 
   // ── Final decision ───────────────────────────────────────────
@@ -1387,6 +1408,125 @@ console.log(result.address_verification.name_match_score); // 0.95
 
 // Query status separately
 const status = await sdk.getAddressStatus(verificationId);`} />
+
+          <Divider />
+
+          {/* ══ AML / SANCTIONS SCREENING ══════════════════════════════════ */}
+          <SectionAnchor id="aml" />
+          <H2>AML / Sanctions Screening</H2>
+          <Lead>
+            Screen verified identities against global sanctions and watchlists (OFAC SDN, EU, UN).
+            AML screening is an opt-in addon — enable it per session by passing{' '}
+            <code style={{ fontFamily: C.mono, color: C.cyan }}>addons.aml_screening: true</code> during initialization.
+            The screening runs automatically as Gate 6, after all identity verification gates pass.
+          </Lead>
+
+          <Callout type="note">
+            AML screening uses OCR-extracted data (full name, date of birth, nationality) from the front document.
+            It runs automatically after Gate 5 (face match) — no additional API call needed. Results appear in the{' '}
+            <code style={{ fontFamily: C.mono }}>aml_screening</code> field of the status response.
+          </Callout>
+
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
+            <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>How it works</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 16px' }}>
+              {[
+                ['1', 'Pass addons.aml_screening: true in the initialize request'],
+                ['2', 'Complete identity verification (front doc → back doc → live capture)'],
+                ['3', 'Gate 6 automatically screens extracted name/DOB against sanctions lists'],
+                ['4', 'Results appear in aml_screening field of the status response'],
+              ].map(([n, text]) => (
+                <React.Fragment key={n}>
+                  <span style={{ fontFamily: C.mono, fontSize: '0.75rem', color: C.cyan, fontWeight: 600 }}>{n}.</span>
+                  <span style={{ fontFamily: C.sans, fontSize: '0.82rem', color: C.muted, lineHeight: 1.6 }}>{text}</span>
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
+            <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>Risk levels & outcomes</div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+              {[
+                { level: 'clear', score: '< 0.5', outcome: 'Verification proceeds normally', color: C.green },
+                { level: 'potential_match', score: '0.5 – 0.84', outcome: 'Routed to manual_review', color: C.amber },
+                { level: 'confirmed_match', score: '>= 0.85', outcome: 'Hard reject (failed)', color: C.red },
+              ].map(r => (
+                <div key={r.level} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 6, padding: 12, borderLeft: `3px solid ${r.color}` }}>
+                  <div style={{ fontFamily: C.mono, fontSize: '0.75rem', color: r.color, fontWeight: 600, marginBottom: 4 }}>{r.level}</div>
+                  <div style={{ fontFamily: C.mono, fontSize: '0.7rem', color: C.dim, marginBottom: 6 }}>score {r.score}</div>
+                  <div style={{ fontFamily: C.sans, fontSize: '0.78rem', color: C.muted, lineHeight: 1.5 }}>{r.outcome}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <Pre label="Enable AML screening" code={`curl -X POST ${apiUrl}/api/v2/verify/initialize \\
+  -H "X-API-Key: your-key" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "user_id": "user-uuid",
+    "addons": { "aml_screening": true }
+  }'`} />
+
+          <Pre label="Status response — with AML results" code={`{
+  "verification_id": "v_abc123",
+  "status": "COMPLETE",
+  "final_result": "verified",
+
+  "aml_screening": {
+    "risk_level": "clear",             // "clear" | "potential_match" | "confirmed_match"
+    "match_found": false,
+    "match_count": 0,
+    "lists_checked": [
+      "us_ofac_sdn",
+      "eu_sanctions",
+      "un_sanctions"
+    ],
+    "screened_at": "2026-03-19T10:05:28Z"
+  }
+}`} />
+
+          <Pre label="Status response — potential match (manual review)" code={`{
+  "verification_id": "v_abc123",
+  "status": "COMPLETE",
+  "final_result": "manual_review",
+  "manual_review_reason": "AML_POTENTIAL_MATCH",
+
+  "aml_screening": {
+    "risk_level": "potential_match",
+    "match_found": true,
+    "match_count": 1,
+    "lists_checked": ["us_ofac_sdn", "eu_sanctions", "un_sanctions"],
+    "screened_at": "2026-03-19T10:05:28Z"
+  }
+}`} />
+
+          <Callout type="warning">
+            When AML screening is not enabled (no <code style={{ fontFamily: C.mono }}>addons.aml_screening</code> flag), the{' '}
+            <code style={{ fontFamily: C.mono }}>aml_screening</code> field will be <code style={{ fontFamily: C.mono }}>null</code>{' '}
+            in the status response. AML screening is failure-safe — if the screening provider is unavailable, verification
+            proceeds normally and the field is set to <code style={{ fontFamily: C.mono }}>null</code>.
+          </Callout>
+
+          <Pre label="SDK usage" code={`// Initialize with AML screening enabled
+const session = await sdk.initialize({
+  userId: 'user-uuid',
+  addons: { aml_screening: true },
+});
+
+// ... complete verification steps ...
+
+// Check AML results in final status
+const status = await sdk.getStatus(session.verification_id);
+
+if (status.aml_screening?.risk_level === 'clear') {
+  console.log('No sanctions matches found');
+} else if (status.aml_screening?.risk_level === 'potential_match') {
+  console.log('Manual review required — potential sanctions match');
+} else if (status.aml_screening?.risk_level === 'confirmed_match') {
+  console.log('Verification failed — confirmed sanctions match');
+}`} />
 
           <Divider />
 
