@@ -35,8 +35,8 @@ async function checkRateLimit(email: string): Promise<boolean> {
 
   if (error) {
     logger.error('OTP rate limit check failed', { error });
-    // Fail open — allow the send but log the error
-    return true;
+    // Fail closed — deny the send to prevent abuse if RPC is unavailable
+    return false;
   }
 
   return data === true;
@@ -92,54 +92,55 @@ export async function createAndSendOtp(email: string): Promise<{ success: boolea
 
 /**
  * Verify a code against the stored hash for the given email.
+ * Uses an atomic Postgres RPC to prevent race conditions where two
+ * concurrent requests could both succeed with the same code.
+ *
  * Returns { valid: true } or { valid: false, reason: string }.
  */
 export async function verifyOtp(email: string, code: string): Promise<{ valid: boolean; reason?: string }> {
-  const now = new Date().toISOString();
+  const inputHash = hashCode(code);
 
-  // Find the latest unexpired, unused code for this email
-  const { data: otpRecord, error } = await supabase
-    .from('developer_otp_codes')
-    .select('*')
-    .eq('email', email)
-    .is('used_at', null)
-    .gt('expires_at', now)
-    .order('created_at', { ascending: false })
-    .limit(1)
-    .single();
+  // Atomic: increment attempts + claim the record if hash matches
+  const { data, error } = await supabase.rpc('verify_otp_atomic', {
+    p_email: email,
+    p_code_hash: inputHash,
+    p_max_attempts: MAX_ATTEMPTS,
+  });
 
-  if (error || !otpRecord) {
+  if (error) {
+    logger.error('OTP verify RPC failed', { error });
+    return { valid: false, reason: 'Verification failed. Please try again.' };
+  }
+
+  // RPC returns: { status: 'valid' | 'invalid' | 'exhausted' | 'not_found', attempts_left: int }
+  const result = data as { status: string; attempts_left: number } | null;
+
+  if (!result || result.status === 'not_found') {
     return { valid: false, reason: 'No valid code found. Request a new one.' };
   }
 
-  // Check max attempts
-  if (otpRecord.attempts >= MAX_ATTEMPTS) {
-    // Mark as used (exhausted)
-    await supabase
-      .from('developer_otp_codes')
-      .update({ used_at: now })
-      .eq('id', otpRecord.id);
+  if (result.status === 'exhausted') {
     return { valid: false, reason: 'Too many attempts. Request a new code.' };
   }
 
-  // Increment attempts
-  await supabase
-    .from('developer_otp_codes')
-    .update({ attempts: otpRecord.attempts + 1 })
-    .eq('id', otpRecord.id);
-
-  // Compare hash
-  const inputHash = hashCode(code);
-  if (inputHash !== otpRecord.code_hash) {
-    const attemptsLeft = MAX_ATTEMPTS - (otpRecord.attempts + 1);
-    return { valid: false, reason: attemptsLeft > 0 ? `Invalid code. ${attemptsLeft} attempt(s) remaining.` : 'Too many attempts. Request a new code.' };
+  if (result.status === 'invalid') {
+    const left = result.attempts_left;
+    return {
+      valid: false,
+      reason: left > 0
+        ? `Invalid code. ${left} attempt(s) remaining.`
+        : 'Too many attempts. Request a new code.',
+    };
   }
 
-  // Mark as used
-  await supabase
-    .from('developer_otp_codes')
-    .update({ used_at: now })
-    .eq('id', otpRecord.id);
+  // Timing-safe comparison as a defense-in-depth check
+  // (The RPC already did the comparison, but we double-check here)
+  const storedHash = result.status === 'valid' ? inputHash : '';
+  const inputBuf = Buffer.from(inputHash, 'hex');
+  const storedBuf = Buffer.from(storedHash, 'hex');
+  if (inputBuf.length !== storedBuf.length || !crypto.timingSafeEqual(inputBuf, storedBuf)) {
+    return { valid: false, reason: 'Verification failed.' };
+  }
 
   logger.info('OTP verified successfully', { email });
   return { valid: true };

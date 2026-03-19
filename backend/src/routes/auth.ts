@@ -1,5 +1,6 @@
 import express, { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
+import rateLimit from 'express-rate-limit';
 import { body, validationResult } from 'express-validator';
 import validator from 'validator';
 import { supabase } from '@/config/database.js';
@@ -12,6 +13,15 @@ import * as githubOAuth from '@/services/githubOAuthService.js';
 import { Developer } from '@/types/index.js';
 import { logger } from '@/utils/logger.js';
 import { generateToken } from '@/middleware/csrf.js';
+
+// Rate limiter for OTP verify: 10 attempts per 15 minutes per IP
+const otpVerifyLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 10,
+  message: { message: 'Too many verification attempts. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
 
 const router = express.Router();
 
@@ -128,12 +138,14 @@ router.post('/developer/otp/send',
 
 // POST /api/auth/developer/otp/verify — verify the 6-digit code
 router.post('/developer/otp/verify',
+  otpVerifyLimiter,
   [
     ...emailValidation,
     body('code')
       .isString()
       .isLength({ min: 6, max: 6 })
-      .withMessage('6-digit code is required'),
+      .isNumeric()
+      .withMessage('6-digit numeric code is required'),
   ],
   catchAsync(async (req: Request, res: Response) => {
     const errors = validationResult(req);
@@ -287,7 +299,7 @@ router.post('/developer/otp/complete-registration',
 // POST /api/auth/developer/github/callback — exchange GitHub code for session
 router.post('/developer/github/callback',
   [
-    body('code').isString().notEmpty().withMessage('GitHub authorization code is required'),
+    body('code').isString().matches(/^[a-f0-9]{10,40}$/).withMessage('Invalid GitHub authorization code'),
   ],
   catchAsync(async (req: Request, res: Response) => {
     const errors = validationResult(req);
@@ -311,6 +323,9 @@ router.post('/developer/github/callback',
     if (!ghUser.email) {
       throw new AuthenticationError('No verified email found on your GitHub account');
     }
+
+    // Normalize GitHub email to match express-validator's normalizeEmail() behaviour
+    ghUser.email = ghUser.email.toLowerCase().trim();
 
     // Try to find developer by github_id first, then by email
     let developer: Developer | null = null;

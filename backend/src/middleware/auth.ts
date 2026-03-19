@@ -126,8 +126,11 @@ export const authenticateJWT = catchAsync(async (req: Request, res: Response, ne
   }
   
   try {
-    const decoded = jwt.verify(token, config.jwtSecret) as any;
-    
+    const decoded = jwt.verify(token, config.jwtSecret, {
+      issuer: 'idswyft-api',
+      audience: 'idswyft-admin',
+    }) as any;
+
     // Get admin user from database
     const { data: adminUser, error } = await supabase
       .from('admin_users')
