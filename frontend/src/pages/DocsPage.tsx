@@ -360,6 +360,17 @@ export const DocsPage: React.FC = () => {
             the relevant field appears. Below is the complete flow.
           </Lead>
 
+          <div style={{ margin: '24px 0 32px', borderRadius: 12, overflow: 'hidden', border: `1px solid ${C.border}`, background: C.codeBg }}>
+            <video
+              src="https://qffbflsboayyqvnqwqil.supabase.co/storage/v1/object/public/platform-assets/developer-integration-demo.mp4"
+              style={{ width: '100%', aspectRatio: '16/9', display: 'block' }}
+              controls
+              playsInline
+              preload="metadata"
+              poster="/idswyft-logo.png"
+            />
+          </div>
+
           <Pipeline />
 
           <CodeTabs tab={tab} onChange={setTab}

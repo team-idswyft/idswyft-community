@@ -8,7 +8,11 @@
     "build": "vite build",
     "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
     "preview": "vite preview",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "generate:narration": "node scripts/generate-narration.mjs",
+    "generate:keyboard-fx": "node scripts/generate-keyboard-fx.mjs",
+    "generate:all-audio": "node scripts/generate-keyboard-fx.mjs && node scripts/generate-narration.mjs",
+    "render:demo": "npx remotion render src/remotion/index.ts DeveloperIntegrationDemo out/developer-integration-demo.mp4 --props='{\"narration\":true}'"
   },
   "dependencies": {
     "@headlessui/react": "^1.7.17",
@@ -34,6 +38,9 @@
     "zustand": "^4.4.6"
   },
   "devDependencies": {
+    "@remotion/bundler": "^4.0.435",
+    "@remotion/cli": "^4.0.435",
+    "@remotion/renderer": "^4.0.435",
     "@types/react": "^18.2.37",
     "@types/react-dom": "^18.2.15",
     "@typescript-eslint/eslint-plugin": "^6.10.0",
