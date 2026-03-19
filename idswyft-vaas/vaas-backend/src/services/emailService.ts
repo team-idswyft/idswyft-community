@@ -59,13 +59,33 @@ interface EmailConfig {
   from_email: string;
 }
 
-// ── Dark-theme constants ────────────────────────────────────────────────────
-const BG = '#080c14';
-const CARD = '#0f1420';
+// ── Dark-theme constants (matching C tokens from frontend/src/theme.ts) ─────
+const BG       = '#080c14';
+const PANEL    = '#0b0f19';
+const CARD     = '#0f1420';
 const CARD_ALT = '#141c2e';
-const TEXT = '#dce4ef';
-const MUTED = '#8896aa';
-const BORDER = 'rgba(151,169,192,0.16)';
+const TEXT     = '#dde2ec';
+const MUTED    = '#8896aa';
+const DIM      = '#4a5568';
+const BORDER   = 'rgba(255,255,255,0.07)';
+const BORDER_S = 'rgba(255,255,255,0.13)';
+
+// Guilloche SVG rosette pattern — base64-encoded for email compatibility.
+// Creates overlapping ellipses at 30-degree intervals (identity-document aesthetic).
+function guillochePatternSvg(accentColor: string): string {
+  const opacity = 0.07;
+  const r = (a: number) => `<ellipse cx="60" cy="60" rx="42" ry="18" fill="none" stroke="${accentColor}" stroke-opacity="${opacity}" stroke-width="0.6" transform="rotate(${a},60,60)"/>`;
+  const circles = [12, 20, 30, 42, 54].map(
+    (rad, i) => `<circle cx="60" cy="60" r="${rad}" fill="none" stroke="${accentColor}" stroke-opacity="${0.04 + i * 0.008}" stroke-width="0.5"/>`
+  ).join('');
+  const ellipses = [0, 30, 60, 90, 120, 150].map(a => r(a)).join('');
+  return `<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120" viewBox="0 0 120 120">${circles}${ellipses}</svg>`;
+}
+
+function guillocheDataUri(accentColor: string): string {
+  const svg = guillochePatternSvg(accentColor);
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`;
+}
 
 export class EmailService {
   private resendApiKey: string;
@@ -135,34 +155,95 @@ export class EmailService {
     return this.emailConfigCache;
   }
 
-  // ── Dark-theme helpers ──────────────────────────────────────────────────
+  // ── Email design system ────────────────────────────────────────────────
 
-  private darkHeader(accent: string, logo: string | null, title: string, subtitle: string): string {
-    const logoHtml = logo ? `<img src="${logo}" alt="${subtitle}" style="max-width:120px;height:auto;margin-bottom:14px;">` : '';
-    return `<div style="border-top:3px solid ${accent};background:#0b0f19;padding:32px 30px;text-align:center;">
+  private emailHeader(accent: string, logo: string | null, title: string, subtitle: string): string {
+    const guilloche = guillocheDataUri(accent);
+    const logoHtml = logo
+      ? `<img src="${logo}" alt="${subtitle}" style="max-width:100px;height:auto;margin-bottom:16px;display:block;margin-left:auto;margin-right:auto;">`
+      : '';
+    return `<div style="background:${PANEL};background-image:url('${guilloche}');background-size:120px 120px;padding:40px 24px 32px;text-align:center;border-bottom:1px solid ${BORDER};">
       ${logoHtml}
-      <h1 style="margin:0;color:${TEXT};font-size:22px;font-weight:700;">${title}</h1>
-      <p style="margin:8px 0 0;color:${MUTED};font-size:14px;">${subtitle}</p>
+      <h1 style="margin:0;color:${TEXT};font-size:22px;font-weight:700;font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;letter-spacing:-0.01em;">${title}</h1>
+      <p style="margin:10px 0 0;color:${MUTED};font-size:14px;font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">${subtitle}</p>
+      <div style="width:40px;height:2px;background:${accent};margin:16px auto 0;border-radius:1px;"></div>
     </div>`;
   }
 
-  private darkFooter(footerText: string): string {
-    return `<div style="padding:22px;text-align:center;border-top:1px solid ${BORDER};color:${MUTED};font-size:13px;">
-      ${footerText}
+  private emailFooter(footerText: string, companyName: string): string {
+    return `<div style="padding:24px 24px 28px;text-align:center;border-top:1px solid ${BORDER};background:${PANEL};">
+      <div style="margin-bottom:10px;">
+        <span style="display:inline-block;width:14px;height:14px;border:1.5px solid ${DIM};border-radius:3px;vertical-align:middle;margin-right:6px;text-align:center;line-height:14px;font-size:9px;color:${DIM};">&#9919;</span>
+        <span style="color:${DIM};font-size:12px;vertical-align:middle;font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">Secured by ${companyName}</span>
+      </div>
+      <p style="margin:0;color:${MUTED};font-size:12px;font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">${footerText}</p>
     </div>`;
   }
 
-  private darkButton(accent: string, href: string, label: string): string {
-    return `<a href="${href}" style="display:inline-block;background:${accent};color:#080c14;padding:14px 28px;border-radius:8px;text-decoration:none;font-weight:700;font-size:15px;box-shadow:0 4px 14px rgba(0,0,0,0.25);letter-spacing:0.02em;">${label}</a>`;
+  private emailButton(accent: string, href: string, label: string): string {
+    return `<table cellpadding="0" cellspacing="0" border="0" style="margin:0 auto;">
+      <tr><td style="border-radius:8px;background:${accent};" bgcolor="${accent}">
+        <a href="${href}" target="_blank" style="display:inline-block;padding:15px 32px;color:${BG};font-size:15px;font-weight:700;font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;text-decoration:none;letter-spacing:0.02em;border-radius:8px;mso-padding-alt:0;">
+          ${label}
+        </a>
+      </td></tr>
+    </table>`;
   }
 
-  private darkWrap(inner: string): string {
+  private emailWrap(inner: string, accent: string): string {
+    const guilloche = guillocheDataUri(accent);
     return `<!DOCTYPE html>
-<html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1.0"></head>
-<body style="margin:0;padding:20px;background:${BG};font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
-<div style="max-width:600px;margin:0 auto;background:${CARD};border-radius:12px;overflow:hidden;border:1px solid ${BORDER};">
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<meta name="supported-color-schemes" content="dark">
+<title>Idswyft</title>
+<style>
+  @media only screen and (max-width:620px) {
+    .email-outer { padding: 8px !important; }
+    .email-card { border-radius: 10px !important; }
+    .email-body { padding: 24px 20px !important; }
+    .email-header { padding: 32px 20px 24px !important; }
+    .email-footer { padding: 20px 16px 24px !important; }
+    .email-h1 { font-size: 20px !important; }
+    .detail-block { padding: 14px !important; }
+  }
+</style>
+</head>
+<body style="margin:0;padding:0;background:${BG};-webkit-text-size-adjust:100%;-ms-text-size-adjust:100%;">
+<div class="email-outer" style="padding:24px 16px;background:${BG};background-image:url('${guilloche}');background-size:240px 240px;">
+<!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="600" align="center"><tr><td><![endif]-->
+<div class="email-card" style="max-width:600px;margin:0 auto;background:${CARD};border-radius:14px;overflow:hidden;border:1px solid ${BORDER_S};box-shadow:0 8px 32px rgba(0,0,0,0.4);">
 ${inner}
-</div></body></html>`;
+</div>
+<!--[if mso]></td></tr></table><![endif]-->
+</div>
+</body></html>`;
+  }
+
+  private detailBlock(accent: string, content: string): string {
+    return `<div class="detail-block" style="background:${CARD_ALT};border-left:3px solid ${accent};border-radius:0 8px 8px 0;padding:18px 20px;margin:20px 0;">
+      ${content}
+    </div>`;
+  }
+
+  private infoBox(borderColor: string, labelColor: string, label: string, message: string): string {
+    return `<div style="background:rgba(${this.hexToRgb(borderColor)},0.06);border:1px solid rgba(${this.hexToRgb(borderColor)},0.22);border-radius:8px;padding:14px 16px;margin:18px 0;">
+      <strong style="color:${labelColor};font-size:13px;">${label}</strong>
+      <span style="color:${MUTED};font-size:14px;"> ${message}</span>
+    </div>`;
+  }
+
+  private hexToRgb(hex: string): string {
+    const h = hex.replace('#', '');
+    return `${parseInt(h.substring(0, 2), 16)},${parseInt(h.substring(2, 4), 16)},${parseInt(h.substring(4, 6), 16)}`;
+  }
+
+  private labelRow(label: string, value: string): string {
+    return `<p style="margin:6px 0;font-size:14px;line-height:1.6;font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">
+      <span style="color:${MUTED};">${label}:</span> <span style="color:${TEXT};">${value}</span>
+    </p>`;
   }
 
   // ── Send infrastructure (unchanged) ─────────────────────────────────────
@@ -249,33 +330,31 @@ ${inner}
     const accent = cfg.primary_color;
     const subject = `Welcome to ${cfg.company_name} VaaS - Your ${data.organization.name} Account is Ready!`;
 
-    const htmlContent = this.darkWrap(`
-      ${this.darkHeader(accent, cfg.logo_url, `Welcome to ${cfg.company_name} VaaS`, data.organization.name)}
-      <div style="padding:30px;color:${TEXT};">
-        <p style="font-size:17px;margin:0 0 16px;">Hello <strong>${data.adminName}</strong>,</p>
-        <p style="color:${MUTED};line-height:1.7;">Your account for <strong style="color:${TEXT};">${data.organization.name}</strong> has been successfully created.</p>
+    const htmlContent = this.emailWrap(`
+      ${this.emailHeader(accent, cfg.logo_url, `Welcome to ${cfg.company_name}`, data.organization.name)}
+      <div class="email-body" style="padding:32px 28px;color:${TEXT};font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">
+        <p style="font-size:16px;margin:0 0 16px;line-height:1.5;">Hello <strong>${data.adminName}</strong>,</p>
+        <p style="color:${MUTED};line-height:1.7;font-size:15px;margin:0 0 24px;">Your account for <strong style="color:${TEXT};">${data.organization.name}</strong> has been successfully created. Here are your login details:</p>
 
-        <div style="background:${CARD_ALT};border-left:3px solid ${accent};border-radius:8px;padding:18px;margin:22px 0;">
-          <p style="margin:0 0 6px;font-size:13px;color:${MUTED};text-transform:uppercase;letter-spacing:0.06em;font-weight:600;">Login Credentials</p>
-          <p style="margin:4px 0;color:${TEXT};"><strong>Dashboard:</strong> <a href="${data.dashboardUrl}" style="color:${accent};">${data.dashboardUrl}</a></p>
-          <p style="margin:4px 0;color:${TEXT};"><strong>Email:</strong> ${data.adminEmail}</p>
-          <p style="margin:4px 0;color:${TEXT};"><strong>Password:</strong> <code style="background:rgba(151,169,192,0.12);padding:2px 6px;border-radius:4px;">${data.adminPassword}</code></p>
-          <p style="margin:4px 0;color:${TEXT};"><strong>Organization:</strong> ${data.organization.name}</p>
+        ${this.detailBlock(accent, `
+          <p style="margin:0 0 10px;font-size:12px;color:${MUTED};text-transform:uppercase;letter-spacing:0.08em;font-weight:600;">Login Credentials</p>
+          ${this.labelRow('Dashboard', `<a href="${data.dashboardUrl}" style="color:${accent};text-decoration:none;">${data.dashboardUrl}</a>`)}
+          ${this.labelRow('Email', data.adminEmail)}
+          ${this.labelRow('Password', `<code style="background:rgba(255,255,255,0.06);padding:3px 8px;border-radius:4px;font-family:'IBM Plex Mono',monospace;font-size:13px;color:${TEXT};">${data.adminPassword}</code>`)}
+          ${this.labelRow('Organization', data.organization.name)}
+        `)}
+
+        ${this.infoBox('#f59e0b', '#fcd34d', 'Security Notice:', 'Please verify your email and change your password after logging in.')}
+
+        <div style="text-align:center;margin:28px 0;">
+          ${data.verifyUrl ? this.emailButton(accent, data.verifyUrl, 'Verify Email & Get Started') : this.emailButton(accent, data.dashboardUrl, 'Access Dashboard')}
         </div>
+        ${data.verifyUrl ? `<p style="color:${MUTED};font-size:13px;text-align:center;margin:0;">After verifying, log in at <a href="${data.dashboardUrl}" style="color:${accent};text-decoration:none;">${data.dashboardUrl}</a></p>` : ''}
 
-        <div style="background:rgba(245,158,11,0.1);border:1px solid rgba(245,158,11,0.28);border-radius:8px;padding:14px;margin:18px 0;">
-          <strong style="color:#fcd34d;">Important:</strong> <span style="color:${MUTED};">Please verify your email and change your password after logging in.</span>
-        </div>
-
-        <div style="text-align:center;margin:24px 0;">
-          ${data.verifyUrl ? this.darkButton(accent, data.verifyUrl, 'Verify Email & Get Started') : this.darkButton(accent, data.dashboardUrl, 'Access Dashboard')}
-        </div>
-        ${data.verifyUrl ? `<p style="color:${MUTED};font-size:13px;text-align:center;">After verifying, you can log in at <a href="${data.dashboardUrl}" style="color:${accent};">${data.dashboardUrl}</a></p>` : ''}
-
-        <p style="color:${MUTED};font-size:14px;">Best regards,<br>The ${cfg.company_name} Team</p>
+        <p style="color:${MUTED};font-size:14px;margin:28px 0 0;">Best regards,<br>The ${cfg.company_name} Team</p>
       </div>
-      ${this.darkFooter(cfg.footer_text)}
-    `);
+      ${this.emailFooter(cfg.footer_text, cfg.company_name)}
+    `, accent);
 
     const textContent = `Welcome to ${cfg.company_name} VaaS!
 
@@ -303,26 +382,30 @@ The ${cfg.company_name} Team`;
     const subject = `New VaaS Signup: ${data.organizationName}`;
 
     const row = (label: string, value: string) =>
-      `<tr><td style="padding:8px 12px;color:${MUTED};font-size:13px;white-space:nowrap;vertical-align:top;">${label}</td><td style="padding:8px 12px;color:${TEXT};font-size:14px;">${value}</td></tr>`;
+      `<tr>
+        <td style="padding:10px 14px;color:${MUTED};font-size:13px;white-space:nowrap;vertical-align:top;border-bottom:1px solid ${BORDER};font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">${label}</td>
+        <td style="padding:10px 14px;color:${TEXT};font-size:14px;border-bottom:1px solid ${BORDER};font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">${value}</td>
+      </tr>`;
 
-    const htmlContent = this.darkWrap(`
-      ${this.darkHeader(accent, cfg.logo_url, 'New VaaS Enterprise Signup', cfg.company_name)}
-      <div style="padding:30px;color:${TEXT};">
-        <div style="background:${CARD_ALT};border-radius:8px;overflow:hidden;margin:0 0 20px;">
-          <table style="width:100%;border-collapse:collapse;">
+    const htmlContent = this.emailWrap(`
+      ${this.emailHeader(accent, cfg.logo_url, 'New Enterprise Signup', cfg.company_name)}
+      <div class="email-body" style="padding:32px 28px;color:${TEXT};font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">
+        <p style="font-size:15px;color:${MUTED};margin:0 0 20px;line-height:1.6;">A new organization has signed up for ${cfg.company_name} VaaS.</p>
+        <div style="background:${CARD_ALT};border-radius:8px;overflow:hidden;border:1px solid ${BORDER};">
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;border-collapse:collapse;">
             <tbody>
-              ${row('Company', data.organizationName)}
-              ${row('Contact', `${data.adminName} (${data.adminEmail})`)}
+              ${row('Company', `<strong>${data.organizationName}</strong>`)}
+              ${row('Contact', `${data.adminName} &lt;${data.adminEmail}&gt;`)}
               ${row('Job Title', data.jobTitle)}
               ${row('Volume', `${data.estimatedVolume}/month`)}
               ${row('Use Case', data.useCase)}
-              ${row('Signup ID', `<code style="background:rgba(151,169,192,0.12);padding:2px 6px;border-radius:4px;font-size:12px;">${data.signupId}</code>`)}
+              ${row('Signup ID', `<code style="background:rgba(255,255,255,0.06);padding:3px 8px;border-radius:4px;font-family:'IBM Plex Mono',monospace;font-size:12px;color:${accent};">${data.signupId}</code>`)}
             </tbody>
           </table>
         </div>
       </div>
-      ${this.darkFooter(cfg.footer_text)}
-    `);
+      ${this.emailFooter(cfg.footer_text, cfg.company_name)}
+    `, accent);
 
     const textContent = `New VaaS Signup: ${data.organizationName}
 
@@ -343,35 +426,43 @@ Signup ID: ${data.signupId}`;
     const subject = `Verify Your ${data.organizationName} Admin Account - ${cfg.company_name} VaaS`;
     const verifyUrl = `${data.dashboardUrl}/verify-email?token=${data.verificationToken}&email=${encodeURIComponent(data.adminEmail)}`;
 
-    const htmlContent = this.darkWrap(`
-      ${this.darkHeader(accent, cfg.logo_url, 'Verify Your Admin Account', `${cfg.company_name} VaaS`)}
-      <div style="padding:30px;color:${TEXT};">
-        <p style="font-size:17px;margin:0 0 16px;">Hello <strong>${data.adminName}</strong>,</p>
-        <p style="color:${MUTED};line-height:1.7;">Please verify your admin account for <strong style="color:${TEXT};">${data.organizationName}</strong> to complete your VaaS setup.</p>
+    const htmlContent = this.emailWrap(`
+      ${this.emailHeader(accent, cfg.logo_url, 'Verify Your Account', `${cfg.company_name} VaaS`)}
+      <div class="email-body" style="padding:32px 28px;color:${TEXT};font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">
+        <p style="font-size:16px;margin:0 0 16px;line-height:1.5;">Hello <strong>${data.adminName}</strong>,</p>
+        <p style="color:${MUTED};line-height:1.7;font-size:15px;margin:0 0 24px;">Please verify your admin account for <strong style="color:${TEXT};">${data.organizationName}</strong> to complete your VaaS setup.</p>
 
-        <div style="text-align:center;margin:24px 0;">
-          ${this.darkButton(accent, verifyUrl, 'Verify Email Address')}
+        <div style="text-align:center;margin:28px 0;">
+          ${this.emailButton(accent, verifyUrl, 'Verify Email Address')}
         </div>
 
-        <p style="color:${MUTED};font-size:14px;">Or use this verification code:</p>
-        <div style="background:${CARD_ALT};padding:16px;border-radius:8px;text-align:center;font-family:monospace;font-size:16px;color:${TEXT};letter-spacing:0.05em;margin:12px 0;">
-          <strong>${data.verificationToken}</strong>
+        <p style="color:${MUTED};font-size:14px;margin:0 0 8px;">Or use this verification code:</p>
+        <div style="background:${CARD_ALT};padding:18px;border-radius:8px;text-align:center;border:1px solid ${BORDER};margin:0 0 24px;">
+          <div style="font-family:'IBM Plex Mono',monospace;font-size:22px;font-weight:700;color:${accent};letter-spacing:0.12em;">${data.verificationToken}</div>
         </div>
 
-        <div style="background:rgba(34,211,238,0.06);border:1px solid rgba(34,211,238,0.18);border-radius:8px;padding:18px;margin:22px 0;">
-          <p style="margin:0 0 10px;font-weight:600;color:${TEXT};">Next Steps:</p>
-          <ul style="margin:0;padding-left:18px;color:${MUTED};line-height:1.8;">
-            <li>Click the verification link above</li>
-            <li>Access your dashboard at <a href="${data.dashboardUrl}" style="color:${accent};">${data.dashboardUrl}</a></li>
-            <li>Set up your organization settings</li>
-            <li>Start integrating our verification API</li>
-          </ul>
-        </div>
+        ${this.detailBlock(accent, `
+          <p style="margin:0 0 12px;font-weight:600;color:${TEXT};font-size:14px;">Next Steps</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;">
+            <tr><td style="padding:4px 0;color:${MUTED};font-size:14px;line-height:1.7;font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">
+              <span style="color:${accent};margin-right:8px;">1.</span> Click the verification link above
+            </td></tr>
+            <tr><td style="padding:4px 0;color:${MUTED};font-size:14px;line-height:1.7;font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">
+              <span style="color:${accent};margin-right:8px;">2.</span> Access your dashboard at <a href="${data.dashboardUrl}" style="color:${accent};text-decoration:none;">${data.dashboardUrl}</a>
+            </td></tr>
+            <tr><td style="padding:4px 0;color:${MUTED};font-size:14px;line-height:1.7;font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">
+              <span style="color:${accent};margin-right:8px;">3.</span> Set up your organization settings
+            </td></tr>
+            <tr><td style="padding:4px 0;color:${MUTED};font-size:14px;line-height:1.7;font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">
+              <span style="color:${accent};margin-right:8px;">4.</span> Start integrating the verification API
+            </td></tr>
+          </table>
+        `)}
 
-        <p style="color:${MUTED};font-size:13px;">If you didn't create this account, please ignore this email.</p>
+        <p style="color:${DIM};font-size:13px;margin:24px 0 0;">If you didn't create this account, you can safely ignore this email.</p>
       </div>
-      ${this.darkFooter(cfg.footer_text)}
-    `);
+      ${this.emailFooter(cfg.footer_text, cfg.company_name)}
+    `, accent);
 
     const textContent = `Verify Your ${data.organizationName} Admin Account - ${cfg.company_name} VaaS
 
@@ -405,48 +496,58 @@ If you didn't create this account, please ignore this email.`;
 
     const subject = `${companyName} - Verify Your Identity`;
 
-    const htmlContent = this.darkWrap(`
-      ${this.darkHeader(accent, logo, 'Identity Verification', companyName)}
-      <div style="padding:30px;color:${TEXT};">
-        <p style="font-size:17px;margin:0 0 16px;">Hello${data.userName ? ` <strong>${data.userName}</strong>` : ''}!</p>
-        <p style="color:${MUTED};line-height:1.7;">${welcomeMessage}</p>
+    const stepRow = (num: string, title: string, desc: string) =>
+      `<tr>
+        <td style="padding:8px 12px 8px 0;vertical-align:top;width:28px;">
+          <div style="width:24px;height:24px;border-radius:50%;background:rgba(${this.hexToRgb(accent)},0.12);border:1px solid rgba(${this.hexToRgb(accent)},0.3);text-align:center;line-height:24px;font-size:12px;font-weight:700;color:${accent};font-family:'IBM Plex Mono',monospace;">${num}</div>
+        </td>
+        <td style="padding:8px 0;vertical-align:top;font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">
+          <strong style="color:${TEXT};font-size:14px;">${title}</strong><br>
+          <span style="color:${MUTED};font-size:13px;line-height:1.5;">${desc}</span>
+        </td>
+      </tr>`;
 
-        ${data.customMessage ? `
-        <div style="background:${CARD_ALT};border-left:3px solid ${accent};border-radius:8px;padding:16px;margin:18px 0;">
-          <strong style="color:${TEXT};">Message from ${data.organizationName}:</strong><br>
-          <span style="color:${MUTED};">${data.customMessage}</span>
-        </div>
-        ` : ''}
+    const htmlContent = this.emailWrap(`
+      ${this.emailHeader(accent, logo, 'Identity Verification', companyName)}
+      <div class="email-body" style="padding:32px 28px;color:${TEXT};font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">
+        <p style="font-size:16px;margin:0 0 16px;line-height:1.5;">Hello${data.userName ? ` <strong>${data.userName}</strong>` : ''},</p>
+        <p style="color:${MUTED};line-height:1.7;font-size:15px;margin:0 0 24px;">${welcomeMessage}</p>
 
-        <div style="text-align:center;margin:24px 0;">
-          ${this.darkButton(accent, data.verificationUrl, 'Start Verification')}
-        </div>
+        ${data.customMessage ? this.detailBlock(accent, `
+          <p style="margin:0 0 4px;font-size:12px;color:${MUTED};text-transform:uppercase;letter-spacing:0.08em;font-weight:600;">Message from ${data.organizationName}</p>
+          <p style="margin:0;color:${TEXT};font-size:14px;line-height:1.6;">${data.customMessage}</p>
+        `) : ''}
 
-        <div style="background:${CARD_ALT};border-radius:8px;padding:18px;margin:22px 0;">
-          <p style="margin:0 0 10px;font-weight:600;color:${TEXT};">What to expect:</p>
-          <ul style="margin:0;padding-left:18px;color:${MUTED};line-height:1.8;">
-            <li><strong style="color:${TEXT};">Document Upload:</strong> Take photos of your government-issued ID</li>
-            <li><strong style="color:${TEXT};">Live Capture:</strong> Quick photo for identity matching</li>
-            <li><strong style="color:${TEXT};">Liveness Check:</strong> Simple verification to confirm you're present</li>
-            <li><strong style="color:${TEXT};">Instant Results:</strong> Get verified in under 2 minutes</li>
-          </ul>
-        </div>
-
-        <div style="background:rgba(245,158,11,0.08);border:1px solid rgba(245,158,11,0.24);border-radius:8px;padding:14px;margin:18px 0;">
-          <strong style="color:#fcd34d;">Important:</strong>
-          <span style="color:${MUTED};"> This verification link expires on ${new Date(data.expiresAt).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at ${new Date(data.expiresAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}.</span>
+        <div style="text-align:center;margin:28px 0;">
+          ${this.emailButton(accent, data.verificationUrl, 'Start Verification')}
         </div>
 
-        <p style="color:${MUTED};font-size:13px;margin-top:24px;">
-          If you're having trouble with the button, copy and paste this link:<br>
-          <a href="${data.verificationUrl}" style="color:${accent};word-break:break-all;">${data.verificationUrl}</a>
+        <div style="background:${CARD_ALT};border-radius:8px;padding:20px;margin:24px 0;border:1px solid ${BORDER};">
+          <p style="margin:0 0 14px;font-weight:600;color:${TEXT};font-size:14px;">What to expect</p>
+          <table role="presentation" cellpadding="0" cellspacing="0" border="0" style="width:100%;">
+            ${stepRow('1', 'Document Upload', 'Take photos of your government-issued ID')}
+            ${stepRow('2', 'Live Capture', 'Quick camera capture for identity matching')}
+            ${stepRow('3', 'Liveness Check', 'Simple verification to confirm you\'re present')}
+            ${stepRow('4', 'Instant Results', 'Get verified in under 2 minutes')}
+          </table>
+        </div>
+
+        ${this.infoBox('#f59e0b', '#fcd34d', 'Expires:', `This verification link expires on ${new Date(data.expiresAt).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })} at ${new Date(data.expiresAt).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })}.`)}
+
+        <p style="color:${DIM};font-size:13px;margin:24px 0 0;">
+          If the button doesn't work, copy and paste this link:<br>
+          <a href="${data.verificationUrl}" style="color:${accent};text-decoration:none;word-break:break-all;font-size:12px;">${data.verificationUrl}</a>
         </p>
       </div>
-      <div style="padding:22px;text-align:center;border-top:1px solid ${BORDER};color:${MUTED};font-size:13px;">
-        <p style="margin:0 0 4px;">This verification is requested by <strong style="color:${TEXT};">${data.organizationName}</strong></p>
-        <p style="margin:0;">${cfg.footer_text}</p>
+      <div class="email-footer" style="padding:24px 24px 28px;text-align:center;border-top:1px solid ${BORDER};background:${PANEL};">
+        <p style="margin:0 0 6px;color:${MUTED};font-size:13px;font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">Verification requested by <strong style="color:${TEXT};">${data.organizationName}</strong></p>
+        <div style="margin-top:8px;">
+          <span style="display:inline-block;width:14px;height:14px;border:1.5px solid ${DIM};border-radius:3px;vertical-align:middle;margin-right:6px;text-align:center;line-height:14px;font-size:9px;color:${DIM};">&#9919;</span>
+          <span style="color:${DIM};font-size:12px;vertical-align:middle;font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">Secured by ${cfg.company_name}</span>
+        </div>
+        <p style="margin:6px 0 0;color:${MUTED};font-size:12px;font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">${cfg.footer_text}</p>
       </div>
-    `);
+    `, accent);
 
     const textContent = `Identity Verification Required - ${data.organizationName}
 
