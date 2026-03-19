@@ -116,6 +116,19 @@ const WEBHOOK_EVENTS: Record<string, string> = {
 
 const WEBHOOK_EVENT_NAMES = Object.keys(WEBHOOK_EVENTS)
 
+/** Syntax-highlight JSON string with theme-consistent colors */
+function highlightJson(json: string): React.ReactNode[] {
+  return json.split('\n').map((line, i) => {
+    const highlighted = line
+      .replace(/"([^"]+)"(?=\s*:)/g, `<span style="color:${C.cyan}">"$1"</span>`)
+      .replace(/:\s*"([^"]*)"/g, `: <span style="color:${C.green}">"$1"</span>`)
+      .replace(/:\s*(\d+\.?\d*)/g, `: <span style="color:${C.amber}">$1</span>`)
+      .replace(/:\s*(true|false)/g, `: <span style="color:${C.purple}">$1</span>`)
+      .replace(/:\s*(null)/g, `: <span style="color:${C.dim}">$1</span>`)
+    return <span key={i} dangerouslySetInnerHTML={{ __html: highlighted + '\n' }} />
+  })
+}
+
 // â"€â"€â"€ Shared styles â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 const inputStyle: React.CSSProperties = {
@@ -583,6 +596,7 @@ export function DeveloperPage() {
   const [webhookDeliveries, setWebhookDeliveries] = useState<Record<string, WebhookDeliveryLog[]>>({})
   const [deliveriesLoading, setDeliveriesLoading] = useState<string | null>(null)
   const [expandedDeliveryId, setExpandedDeliveryId] = useState<string | null>(null)
+  const [resendingDeliveryId, setResendingDeliveryId] = useState<string | null>(null)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [expandedKeyId, setExpandedKeyId] = useState<string | null>(null)
   const [keyLogs, setKeyLogs] = useState<Record<string, ApiActivity[]>>({})
@@ -1016,6 +1030,34 @@ export function DeveloperPage() {
     finally { setDeliveriesLoading(null) }
   }
 
+  const resendDelivery = async (webhookId: string, deliveryId: string) => {
+    if (!token) return
+    setResendingDeliveryId(deliveryId)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/webhooks/${webhookId}/deliveries/${deliveryId}/resend`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (res.ok) {
+        toast.success('Webhook resent')
+        // Refresh deliveries for this webhook
+        const listRes = await fetch(`${API_BASE_URL}/api/developer/webhooks/${webhookId}/deliveries`, {
+          headers: { Authorization: `Bearer ${token}` },
+        })
+        if (listRes.ok) {
+          const data = await listRes.json()
+          setWebhookDeliveries(prev => ({ ...prev, [webhookId]: data.deliveries ?? [] }))
+        }
+      } else {
+        toast.error('Failed to resend webhook')
+      }
+    } catch {
+      toast.error('Failed to resend webhook')
+    } finally {
+      setResendingDeliveryId(null)
+    }
+  }
+
   const deleteAccount = async () => {
     if (!token) return
     setDeleteAccountLoading(true)
@@ -1056,8 +1098,8 @@ export function DeveloperPage() {
   -d '{"mode":"sandbox"}'`
 
   return (
-    <div className="pattern-microprint pattern-faint pattern-fade-edges pattern-full" style={{ background: C.bg, fontFamily: C.sans, color: C.text, minHeight: '100vh' }}>
-      <div style={{ maxWidth: 960, margin: '0 auto', padding: '48px 24px' }}>
+    <div className="pattern-microprint pattern-faint pattern-fade-edges pattern-full" style={{ background: C.bg, fontFamily: C.sans, color: C.text, fontSize: 14, minHeight: '100vh' }}>
+      <div style={{ maxWidth: 1080, margin: '0 auto', padding: '48px 32px' }}>
 
         {/* Header */}
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 40 }}>
@@ -1653,19 +1695,50 @@ export function DeveloperPage() {
                                   <span style={{ color: C.muted, fontSize: 10, marginLeft: 4, transition: 'transform 0.15s', transform: isExpanded ? 'rotate(90deg)' : 'none' }}>&#9656;</span>
                                 </div>
                                 {isExpanded && (
-                                  <div style={{ background: C.surface, borderRadius: '0 0 4px 4px', padding: '8px 10px', borderTop: `1px solid ${C.border}` }}>
+                                  <div style={{ background: C.codeBg, borderRadius: '0 0 6px 6px', border: `1px solid ${C.border}`, borderTop: 'none', overflow: 'hidden' }}>
                                     {d.payload && (
-                                      <div style={{ marginBottom: 8 }}>
-                                        <div style={{ fontSize: 10, fontWeight: 600, color: C.muted, marginBottom: 4 }}>Request Payload</div>
-                                        <pre style={{ margin: 0, padding: 8, background: C.bg, borderRadius: 4, fontSize: 10, fontFamily: C.mono, color: C.text, overflowX: 'auto', maxHeight: 200, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{JSON.stringify(d.payload, null, 2)}</pre>
+                                      <div style={{ padding: '10px 12px', borderBottom: `1px solid ${C.border}` }}>
+                                        <div style={{ fontSize: 10, fontWeight: 600, color: C.muted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Request Payload</div>
+                                        <pre style={{ margin: 0, padding: 10, background: C.bg, borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 11, lineHeight: 1.5, fontFamily: C.mono, color: C.text, overflowX: 'auto', maxHeight: 240, whiteSpace: 'pre', wordBreak: 'normal' }}>{highlightJson(JSON.stringify(d.payload, null, 2))}</pre>
                                       </div>
                                     )}
-                                    <div>
-                                      <div style={{ fontSize: 10, fontWeight: 600, color: C.muted, marginBottom: 4 }}>
-                                        Response {d.response_status ? `(${d.response_status})` : ''}
+                                    <div style={{ padding: '10px 12px' }}>
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                                        <span style={{ fontSize: 10, fontWeight: 600, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Response</span>
+                                        {d.response_status && (
+                                          <span style={{
+                                            fontSize: 9,
+                                            fontWeight: 600,
+                                            padding: '1px 6px',
+                                            borderRadius: 4,
+                                            background: d.response_status < 300 ? C.greenDim : d.response_status < 500 ? C.amberDim : C.redDim,
+                                            color: d.response_status < 300 ? C.green : d.response_status < 500 ? C.amber : C.red,
+                                          }}>{d.response_status}</span>
+                                        )}
                                       </div>
-                                      <pre style={{ margin: 0, padding: 8, background: C.bg, borderRadius: 4, fontSize: 10, fontFamily: C.mono, color: C.muted, overflowX: 'auto', maxHeight: 120, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{d.response_body ? d.response_body.slice(0, 500) : 'No response captured'}</pre>
+                                      <pre style={{ margin: 0, padding: 10, background: C.bg, borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 11, lineHeight: 1.5, fontFamily: C.mono, color: C.muted, overflowX: 'auto', maxHeight: 120, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{d.response_body ? (() => { try { return highlightJson(JSON.stringify(JSON.parse(d.response_body), null, 2)) } catch { return d.response_body.slice(0, 500) } })() : 'No response captured'}</pre>
                                     </div>
+                                    {(d.status === 'failed' || d.status === 'pending') && d.payload && (
+                                      <div style={{ padding: '8px 12px', borderTop: `1px solid ${C.border}`, display: 'flex', justifyContent: 'flex-end' }}>
+                                        <button
+                                          onClick={(e) => { e.stopPropagation(); resendDelivery(hook.id, d.id) }}
+                                          disabled={resendingDeliveryId === d.id}
+                                          style={{
+                                            background: 'none',
+                                            border: `1px solid ${C.cyanBorder}`,
+                                            color: C.cyan,
+                                            borderRadius: 6,
+                                            padding: '4px 12px',
+                                            fontSize: 11,
+                                            fontWeight: 500,
+                                            cursor: resendingDeliveryId === d.id ? 'wait' : 'pointer',
+                                            opacity: resendingDeliveryId === d.id ? 0.5 : 1,
+                                          }}
+                                        >
+                                          {resendingDeliveryId === d.id ? 'Resending...' : 'Resend'}
+                                        </button>
+                                      </div>
+                                    )}
                                   </div>
                                 )}
                               </div>

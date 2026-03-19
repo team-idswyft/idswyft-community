@@ -877,6 +877,77 @@ router.post('/webhooks/:webhookId/test',
   })
 );
 
+// Resend a failed/pending webhook delivery with the original payload
+router.post('/webhooks/:webhookId/deliveries/:deliveryId/resend',
+  apiKeyRateLimit,
+  authenticateDeveloperJWT,
+  [
+    param('webhookId').isUUID().withMessage('Invalid webhook ID format'),
+    param('deliveryId').isUUID().withMessage('Invalid delivery ID format'),
+  ],
+  catchAsync(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw new ValidationError('Validation failed', 'multiple', errors.array());
+    }
+
+    const developer = req.developer;
+    if (!developer) {
+      throw new AuthenticationError('Developer authentication required');
+    }
+
+    const { webhookId, deliveryId } = req.params;
+
+    // Verify webhook belongs to this developer
+    const { data: webhook, error: whError } = await supabase
+      .from('webhooks')
+      .select('*')
+      .eq('id', webhookId)
+      .eq('developer_id', developer.id)
+      .single();
+
+    if (whError || !webhook) {
+      throw new NotFoundError('Webhook');
+    }
+
+    // Load the original delivery
+    const { data: delivery, error: dlError } = await supabase
+      .from('webhook_deliveries')
+      .select('*')
+      .eq('id', deliveryId)
+      .eq('webhook_id', webhookId)
+      .single();
+
+    if (dlError || !delivery) {
+      throw new NotFoundError('Delivery');
+    }
+
+    // Create a new delivery with the original payload (preserves audit trail)
+    const webhookService = new WebhookService();
+    const newDelivery = await webhookService.sendWebhook(
+      webhook,
+      delivery.verification_request_id,
+      delivery.payload,
+    );
+
+    logger.info('Webhook delivery resent', {
+      developerId: developer.id,
+      webhookId,
+      originalDeliveryId: deliveryId,
+      newDeliveryId: newDelivery.id,
+    });
+
+    res.json({
+      success: true,
+      delivery: {
+        id: newDelivery.id,
+        status: newDelivery.status,
+        created_at: newDelivery.created_at,
+      },
+    });
+  })
+);
+
 // Delete webhook for developer (JWT-authenticated developer portal)
 router.delete('/webhooks/:webhookId',
   apiKeyRateLimit,
