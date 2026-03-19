@@ -75,6 +75,17 @@ export const config: AppConfig = {
     liveness: (process.env.LIVENESS_PROVIDER ?? 'heuristic') as 'heuristic' | 'custom',
     customOcrEndpoint: process.env.CUSTOM_OCR_ENDPOINT,
     customFaceEndpoint: process.env.CUSTOM_FACE_ENDPOINT,
+  },
+
+  email: {
+    resendApiKey: process.env.RESEND_API_KEY || '',
+    fromAddress: process.env.EMAIL_FROM || 'Idswyft <noreply@mail.idswyft.app>',
+  },
+
+  github: {
+    clientId: process.env.GITHUB_CLIENT_ID || '',
+    clientSecret: process.env.GITHUB_CLIENT_SECRET || '',
+    redirectUri: process.env.GITHUB_REDIRECT_URI || 'https://idswyft.app/developer',
   }
 };
 

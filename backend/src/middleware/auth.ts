@@ -373,6 +373,29 @@ export const generateAPIKey = (): { key: string; hash: string; prefix: string } 
   return { key, hash, prefix };
 };
 
+// Generate a short-lived registration token (15 min) for new developers who verified OTP
+export const generateRegistrationToken = (email: string): string => {
+  return jwt.sign(
+    { email, type: 'registration' },
+    config.jwtSecret,
+    { expiresIn: '15m', issuer: 'idswyft-api', audience: 'idswyft-registration' }
+  );
+};
+
+// Verify a registration token — returns the email or throws
+export const verifyRegistrationToken = (token: string): string => {
+  const decoded = jwt.verify(token, config.jwtSecret, {
+    issuer: 'idswyft-api',
+    audience: 'idswyft-registration',
+  }) as { email: string; type: string };
+
+  if (decoded.type !== 'registration') {
+    throw new AuthenticationError('Invalid registration token');
+  }
+
+  return decoded.email;
+};
+
 // Middleware to log authentication events
 export const logAuthEvent = (event: string) => {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -408,6 +431,8 @@ export default {
   checkPremiumAccess,
   generateAdminToken,
   generateDeveloperToken,
+  generateRegistrationToken,
+  verifyRegistrationToken,
   generateAPIKey,
   logAuthEvent
 };

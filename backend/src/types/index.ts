@@ -118,6 +118,8 @@ export interface Developer {
   webhook_url?: string;
   sandbox_webhook_url?: string;
   is_verified: boolean;
+  github_id?: number;
+  avatar_url?: string;
   created_at: Date;
 }
 
@@ -304,6 +306,15 @@ export interface AppConfig {
     liveness: 'heuristic' | 'custom';
     customOcrEndpoint?: string;
     customFaceEndpoint?: string;
+  };
+  email: {
+    resendApiKey: string;
+    fromAddress: string;
+  };
+  github: {
+    clientId: string;
+    clientSecret: string;
+    redirectUri: string;
   };
 }
 
