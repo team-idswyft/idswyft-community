@@ -752,22 +752,32 @@ router.post('/webhooks/:webhookId/test',
         headers['X-Idswyft-Signature'] = createWebhookSignature(body, signingSecret);
       }
 
+      const controller = new AbortController();
+      const abortTimer = setTimeout(() => controller.abort(), 8000);
+
       const response = await axios.post(webhook.url, testPayload, {
         headers,
-        timeout: 5000,
+        timeout: 10000,
+        signal: controller.signal,
         validateStatus: () => true,
       });
+
+      clearTimeout(abortTimer);
 
       res.json({
         success: response.status < 500,
         status_code: response.status,
       });
-    } catch (err) {
-      logger.error('Webhook test failed:', err);
+    } catch (err: any) {
+      const isTimeout = err.code === 'ECONNABORTED' || err.code === 'ERR_CANCELED'
+        || err.message?.includes('timeout') || err.message?.includes('aborted');
+      logger.error('Webhook test failed:', { url: webhook.url, code: err.code, message: err.message });
       res.json({
         success: false,
         status_code: null,
-        error: err instanceof Error ? err.message : 'Test delivery failed',
+        error: isTimeout
+          ? 'Connection timed out — verify the webhook URL is reachable'
+          : (err.message || 'Test delivery failed'),
       });
     }
   })

@@ -850,19 +850,25 @@ export function DeveloperPage() {
   const testWebhook = async (id: string) => {
     if (!token) return
     setTestingWebhookId(id)
+    const controller = new AbortController()
+    const timer = setTimeout(() => controller.abort(), 15000)
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/webhooks/${id}/test`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${token}` },
+        signal: controller.signal,
       })
+      clearTimeout(timer)
       const data = await res.json()
       if (data.success) {
         toast.success(`Test delivered (HTTP ${data.status_code})`)
       } else {
         toast.error(data.error || `Test failed${data.status_code ? ` (HTTP ${data.status_code})` : ''}`)
       }
-    } catch {
-      toast.error('Failed to send test webhook')
+    } catch (err: unknown) {
+      clearTimeout(timer)
+      const isAbort = err instanceof DOMException && err.name === 'AbortError'
+      toast.error(isAbort ? 'Test timed out — check that the webhook URL is reachable' : 'Failed to send test webhook')
     } finally {
       setTestingWebhookId(null)
     }
