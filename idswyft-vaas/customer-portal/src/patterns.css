@@ -47,9 +47,9 @@
 
 /* ── Intensity modifiers ────────────────────────────────── */
 
-.pattern-faint   { --pattern-opacity: 0.02; }
-.pattern-subtle  { --pattern-opacity: 0.04; }
-.pattern-visible { --pattern-opacity: 0.08; }
+.pattern-faint   { --pattern-opacity: 0.06; }
+.pattern-subtle  { --pattern-opacity: 0.10; }
+.pattern-visible { --pattern-opacity: 0.16; }
 
 /* No vignette fade — pattern fills the entire area */
 .pattern-full::before {
