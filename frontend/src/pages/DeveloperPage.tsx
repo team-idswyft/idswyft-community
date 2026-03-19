@@ -592,6 +592,16 @@ export function DeveloperPage() {
   const [verificationDetailError, setVerificationDetailError] = useState<string | null>(null)
   const [detailTab, setDetailTab] = useState<'scores' | 'json'>('scores')
 
+  // LLM Enhancement settings
+  const [llmProvider, setLlmProvider] = useState<string>('')
+  const [llmApiKey, setLlmApiKey] = useState<string>('')
+  const [llmEndpointUrl, setLlmEndpointUrl] = useState<string>('')
+  const [llmKeyPreview, setLlmKeyPreview] = useState<string>('')
+  const [llmConfigured, setLlmConfigured] = useState(false)
+  const [llmSaving, setLlmSaving] = useState(false)
+  const [llmLoading, setLlmLoading] = useState(false)
+  const [showLlmKey, setShowLlmKey] = useState(false)
+
   const fetchKeys = async (t: string) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/api-keys`, {
@@ -623,11 +633,75 @@ export function DeveloperPage() {
     } catch { /* network error */ }
   }
 
+  const fetchLLMSettings = async (t: string) => {
+    setLlmLoading(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/settings/llm`, {
+        headers: { Authorization: `Bearer ${t}` },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setLlmConfigured(data.configured)
+        setLlmProvider(data.provider || '')
+        setLlmKeyPreview(data.api_key_preview || '')
+        setLlmEndpointUrl(data.endpoint_url || '')
+        setLlmApiKey('')
+        setShowLlmKey(false)
+      }
+    } catch { /* network error */ }
+    setLlmLoading(false)
+  }
+
+  const saveLLMSettings = async () => {
+    if (!token) return
+    setLlmSaving(true)
+    try {
+      const body: Record<string, string | null> = { provider: llmProvider || null }
+      if (llmApiKey) body.api_key = llmApiKey
+      if (llmProvider === 'custom') body.endpoint_url = llmEndpointUrl || null
+      const res = await fetch(`${API_BASE_URL}/api/developer/settings/llm`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      if (res.ok) {
+        toast.success(llmProvider ? 'LLM settings saved' : 'LLM settings cleared')
+        fetchLLMSettings(token)
+      } else {
+        const err = await res.json().catch(() => ({ error: 'Failed to save' }))
+        toast.error(err.error || 'Failed to save LLM settings')
+      }
+    } catch { toast.error('Network error') }
+    setLlmSaving(false)
+  }
+
+  const clearLLMSettings = async () => {
+    if (!token) return
+    setLlmSaving(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/settings/llm`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ provider: null }),
+      })
+      if (res.ok) {
+        toast.success('LLM settings cleared')
+        setLlmProvider('')
+        setLlmApiKey('')
+        setLlmEndpointUrl('')
+        setLlmKeyPreview('')
+        setLlmConfigured(false)
+      }
+    } catch { toast.error('Network error') }
+    setLlmSaving(false)
+  }
+
   useEffect(() => {
     if (token) {
       fetchKeys(token)
       fetchStats(token)
       fetchWebhooks(token)
+      fetchLLMSettings(token)
     }
   }, [token])
 
@@ -1729,6 +1803,114 @@ if (expected !== req.headers['x-idswyft-signature']) {
               >
                 &times;
               </button>
+            </div>
+
+            {/* OCR Enhancement (LLM Fallback) */}
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                <CodeBracketIcon style={{ width: 16, height: 16, color: C.cyan }} />
+                <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>OCR Enhancement</div>
+              </div>
+              <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
+                This is completely optional. Our OCR pipeline extracts document fields using fast heuristics.
+                When you provide an LLM key, it acts as a <strong style={{ color: C.text, fontWeight: 500 }}>second-pass fallback</strong> --
+                only called for fields where heuristic confidence is below 60%.
+                This can improve accuracy on unusual layouts or poor-quality scans, but most documents process fine without it.
+                Your key is encrypted at rest and only used during your verifications.
+              </div>
+
+              {llmLoading ? (
+                <div style={{ color: C.muted, fontSize: 13 }}>Loading...</div>
+              ) : (
+                <>
+                  {/* Provider select */}
+                  <label style={labelStyle}>Provider</label>
+                  <select
+                    value={llmProvider}
+                    onChange={e => { setLlmProvider(e.target.value); setLlmApiKey(''); setShowLlmKey(false) }}
+                    style={{ ...inputStyle, marginBottom: 12, cursor: 'pointer', appearance: 'auto' }}
+                  >
+                    <option value="">None (disabled)</option>
+                    <option value="openai">OpenAI (GPT-4o Vision)</option>
+                    <option value="anthropic">Anthropic (Claude Vision)</option>
+                    <option value="custom">Custom (OpenAI-compatible endpoint)</option>
+                  </select>
+
+                  {llmProvider && (
+                    <>
+                      {/* API Key */}
+                      <label style={labelStyle}>
+                        API Key
+                        {llmConfigured && llmKeyPreview && !llmApiKey && (
+                          <span style={{ color: C.green, marginLeft: 8, fontWeight: 400 }}>
+                            configured: {llmKeyPreview}
+                          </span>
+                        )}
+                      </label>
+                      <div style={{ position: 'relative', marginBottom: 12 }}>
+                        <input
+                          type={showLlmKey ? 'text' : 'password'}
+                          style={{ ...inputStyle, paddingRight: 40 }}
+                          value={llmApiKey}
+                          onChange={e => setLlmApiKey(e.target.value)}
+                          placeholder={llmConfigured ? 'Enter new key to replace' : llmProvider === 'anthropic' ? 'sk-ant-...' : 'sk-...'}
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowLlmKey(!showLlmKey)}
+                          style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 4 }}
+                        >
+                          {showLlmKey
+                            ? <EyeSlashIcon style={{ width: 16, height: 16 }} />
+                            : <EyeIcon style={{ width: 16, height: 16 }} />
+                          }
+                        </button>
+                      </div>
+
+                      {/* Custom endpoint URL */}
+                      {llmProvider === 'custom' && (
+                        <>
+                          <label style={labelStyle}>Endpoint URL</label>
+                          <input
+                            type="url"
+                            style={{ ...inputStyle, marginBottom: 12 }}
+                            value={llmEndpointUrl}
+                            onChange={e => setLlmEndpointUrl(e.target.value)}
+                            placeholder="https://your-server.com/v1/chat/completions"
+                          />
+                        </>
+                      )}
+
+                      {/* Save / Clear buttons */}
+                      <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                        <button
+                          onClick={saveLLMSettings}
+                          disabled={llmSaving || (!llmApiKey && !llmConfigured)}
+                          style={{
+                            background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
+                            padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                            opacity: (llmSaving || (!llmApiKey && !llmConfigured)) ? 0.5 : 1,
+                          }}
+                        >
+                          {llmSaving ? 'Saving...' : 'Save'}
+                        </button>
+                        {llmConfigured && (
+                          <button
+                            onClick={clearLLMSettings}
+                            disabled={llmSaving}
+                            style={{
+                              background: 'none', border: `1px solid ${C.border}`, color: C.muted,
+                              borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13,
+                            }}
+                          >
+                            Remove
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </>
+              )}
             </div>
 
             {/* Danger Zone */}

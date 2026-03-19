@@ -33,6 +33,9 @@ import { computeFaceMatch } from '@/verification/face/faceMatchService.js';
 import { SessionFlowError } from '@/verification/exceptions.js';
 import { WebhookService } from '@/services/webhook.js';
 import type { WebhookPayload, VerificationSource } from '@/types/index.js';
+import type { LLMProviderConfig } from '@/providers/ocr/LLMFieldExtractor.js';
+import { decryptSecret } from '@/utils/encryption.js';
+import { config } from '@/config/index.js';
 
 const router = express.Router();
 
@@ -140,6 +143,34 @@ async function hydrateSession(verificationId: string, isSandbox: boolean): Promi
   return createSession(isSandbox, hydration, addons);
 }
 
+// ─── Developer LLM config lookup ────────────────────────────────
+
+/** Look up developer's LLM provider config. Returns undefined if not configured. */
+async function getDeveloperLLMConfig(developerId: string): Promise<LLMProviderConfig | undefined> {
+  try {
+    const { data } = await supabase
+      .from('developers')
+      .select('llm_provider, llm_api_key_encrypted, llm_endpoint_url')
+      .eq('id', developerId)
+      .single();
+
+    if (!data?.llm_provider || !data?.llm_api_key_encrypted) return undefined;
+
+    const apiKey = decryptSecret(data.llm_api_key_encrypted, config.encryptionKey);
+    return {
+      provider: data.llm_provider as LLMProviderConfig['provider'],
+      apiKey,
+      endpointUrl: data.llm_endpoint_url || undefined,
+    };
+  } catch (err) {
+    logger.debug('getDeveloperLLMConfig: failed to load LLM config', {
+      developerId,
+      error: err instanceof Error ? err.message : 'Unknown',
+    });
+    return undefined;
+  }
+}
+
 // ─── Step adapters: Run extraction and then delegate to session ──
 
 /** Run front OCR extraction and build FrontExtractionResult */
@@ -149,8 +180,9 @@ async function extractFrontDocument(
   documentType: string,
   issuingCountry?: string,
   verificationId?: string,
+  llmConfig?: LLMProviderConfig,
 ): Promise<FrontExtractionResult> {
-  const ocrData = await ocrService.processDocument(documentId, documentPath, documentType, issuingCountry, verificationId);
+  const ocrData = await ocrService.processDocument(documentId, documentPath, documentType, issuingCountry, verificationId, llmConfig);
 
   // Calculate average confidence from per-field confidence scores
   const confidenceScores = ocrData?.confidence_scores || {};
@@ -670,8 +702,12 @@ router.post('/:verification_id/front-document',
     // Resolve issuing_country: per-request override > session state
     const resolvedCountry = issuing_country?.toUpperCase() || undefined;
 
+    // Look up developer's LLM config for enhanced OCR extraction
+    const developerId = (req as any).developer.id;
+    const llmConfig = await getDeveloperLLMConfig(developerId);
+
     // Run front extraction (downloadFile resolves bucket from encoded path)
-    const frontResult = await extractFrontDocument(documentPath, document.id, document_type, resolvedCountry, verification_id);
+    const frontResult = await extractFrontDocument(documentPath, document.id, document_type, resolvedCountry, verification_id, llmConfig);
 
     // Ephemeral cleanup: demo files are deleted immediately after extraction
     if (source === 'demo') {

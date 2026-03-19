@@ -9,6 +9,8 @@ import { logger } from '@/utils/logger.js';
 import { getCountryFormat, INTERNATIONAL_HEADER_NOISE } from './internationalIdFormats.js';
 import type { CountryDocFormat } from './internationalIdFormats.js';
 import { STATE_DL_FORMATS } from './dlFormats.js';
+import { findLowConfidenceFields, extractFieldsWithLLM, mergeLLMResults } from './LLMFieldExtractor.js';
+import type { LLMProviderConfig } from './LLMFieldExtractor.js';
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -122,6 +124,40 @@ export function standardizeDateFormat(raw: string): string {
   return parseInt(p1, 10) > 12
     ? `${p3}-${p2.padStart(2,'0')}-${p1.padStart(2,'0')}`
     : `${p3}-${p1.padStart(2,'0')}-${p2.padStart(2,'0')}`;
+}
+
+/**
+ * Disambiguate an expiry date when MM/DD vs DD/MM is ambiguous.
+ * If both parts ≤ 12 (e.g., "01/02/2028"), try both interpretations:
+ *   MM/DD → 2028-01-02
+ *   DD/MM → 2028-02-01
+ * Prefer the interpretation that yields a future date. If both are
+ * future or both are past, default to MM/DD (US convention).
+ */
+function disambiguateExpiryDate(dateYMD: string): string {
+  const m = dateYMD.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return dateYMD;
+
+  const [, year, a, b] = m;
+  const aNum = parseInt(a, 10);
+  const bNum = parseInt(b, 10);
+
+  // Only ambiguous when both could be month (1-12) and day (1-31)
+  if (aNum > 12 || bNum > 12) return dateYMD;
+  // If they're the same, no ambiguity
+  if (aNum === bNum) return dateYMD;
+
+  const now = Date.now();
+  const asMMDD = new Date(`${year}-${a}-${b}`).getTime();
+  const asDDMM = new Date(`${year}-${b}-${a}`).getTime();
+
+  // Prefer interpretation that yields a future date
+  const mmddFuture = asMMDD > now;
+  const ddmmFuture = asDDMM > now;
+
+  if (mmddFuture && !ddmmFuture) return dateYMD;               // MM/DD is future, keep it
+  if (ddmmFuture && !mmddFuture) return `${year}-${b}-${a}`;   // DD/MM is future, swap
+  return dateYMD;                                                // Both same — default MM/DD
 }
 
 /** Parse AAMVA compact date MMDDYYYY or MMDDYY → YYYY-MM-DD */
@@ -245,7 +281,7 @@ export class PaddleOCRProvider implements OCRProvider {
     return this.service!;
   }
 
-  async processDocument(buffer: Buffer, documentType: string, issuingCountry?: string): Promise<OCRData> {
+  async processDocument(buffer: Buffer, documentType: string, issuingCountry?: string, llmConfig?: LLMProviderConfig): Promise<OCRData> {
     const svc         = await this.ensureInitialized();
     const arrayBuffer = new Uint8Array(buffer).buffer;
     const result: PaddleOcrResult = await svc.recognize(arrayBuffer);
@@ -280,6 +316,33 @@ export class PaddleOCRProvider implements OCRProvider {
 
     // Set issuing_country on OCR data if provided
     if (country) ocrData.issuing_country = country;
+
+    // LLM fallback: re-extract low-confidence or empty fields via developer's LLM provider
+    if (llmConfig) {
+      const lowFields = findLowConfidenceFields(ocrData);
+      if (lowFields.length > 0) {
+        try {
+          const llmResult = await extractFieldsWithLLM({
+            imageBuffer: buffer,
+            documentType,
+            fieldsNeeded: lowFields,
+            ocrContext: ocrData.raw_text,
+            llmConfig,
+          });
+          mergeLLMResults(ocrData, llmResult);
+          logger.info('PaddleOCRProvider: LLM fallback applied', {
+            provider: llmConfig.provider,
+            fieldsRequested: lowFields,
+            fieldsExtracted: Object.keys(llmResult),
+          });
+        } catch (err) {
+          logger.warn('PaddleOCRProvider: LLM fallback failed', {
+            provider: llmConfig.provider,
+            error: err instanceof Error ? err.message : 'Unknown',
+          });
+        }
+      }
+    }
 
     logger.info('PaddleOCRProvider: extraction result', {
       documentType,
@@ -453,7 +516,7 @@ export class PaddleOCRProvider implements OCRProvider {
     if (!ocrData.expiration_date) {
       const exp = this.extractExpiryFromLines(flatLines, labelMap);
       if (exp) {
-        ocrData.expiration_date = exp.value;
+        ocrData.expiration_date = disambiguateExpiryDate(exp.value);
         ocrData.confidence_scores!.expiration_date = exp.confidence;
       }
     }
@@ -1305,7 +1368,7 @@ export class PaddleOCRProvider implements OCRProvider {
     }
 
     this.findLastDateField(flatLines, [/date\s*of\s*expiry/i, /expiry/i, /expires/i, /exp/i], (value, conf) => {
-      ocrData.expiration_date = value;
+      ocrData.expiration_date = disambiguateExpiryDate(value);
       ocrData.confidence_scores!.expiration_date = conf;
     });
 
@@ -1376,7 +1439,7 @@ export class PaddleOCRProvider implements OCRProvider {
       }
     });
     this.findDateField(flatLines, [/expiry/i, /expires/i, /valid\s*until/i, /\bexp\b/i], (value, conf) => {
-      ocrData.expiration_date = value;
+      ocrData.expiration_date = disambiguateExpiryDate(value);
       ocrData.confidence_scores!.expiration_date = conf;
     });
 
@@ -1724,7 +1787,7 @@ export class PaddleOCRProvider implements OCRProvider {
       }
     });
     this.findDateField(flatLines, [/expiry/i, /expires/i, /exp/i], (value, conf) => {
-      ocrData.expiration_date = value;
+      ocrData.expiration_date = disambiguateExpiryDate(value);
       ocrData.confidence_scores!.expiration_date = conf;
     });
   }

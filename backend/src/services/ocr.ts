@@ -5,6 +5,7 @@ import { ProviderMetricsService } from './providerMetrics.js';
 import { OCRData } from '@/types/index.js';
 import { createOCRProvider } from '@/providers/ocr/index.js';
 import type { OCRProvider } from '@/providers/types.js';
+import type { LLMProviderConfig } from '@/providers/ocr/LLMFieldExtractor.js';
 
 export class OCRService {
   private storageService: StorageService;
@@ -25,7 +26,8 @@ export class OCRService {
     filePath: string,
     documentType: string,
     issuingCountry?: string,
-    verificationId?: string
+    verificationId?: string,
+    llmConfig?: LLMProviderConfig,
   ): Promise<OCRData> {
     logger.info('Starting OCR processing', { documentId, filePath, documentType, issuingCountry });
 
@@ -35,7 +37,7 @@ export class OCRService {
       let ocrData: OCRData;
       const start = Date.now();
 
-      ocrData = await this.provider.processDocument(fileBuffer, documentType, issuingCountry);
+      ocrData = await this.provider.processDocument(fileBuffer, documentType, issuingCountry, llmConfig);
       const scores = Object.values(ocrData.confidence_scores || {});
       const avgConfidence = scores.length > 0 ? scores.reduce((s, v) => s + v, 0) / scores.length : undefined;
 

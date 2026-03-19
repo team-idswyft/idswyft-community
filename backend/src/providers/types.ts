@@ -1,9 +1,10 @@
 import { OCRData } from '../types/index.js';
+import type { LLMProviderConfig } from './ocr/LLMFieldExtractor.js';
 
 // ── OCR Provider ──────────────────────────────────────
 export interface OCRProvider {
   readonly name: string;
-  processDocument(buffer: Buffer, documentType: string, issuingCountry?: string): Promise<OCRData>;
+  processDocument(buffer: Buffer, documentType: string, issuingCountry?: string, llmConfig?: LLMProviderConfig): Promise<OCRData>;
 }
 
 // ── Face Matching Provider ────────────────────────────
