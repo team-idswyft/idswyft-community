@@ -1217,9 +1217,10 @@ function App() {
         id="pricing"
         className="pattern-microprint pattern-faint pattern-fade-edges pattern-full"
         style={{
-          padding: '96px 0 40px',
+          padding: '96px 0',
           background: 'rgba(255,255,255,0.012)',
           borderTop: '1px solid rgba(255,255,255,0.05)',
+          borderBottom: '1px solid rgba(255,255,255,0.05)',
         }}
       >
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
@@ -1383,7 +1384,7 @@ function App() {
       {/* ════════════════════════════════════════
           FINAL CTA
           ════════════════════════════════════════ */}
-      <section className="relative overflow-hidden pattern-guilloche pattern-subtle pattern-animate-slow pattern-full" style={{ paddingTop: 48, paddingBottom: 80 }}>
+      <section className="py-32 relative overflow-hidden pattern-guilloche pattern-subtle pattern-animate-slow pattern-full">
         {/* Bottom radial glow */}
         <div
           className="absolute bottom-0 left-1/2 -translate-x-1/2"

@@ -26,6 +26,7 @@
 
 [class*="pattern-"] {
   position: relative;
+  isolation: isolate;
 }
 
 [class*="pattern-"]::before {
@@ -33,16 +34,10 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 0;
+  z-index: -1;
   opacity: var(--pattern-opacity, 0.04);
   mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
   -webkit-mask-image: radial-gradient(ellipse at center, black 40%, transparent 80%);
-}
-
-/* Ensure content stays above the pattern layer */
-[class*="pattern-"] > * {
-  position: relative;
-  z-index: 1;
 }
 
 /* ── Intensity modifiers ────────────────────────────────── */
@@ -128,7 +123,7 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 0;
+  z-index: -1;
   background: linear-gradient(to bottom, transparent 60%, var(--pattern-bg, #040d1a) 100%);
 }
 
@@ -137,7 +132,7 @@
   position: absolute;
   inset: 0;
   pointer-events: none;
-  z-index: 0;
+  z-index: -1;
   background: radial-gradient(ellipse at center, transparent 30%, var(--pattern-bg, #040d1a) 80%);
 }
 
