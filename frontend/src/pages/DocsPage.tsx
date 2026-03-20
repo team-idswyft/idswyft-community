@@ -290,6 +290,7 @@ const NAV = [
   { id: 'monitoring', label: 'Monitoring', depth: 0 },
   { id: 'statuses', label: 'Statuses', depth: 0 },
   { id: 'rate-limits', label: 'Rate Limits', depth: 0 },
+  { id: 'changelog', label: 'Changelog', depth: 0 },
   { id: 'support', label: 'Support', depth: 0 },
 ];
 
@@ -1671,6 +1672,111 @@ await sdk.cancelMonitoringSchedule(schedule.schedule.id);`} />
               ))}
             </div>
           </div>
+
+          <Divider />
+
+          {/* ══ CHANGELOG ═══════════════════════════════════════════════════ */}
+          <SectionAnchor id="changelog" />
+          <H2>Changelog</H2>
+          <Lead>
+            Notable changes to the Idswyft API. This project uses{' '}
+            <a href="https://semver.org" target="_blank" rel="noopener noreferrer" style={{ color: C.cyan, textDecoration: 'none' }}>Semantic Versioning</a>.
+          </Lead>
+
+          {[
+            {
+              version: '1.1.0',
+              date: '2026-03-19',
+              added: [
+                'Visual authenticity checks — FFT analysis, color distribution, zone validation, deepfake detection',
+                'Webhook resend endpoint (POST /api/developer/webhooks/:id/deliveries/:did/resend)',
+                'Per-API-key scoping for webhook endpoints',
+                'Developer-configurable LLM fallback for OCR with date disambiguation',
+                'Developer portal analytics charts with 7-day retention',
+                'Account deletion endpoint (DELETE /api/developer/account)',
+                'Email OTP + GitHub OAuth authentication (replaced insecure password login)',
+                'Webhook delivery logs endpoint (GET /api/developer/webhooks/:id/deliveries)',
+                'Webhook test endpoint with timeout handling',
+                'AML/sanctions screening opt-in addon',
+                'US driver\'s license format validator',
+                '/health endpoint for Railway health checks + /api/health for API consumers',
+              ],
+              fixed: [
+                'NULL events column silently filtering out webhook deliveries',
+                'Per-provider metrics now derived from results JSONB instead of session-level aggregates',
+                'Missing webhook_deliveries table migration',
+                'OTP security hardening — atomic verify, timing-safe comparison, fail-closed',
+                'Trailing AAMVA field markers stripped from space-separated DLN',
+                'CORS origins always include production domains',
+              ],
+              changed: [
+                'Email templates redesigned with guilloche pattern, platform identity, and mobile optimization',
+              ],
+            },
+            {
+              version: '1.0.0',
+              date: '2025-12-01',
+              added: [
+                'Initial release — document OCR, face matching, verification pipeline',
+                'RESTful API for verification workflows',
+                'API key management system',
+                'Webhook notification system with HMAC-SHA256 signing',
+                'Sandbox environment for developer testing',
+                'Rate limiting and abuse protection',
+              ],
+              fixed: [],
+              changed: [],
+            },
+          ].map(release => (
+            <div key={release.version} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, marginBottom: 20, overflow: 'hidden' }}>
+              <div style={{ padding: '16px 24px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+                <Pill color={C.cyan} bg={C.cyanDim}>v{release.version}</Pill>
+                <span style={{ fontFamily: C.mono, fontSize: '0.78rem', color: C.dim }}>{release.date}</span>
+                {release.version === '1.1.0' && <Pill color={C.green} bg={C.greenDim}>latest</Pill>}
+              </div>
+              <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
+                {release.added.length > 0 && (
+                  <div>
+                    <div style={{ fontFamily: C.mono, fontSize: '0.68rem', fontWeight: 600, color: C.green, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.green }} />
+                      Added
+                    </div>
+                    {release.added.map(item => (
+                      <div key={item} style={{ fontFamily: C.sans, fontSize: '0.82rem', color: C.muted, lineHeight: 1.65, padding: '3px 0 3px 12px', borderLeft: `2px solid ${C.green}20` }}>
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {release.fixed.length > 0 && (
+                  <div>
+                    <div style={{ fontFamily: C.mono, fontSize: '0.68rem', fontWeight: 600, color: C.amber, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.amber }} />
+                      Fixed
+                    </div>
+                    {release.fixed.map(item => (
+                      <div key={item} style={{ fontFamily: C.sans, fontSize: '0.82rem', color: C.muted, lineHeight: 1.65, padding: '3px 0 3px 12px', borderLeft: `2px solid ${C.amber}20` }}>
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {release.changed.length > 0 && (
+                  <div>
+                    <div style={{ fontFamily: C.mono, fontSize: '0.68rem', fontWeight: 600, color: C.blue, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                      <span style={{ width: 6, height: 6, borderRadius: '50%', background: C.blue }} />
+                      Changed
+                    </div>
+                    {release.changed.map(item => (
+                      <div key={item} style={{ fontFamily: C.sans, fontSize: '0.82rem', color: C.muted, lineHeight: 1.65, padding: '3px 0 3px 12px', borderLeft: `2px solid ${C.blue}20` }}>
+                        {item}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
 
           <Divider />
 
