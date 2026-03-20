@@ -15,7 +15,10 @@ import {
   Download,
   Search,
   Zap,
-  Clock
+  Clock,
+  ChevronDown,
+  ChevronRight,
+  Layers
 } from 'lucide-react';
 import { apiClient } from '../services/api';
 import type { Webhook, WebhookDelivery, WebhookFormData } from '../types.js';
@@ -924,7 +927,61 @@ interface WebhookDeliveriesModalProps {
   onClose: () => void;
 }
 
+function getVaasSessionId(delivery: WebhookDelivery): string | null {
+  return delivery.event_data?.data?.object?.verification_session?.id ?? null;
+}
+
+function getLifecycleStatus(deliveries: WebhookDelivery[]): { label: string; accentKey: string } {
+  const types = deliveries.map(d => d.event_type);
+  if (types.some(t => t.includes('approved') || t.includes('verified')))
+    return { label: 'Approved', accentKey: 'success' };
+  if (types.some(t => t.includes('rejected') || t.includes('failed')))
+    return { label: 'Failed', accentKey: 'failed' };
+  if (types.some(t => t.includes('manual_review')))
+    return { label: 'Review', accentKey: 'pending' };
+  if (types.some(t => t.includes('completed')))
+    return { label: 'Completed', accentKey: 'success' };
+  if (types.some(t => t.includes('overridden')))
+    return { label: 'Overridden', accentKey: 'pending' };
+  if (types.some(t => t.includes('expired')))
+    return { label: 'Expired', accentKey: 'failed' };
+  return { label: 'In Progress', accentKey: 'default' };
+}
+
+function groupDeliveriesBySession(deliveries: WebhookDelivery[]): { groupId: string; label: string; deliveries: WebhookDelivery[] }[] {
+  const map = new Map<string, WebhookDelivery[]>();
+  for (const d of deliveries) {
+    const sid = getVaasSessionId(d) ?? '__other__';
+    if (!map.has(sid)) map.set(sid, []);
+    map.get(sid)!.push(d);
+  }
+  // Sort deliveries within each group ascending by created_at (lifecycle order)
+  for (const [, group] of map) {
+    group.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime());
+  }
+  // Build result array, sorted by earliest delivery descending (most recent verification first)
+  const result: { groupId: string; label: string; deliveries: WebhookDelivery[] }[] = [];
+  for (const [sid, group] of map) {
+    if (sid === '__other__') continue;
+    result.push({ groupId: sid, label: sid.substring(0, 8) + '...', deliveries: group });
+  }
+  result.sort((a, b) => new Date(b.deliveries[0].created_at).getTime() - new Date(a.deliveries[0].created_at).getTime());
+  // Append "Other Events" at the end
+  const other = map.get('__other__');
+  if (other) {
+    result.push({ groupId: '__other__', label: 'Other Events', deliveries: other });
+  }
+  return result;
+}
+
 function WebhookDeliveriesModal({ webhook, deliveries, onClose }: WebhookDeliveriesModalProps) {
+  const [viewMode, setViewMode] = useState<'chronological' | 'grouped'>('grouped');
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(() => {
+    // Default expand first 3 groups
+    const groups = groupDeliveriesBySession(deliveries);
+    return new Set(groups.slice(0, 3).map(g => g.groupId));
+  });
+
   const getDeliveryStatusKey = (status: string): string => {
     switch (status) {
       case 'delivered': return 'success';
@@ -945,6 +1002,72 @@ function WebhookDeliveriesModal({ webhook, deliveries, onClose }: WebhookDeliver
     });
   };
 
+  const toggleGroup = (groupId: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      next.has(groupId) ? next.delete(groupId) : next.add(groupId);
+      return next;
+    });
+  };
+
+  const groups = groupDeliveriesBySession(deliveries);
+
+  const renderDeliveryRow = (delivery: WebhookDelivery) => (
+    <tr key={delivery.id} className="hover:bg-slate-800/40 transition-colors">
+      <td className="px-5 py-4 whitespace-nowrap">
+        <div className={`${monoSm} text-slate-100`}>
+          {delivery.event_type}
+        </div>
+        <div className={`${monoXs} text-slate-500 mt-0.5`}>
+          ID: {delivery.id.substring(0, 8)}...
+        </div>
+      </td>
+      <td className="px-5 py-4 whitespace-nowrap">
+        <span className={`${statusPill} ${getStatusAccent(getDeliveryStatusKey(delivery.status)).pill}`}>
+          {delivery.status}
+        </span>
+      </td>
+      <td className="px-5 py-4 whitespace-nowrap">
+        <div className={monoSm}>
+          {delivery.http_status_code ? (
+            <span className={
+              delivery.http_status_code < 300
+                ? 'text-emerald-300'
+                : 'text-rose-300'
+            }>
+              {delivery.http_status_code}
+            </span>
+          ) : (
+            <span className="text-slate-500">N/A</span>
+          )}
+        </div>
+        {delivery.error_message && (
+          <div className={`${monoXs} text-rose-400 truncate max-w-xs mt-0.5`}>
+            {delivery.error_message}
+          </div>
+        )}
+      </td>
+      <td className="px-5 py-4 whitespace-nowrap">
+        <span className={`${monoSm} text-slate-100`}>
+          {delivery.attempts}/{delivery.max_retries}
+        </span>
+        {delivery.next_retry_at && (
+          <div className={`${monoXs} text-slate-500 mt-0.5`}>
+            Next: {formatDate(delivery.next_retry_at)}
+          </div>
+        )}
+      </td>
+      <td className="px-5 py-4 whitespace-nowrap">
+        <div className={`${monoXs} text-slate-400`}>{formatDate(delivery.created_at)}</div>
+        {delivery.delivered_at && (
+          <div className={`${monoXs} text-emerald-400 mt-0.5`}>
+            Delivered: {formatDate(delivery.delivered_at)}
+          </div>
+        )}
+      </td>
+    </tr>
+  );
+
   return (
     <Modal
       isOpen={true}
@@ -953,89 +1076,117 @@ function WebhookDeliveriesModal({ webhook, deliveries, onClose }: WebhookDeliver
       size="2xl"
     >
       <div className="space-y-4">
-        <div className={infoPanel}>
-          <p className={sectionLabel}>Endpoint</p>
-          <p className={`${monoSm} text-slate-100`}>{webhook.url}</p>
+        <div className="flex items-center justify-between">
+          <div className={infoPanel + ' flex-1'}>
+            <p className={sectionLabel}>Endpoint</p>
+            <p className={`${monoSm} text-slate-100`}>{webhook.url}</p>
+          </div>
+
+          {/* View toggle */}
+          <div className="flex items-center ml-4 rounded-lg border border-white/10 overflow-hidden flex-shrink-0">
+            <button
+              onClick={() => setViewMode('chronological')}
+              className={`${monoXs} px-3 py-1.5 transition-colors ${
+                viewMode === 'chronological'
+                  ? 'bg-cyan-500/20 text-cyan-200'
+                  : 'text-slate-400 hover:bg-slate-800/40'
+              }`}
+            >
+              <Clock className="w-3 h-3 inline mr-1" />
+              Chronological
+            </button>
+            <button
+              onClick={() => setViewMode('grouped')}
+              className={`${monoXs} px-3 py-1.5 transition-colors border-l border-white/10 ${
+                viewMode === 'grouped'
+                  ? 'bg-cyan-500/20 text-cyan-200'
+                  : 'text-slate-400 hover:bg-slate-800/40'
+              }`}
+            >
+              <Layers className="w-3 h-3 inline mr-1" />
+              By Verification
+            </button>
+          </div>
         </div>
 
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-white/10">
-            <thead>
-              <tr>
-                <th className={tableHeaderClass}>Event</th>
-                <th className={tableHeaderClass}>Status</th>
-                <th className={tableHeaderClass}>Response</th>
-                <th className={tableHeaderClass}>Attempts</th>
-                <th className={tableHeaderClass}>Timestamp</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-white/10">
-              {deliveries.length === 0 ? (
+        {deliveries.length === 0 ? (
+          <div className="px-5 py-8 text-center text-slate-500">
+            No deliveries found for this webhook
+          </div>
+        ) : viewMode === 'chronological' ? (
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-white/10">
+              <thead>
                 <tr>
-                  <td colSpan={5} className="px-5 py-8 text-center text-slate-500">
-                    No deliveries found for this webhook
-                  </td>
+                  <th className={tableHeaderClass}>Event</th>
+                  <th className={tableHeaderClass}>Status</th>
+                  <th className={tableHeaderClass}>Response</th>
+                  <th className={tableHeaderClass}>Attempts</th>
+                  <th className={tableHeaderClass}>Timestamp</th>
                 </tr>
-              ) : (
-                deliveries.map((delivery) => (
-                  <tr key={delivery.id} className="hover:bg-slate-800/40 transition-colors">
-                    <td className="px-5 py-4 whitespace-nowrap">
-                      <div className={`${monoSm} text-slate-100`}>
-                        {delivery.event_type}
-                      </div>
-                      <div className={`${monoXs} text-slate-500 mt-0.5`}>
-                        ID: {delivery.id.substring(0, 8)}...
-                      </div>
-                    </td>
-                    <td className="px-5 py-4 whitespace-nowrap">
-                      <span className={`${statusPill} ${getStatusAccent(getDeliveryStatusKey(delivery.status)).pill}`}>
-                        {delivery.status}
+              </thead>
+              <tbody className="divide-y divide-white/10">
+                {deliveries.map(renderDeliveryRow)}
+              </tbody>
+            </table>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {groups.map(group => {
+              const isExpanded = expandedGroups.has(group.groupId);
+              const lifecycle = getLifecycleStatus(group.deliveries);
+              const firstDate = formatDate(group.deliveries[0].created_at);
+              const lastDate = group.deliveries.length > 1
+                ? formatDate(group.deliveries[group.deliveries.length - 1].created_at)
+                : null;
+
+              return (
+                <div key={group.groupId} className={cardSurface}>
+                  <button
+                    onClick={() => toggleGroup(group.groupId)}
+                    className="w-full flex items-center justify-between px-4 py-3 hover:bg-slate-800/40 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      {isExpanded
+                        ? <ChevronDown className="w-4 h-4 text-slate-400" />
+                        : <ChevronRight className="w-4 h-4 text-slate-400" />
+                      }
+                      <span className={`${monoSm} text-slate-100`}>{group.label}</span>
+                      <span className={`${monoXs} px-2 py-0.5 rounded-full bg-slate-700/50 text-slate-300`}>
+                        {group.deliveries.length} event{group.deliveries.length !== 1 ? 's' : ''}
                       </span>
-                    </td>
-                    <td className="px-5 py-4 whitespace-nowrap">
-                      <div className={monoSm}>
-                        {delivery.http_status_code ? (
-                          <span className={
-                            delivery.http_status_code < 300
-                              ? 'text-emerald-300'
-                              : 'text-rose-300'
-                          }>
-                            {delivery.http_status_code}
-                          </span>
-                        ) : (
-                          <span className="text-slate-500">N/A</span>
-                        )}
-                      </div>
-                      {delivery.error_message && (
-                        <div className={`${monoXs} text-rose-400 truncate max-w-xs mt-0.5`}>
-                          {delivery.error_message}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-5 py-4 whitespace-nowrap">
-                      <span className={`${monoSm} text-slate-100`}>
-                        {delivery.attempts}/{delivery.max_retries}
+                      <span className={`${statusPill} ${getStatusAccent(lifecycle.accentKey).pill}`}>
+                        {lifecycle.label}
                       </span>
-                      {delivery.next_retry_at && (
-                        <div className={`${monoXs} text-slate-500 mt-0.5`}>
-                          Next: {formatDate(delivery.next_retry_at)}
-                        </div>
-                      )}
-                    </td>
-                    <td className="px-5 py-4 whitespace-nowrap">
-                      <div className={`${monoXs} text-slate-400`}>{formatDate(delivery.created_at)}</div>
-                      {delivery.delivered_at && (
-                        <div className={`${monoXs} text-emerald-400 mt-0.5`}>
-                          Delivered: {formatDate(delivery.delivered_at)}
-                        </div>
-                      )}
-                    </td>
-                  </tr>
-                ))
-              )}
-            </tbody>
-          </table>
-        </div>
+                    </div>
+                    <div className={`${monoXs} text-slate-500`}>
+                      {firstDate}{lastDate ? ` → ${lastDate}` : ''}
+                    </div>
+                  </button>
+
+                  {isExpanded && (
+                    <div className="border-t border-white/10 overflow-x-auto">
+                      <table className="min-w-full divide-y divide-white/10">
+                        <thead>
+                          <tr>
+                            <th className={tableHeaderClass}>Event</th>
+                            <th className={tableHeaderClass}>Status</th>
+                            <th className={tableHeaderClass}>Response</th>
+                            <th className={tableHeaderClass}>Attempts</th>
+                            <th className={tableHeaderClass}>Timestamp</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/10">
+                          {group.deliveries.map(renderDeliveryRow)}
+                        </tbody>
+                      </table>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
 
         <div className="flex justify-end pt-4 border-t border-white/10">
           <button

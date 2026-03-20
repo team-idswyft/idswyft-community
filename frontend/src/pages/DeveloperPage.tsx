@@ -131,6 +131,48 @@ function highlightJson(json: string): React.ReactNode[] {
 
 // â"€â"€â"€ Shared styles â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
+// ── Delivery grouping helpers ──
+
+function getDevPortalSessionId(d: WebhookDeliveryLog): string | null {
+  return d.payload?.verification_id ?? null
+}
+
+function getDevLifecycleStatus(deliveries: WebhookDeliveryLog[]): { label: string; color: string; bg: string } {
+  const events = deliveries.map(d => d.event || '')
+  if (events.some(e => e.includes('approved') || e.includes('verified')))
+    return { label: 'Approved', color: C.green, bg: C.greenDim }
+  if (events.some(e => e.includes('rejected') || e.includes('failed')))
+    return { label: 'Failed', color: C.red, bg: C.redDim }
+  if (events.some(e => e.includes('manual_review')))
+    return { label: 'Review', color: C.amber, bg: C.amberDim }
+  if (events.some(e => e.includes('completed')))
+    return { label: 'Completed', color: C.green, bg: C.greenDim }
+  if (events.some(e => e.includes('expired')))
+    return { label: 'Expired', color: C.red, bg: C.redDim }
+  return { label: 'In Progress', color: C.muted, bg: 'rgba(255,255,255,0.04)' }
+}
+
+function groupDevDeliveries(deliveries: WebhookDeliveryLog[]): { groupId: string; label: string; deliveries: WebhookDeliveryLog[] }[] {
+  const map = new Map<string, WebhookDeliveryLog[]>()
+  for (const d of deliveries) {
+    const sid = getDevPortalSessionId(d) ?? '__other__'
+    if (!map.has(sid)) map.set(sid, [])
+    map.get(sid)!.push(d)
+  }
+  for (const [, group] of map) {
+    group.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
+  }
+  const result: { groupId: string; label: string; deliveries: WebhookDeliveryLog[] }[] = []
+  for (const [sid, group] of map) {
+    if (sid === '__other__') continue
+    result.push({ groupId: sid, label: sid.substring(0, 8) + '...', deliveries: group })
+  }
+  result.sort((a, b) => new Date(b.deliveries[0].created_at).getTime() - new Date(a.deliveries[0].created_at).getTime())
+  const other = map.get('__other__')
+  if (other) result.push({ groupId: '__other__', label: 'Other Events', deliveries: other })
+  return result
+}
+
 const inputStyle: React.CSSProperties = {
   background: C.surface,
   border: `1px solid ${C.border}`,
@@ -597,6 +639,8 @@ export function DeveloperPage() {
   const [deliveriesLoading, setDeliveriesLoading] = useState<string | null>(null)
   const [expandedDeliveryId, setExpandedDeliveryId] = useState<string | null>(null)
   const [resendingDeliveryId, setResendingDeliveryId] = useState<string | null>(null)
+  const [deliveryViewMode, setDeliveryViewMode] = useState<Record<string, 'chronological' | 'grouped'>>({})
+  const [expandedSessionGroups, setExpandedSessionGroups] = useState<Record<string, Set<string>>>({})
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [expandedKeyId, setExpandedKeyId] = useState<string | null>(null)
   const [keyLogs, setKeyLogs] = useState<Record<string, ApiActivity[]>>({})
@@ -1056,6 +1100,59 @@ export function DeveloperPage() {
     } finally {
       setResendingDeliveryId(null)
     }
+  }
+
+  // Shared delivery item renderer used by both chronological and grouped views
+  const renderDeliveryItem = (d: WebhookDeliveryLog, webhookId: string, opts?: { compact?: boolean }) => {
+    const statusColor = d.status === 'delivered' ? C.green : d.status === 'failed' ? C.red : C.muted
+    const isExpanded = expandedDeliveryId === d.id
+    const compact = opts?.compact
+    return (
+      <div key={d.id}>
+        <div
+          onClick={() => setExpandedDeliveryId(isExpanded ? null : d.id)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 8, padding: compact ? '5px 8px' : '6px 8px',
+            background: isExpanded ? C.surface : C.panel, borderRadius: isExpanded ? '4px 4px 0 0' : 4,
+            fontSize: 11, cursor: 'pointer', transition: 'background 0.15s',
+          }}
+        >
+          <span style={{ width: 6, height: 6, borderRadius: '50%', background: statusColor, flexShrink: 0 }} />
+          <span style={{ fontFamily: C.mono, color: C.text, minWidth: compact ? 140 : 160 }}>{d.event || 'unknown'}</span>
+          <span style={{ color: statusColor, fontWeight: 500, minWidth: compact ? 50 : 60, fontSize: compact ? 10 : 11 }}>{d.status === 'delivered' ? `${d.response_status}` : d.status}</span>
+          <span style={{ color: C.muted, fontSize: 10, marginLeft: 'auto', whiteSpace: 'nowrap' }}>{compact ? new Date(d.created_at).toLocaleTimeString() : new Date(d.created_at).toLocaleString()}</span>
+          <span style={{ color: C.muted, fontSize: 10, marginLeft: 4, transition: 'transform 0.15s', transform: isExpanded ? 'rotate(90deg)' : 'none' }}>&#9656;</span>
+        </div>
+        {isExpanded && (
+          <div style={{ background: C.codeBg, borderRadius: '0 0 6px 6px', border: `1px solid ${C.border}`, borderTop: 'none', overflow: 'hidden' }}>
+            {d.payload && (
+              <div style={{ padding: '10px 12px', borderBottom: `1px solid ${C.border}` }}>
+                <div style={{ fontSize: 10, fontWeight: 600, color: C.muted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Request Payload</div>
+                <pre style={{ margin: 0, padding: 10, background: C.bg, borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 11, lineHeight: 1.5, fontFamily: C.mono, color: C.text, overflowX: 'auto', maxHeight: 240, whiteSpace: 'pre', wordBreak: 'normal' }}>{highlightJson(JSON.stringify(d.payload, null, 2))}</pre>
+              </div>
+            )}
+            <div style={{ padding: '10px 12px' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
+                <span style={{ fontSize: 10, fontWeight: 600, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Response</span>
+                {d.response_status && (
+                  <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: d.response_status < 300 ? C.greenDim : d.response_status < 500 ? C.amberDim : C.redDim, color: d.response_status < 300 ? C.green : d.response_status < 500 ? C.amber : C.red }}>{d.response_status}</span>
+                )}
+              </div>
+              <pre style={{ margin: 0, padding: 10, background: C.bg, borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 11, lineHeight: 1.5, fontFamily: C.mono, color: C.muted, overflowX: 'auto', maxHeight: 120, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{d.response_body ? (() => { try { return highlightJson(JSON.stringify(JSON.parse(d.response_body), null, 2)) } catch { return d.response_body.slice(0, 500) } })() : 'No response captured'}</pre>
+            </div>
+            {(d.status === 'failed' || d.status === 'pending') && d.payload && (
+              <div style={{ padding: '8px 12px', borderTop: `1px solid ${C.border}`, display: 'flex', justifyContent: 'flex-end' }}>
+                <button
+                  onClick={(e) => { e.stopPropagation(); resendDelivery(webhookId, d.id) }}
+                  disabled={resendingDeliveryId === d.id}
+                  style={{ background: 'none', border: `1px solid ${C.cyanBorder}`, color: C.cyan, borderRadius: 6, padding: '4px 12px', fontSize: 11, fontWeight: 500, cursor: resendingDeliveryId === d.id ? 'wait' : 'pointer', opacity: resendingDeliveryId === d.id ? 0.5 : 1 }}
+                >{resendingDeliveryId === d.id ? 'Resending...' : 'Resend'}</button>
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    )
   }
 
   const deleteAccount = async () => {
@@ -1658,93 +1755,94 @@ export function DeveloperPage() {
                   {/* Delivery log */}
                   {expandedWebhookLog === hook.id && (
                     <div style={{ marginTop: 10, borderTop: `1px solid ${C.border}`, paddingTop: 10 }}>
-                      <div style={{ fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 8 }}>Recent Deliveries</div>
+                      {/* Header with view toggle */}
+                      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
+                        <div style={{ fontSize: 11, fontWeight: 600, color: C.muted }}>Recent Deliveries</div>
+                        {webhookDeliveries[hook.id] && webhookDeliveries[hook.id].length > 0 && (
+                          <div style={{ display: 'flex', borderRadius: 4, overflow: 'hidden', border: `1px solid ${C.border}` }}>
+                            <button
+                              onClick={() => setDeliveryViewMode(prev => ({ ...prev, [hook.id]: 'chronological' }))}
+                              style={{
+                                background: (deliveryViewMode[hook.id] || 'grouped') === 'chronological' ? C.cyanDim : 'none',
+                                color: (deliveryViewMode[hook.id] || 'grouped') === 'chronological' ? C.cyan : C.muted,
+                                border: 'none', padding: '2px 8px', fontSize: 10, cursor: 'pointer', fontFamily: C.mono,
+                              }}
+                            >Timeline</button>
+                            <button
+                              onClick={() => setDeliveryViewMode(prev => ({ ...prev, [hook.id]: 'grouped' }))}
+                              style={{
+                                background: (deliveryViewMode[hook.id] || 'grouped') === 'grouped' ? C.cyanDim : 'none',
+                                color: (deliveryViewMode[hook.id] || 'grouped') === 'grouped' ? C.cyan : C.muted,
+                                border: 'none', borderLeft: `1px solid ${C.border}`, padding: '2px 8px', fontSize: 10, cursor: 'pointer', fontFamily: C.mono,
+                              }}
+                            >By Session</button>
+                          </div>
+                        )}
+                      </div>
                       {(!webhookDeliveries[hook.id] || webhookDeliveries[hook.id].length === 0) ? (
                         <div style={{ fontSize: 12, color: C.muted, fontStyle: 'italic' }}>No deliveries yet</div>
-                      ) : (
+                      ) : (deliveryViewMode[hook.id] || 'grouped') === 'chronological' ? (
+                        /* Chronological flat list */
                         <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 240, overflowY: 'auto' }}>
-                          {webhookDeliveries[hook.id].map(d => {
-                            const statusColor = d.status === 'delivered' ? C.green : d.status === 'failed' ? C.red : C.muted
-                            const isExpanded = expandedDeliveryId === d.id
-                            return (
-                              <div key={d.id}>
-                                <div
-                                  onClick={() => setExpandedDeliveryId(isExpanded ? null : d.id)}
-                                  style={{
-                                    display: 'flex',
-                                    alignItems: 'center',
-                                    gap: 8,
-                                    padding: '6px 8px',
-                                    background: isExpanded ? C.surface : C.panel,
-                                    borderRadius: isExpanded ? '4px 4px 0 0' : 4,
-                                    fontSize: 11,
-                                    cursor: 'pointer',
-                                    transition: 'background 0.15s',
-                                  }}
-                                >
-                                  <span style={{ width: 6, height: 6, borderRadius: '50%', background: statusColor, flexShrink: 0 }} />
-                                  <span style={{ fontFamily: C.mono, color: C.text, minWidth: 160 }}>
-                                    {d.event || 'unknown'}
-                                  </span>
-                                  <span style={{ color: statusColor, fontWeight: 500, minWidth: 60 }}>
-                                    {d.status === 'delivered' ? `${d.response_status}` : d.status}
-                                  </span>
-                                  <span style={{ color: C.muted, fontSize: 10, marginLeft: 'auto', whiteSpace: 'nowrap' }}>
-                                    {new Date(d.created_at).toLocaleString()}
-                                  </span>
-                                  <span style={{ color: C.muted, fontSize: 10, marginLeft: 4, transition: 'transform 0.15s', transform: isExpanded ? 'rotate(90deg)' : 'none' }}>&#9656;</span>
-                                </div>
-                                {isExpanded && (
-                                  <div style={{ background: C.codeBg, borderRadius: '0 0 6px 6px', border: `1px solid ${C.border}`, borderTop: 'none', overflow: 'hidden' }}>
-                                    {d.payload && (
-                                      <div style={{ padding: '10px 12px', borderBottom: `1px solid ${C.border}` }}>
-                                        <div style={{ fontSize: 10, fontWeight: 600, color: C.muted, marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Request Payload</div>
-                                        <pre style={{ margin: 0, padding: 10, background: C.bg, borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 11, lineHeight: 1.5, fontFamily: C.mono, color: C.text, overflowX: 'auto', maxHeight: 240, whiteSpace: 'pre', wordBreak: 'normal' }}>{highlightJson(JSON.stringify(d.payload, null, 2))}</pre>
-                                      </div>
-                                    )}
-                                    <div style={{ padding: '10px 12px' }}>
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginBottom: 6 }}>
-                                        <span style={{ fontSize: 10, fontWeight: 600, color: C.muted, textTransform: 'uppercase', letterSpacing: '0.05em' }}>Response</span>
-                                        {d.response_status && (
-                                          <span style={{
-                                            fontSize: 9,
-                                            fontWeight: 600,
-                                            padding: '1px 6px',
-                                            borderRadius: 4,
-                                            background: d.response_status < 300 ? C.greenDim : d.response_status < 500 ? C.amberDim : C.redDim,
-                                            color: d.response_status < 300 ? C.green : d.response_status < 500 ? C.amber : C.red,
-                                          }}>{d.response_status}</span>
-                                        )}
-                                      </div>
-                                      <pre style={{ margin: 0, padding: 10, background: C.bg, borderRadius: 6, border: `1px solid ${C.border}`, fontSize: 11, lineHeight: 1.5, fontFamily: C.mono, color: C.muted, overflowX: 'auto', maxHeight: 120, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{d.response_body ? (() => { try { return highlightJson(JSON.stringify(JSON.parse(d.response_body), null, 2)) } catch { return d.response_body.slice(0, 500) } })() : 'No response captured'}</pre>
+                          {webhookDeliveries[hook.id].map(d => renderDeliveryItem(d, hook.id))}
+                        </div>
+                      ) : (
+                        /* Grouped by verification session */
+                        (() => {
+                          const groups = groupDevDeliveries(webhookDeliveries[hook.id])
+                          const defaultExpanded = new Set(groups.slice(0, 3).map(g => g.groupId))
+                          const hookGroups = expandedSessionGroups[hook.id] ?? defaultExpanded
+
+                          return (
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 400, overflowY: 'auto' }}>
+                              {groups.map(group => {
+                                const isGroupExpanded = hookGroups.has(group.groupId)
+                                const lifecycle = getDevLifecycleStatus(group.deliveries)
+                                const toggleSessionGroup = () => {
+                                  setExpandedSessionGroups(prev => {
+                                    const current = prev[hook.id] ?? defaultExpanded
+                                    const next = new Set(current)
+                                    next.has(group.groupId) ? next.delete(group.groupId) : next.add(group.groupId)
+                                    return { ...prev, [hook.id]: next }
+                                  })
+                                }
+
+                                return (
+                                  <div key={group.groupId} style={{ border: `1px solid ${C.border}`, borderRadius: 6, overflow: 'hidden' }}>
+                                    {/* Group header */}
+                                    <div
+                                      onClick={toggleSessionGroup}
+                                      style={{
+                                        display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px',
+                                        background: C.surface, cursor: 'pointer', transition: 'background 0.15s',
+                                      }}
+                                    >
+                                      <span style={{ color: C.muted, fontSize: 10, transition: 'transform 0.15s', transform: isGroupExpanded ? 'rotate(90deg)' : 'none' }}>&#9656;</span>
+                                      <span style={{ fontFamily: C.mono, color: C.text, fontSize: 11 }}>{group.label}</span>
+                                      <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', color: C.muted, fontFamily: C.mono }}>
+                                        {group.deliveries.length}
+                                      </span>
+                                      <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: lifecycle.bg, color: lifecycle.color }}>
+                                        {lifecycle.label}
+                                      </span>
+                                      <span style={{ color: C.muted, fontSize: 9, marginLeft: 'auto', whiteSpace: 'nowrap', fontFamily: C.mono }}>
+                                        {new Date(group.deliveries[0].created_at).toLocaleDateString()}
+                                        {group.deliveries.length > 1 && ` → ${new Date(group.deliveries[group.deliveries.length - 1].created_at).toLocaleDateString()}`}
+                                      </span>
                                     </div>
-                                    {(d.status === 'failed' || d.status === 'pending') && d.payload && (
-                                      <div style={{ padding: '8px 12px', borderTop: `1px solid ${C.border}`, display: 'flex', justifyContent: 'flex-end' }}>
-                                        <button
-                                          onClick={(e) => { e.stopPropagation(); resendDelivery(hook.id, d.id) }}
-                                          disabled={resendingDeliveryId === d.id}
-                                          style={{
-                                            background: 'none',
-                                            border: `1px solid ${C.cyanBorder}`,
-                                            color: C.cyan,
-                                            borderRadius: 6,
-                                            padding: '4px 12px',
-                                            fontSize: 11,
-                                            fontWeight: 500,
-                                            cursor: resendingDeliveryId === d.id ? 'wait' : 'pointer',
-                                            opacity: resendingDeliveryId === d.id ? 0.5 : 1,
-                                          }}
-                                        >
-                                          {resendingDeliveryId === d.id ? 'Resending...' : 'Resend'}
-                                        </button>
+
+                                    {/* Group body */}
+                                    {isGroupExpanded && (
+                                      <div style={{ borderTop: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 2, padding: 4 }}>
+                                        {group.deliveries.map(d => renderDeliveryItem(d, hook.id, { compact: true }))}
                                       </div>
                                     )}
                                   </div>
-                                )}
-                              </div>
-                            )
-                          })}
-                        </div>
+                                )
+                              })}
+                            </div>
+                          )
+                        })()
                       )}
                     </div>
                   )}
