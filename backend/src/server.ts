@@ -28,7 +28,7 @@ import batchRoutes from './routes/batch.js';
 import addressVerificationRoutes from './routes/addressVerification.js';
 import monitoringRoutes from './routes/monitoring.js';
 import statusRoutes from './routes/status.js';
-import { API_DOCS_MARKDOWN } from './docs/apiDocsMarkdown.js';
+import { API_DOCS_MARKDOWN } from './api-docs/apiDocsMarkdown.js';
 
 const app = express();
 
