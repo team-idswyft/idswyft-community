@@ -175,29 +175,50 @@ Returns the full verification record: OCR data, cross-validation, liveness, face
 
 ## Integration Options
 
-### Ready-Made Page (Fastest)
-
-Redirect users to the hosted verification page, or embed it in an iframe:
+Three ways to add identity verification — from zero-code to full control. All use the same hosted page:
 
 \`\`\`
-https://idswyft.app/user-verification?api_key=sk_live_xxx&user_id=user-123&redirect_url=https://yourapp.com/done&theme=dark
+https://idswyft.app/user-verification
 \`\`\`
 
-**Embed in iframe:**
+### Option 1: Redirect (Easiest)
+
+Send users to the hosted page with a link or redirect. After verification, they return to your \`redirect_url\`.
+
+\`\`\`javascript
+window.location.href = 'https://idswyft.app/user-verification'
+  + '?api_key=sk_live_xxx'
+  + '&user_id=user-123'
+  + '&redirect_url=' + encodeURIComponent('https://yourapp.com/done')
+  + '&theme=dark';
+\`\`\`
+
+### Option 2: Iframe Embed (No SDK needed)
+
+Embed the hosted page inside your app. Users never leave your site.
 
 \`\`\`html
 <iframe
   src="https://idswyft.app/user-verification?api_key=sk_live_xxx&user_id=user-123&theme=dark"
   width="100%" height="700" frameborder="0"
   allow="camera; microphone"
+  style="border: none; border-radius: 8px;"
 ></iframe>
 \`\`\`
+
+> **Important:** The iframe requires \`allow="camera; microphone"\` for liveness detection to work.
+
+### Option 3: SDK Embed (Recommended for SPAs)
+
+Use the \`@idswyft/sdk\` IdswyftEmbed component for modal or inline mode with event callbacks. See the Embed Component section below.
+
+### URL Parameters
 
 | Parameter | Type | Required | Description |
 |-----------|------|----------|-------------|
 | api_key | string | Yes | Your API key |
 | user_id | UUID | Yes | User identifier |
-| redirect_url | URL | No | Redirect after completion |
+| redirect_url | URL | No | Where to redirect after completion. Required for redirect; optional for iframe/embed |
 | theme | 'light' \\| 'dark' | No | UI theme (default: dark) |
 | address_verif | 'true' | No | Enable address verification step |
 

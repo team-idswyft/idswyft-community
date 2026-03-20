@@ -1109,25 +1109,40 @@ data = res.json()`} />
           {/* ══ INTEGRATION OPTIONS ══════════════════════════════════════════ */}
           <SectionAnchor id="integration" />
           <H2>Integration Options</H2>
-          <Lead>Two ways to add identity verification to your product. Pick the one that fits your timeline and control requirements.</Lead>
+          <Lead>Three ways to add identity verification to your product — from zero-code to full control.</Lead>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+          {/* ── Hosted page URL callout ── */}
+          <div style={{ background: `${C.cyan}11`, border: `1px solid ${C.cyan}33`, borderRadius: 10, padding: '16px 20px', marginBottom: 24 }}>
+            <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.text, margin: '0 0 8px', fontWeight: 600 }}>
+              Hosted Verification Page
+            </p>
+            <p style={{ fontFamily: C.sans, fontSize: '0.83rem', color: C.muted, margin: '0 0 8px', lineHeight: 1.65 }}>
+              Idswyft hosts a complete verification UI at the following URL. This is the page used by all three integration methods below — redirect, iframe, or SDK embed.
+            </p>
+            <code style={{ fontFamily: C.mono, fontSize: '0.85rem', color: C.cyan, display: 'block', padding: '8px 12px', background: C.bg, borderRadius: 6, border: `1px solid ${C.border}` }}>
+              https://idswyft.app/user-verification
+            </code>
+          </div>
+
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 24 }}>
             {[
               {
-                emoji: '🚀', title: 'Ready-Made Page',
-                tag: { label: 'Fastest', color: C.green, bg: C.greenDim },
-                desc: 'Redirect users to our hosted verification page or embed it in an iframe. We handle all steps, camera access, and result display.',
-                features: ['Embeddable via iframe or SDK component', 'Mobile-first with QR handoff (recommended)', 'Complete UI, zero frontend work', 'Camera + liveness built-in', 'Optional address verification (address_verif=true)', 'Webhook notifications on completion'],
-                href: '/user-verification',
-                cta: 'Try demo →',
+                emoji: '🔗', title: 'Redirect',
+                tag: { label: 'Easiest', color: C.green, bg: C.greenDim },
+                desc: 'Send users to the hosted page with a link or redirect. After verification, they are sent back to your redirect_url.',
+                features: ['Zero frontend code', 'Works on any platform', 'User leaves your site temporarily', 'Best for: server-rendered apps, email flows'],
               },
               {
-                emoji: '⚙️', title: 'Custom API',
-                tag: { label: 'Full control', color: C.blue, bg: C.blueDim },
-                desc: 'Build your own UI using the REST API directly. Full control over every step, styling, and user flow.',
-                features: ['Custom UI/UX', 'Own the camera experience', 'Embed in existing flows', 'Webhook integrations', 'Enterprise configuration'],
-                href: '#flow',
-                cta: 'View API docs →',
+                emoji: '🖼️', title: 'Iframe Embed',
+                tag: { label: 'No SDK needed', color: C.blue, bg: C.blueDim },
+                desc: 'Embed the hosted page inside your app using a standard HTML iframe. Users never leave your site.',
+                features: ['One line of HTML', 'Users stay on your domain', 'Requires allow="camera"', 'Best for: quick inline embed'],
+              },
+              {
+                emoji: '⚡', title: 'SDK Embed',
+                tag: { label: 'Recommended', color: C.cyan, bg: `${C.cyan}22` },
+                desc: 'Use the @idswyft/sdk IdswyftEmbed component for modal or inline mode with event callbacks.',
+                features: ['Modal or inline mode', 'onComplete / onError callbacks', 'postMessage communication', 'Best for: SPAs, React, Vue'],
               },
             ].map(opt => (
               <div key={opt.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
@@ -1144,29 +1159,46 @@ data = res.json()`} />
                     </li>
                   ))}
                 </ul>
-                <a href={opt.href} style={{ marginTop: 'auto', display: 'inline-block', fontFamily: C.sans, fontSize: '0.82rem', fontWeight: 600, color: C.cyan, textDecoration: 'none' }}>{opt.cta}</a>
               </div>
             ))}
           </div>
 
+          <p style={{ fontFamily: C.sans, fontSize: '0.83rem', color: C.muted, lineHeight: 1.65, marginBottom: 8 }}>
+            All three methods use the same hosted page URL with query parameters. For fully custom UI, see the{' '}
+            <button onClick={() => scrollTo('flow')} style={{ color: C.cyan, background: 'none', border: 'none', cursor: 'pointer', fontFamily: C.mono, fontSize: 'inherit', padding: 0 }}>REST API</button> section.
+          </p>
+
           <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 24 }}>
-            <div style={{ padding: '12px 20px', borderBottom: `1px solid ${C.border}`, fontFamily: C.mono, fontSize: '0.72rem', color: C.muted, letterSpacing: '0.07em', textTransform: 'uppercase' }}>URL parameters (ready-made page)</div>
+            <div style={{ padding: '12px 20px', borderBottom: `1px solid ${C.border}`, fontFamily: C.mono, fontSize: '0.72rem', color: C.muted, letterSpacing: '0.07em', textTransform: 'uppercase' }}>URL parameters</div>
             <div style={{ padding: '8px 20px' }}>
               <FieldRow name="api_key" type="string" req={true} desc="Your Idswyft API key." />
               <FieldRow name="user_id" type="UUID string" req={true} desc="Unique identifier for the user being verified." />
-              <FieldRow name="redirect_url" type="URL string" req={false} desc="Where to redirect after verification completes." />
+              <FieldRow name="redirect_url" type="URL string" req={false} desc="Where to redirect after verification completes. Required for redirect integration; optional for iframe/embed." />
               <FieldRow name="theme" type="'light' | 'dark'" req={false} desc="UI color theme. Defaults to dark." />
               <FieldRow name="address_verif" type="'true'" req={false} desc="When set to 'true', adds an optional proof-of-address step after identity verification. Users can upload a utility bill, bank statement, or tax document. The name is cross-referenced against the verified ID." />
             </div>
           </div>
 
-          <Pre label="Example URL (redirect)" code={`https://idswyft.app/user-verification?api_key=sk_live_xxx&user_id=user-123&redirect_url=https://yourapp.com/done&theme=dark`} />
-          <Pre label="Example URL (identity + address)" code={`https://idswyft.app/user-verification?api_key=sk_live_xxx&user_id=user-123&address_verif=true&redirect_url=https://yourapp.com/done`} />
-          <Pre label="Embed in iframe" code={`<iframe
+          <Pre label="Option 1: Redirect (link or window.location)" code={`// Redirect the user to the hosted verification page
+window.location.href = 'https://idswyft.app/user-verification'
+  + '?api_key=sk_live_xxx'
+  + '&user_id=user-123'
+  + '&redirect_url=' + encodeURIComponent('https://yourapp.com/done')
+  + '&theme=dark';`} />
+          <Pre label="Option 2: Iframe embed (HTML)" code={`<!-- Embed the verification page inline on your site -->
+<iframe
   src="https://idswyft.app/user-verification?api_key=sk_live_xxx&user_id=user-123&theme=dark"
   width="100%" height="700" frameborder="0"
   allow="camera; microphone"
+  style="border: none; border-radius: 8px;"
 ></iframe>`} />
+          <Pre label="Option 3: SDK embed (see Embed Component section)" code={`import { IdswyftEmbed } from '@idswyft/sdk';
+
+const embed = new IdswyftEmbed({ mode: 'modal', theme: 'dark' });
+embed.open(sessionToken, {
+  onComplete: (result) => console.log(result.finalResult),
+  onError: (error) => console.error(error.message),
+});`} />
 
           <Divider />
 
