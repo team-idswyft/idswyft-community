@@ -1692,7 +1692,6 @@ await sdk.cancelMonitoringSchedule(schedule.schedule.id);`} />
                 'Webhook resend endpoint (POST /api/developer/webhooks/:id/deliveries/:did/resend)',
                 'Per-API-key scoping for webhook endpoints',
                 'Developer-configurable LLM fallback for OCR with date disambiguation',
-                'Developer portal analytics charts with 7-day retention',
                 'Account deletion endpoint (DELETE /api/developer/account)',
                 'Email OTP + GitHub OAuth authentication (replaced insecure password login)',
                 'Webhook delivery logs endpoint (GET /api/developer/webhooks/:id/deliveries)',
@@ -1709,9 +1708,7 @@ await sdk.cancelMonitoringSchedule(schedule.schedule.id);`} />
                 'Trailing AAMVA field markers stripped from space-separated DLN',
                 'CORS origins always include production domains',
               ],
-              changed: [
-                'Email templates redesigned with guilloche pattern, platform identity, and mobile optimization',
-              ],
+              changed: [],
             },
             {
               version: '1.0.0',
