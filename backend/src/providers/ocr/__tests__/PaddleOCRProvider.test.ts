@@ -184,26 +184,48 @@ describe('PaddleOCRProvider', () => {
       expect(data.expiration_date).toBe('2033-09-29');
     });
 
-    it('strips leading AAMVA field markers from DL number (NC "DLN 11 000046688716 9")', async () => {
-      // Real-world NC license: OCR reads "4d DLN 11 000046688716 9 Class C"
+    it('strips leading AAMVA field markers from DL number (NC "DLN 11 000023457891 9")', async () => {
+      // NC specimen: OCR reads "4d DLN 11 000023457891 9 Class C"
       // where "11" is AAMVA element ID and "9" is the vehicle class field marker.
       mockRecognize.mockResolvedValue(
         makeResult([
           [{ text: 'NORTH CAROLINA', confidence: 0.99 }, { text: 'DRIVER LICENSE', confidence: 0.99 }],
-          [{ text: '4d DLN 11 000046688716 9 Class C', confidence: 0.80 }],
-          [{ text: 'LORISSON', confidence: 1.0 }],
-          [{ text: 'OBED', confidence: 0.94 }],
-          [{ text: '84020 TRYON PARK RD', confidence: 0.96 }],
-          [{ text: 'CHARLOTTE, NC 28262-3682', confidence: 0.99 }],
+          [{ text: '4d DLN 11 000023457891 9 Class C', confidence: 0.80 }],
+          [{ text: 'PUBLIC', confidence: 1.0 }],
+          [{ text: 'JANE Q', confidence: 0.94 }],
+          [{ text: '2345 YOUR STREET', confidence: 0.96 }],
+          [{ text: 'YOUR CITY, NC 99999-1234', confidence: 0.99 }],
           [{ text: '3 Date of birth', confidence: 0.98 }, { text: 'N Sex Eyes', confidence: 0.85 }],
-          [{ text: '09/29/1979', confidence: 1.0 }, { text: 'M', confidence: 1.0 }, { text: 'BLK', confidence: 1.0 }],
-          [{ text: '5 DD 0041761301', confidence: 0.98 }, { text: '08/14/2025', confidence: 1.0 }, { text: '09/29/2033', confidence: 1.0 }],
+          [{ text: '06/01/1964', confidence: 1.0 }, { text: 'F', confidence: 1.0 }, { text: 'BRO', confidence: 1.0 }],
+          [{ text: '5 DD 12345689', confidence: 0.98 }, { text: '05/28/2024', confidence: 1.0 }, { text: '06/01/2032', confidence: 1.0 }],
         ]),
       );
 
       const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
 
-      expect(data.document_number).toBe('000046688716');
+      expect(data.document_number).toBe('000023457891');
+    });
+
+    it('handles concatenated OCR where DLN + digits + AAMVA ID run together (NC "DLN0000234578919Clas")', async () => {
+      // NC specimen: PaddleOCR merges the DLN label, 12-digit number,
+      // trailing AAMVA element 9 (Class), and truncated "Class" into one token.
+      mockRecognize.mockResolvedValue(
+        makeResult([
+          [{ text: 'NORTH CAROLINA', confidence: 0.99 }, { text: 'DRIVER LICENSE', confidence: 0.99 }],
+          [{ text: 'DLN0000234578919Clas', confidence: 0.86 }],
+          [{ text: 'PUBLIC', confidence: 1.0 }],
+          [{ text: 'JANE Q', confidence: 0.94 }],
+          [{ text: '2345 YOUR STREET', confidence: 0.96 }],
+          [{ text: 'YOUR CITY, NC 99999-1234', confidence: 0.99 }],
+          [{ text: '3 Date of birth', confidence: 0.98 }, { text: 'N Sex Eyes', confidence: 0.85 }],
+          [{ text: '06/01/1964', confidence: 1.0 }, { text: 'F', confidence: 1.0 }, { text: 'BRO', confidence: 1.0 }],
+          [{ text: '5 DD 12345689', confidence: 0.98 }, { text: '05/28/2024', confidence: 1.0 }, { text: '06/01/2032', confidence: 1.0 }],
+        ]),
+      );
+
+      const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
+
+      expect(data.document_number).toBe('000023457891');
     });
 
     it('does NOT extract state names or document headers as name/id_number', async () => {

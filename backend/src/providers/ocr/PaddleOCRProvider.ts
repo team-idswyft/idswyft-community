@@ -543,7 +543,7 @@ export class PaddleOCRProvider implements OCRProvider {
     const map = new Map<string, FlatLine & { lineIndex: number }>();
 
     const labelPatterns: Array<[string, RegExp]> = [
-      ['dl_number',   /(?:4d\b|DLn?\b|DL\s*(?:NO\.?|#)|LIC(?:ENSE)?\s*(?:NO\.?|NUMBER|#)|OL\s*NO\.?|OPERATOR\s*(?:LICENSE|LIC)\s*(?:NO|#)?|PERMIT\s*NO|CUSTOMER\s*ID|CID\b|ID\s*NO\.?|ID(?=\s*\d)|(?:^|\s)I(?=\d{3}\s*\d{3}))/i],
+      ['dl_number',   /(?:4d\b|DLn?(?:\b|(?=\d))|DL\s*(?:NO\.?|#)|LIC(?:ENSE)?\s*(?:NO\.?|NUMBER|#)|OL\s*NO\.?|OPERATOR\s*(?:LICENSE|LIC)\s*(?:NO|#)?|PERMIT\s*NO|CUSTOMER\s*ID|CID\b|ID\s*NO\.?|ID(?=\s*\d)|(?:^|\s)I(?=\d{3}\s*\d{3}))/i],
       ['last_name',   /\b(?:LN|LAST\s*NAME|FAMILY\s*NAME|SURNAME)\b/i],
       ['first_name',  /\b(?:FN|FIRST\s*NAME|GIVEN\s*NAME)\b/i],
       ['full_name',   /\b(?:FULL\s*)?NAME\b/i],
@@ -612,6 +612,37 @@ export class PaddleOCRProvider implements OCRProvider {
         if (/\d/.test(cleaned) && cleaned.length >= 5 && cleaned.length <= 15
             && !this.looksLikeDate(cleaned)) {
           return cleaned;
+        }
+      }
+
+      // Handle concatenated OCR: "DLN0000234578919Clas" where PaddleOCR merges
+      // the DLN digits + trailing AAMVA element ID + field name into one token.
+      // Extract digits, then strip trailing AAMVA designator if followed by a field name.
+      const concatM = labelLine.text.match(
+        /(?:4d\s*)?(?:DLn?|DL\s*(?:NO\.?|#?))\s*(\d{6,15})(?=[A-Za-z]{2,})/i,
+      );
+      if (concatM) {
+        let digits = concatM[1];
+        const afterPos = concatM.index! + concatM[0].length;
+        const suffix = labelLine.text.slice(afterPos);
+        // Known AAMVA element-ID → field-name pairs that appear after DLN on the card
+        const AAMVA_SUFFIX: Array<[RegExp, string]> = [
+          [/^(?:Class|Clas)\b/i, '9'],   // 9 = Vehicle class
+          [/^Sex\b/i,            '15'],   // 15 = Sex
+          [/^Eyes?\b/i,          '18'],   // 18 = Eye color
+          [/^Hair\b/i,           '19'],   // 19 = Hair color
+          [/^(?:Hgt|Height)\b/i, '16'],   // 16 = Height
+          [/^Restr/i,            '12'],   // 12 = Restrictions
+          [/^DD\b/i,             '5'],    // 5 = Document discriminator
+        ];
+        for (const [re, id] of AAMVA_SUFFIX) {
+          if (re.test(suffix) && digits.endsWith(id)) {
+            digits = digits.slice(0, -id.length);
+            break;
+          }
+        }
+        if (digits.length >= 6 && digits.length <= 14 && !this.looksLikeDate(digits)) {
+          return digits;
         }
       }
 
@@ -688,7 +719,7 @@ export class PaddleOCRProvider implements OCRProvider {
     ];
 
     // Scan with priority: lines containing DL-related labels get tried first
-    const DL_LABEL_RE = /\b(?:4d|DLn?|DL\s*(?:NO\.?|#)|LIC(?:ENSE)?\s*(?:NO\.?|#)|OL\s*NO)\b/i;
+    const DL_LABEL_RE = /(?:\b4d\b|DLn?(?:\b|(?=\d))|\bDL\s*(?:NO\.?|#)|\bLIC(?:ENSE)?\s*(?:NO\.?|#)|\bOL\s*NO\b)/i;
     const priorityLines = lines.filter(l => DL_LABEL_RE.test(l.text));
     const otherLines = lines.filter(l => !DL_LABEL_RE.test(l.text));
 
