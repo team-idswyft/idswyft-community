@@ -50,7 +50,10 @@ const amlProvider = createAMLProvider();
 
 const upload = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 10 * 1024 * 1024 },
+  limits: {
+    fileSize:  10 * 1024 * 1024, // 10 MB for image files
+    fieldSize: 10 * 1024 * 1024, // 10 MB for text fields (liveness_metadata contains base64 frames)
+  },
 });
 
 // ─── Session persistence helpers ──────────────────────────────

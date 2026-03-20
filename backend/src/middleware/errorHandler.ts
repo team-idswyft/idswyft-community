@@ -215,6 +215,14 @@ export const errorHandler = (
     error = new FileUploadError('Unexpected file field.');
   }
 
+  if (err.code === 'LIMIT_FIELD_VALUE') {
+    error = new ValidationError(
+      `Field value too large: ${err.field || 'unknown'}. Reduce payload size.`,
+      err.field || 'unknown',
+      null,
+    );
+  }
+
   // Express validator errors
   if (err.errors && Array.isArray(err.errors)) {
     const messages = err.errors.map((e: any) => `${e.param}: ${e.msg}`).join(', ');
