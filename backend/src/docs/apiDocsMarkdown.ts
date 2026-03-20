@@ -322,7 +322,7 @@ Modes: \`modal\` (full-screen overlay) or \`inline\` (fits your container).
 | OCR Extraction | PaddleOCR/Tesseract, name/DOB/ID number, AAMVA parsing, per-field confidence |
 | Document Quality | Blur detection, brightness/contrast, resolution check (≥800x600), auto-reject |
 | Cross-Validation | PDF417/QR decode, Levenshtein matching, front-back consistency, weighted scoring |
-| Liveness & Face Match | Entropy analysis, pixel variance, face detection (SSDMobileNet), 128-d embeddings, cosine similarity |
+| Liveness & Face Match | EXIF metadata, JPEG artifacts, color histogram, byte entropy, pixel variance, edge density, face detection (SSDMobilenetv1), 128-d embeddings, cosine similarity |
 
 ---
 
