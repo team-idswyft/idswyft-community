@@ -177,10 +177,20 @@ Returns the full verification record: OCR data, cross-validation, liveness, face
 
 ### Ready-Made Page (Fastest)
 
-Redirect users to the hosted verification page:
+Redirect users to the hosted verification page, or embed it in an iframe:
 
 \`\`\`
-/user-verification?api_key=sk_live_xxx&user_id=user-123&redirect_url=https://yourapp.com/done&theme=dark
+https://idswyft.app/user-verification?api_key=sk_live_xxx&user_id=user-123&redirect_url=https://yourapp.com/done&theme=dark
+\`\`\`
+
+**Embed in iframe:**
+
+\`\`\`html
+<iframe
+  src="https://idswyft.app/user-verification?api_key=sk_live_xxx&user_id=user-123&theme=dark"
+  width="100%" height="700" frameborder="0"
+  allow="camera; microphone"
+></iframe>
 \`\`\`
 
 | Parameter | Type | Required | Description |

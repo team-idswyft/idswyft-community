@@ -1,6 +1,15 @@
 {
   "buildCommand": "npm run build",
   "outputDirectory": "dist",
+  "headers": [
+    {
+      "source": "/user-verification",
+      "headers": [
+        { "key": "X-Frame-Options", "value": "" },
+        { "key": "Content-Security-Policy", "value": "frame-ancestors *" }
+      ]
+    }
+  ],
   "rewrites": [
     {
       "source": "/((?!api/.*).*)",

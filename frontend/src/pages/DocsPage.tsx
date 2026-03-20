@@ -1116,8 +1116,8 @@ data = res.json()`} />
               {
                 emoji: '🚀', title: 'Ready-Made Page',
                 tag: { label: 'Fastest', color: C.green, bg: C.greenDim },
-                desc: 'Redirect users to our hosted verification page. Users choose between mobile (recommended) or desktop — we handle all steps, camera access, and result display.',
-                features: ['Mobile-first with QR handoff (recommended)', 'Complete UI, zero frontend work', 'Camera + liveness built-in', 'Optional address verification (address_verif=true)', 'Webhook notifications on completion', 'Custom redirect on completion'],
+                desc: 'Redirect users to our hosted verification page or embed it in an iframe. We handle all steps, camera access, and result display.',
+                features: ['Embeddable via iframe or SDK component', 'Mobile-first with QR handoff (recommended)', 'Complete UI, zero frontend work', 'Camera + liveness built-in', 'Optional address verification (address_verif=true)', 'Webhook notifications on completion'],
                 href: '/user-verification',
                 cta: 'Try demo →',
               },
@@ -1160,8 +1160,13 @@ data = res.json()`} />
             </div>
           </div>
 
-          <Pre label="Example URL (identity only)" code={`https://yourapp.com/user-verification?api_key=sk_live_xxx&user_id=user-123&redirect_url=https://yourapp.com/done&theme=dark`} />
-          <Pre label="Example URL (identity + address)" code={`https://yourapp.com/user-verification?api_key=sk_live_xxx&user_id=user-123&address_verif=true&redirect_url=https://yourapp.com/done`} />
+          <Pre label="Example URL (redirect)" code={`https://idswyft.app/user-verification?api_key=sk_live_xxx&user_id=user-123&redirect_url=https://yourapp.com/done&theme=dark`} />
+          <Pre label="Example URL (identity + address)" code={`https://idswyft.app/user-verification?api_key=sk_live_xxx&user_id=user-123&address_verif=true&redirect_url=https://yourapp.com/done`} />
+          <Pre label="Embed in iframe" code={`<iframe
+  src="https://idswyft.app/user-verification?api_key=sk_live_xxx&user_id=user-123&theme=dark"
+  width="100%" height="700" frameborder="0"
+  allow="camera; microphone"
+></iframe>`} />
 
           <Divider />
 
