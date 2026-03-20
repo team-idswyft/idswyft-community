@@ -12,7 +12,6 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - Webhook resend endpoint (`POST /api/developer/webhooks/:id/deliveries/:did/resend`)
 - Per-API-key scoping for webhook endpoints
 - Developer-configurable LLM fallback for OCR with date disambiguation
-- Developer portal analytics charts with 7-day retention
 - Account deletion endpoint (`DELETE /api/developer/account`)
 - Email OTP + GitHub OAuth authentication (replaced insecure password login)
 - Webhook delivery logs endpoint (`GET /api/developer/webhooks/:id/deliveries`)
@@ -28,9 +27,6 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 - OTP security hardening — atomic verify, timing-safe comparison, fail-closed
 - Trailing AAMVA field markers stripped from space-separated DLN
 - CORS origins always include production domains
-
-### Changed
-- Email templates redesigned with guilloche pattern, platform identity, and mobile optimization
 
 ## [1.0.0] - 2025-12-01
 
