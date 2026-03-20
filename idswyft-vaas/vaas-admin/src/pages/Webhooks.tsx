@@ -29,9 +29,11 @@ import { sectionLabel, statNumber, monoXs, monoSm, cardSurface, statusPill, tabl
 const WEBHOOK_EVENTS = [
   { value: 'verification.started', label: 'Verification Started', description: 'When a new verification session begins' },
   { value: 'verification.completed', label: 'Verification Completed', description: 'When verification is completed (success or failure)' },
-  { value: 'verification.verified', label: 'Verification Verified', description: 'When verification is successfully verified' },
   { value: 'verification.failed', label: 'Verification Failed', description: 'When verification fails validation' },
   { value: 'verification.manual_review', label: 'Manual Review Required', description: 'When verification requires manual review' },
+  { value: 'verification.approved', label: 'Verification Approved', description: 'When verification is approved by admin' },
+  { value: 'verification.rejected', label: 'Verification Rejected', description: 'When verification is rejected by admin' },
+  { value: 'verification.overridden', label: 'Verification Overridden', description: 'When verification result is manually overridden' },
   { value: 'verification.expired', label: 'Verification Expired', description: 'When verification session expires' },
   { value: 'user.created', label: 'User Created', description: 'When a new end user is created' },
   { value: 'user.updated', label: 'User Updated', description: 'When user information is updated' }
