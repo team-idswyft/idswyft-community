@@ -72,7 +72,7 @@ export const config: AppConfig = {
   providers: {
     ocr: (process.env.OCR_PROVIDER ?? 'auto') as 'tesseract' | 'openai' | 'azure' | 'aws-textract' | 'auto',
     face: (process.env.FACE_PROVIDER ?? 'tensorflow') as 'tensorflow' | 'aws-rekognition' | 'custom',
-    liveness: (process.env.LIVENESS_PROVIDER ?? 'heuristic') as 'heuristic' | 'custom',
+    liveness: (process.env.LIVENESS_PROVIDER ?? 'enhanced-heuristic') as 'enhanced-heuristic' | 'custom',
     customOcrEndpoint: process.env.CUSTOM_OCR_ENDPOINT,
     customFaceEndpoint: process.env.CUSTOM_FACE_ENDPOINT,
   },

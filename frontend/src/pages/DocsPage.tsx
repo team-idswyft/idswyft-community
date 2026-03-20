@@ -281,6 +281,10 @@ const NAV = [
   { id: 'step-5', label: '5 · Get Results', depth: 1 },
   { id: 'selfie', label: 'Cross-Validation', depth: 1 },
   { id: 'integration', label: 'Integration', depth: 0 },
+  { id: 'guides', label: 'Guides', depth: 0 },
+  { id: 'guide-e2e', label: 'End-to-End Tutorial', depth: 1 },
+  { id: 'guide-mobile', label: 'Mobile Handoff', depth: 1 },
+  { id: 'guide-custom-ui', label: 'Building Custom UI', depth: 1 },
   { id: 'sdk', label: 'JavaScript SDK', depth: 0 },
   { id: 'embed', label: 'Embed Component', depth: 0 },
   { id: 'analysis', label: 'Analysis Engine', depth: 0 },
@@ -331,7 +335,21 @@ export const DocsPage: React.FC = () => {
           </span>
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
-          <Pill color={C.green} bg={C.greenDim}>v4.0</Pill>
+          <a
+            href={`${apiUrl}/api/docs/markdown`}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              fontFamily: C.mono, fontSize: '0.72rem', fontWeight: 500,
+              color: C.muted, textDecoration: 'none',
+              padding: '4px 10px', borderRadius: 6,
+              border: `1px solid ${C.border}`,
+              transition: 'color 0.15s, border-color 0.15s',
+            }}
+            onMouseEnter={e => { (e.target as HTMLElement).style.color = C.cyan; (e.target as HTMLElement).style.borderColor = C.cyan; }}
+            onMouseLeave={e => { (e.target as HTMLElement).style.color = C.muted; (e.target as HTMLElement).style.borderColor = C.border; }}
+          >.md</a>
+          <Pill color={C.green} bg={C.greenDim}>v1.2.0</Pill>
           <Pill color={C.muted} bg="rgba(74,85,104,0.13)">March 2026</Pill>
         </div>
       </div>
@@ -734,47 +752,193 @@ data = res.json()`} />
           <EndpointCard step={4} method="POST" path="/api/v2/verify/:id/live-capture" title="Submit Live Capture"
             badge={{ label: 'final gate', color: C.green, bg: C.greenDim }}>
             <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
-              Submit a <strong style={{ color: C.text }}>live capture image file</strong> for liveness detection (Gate 4) and
-              face matching (Gate 5) against the front document photo. Only available after cross-validation passes.
-              Uses multipart file upload with field name <code style={{ fontFamily: C.mono, color: C.cyan }}>selfie</code>.
-              This is the final step — the response includes face match scores, liveness results, and
-              the <code style={{ fontFamily: C.mono, color: C.cyan }}>final_result</code> auto-decision.
+              One endpoint, two gates, two liveness modes. Submit a{' '}
+              <strong style={{ color: C.text }}>live capture image</strong> plus optional{' '}
+              <code style={{ fontFamily: C.mono, color: C.cyan }}>liveness_metadata</code> to unlock stronger liveness detection.{' '}
+              <strong style={{ color: C.text }}>Gate 4 (Liveness)</strong> checks that the image is from a live person, then{' '}
+              <strong style={{ color: C.text }}>Gate 5 (Face Match)</strong> auto-triggers to compare against the document photo
+              (128-d cosine similarity, threshold 0.60).
             </p>
 
-            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
-              <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>Liveness & face match checks</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px' }}>
-                {['Image byte entropy analysis', 'Pixel variance & texture checks', 'File size heuristics (vs screenshots)', 'Digital artifact detection', 'Face detection (SSDMobileNet)', 'Face embedding cosine similarity'].map(s => (
-                  <div key={s} style={{ fontFamily: C.sans, fontSize: '0.8rem', color: C.muted, display: 'flex', gap: 8, alignItems: 'center' }}>
-                    <span style={{ color: C.green, fontSize: '0.7rem' }}>✓</span> {s}
+            {/* Two-column mode comparison */}
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
+              {[
+                {
+                  title: 'Passive', color: C.amber, label: 'Basic',
+                  desc: 'Just upload the image — no extra data needed. 8 heuristic signals (entropy, pixel variance, EXIF, file size, etc.).',
+                  signals: ['Byte entropy analysis', 'Pixel variance & texture', 'File size heuristics', 'EXIF metadata checks', 'Color distribution', 'Digital artifact detection', 'Face detection (SSDMobileNet)', 'Frequency domain analysis'],
+                  security: 'Basic',
+                  when: 'Low-risk onboarding, sandbox testing',
+                },
+                {
+                  title: 'Head Turn', color: C.green, label: 'Recommended',
+                  desc: 'Client captures 5\u201312 timed frames while user turns head. Server runs face detection + 7 weighted checks. Pass \u2265 0.70. Zero ML on the client.',
+                  signals: ['All passive checks', 'Face present across all frames', 'Head turn detected (\u226512\u00B0 yaw)', 'Correct direction compliance', 'Return to center verified', 'Temporal plausibility (3\u201360s)', 'Face bounding box consistency', 'Virtual camera detection'],
+                  security: 'Strong',
+                  when: 'All production identity verification',
+                },
+              ].map(t => (
+                <div key={t.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 10, borderTop: `3px solid ${t.color}` }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <span style={{ fontFamily: C.mono, fontSize: '0.82rem', fontWeight: 700, color: t.color }}>{t.title}</span>
+                    <Pill color={t.color} bg={`${t.color}18`}>{t.label}</Pill>
                   </div>
+                  <p style={{ fontFamily: C.sans, fontSize: '0.78rem', color: C.muted, lineHeight: 1.6, margin: 0 }}>{t.desc}</p>
+                  <div>
+                    {t.signals.map(s => (
+                      <div key={s} style={{ fontFamily: C.sans, fontSize: '0.72rem', color: C.dim, padding: '2px 0', display: 'flex', gap: 6 }}>
+                        <span style={{ color: t.color, fontSize: '0.6rem', marginTop: 3 }}>▸</span> {s}
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: 'auto', paddingTop: 8, borderTop: `1px solid ${C.border}` }}>
+                    <div style={{ fontFamily: C.mono, fontSize: '0.65rem', color: C.dim, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 2 }}>Security</div>
+                    <span style={{ fontFamily: C.sans, fontSize: '0.78rem', color: t.color, fontWeight: 600 }}>{t.security}</span>
+                  </div>
+                  <div>
+                    <div style={{ fontFamily: C.mono, fontSize: '0.65rem', color: C.dim, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 2 }}>Best for</div>
+                    <span style={{ fontFamily: C.sans, fontSize: '0.75rem', color: C.muted }}>{t.when}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Client-side requirements */}
+            <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
+              <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>Client-side requirements</div>
+              <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr 1fr', gap: '8px 16px' }}>
+                {[
+                  ['Passive', 'None — just upload the image file', 'None'],
+                  ['Head turn', 'getUserMedia() + canvas.toDataURL()', 'None — all face analysis runs server-side'],
+                ].map(([tier, browser, deps]) => (
+                  <React.Fragment key={tier}>
+                    <span style={{ fontFamily: C.mono, fontSize: '0.75rem', color: C.cyan, fontWeight: 600 }}>{tier}</span>
+                    <span style={{ fontFamily: C.sans, fontSize: '0.78rem', color: C.muted, lineHeight: 1.5 }}>{browser}</span>
+                    <span style={{ fontFamily: C.sans, fontSize: '0.78rem', color: C.muted, lineHeight: 1.5 }}>{deps}</span>
+                  </React.Fragment>
                 ))}
               </div>
             </div>
 
+            <Callout type="tip">
+              <strong>Head turn needs zero ML dependencies on the client.</strong> Just capture JPEG frames from the camera
+              using standard browser APIs (<code style={{ fontFamily: C.mono }}>getUserMedia</code> + <code style={{ fontFamily: C.mono }}>canvas.toDataURL</code>).
+              The server handles all face detection and yaw estimation. This is what the hosted verification page and demo use internally.
+            </Callout>
+
+            {/* Fields */}
             <div style={{ marginBottom: 12 }}>
-              <FieldRow name="selfie" type="File" req={true} desc="JPEG or PNG live capture image. Max 10 MB." />
+              <FieldRow name="selfie" type="File" req={true} desc="JPEG or PNG image captured live from the user's camera via getUserMedia(). Max 10 MB. Static file uploads will fail liveness." />
+              <FieldRow name="liveness_metadata" type="JSON string" req={false} desc="JSON-stringified challenge data for head_turn liveness. Omit for passive mode (lowest pass rate)." />
             </div>
+
+            <Callout type="warning">
+              <strong>The selfie must be a live camera capture, not a file upload.</strong> The liveness engine runs anti-spoofing
+              checks on every image — even in passive mode (8 heuristic signals including EXIF analysis, compression artifacts,
+              moire detection). A static photo uploaded from disk will almost certainly fail with{' '}
+              <code style={{ fontFamily: C.mono }}>LIVENESS_FAILED</code> because it lacks camera metadata and has
+              re-compression artifacts. Always use{' '}
+              <code style={{ fontFamily: C.mono }}>getUserMedia()</code> to capture directly from the device camera.
+            </Callout>
+
+            {/* liveness_metadata JSON shape */}
+            <Pre label="liveness_metadata — head_turn" code={`{
+  "challenge_type": "head_turn",
+  "challenge_direction": "left",
+  "frames": [
+    { "frame_base64": "/9j/4AAQ...", "timestamp": 1000,  "phase": "turn1_start" },
+    { "frame_base64": "/9j/4BBR...", "timestamp": 4000,  "phase": "turn1_peak" },
+    { "frame_base64": "/9j/4CCG...", "timestamp": 7000,  "phase": "turn1_return" },
+    { "frame_base64": "/9j/4DDH...", "timestamp": 8200,  "phase": "turn_start" },
+    { "frame_base64": "/9j/4EEI...", "timestamp": 11200, "phase": "turn_peak" },
+    { "frame_base64": "/9j/4FFJ...", "timestamp": 14200, "phase": "turn_return" }
+  ],
+  "start_timestamp": 0,
+  "end_timestamp": 15000
+}`} />
+
+            {/* Passive upload example (simplest) */}
             <CodeTabs tab={tab} onChange={setTab}
-              curl={`curl -X POST ${apiUrl}/api/v2/verify/550e8400-e29b-41d4-a716-446655440001/live-capture \\
+              curl={`# Passive liveness (just the file, no metadata)
+curl -X POST ${apiUrl}/api/v2/verify/VERIFICATION_ID/live-capture \\
   -H "X-API-Key: your-key" \\
-  -F "selfie=@selfie.jpg"`}
-              js={`const fd = new FormData();
-fd.append('selfie', captureFile); // File from live capture
+  -F "selfie=@capture.jpg"`}
+              js={`// Passive liveness — just the file
+const fd = new FormData();
+fd.append('selfie', captureFile);
 
 const res = await fetch(
   \`${apiUrl}/api/v2/verify/\${verification_id}/live-capture\`,
   { method: 'POST', headers: { 'X-API-Key': 'your-key' }, body: fd },
 );
 const data = await res.json();`}
-              python={`import requests
+              python={`# Passive liveness — just the file
+import requests
 
 res = requests.post(
     f'${apiUrl}/api/v2/verify/{verification_id}/live-capture',
-    headers={ 'X-API-Key': 'your-key' },
-    files={ 'selfie': open('selfie.jpg', 'rb') },
+    headers={'X-API-Key': 'your-key'},
+    files={'selfie': open('capture.jpg', 'rb')},
 )
 data = res.json()`} />
+
+            <CodeTabs tab={tab} onChange={setTab}
+              curl={`# Head-turn liveness — capture frames from camera, server analyzes face
+curl -X POST ${apiUrl}/api/v2/verify/VERIFICATION_ID/live-capture \\
+  -H "X-API-Key: your-key" \\
+  -F "selfie=@capture.jpg" \\
+  -F 'liveness_metadata={
+    "challenge_type": "head_turn",
+    "challenge_direction": "left",
+    "frames": [
+      {"frame_base64":"<base64>","timestamp":1000,"phase":"turn1_start"},
+      {"frame_base64":"<base64>","timestamp":4000,"phase":"turn1_peak"},
+      {"frame_base64":"<base64>","timestamp":7000,"phase":"turn1_return"},
+      {"frame_base64":"<base64>","timestamp":8200,"phase":"turn_start"},
+      {"frame_base64":"<base64>","timestamp":11200,"phase":"turn_peak"},
+      {"frame_base64":"<base64>","timestamp":14200,"phase":"turn_return"}
+    ],
+    "start_timestamp": 0,
+    "end_timestamp": 15000
+  }'`}
+              js={`// Head-turn liveness — capture frames from camera, server analyzes face
+const fd = new FormData();
+fd.append('selfie', captureFile);
+fd.append('liveness_metadata', JSON.stringify({
+  challenge_type: 'head_turn',
+  challenge_direction: 'left',
+  frames: capturedFrames, // from canvas.toDataURL('image/jpeg', 0.7)
+  // Each frame: { frame_base64, timestamp, phase }
+  // Phases: turn1_start → turn1_peak → turn1_return → turn_start → turn_peak → turn_return
+  start_timestamp: startTime,
+  end_timestamp: Date.now(),
+}));
+
+const res = await fetch(
+  \`${apiUrl}/api/v2/verify/\${verification_id}/live-capture\`,
+  { method: 'POST', headers: { 'X-API-Key': 'your-key' }, body: fd },
+);
+const data = await res.json();`}
+              python={`# Head-turn liveness — capture frames from camera, server analyzes face
+import requests, json
+
+metadata = {
+    'challenge_type': 'head_turn',
+    'challenge_direction': 'left',
+    'frames': captured_frames,  # list of {frame_base64, timestamp, phase}
+    # Phases: turn1_start → turn1_peak → turn1_return → turn_start → turn_peak → turn_return
+    'start_timestamp': start_time,
+    'end_timestamp': end_time,
+}
+
+res = requests.post(
+    f'${apiUrl}/api/v2/verify/{verification_id}/live-capture',
+    headers={'X-API-Key': 'your-key'},
+    files={'selfie': open('capture.jpg', 'rb')},
+    data={'liveness_metadata': json.dumps(metadata)},
+)
+data = res.json()`} />
+
             <Pre label="Response  —  HTTP 201" code={`{
   "success": true,
   "verification_id": "550e8400-e29b-41d4-a716-446655440001",
@@ -786,25 +950,31 @@ data = res.json()`} />
   // Face match (live capture vs document photo):
   "face_match_results": {
     "passed": true,
-    "similarity_score": 0.94,     // similarity 0.0 – 1.0
+    "similarity_score": 0.94,     // cosine similarity 0.0 – 1.0
     "threshold_used": 0.6         // configurable confidence threshold
   },
 
   // Liveness detection:
   "liveness_results": {
     "liveness_passed": true,
-    "liveness_score": 0.96
+    "liveness_score": 0.96,
+    "liveness_mode": "head_turn"  // "passive" | "head_turn"
   },
 
   // Final auto-decision:
   "final_result": "verified"      // "verified" | "manual_review" | "failed"
 }`} />
-            <Callout type="note">
-              Poll{' '}
-              <code style={{ fontFamily: C.mono }}>GET /api/v2/verify/:id/status</code> until{' '}
-              <code style={{ fontFamily: C.mono }}>final_result</code> is non-null ({' '}
-              <StatusPill status="verified" />, <StatusPill status="failed" />, or <StatusPill status="manual_review" />).
-              Face match and liveness scores are in the status response.
+
+            <Callout type="tip">
+              <strong>Which mode should you use?</strong> For low-risk flows (e.g. sandbox, basic onboarding), passive is fine.
+              For all production identity verification, use <strong>head turn</strong> — it provides strong anti-spoofing
+              with zero client-side ML dependencies.
+            </Callout>
+            <Callout type="warning">
+              If <code style={{ fontFamily: C.mono }}>liveness_metadata</code> is provided but fails validation (wrong schema,
+              missing fields), the API returns <strong>HTTP 400</strong> with a{' '}
+              <code style={{ fontFamily: C.mono }}>VALIDATION_ERROR</code> code. It does not silently fall back to passive mode.
+              Always check your metadata format matches the schema above.
             </Callout>
           </EndpointCard>
 
@@ -995,6 +1165,432 @@ data = res.json()`} />
 
           <Divider />
 
+          {/* ══ GUIDES & TUTORIALS ════════════════════════════════════════════ */}
+          <SectionAnchor id="guides" />
+          <H2>Guides & Tutorials</H2>
+          <Lead>Step-by-step walkthroughs for common integration patterns. Each guide includes production-ready code with proper error handling.</Lead>
+
+          {/* ── Guide 1: End-to-End Tutorial ── */}
+          <SectionAnchor id="guide-e2e" />
+          <h3 style={{ fontFamily: C.mono, fontSize: '1rem', fontWeight: 600, color: C.text, margin: '32px 0 8px' }}>
+            <span style={{ color: C.cyan, fontWeight: 400 }}>→</span> End-to-End Verification Tutorial
+          </h3>
+          <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
+            A complete walkthrough with proper error handling, exponential backoff polling, and all 5 verification steps.
+            Unlike the Quick Start (which is minimal), this guide shows production-ready patterns.
+          </p>
+
+          <CodeTabs tab={tab} onChange={setTab}
+            js={`// ─── Reusable polling helper with exponential backoff ──────────
+async function pollStatus(verificationId, apiKey, baseUrl, {
+  condition, // (data) => boolean — stop polling when true
+  maxAttempts = 60,
+  initialDelay = 1000,
+  maxDelay = 10000,
+} = {}) {
+  let delay = initialDelay;
+  for (let i = 0; i < maxAttempts; i++) {
+    await new Promise(ok => setTimeout(ok, delay));
+    const res = await fetch(
+      \`\${baseUrl}/api/v2/verify/\${verificationId}/status\`,
+      { headers: { 'X-API-Key': apiKey } },
+    );
+    if (!res.ok) throw new Error(\`Poll failed: \${res.status}\`);
+    const data = await res.json();
+    if (data.final_result === 'failed') {
+      throw new Error(\`Verification failed: \${data.failure_reason}\`);
+    }
+    if (condition(data)) return data;
+    delay = Math.min(delay * 1.5, maxDelay); // exponential backoff
+  }
+  throw new Error('Polling timed out');
+}
+
+// ─── Full verification flow ────────────────────────────────────
+const BASE = '${apiUrl}';
+const KEY  = 'sk_live_your_key';
+const headers = { 'X-API-Key': KEY };
+
+// Step 1: Initialize
+const init = await fetch(\`\${BASE}/api/v2/verify/initialize\`, {
+  method: 'POST',
+  headers: { ...headers, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ user_id: 'user-uuid' }),
+}).then(r => r.json());
+const vid = init.verification_id;
+
+// Step 2: Upload front document
+const fd1 = new FormData();
+fd1.append('document_type', 'drivers_license');
+fd1.append('document', frontFile);
+const frontRes = await fetch(\`\${BASE}/api/v2/verify/\${vid}/front-document\`, {
+  method: 'POST', headers, body: fd1,
+}).then(r => r.json());
+if (!frontRes.success) throw new Error(frontRes.message);
+
+// Poll until OCR is ready
+const ocrResult = await pollStatus(vid, KEY, BASE, {
+  condition: (d) => d.ocr_data != null,
+});
+console.log('OCR:', ocrResult.ocr_data.full_name);
+
+// Step 3: Upload back document (cross-validation auto-triggers)
+const fd2 = new FormData();
+fd2.append('document_type', 'drivers_license');
+fd2.append('document', backFile);
+await fetch(\`\${BASE}/api/v2/verify/\${vid}/back-document\`, {
+  method: 'POST', headers, body: fd2,
+}).then(r => r.json());
+
+// Poll until cross-validation completes
+const crossResult = await pollStatus(vid, KEY, BASE, {
+  condition: (d) => d.cross_validation_results != null,
+});
+console.log('Cross-val:', crossResult.cross_validation_results.verdict);
+
+// Step 4: Submit live capture with liveness data
+// Head turn challenge — no client ML needed, just camera frames.
+// Capture frames from getUserMedia() via canvas at different time points.
+const fd3 = new FormData();
+fd3.append('selfie', captureBlob, 'capture.jpg');
+fd3.append('liveness_metadata', JSON.stringify({
+  challenge_type: 'head_turn',
+  challenge_direction: 'left',
+  frames: capturedFrames, // array from canvas.toDataURL('image/jpeg')
+  // Each frame: { frame_base64, timestamp, phase }
+  start_timestamp: startTime,
+  end_timestamp: Date.now(),
+}));
+const liveRes = await fetch(\`\${BASE}/api/v2/verify/\${vid}/live-capture\`, {
+  method: 'POST', headers, body: fd3,
+}).then(r => r.json());
+
+// Verify which liveness mode was actually used
+console.log('Liveness mode:', liveRes.liveness_results?.liveness_mode);
+
+// Poll for final result
+const final = await pollStatus(vid, KEY, BASE, {
+  condition: (d) => d.final_result != null,
+});
+console.log('Result:', final.final_result);
+console.log('Face match:', final.face_match_results?.similarity_score);
+console.log('Liveness:', final.liveness_results?.liveness_passed);`}
+            python={`import requests, time
+
+BASE = '${apiUrl}'
+KEY  = 'sk_live_your_key'
+HEADERS = {'X-API-Key': KEY}
+
+# ─── Reusable polling helper with exponential backoff ──────────
+def poll_status(vid, *, condition, max_attempts=60,
+                initial_delay=1.0, max_delay=10.0):
+    delay = initial_delay
+    for _ in range(max_attempts):
+        time.sleep(delay)
+        r = requests.get(
+            f'{BASE}/api/v2/verify/{vid}/status', headers=HEADERS
+        ).json()
+        if r.get('final_result') == 'failed':
+            raise Exception(f"Verification failed: {r.get('failure_reason')}")
+        if condition(r):
+            return r
+        delay = min(delay * 1.5, max_delay)
+    raise TimeoutError('Polling timed out')
+
+# ─── Full verification flow ────────────────────────────────────
+
+# Step 1: Initialize
+init = requests.post(f'{BASE}/api/v2/verify/initialize',
+    headers={**HEADERS, 'Content-Type': 'application/json'},
+    json={'user_id': 'user-uuid'},
+).json()
+vid = init['verification_id']
+
+# Step 2: Upload front document
+with open('front.jpg', 'rb') as f:
+    requests.post(f'{BASE}/api/v2/verify/{vid}/front-document',
+        headers=HEADERS,
+        data={'document_type': 'drivers_license'},
+        files={'document': f},
+    )
+
+# Poll until OCR is ready
+ocr = poll_status(vid, condition=lambda d: d.get('ocr_data'))
+print('OCR:', ocr['ocr_data']['full_name'])
+
+# Step 3: Upload back document
+with open('back.jpg', 'rb') as f:
+    requests.post(f'{BASE}/api/v2/verify/{vid}/back-document',
+        headers=HEADERS,
+        data={'document_type': 'drivers_license'},
+        files={'document': f},
+    )
+
+# Poll until cross-validation completes
+cross = poll_status(vid, condition=lambda d: d.get('cross_validation_results'))
+print('Cross-val:', cross['cross_validation_results']['verdict'])
+
+# Step 4: Submit live capture with liveness data
+# Head turn challenge — no client ML needed, just camera frames.
+# captured_frames: list of dicts from canvas.toDataURL() on the frontend.
+import json
+
+liveness_metadata = {
+    'challenge_type': 'head_turn',
+    'challenge_direction': 'left',
+    'frames': captured_frames,  # list of {frame_base64, timestamp, phase}
+    'start_timestamp': start_time,
+    'end_timestamp': end_time,
+}
+
+with open('capture.jpg', 'rb') as f:
+    live_res = requests.post(f'{BASE}/api/v2/verify/{vid}/live-capture',
+        headers=HEADERS,
+        files={'selfie': f},
+        data={'liveness_metadata': json.dumps(liveness_metadata)},
+    ).json()
+
+# Verify which liveness mode was actually used
+print('Liveness mode:', live_res.get('liveness_results', {}).get('liveness_mode'))
+
+# Poll for final result
+final = poll_status(vid, condition=lambda d: d.get('final_result'))
+print('Result:', final['final_result'])
+print('Face match:', final.get('face_match_results', {}).get('similarity_score'))
+print('Liveness:', final.get('liveness_results', {}).get('liveness_passed'))`} />
+
+          <Callout type="tip">
+            For event-driven updates without manual polling, use the SDK's{' '}
+            <code style={{ fontFamily: C.mono }}>watch()</code> method — see the{' '}
+            <button onClick={() => scrollTo('sdk')} style={{ color: C.cyan, background: 'none', border: 'none', cursor: 'pointer', fontFamily: C.mono, fontSize: 'inherit', padding: 0 }}>JavaScript SDK</button>{' '}
+            section.
+          </Callout>
+          <Callout type="warning">
+            <strong>Liveness detection is mandatory.</strong> The live capture endpoint runs Gate 4 (liveness) before
+            Gate 5 (face match). We recommend the <strong>head turn</strong> mode — it requires no client-side
+            ML libraries, just <code style={{ fontFamily: C.mono }}>getUserMedia()</code> + canvas frame capture.
+            Omitting <code style={{ fontFamily: C.mono }}>liveness_metadata</code> falls back to passive mode
+            (lowest pass rate). Check <code style={{ fontFamily: C.mono }}>liveness_results.liveness_mode</code>{' '}
+            in the response to confirm which mode was used. See{' '}
+            <button onClick={() => scrollTo('step-4')} style={{ color: C.cyan, background: 'none', border: 'none', cursor: 'pointer', fontFamily: C.mono, fontSize: 'inherit', padding: 0 }}>Step 4</button>{' '}
+            for details and metadata shapes.
+          </Callout>
+
+          {/* ── Guide 2: Mobile Handoff ── */}
+          <SectionAnchor id="guide-mobile" />
+          <h3 style={{ fontFamily: C.mono, fontSize: '1rem', fontWeight: 600, color: C.text, margin: '32px 0 8px' }}>
+            <span style={{ color: C.cyan, fontWeight: 400 }}>→</span> Mobile Handoff
+          </h3>
+          <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
+            Let users start verification on desktop and continue on their phone. Your backend creates a handoff
+            session with a short-lived token, which you present as a QR code or deep link. The mobile browser opens
+            the hosted verification page and camera access works natively.
+          </p>
+
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
+            <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>How handoff works</div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 16px' }}>
+              {[
+                ['1', 'Your backend calls POST /api/verify/handoff/create with api_key and user_id in the request body'],
+                ['2', 'API returns a token (valid for 10 minutes) and an expires_at timestamp'],
+                ['3', 'Build a verification URL using the token and display it as a QR code or deep link'],
+                ['4', 'User opens the URL on their phone — the hosted page handles all steps'],
+                ['5', 'Poll GET /api/verify/handoff/:token/status from your backend until status is "completed"'],
+              ].map(([n, text]) => (
+                <React.Fragment key={n}>
+                  <span style={{ fontFamily: C.mono, fontSize: '0.75rem', color: C.cyan, fontWeight: 600 }}>{n}.</span>
+                  <span style={{ fontFamily: C.sans, fontSize: '0.82rem', color: C.muted, lineHeight: 1.6 }}>{text}</span>
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+
+          <CodeTabs tab={tab} onChange={setTab}
+            curl={`# Create handoff session (api_key in body, not header)
+curl -X POST ${apiUrl}/api/verify/handoff/create \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "api_key": "sk_live_your_key",
+    "user_id": "user-uuid"
+  }'
+
+# Poll status using the token
+curl -X GET ${apiUrl}/api/verify/handoff/TOKEN/status`}
+            js={`// Create handoff session from your backend
+const handoff = await fetch(\`${apiUrl}/api/verify/handoff/create\`, {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    api_key: 'sk_live_your_key',
+    user_id: 'user-uuid',
+  }),
+}).then(r => r.json());
+
+// Build the verification URL with the token
+const verifyUrl = \`https://idswyft.app/user-verification?token=\${handoff.token}\`;
+
+// Display QR code (use any QR library: qrcode, qrcode.react, etc.)
+showQrCode(verifyUrl);
+
+// Poll for completion using the token
+const pollHandoff = setInterval(async () => {
+  const res = await fetch(
+    \`${apiUrl}/api/verify/handoff/\${handoff.token}/status\`,
+  );
+  if (res.status === 410) {
+    clearInterval(pollHandoff);
+    console.log('Session expired — regenerate token');
+    return;
+  }
+  const status = await res.json();
+  if (status.status === 'completed') {
+    clearInterval(pollHandoff);
+    console.log('Verification complete:', status.result);
+  }
+}, 3000);`}
+            python={`import requests, time
+
+BASE = '${apiUrl}'
+
+# Create handoff session (api_key in body, not header)
+handoff = requests.post(f'{BASE}/api/verify/handoff/create',
+    json={
+        'api_key': 'sk_live_your_key',
+        'user_id': 'user-uuid',
+    },
+).json()
+
+# Build the verification URL with the token
+verify_url = f'https://idswyft.app/user-verification?token={handoff["token"]}'
+print('Scan this URL:', verify_url)
+
+# Poll for completion using the token
+while True:
+    time.sleep(3)
+    res = requests.get(f'{BASE}/api/verify/handoff/{handoff["token"]}/status')
+    if res.status_code == 410:
+        print('Session expired — regenerate token')
+        break
+    status = res.json()
+    if status['status'] == 'completed':
+        print('Done! Result:', status.get('result'))
+        break`} />
+
+          <Pre label="Response  —  handoff/create  (HTTP 201)" code={`{
+  "token": "a1b2c3d4e5f6...64-char-hex-token",
+  "expires_at": "2026-03-20T10:10:00Z"
+}`} />
+
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
+            <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>Best practices</div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {[
+                'HTTPS is required for camera access on mobile browsers',
+                'Test on real devices — emulators don\'t support camera APIs',
+                'Use a QR library (qrcode, qrcode.react) rather than generating images manually',
+                'Handle token expiry (10 min) — show a "Regenerate" button if the user is slow',
+                'Set redirect_url to bring the user back to your app after verification',
+              ].map(tip => (
+                <div key={tip} style={{ fontFamily: C.sans, fontSize: '0.8rem', color: C.muted, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+                  <span style={{ color: C.green, fontSize: '0.7rem', marginTop: 3 }}>✓</span> {tip}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* ── Guide 3: Building Custom UI ── */}
+          <SectionAnchor id="guide-custom-ui" />
+          <h3 style={{ fontFamily: C.mono, fontSize: '1rem', fontWeight: 600, color: C.text, margin: '32px 0 8px' }}>
+            <span style={{ color: C.cyan, fontWeight: 400 }}>→</span> Building a Custom Verification UI
+          </h3>
+          <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
+            Patterns and best practices for building your own verification UI on top of the REST API.
+          </p>
+
+          <h4 style={{ fontFamily: C.mono, fontSize: '0.85rem', fontWeight: 600, color: C.text, margin: '24px 0 12px' }}>Polling Strategies</h4>
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 24 }}>
+            {[
+              { title: 'Fixed Interval', color: C.amber, pros: 'Simple to implement', cons: 'Wastes requests if processing is slow', code: 'setInterval(() => poll(), 2000)' },
+              { title: 'Exponential Backoff', color: C.green, pros: 'Efficient — reduces load over time', cons: 'Slightly slower on fast responses', code: 'delay = min(delay * 1.5, 10s)' },
+              { title: 'SDK watch()', color: C.cyan, pros: 'Event-driven, auto-cleanup', cons: 'Requires @idswyft/sdk', code: 'sdk.watch(id).on(\'done\', cb)' },
+            ].map(s => (
+              <div key={s.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '18px 20px' }}>
+                <div style={{ fontFamily: C.mono, fontSize: '0.78rem', fontWeight: 600, color: s.color, marginBottom: 8 }}>{s.title}</div>
+                <div style={{ fontFamily: C.sans, fontSize: '0.78rem', color: C.muted, marginBottom: 4 }}><span style={{ color: C.green }}>+</span> {s.pros}</div>
+                <div style={{ fontFamily: C.sans, fontSize: '0.78rem', color: C.muted, marginBottom: 8 }}><span style={{ color: C.red }}>−</span> {s.cons}</div>
+                <code style={{ fontFamily: C.mono, fontSize: '0.7rem', color: C.dim }}>{s.code}</code>
+              </div>
+            ))}
+          </div>
+
+          <h4 style={{ fontFamily: C.mono, fontSize: '0.85rem', fontWeight: 600, color: C.text, margin: '24px 0 12px' }}>Progress Indicators</h4>
+          <p style={{ fontFamily: C.sans, fontSize: '0.85rem', color: C.muted, lineHeight: 1.7, marginBottom: 12 }}>
+            Map the <code style={{ fontFamily: C.mono, color: C.cyan }}>status</code> field to user-friendly step labels:
+          </p>
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 24 }}>
+            <div style={{ padding: '8px 20px' }}>
+              {[
+                { status: 'AWAITING_FRONT', label: 'Upload your ID (front)', step: '1/4' },
+                { status: 'AWAITING_BACK', label: 'Upload your ID (back)', step: '2/4' },
+                { status: 'CROSS_VALIDATING', label: 'Verifying document...', step: '2/4' },
+                { status: 'AWAITING_LIVE', label: 'Take a photo of yourself', step: '3/4' },
+                { status: 'FACE_MATCHING', label: 'Verifying identity...', step: '3/4' },
+                { status: 'COMPLETE', label: 'Verification complete!', step: '4/4' },
+                { status: 'HARD_REJECTED', label: 'Verification failed', step: '—' },
+              ].map(r => (
+                <div key={r.status} style={{ display: 'flex', gap: 12, padding: '8px 0', borderTop: `1px solid ${C.border}`, alignItems: 'center' }}>
+                  <code style={{ fontFamily: C.mono, fontSize: '0.75rem', color: C.cyan, width: 160, flexShrink: 0 }}>{r.status}</code>
+                  <span style={{ fontFamily: C.sans, fontSize: '0.82rem', color: C.text, flex: 1 }}>{r.label}</span>
+                  <code style={{ fontFamily: C.mono, fontSize: '0.72rem', color: C.dim }}>{r.step}</code>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <h4 style={{ fontFamily: C.mono, fontSize: '0.85rem', fontWeight: 600, color: C.text, margin: '24px 0 12px' }}>Error Recovery</h4>
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 24 }}>
+            <div style={{ padding: '8px 20px' }}>
+              {[
+                { code: '409 Conflict', action: 'Session was rejected by a gate. Start a new verification session.', color: C.orange },
+                { code: '429 Too Many Requests', action: 'Back off and retry after the Retry-After header value.', color: C.amber },
+                { code: '400 Bad Request', action: 'Fix the input (wrong file format, missing fields) and retry the same step.', color: C.amber },
+                { code: 'Network Error', action: 'Retry with exponential backoff (max 3 retries). The API is idempotent for uploads.', color: C.red },
+              ].map(r => (
+                <div key={r.code} style={{ display: 'flex', gap: 12, padding: '10px 0', borderTop: `1px solid ${C.border}`, alignItems: 'flex-start' }}>
+                  <code style={{ fontFamily: C.mono, fontSize: '0.75rem', color: r.color, width: 180, flexShrink: 0 }}>{r.code}</code>
+                  <span style={{ fontFamily: C.sans, fontSize: '0.82rem', color: C.muted, flex: 1, lineHeight: 1.6 }}>{r.action}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
+          <h4 style={{ fontFamily: C.mono, fontSize: '0.85rem', fontWeight: 600, color: C.text, margin: '24px 0 12px' }}>Displaying OCR Results</h4>
+          <Pre label="Parse OCR data from status response" code={`const status = await fetch(
+  \`${apiUrl}/api/v2/verify/\${vid}/status\`,
+  { headers: { 'X-API-Key': 'your-key' } },
+).then(r => r.json());
+
+if (status.ocr_data) {
+  const { full_name, date_of_birth, id_number, confidence_scores } = status.ocr_data;
+
+  // Highlight low-confidence fields for manual review
+  const LOW_CONFIDENCE = 0.8;
+  Object.entries(confidence_scores).forEach(([field, score]) => {
+    if (score < LOW_CONFIDENCE) {
+      console.warn(\`Low confidence for \${field}: \${score}\`);
+      // Show a yellow highlight or "please verify" prompt in your UI
+    }
+  });
+}`} />
+
+          <Callout type="tip">
+            For teams that want a pre-built UI, use the{' '}
+            <button onClick={() => scrollTo('embed')} style={{ color: C.cyan, background: 'none', border: 'none', cursor: 'pointer', fontFamily: C.mono, fontSize: 'inherit', padding: 0 }}>Embed Component</button>{' '}
+            — it provides a complete verification experience you can drop into your app with zero frontend code.
+          </Callout>
+
+          <Divider />
+
           {/* ══ JAVASCRIPT SDK ════════════════════════════════════════════════ */}
           <SectionAnchor id="sdk" />
           <H2>JavaScript SDK</H2>
@@ -1016,15 +1612,23 @@ const sdk = new IdswyftSDK({
           <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 16 }}>
             <div style={{ padding: '12px 20px', borderBottom: `1px solid ${C.border}`, fontFamily: C.mono, fontSize: '0.72rem', color: C.muted, letterSpacing: '0.07em', textTransform: 'uppercase' }}>SDK Methods</div>
             <div style={{ padding: '8px 20px' }}>
-              <FieldRow name="startVerification()" type="→ InitializeResponse" req={false} desc="Create a new verification session" />
-              <FieldRow name="uploadFrontDocument()" type="→ VerificationResult" req={false} desc="Upload front of ID for OCR extraction" />
-              <FieldRow name="uploadBackDocument()" type="→ VerificationResult" req={false} desc="Upload back of ID for cross-validation" />
-              <FieldRow name="uploadSelfie()" type="→ VerificationResult" req={false} desc="Submit live capture for face match" />
-              <FieldRow name="getVerificationStatus()" type="→ VerificationResult" req={false} desc="Get full session status and results" />
-              <FieldRow name="watch()" type="→ EventEmitter" req={false} desc="Real-time event stream (see below)" />
-              <FieldRow name="createBatch()" type="→ BatchJobResponse" req={false} desc="Create batch verification job" />
-              <FieldRow name="uploadAddressDocument()" type="→ AddressResult" req={false} desc="Upload proof-of-address document" />
-              <FieldRow name="createMonitoringSchedule()" type="→ Schedule" req={false} desc="Schedule re-verification" />
+              {[
+                { method: 'startVerification()', returns: 'InitializeResponse', desc: 'Create a new verification session' },
+                { method: 'uploadFrontDocument()', returns: 'VerificationResult', desc: 'Upload front of ID for OCR extraction' },
+                { method: 'uploadBackDocument()', returns: 'VerificationResult', desc: 'Upload back of ID for cross-validation' },
+                { method: 'uploadSelfie()', returns: 'VerificationResult', desc: 'Submit live capture for face match' },
+                { method: 'getVerificationStatus()', returns: 'VerificationResult', desc: 'Get full session status and results' },
+                { method: 'watch()', returns: 'EventEmitter', desc: 'Real-time event stream (see below)' },
+                { method: 'createBatch()', returns: 'BatchJobResponse', desc: 'Create batch verification job' },
+                { method: 'uploadAddressDocument()', returns: 'AddressResult', desc: 'Upload proof-of-address document' },
+                { method: 'createMonitoringSchedule()', returns: 'Schedule', desc: 'Schedule re-verification' },
+              ].map(row => (
+                <div key={row.method} style={{ display: 'grid', gridTemplateColumns: '220px 140px 1fr', gap: 12, padding: '10px 0', borderTop: `1px solid ${C.border}`, alignItems: 'baseline' }}>
+                  <code style={{ fontFamily: C.mono, fontSize: '0.78rem', color: C.cyan, whiteSpace: 'nowrap' }}>{row.method}</code>
+                  <code style={{ fontFamily: C.mono, fontSize: '0.72rem', color: C.muted, whiteSpace: 'nowrap' }}>→ {row.returns}</code>
+                  <span style={{ fontFamily: C.sans, fontSize: '0.83rem', color: C.text, lineHeight: 1.6 }}>{row.desc}</span>
+                </div>
+              ))}
             </div>
           </div>
 
@@ -1685,6 +2289,18 @@ await sdk.cancelMonitoringSchedule(schedule.schedule.id);`} />
 
           {[
             {
+              version: '1.2.0',
+              date: '2026-03-20',
+              added: [],
+              fixed: [],
+              changed: [
+                'Liveness system: removed dead MediaPipe code path, renamed MultiFrame → HeadTurn',
+                'Malformed liveness_metadata now returns HTTP 400 (VALIDATION_ERROR) instead of silently falling back to passive mode',
+                'Removed legacy multi_frame_color challenge type alias — only head_turn is accepted',
+                'color_sequence field is now optional (clients no longer need to send it)',
+              ],
+            },
+            {
               version: '1.1.0',
               date: '2026-03-19',
               added: [
@@ -1729,7 +2345,7 @@ await sdk.cancelMonitoringSchedule(schedule.schedule.id);`} />
               <div style={{ padding: '16px 24px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
                 <Pill color={C.cyan} bg={C.cyanDim}>v{release.version}</Pill>
                 <span style={{ fontFamily: C.mono, fontSize: '0.78rem', color: C.dim }}>{release.date}</span>
-                {release.version === '1.1.0' && <Pill color={C.green} bg={C.greenDim}>latest</Pill>}
+                {release.version === '1.2.0' && <Pill color={C.green} bg={C.greenDim}>latest</Pill>}
               </div>
               <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
                 {release.added.length > 0 && (

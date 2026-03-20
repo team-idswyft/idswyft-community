@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
-import { verifyMultiFrameLiveness } from '../MultiFrameLivenessVerifier.js';
-import type { FaceDetectionService } from '../MultiFrameLivenessVerifier.js';
-import type { MultiFrameLivenessMetadata, AnalysisFrame } from '../../../verification/models/multiFrameLivenessSchema.js';
+import { verifyHeadTurnLiveness } from '../HeadTurnVerifier.js';
+import type { FaceDetectionService } from '../HeadTurnVerifier.js';
+import type { HeadTurnLivenessMetadata, AnalysisFrame } from '../../../verification/models/headTurnLivenessSchema.js';
 import type { FaceBufferDetectionResult } from '../../../services/faceRecognition.js';
 
 // ─── Helpers ─────────────────────────────────────────────
@@ -60,25 +60,23 @@ function createMockFaceService(
   };
 }
 
-/** Build a valid multi-frame metadata payload. */
+/** Build a valid head-turn metadata payload (6 frames, turn phases only). */
 function makeMetadata(
-  overrides: Partial<MultiFrameLivenessMetadata> = {},
-): MultiFrameLivenessMetadata {
+  overrides: Partial<HeadTurnLivenessMetadata> = {},
+): HeadTurnLivenessMetadata {
   const frames: AnalysisFrame[] = [
-    { frame_base64: FAKE_FRAME_BASE64, timestamp: 1000, phase: 'color_red', color_rgb: [255, 0, 0] },
-    { frame_base64: FAKE_FRAME_BASE64, timestamp: 2500, phase: 'color_green', color_rgb: [0, 255, 0] },
-    { frame_base64: FAKE_FRAME_BASE64, timestamp: 4000, phase: 'color_blue', color_rgb: [0, 0, 255] },
-    { frame_base64: FAKE_FRAME_BASE64, timestamp: 5500, phase: 'color_white', color_rgb: [255, 255, 255] },
-    { frame_base64: FAKE_FRAME_BASE64, timestamp: 7000, phase: 'turn_start' },
-    { frame_base64: FAKE_FRAME_BASE64, timestamp: 10000, phase: 'turn_peak' },
-    { frame_base64: FAKE_FRAME_BASE64, timestamp: 13000, phase: 'turn_return' },
+    { frame_base64: FAKE_FRAME_BASE64, timestamp: 1000, phase: 'turn1_start' },
+    { frame_base64: FAKE_FRAME_BASE64, timestamp: 4000, phase: 'turn1_peak' },
+    { frame_base64: FAKE_FRAME_BASE64, timestamp: 7000, phase: 'turn1_return' },
+    { frame_base64: FAKE_FRAME_BASE64, timestamp: 8200, phase: 'turn_start' },
+    { frame_base64: FAKE_FRAME_BASE64, timestamp: 11200, phase: 'turn_peak' },
+    { frame_base64: FAKE_FRAME_BASE64, timestamp: 14200, phase: 'turn_return' },
   ];
 
   return {
-    challenge_type: 'multi_frame_color',
+    challenge_type: 'head_turn',
     challenge_direction: 'left',
     frames: overrides.frames ?? frames,
-    color_sequence: [[255, 0, 0], [0, 255, 0], [0, 0, 255], [255, 255, 255]],
     start_timestamp: 0,
     end_timestamp: 15000,
     ...overrides,
@@ -87,23 +85,22 @@ function makeMetadata(
 
 // ─── Tests ──────────────────────────────────────────────
 
-describe('MultiFrameLivenessVerifier', () => {
-  describe('valid multi-frame sequence', () => {
+describe('HeadTurnVerifier', () => {
+  describe('valid head-turn sequence', () => {
     it('passes with correct head turn and consistent face', async () => {
-      // 4 color frames (neutral face) + turn_start (yaw=0), turn_peak (yaw=20), turn_return (yaw=0)
+      // 6 head-turn frames: turn1 (warm-up) + turn (scored)
       // Front camera: physical left turn = positive yaw in raw image
       const detections = [
-        makeFaceDetection({ yaw: 0 }),  // color_red
-        makeFaceDetection({ yaw: 0 }),  // color_green
-        makeFaceDetection({ yaw: 0 }),  // color_blue
-        makeFaceDetection({ yaw: 0 }),  // color_white
+        makeFaceDetection({ yaw: 0 }),  // turn1_start
+        makeFaceDetection({ yaw: 0 }),  // turn1_peak
+        makeFaceDetection({ yaw: 0 }),  // turn1_return
         makeFaceDetection({ yaw: 0 }),  // turn_start
         makeFaceDetection({ yaw: 20 }), // turn_peak (left = positive in raw front-camera image)
         makeFaceDetection({ yaw: 2 }),  // turn_return (back to center)
       ];
 
       const faceService = createMockFaceService(detections);
-      const result = await verifyMultiFrameLiveness(makeMetadata(), faceService);
+      const result = await verifyHeadTurnLiveness(makeMetadata(), faceService);
 
       expect(result.checks.face_present_all_frames.passed).toBe(true);
       expect(result.checks.head_turn_detected.passed).toBe(true);
@@ -118,10 +115,9 @@ describe('MultiFrameLivenessVerifier', () => {
     it('passes for right direction turn', async () => {
       // Front camera: physical right turn = negative yaw in raw image
       const detections = [
-        makeFaceDetection({ yaw: 0 }),   // color_red
-        makeFaceDetection({ yaw: 0 }),   // color_green
-        makeFaceDetection({ yaw: 0 }),   // color_blue
-        makeFaceDetection({ yaw: 0 }),   // color_white
+        makeFaceDetection({ yaw: 0 }),   // turn1_start
+        makeFaceDetection({ yaw: 0 }),   // turn1_peak
+        makeFaceDetection({ yaw: 0 }),   // turn1_return
         makeFaceDetection({ yaw: 0 }),   // turn_start
         makeFaceDetection({ yaw: -20 }), // turn_peak (right = negative in raw front-camera image)
         makeFaceDetection({ yaw: -2 }),  // turn_return
@@ -129,7 +125,7 @@ describe('MultiFrameLivenessVerifier', () => {
 
       const faceService = createMockFaceService(detections);
       const metadata = makeMetadata({ challenge_direction: 'right' });
-      const result = await verifyMultiFrameLiveness(metadata, faceService);
+      const result = await verifyHeadTurnLiveness(metadata, faceService);
 
       expect(result.checks.head_turn_detected.passed).toBe(true);
       expect(result.checks.correct_direction.passed).toBe(true);
@@ -140,29 +136,28 @@ describe('MultiFrameLivenessVerifier', () => {
   describe('face presence check', () => {
     it('fails when face missing in 2+ frames', async () => {
       const detections = [
-        null,                            // color_red — no face
-        null,                            // color_green — no face
-        makeFaceDetection({ yaw: 0 }),   // color_blue
-        makeFaceDetection({ yaw: 0 }),   // color_white
+        null,                            // turn1_start — no face
+        null,                            // turn1_peak — no face
+        makeFaceDetection({ yaw: 0 }),   // turn1_return
         makeFaceDetection({ yaw: 0 }),   // turn_start
         makeFaceDetection({ yaw: -20 }), // turn_peak
         makeFaceDetection({ yaw: 0 }),   // turn_return
       ];
 
       const faceService = createMockFaceService(detections);
-      const result = await verifyMultiFrameLiveness(makeMetadata(), faceService);
+      const result = await verifyHeadTurnLiveness(makeMetadata(), faceService);
 
       expect(result.checks.face_present_all_frames.passed).toBe(false);
-      expect(result.checks.face_present_all_frames.detail).toContain('5/7');
+      expect(result.checks.face_present_all_frames.detail).toContain('4/6');
     });
 
     it('fails with low confidence face detection', async () => {
-      const detections = Array(7).fill(null).map(() =>
+      const detections = Array(6).fill(null).map(() =>
         makeFaceDetection({ yaw: 0, confidence: 0.1 }),
       );
 
       const faceService = createMockFaceService(detections);
-      const result = await verifyMultiFrameLiveness(makeMetadata(), faceService);
+      const result = await verifyHeadTurnLiveness(makeMetadata(), faceService);
 
       expect(result.checks.face_present_all_frames.passed).toBe(false);
     });
@@ -171,17 +166,16 @@ describe('MultiFrameLivenessVerifier', () => {
   describe('head turn detection', () => {
     it('fails when yaw delta is insufficient', async () => {
       const detections = [
-        makeFaceDetection({ yaw: 0 }), // color frames...
-        makeFaceDetection({ yaw: 0 }),
-        makeFaceDetection({ yaw: 0 }),
-        makeFaceDetection({ yaw: 0 }),
+        makeFaceDetection({ yaw: 0 }), // turn1_start
+        makeFaceDetection({ yaw: 0 }), // turn1_peak
+        makeFaceDetection({ yaw: 0 }), // turn1_return
         makeFaceDetection({ yaw: 0 }), // turn_start
         makeFaceDetection({ yaw: 5 }), // turn_peak — only 5 degrees (positive = left, but insufficient)
         makeFaceDetection({ yaw: 0 }), // turn_return
       ];
 
       const faceService = createMockFaceService(detections);
-      const result = await verifyMultiFrameLiveness(makeMetadata(), faceService);
+      const result = await verifyHeadTurnLiveness(makeMetadata(), faceService);
 
       expect(result.checks.head_turn_detected.passed).toBe(false);
       expect(result.checks.head_turn_detected.detail).toContain('5.0');
@@ -192,10 +186,9 @@ describe('MultiFrameLivenessVerifier', () => {
     it('fails when head turns in wrong direction', async () => {
       // Asked to turn left but turned right (front camera: right = negative yaw)
       const detections = [
-        makeFaceDetection({ yaw: 0 }),
-        makeFaceDetection({ yaw: 0 }),
-        makeFaceDetection({ yaw: 0 }),
-        makeFaceDetection({ yaw: 0 }),
+        makeFaceDetection({ yaw: 0 }),   // turn1_start
+        makeFaceDetection({ yaw: 0 }),   // turn1_peak
+        makeFaceDetection({ yaw: 0 }),   // turn1_return
         makeFaceDetection({ yaw: 0 }),   // turn_start
         makeFaceDetection({ yaw: -20 }), // turn_peak — right (negative) instead of left (positive)
         makeFaceDetection({ yaw: -2 }),  // turn_return
@@ -203,7 +196,7 @@ describe('MultiFrameLivenessVerifier', () => {
 
       const faceService = createMockFaceService(detections);
       const metadata = makeMetadata({ challenge_direction: 'left' });
-      const result = await verifyMultiFrameLiveness(metadata, faceService);
+      const result = await verifyHeadTurnLiveness(metadata, faceService);
 
       expect(result.checks.correct_direction.passed).toBe(false);
     });
@@ -212,17 +205,16 @@ describe('MultiFrameLivenessVerifier', () => {
   describe('return to center', () => {
     it('fails when head does not return to center', async () => {
       const detections = [
-        makeFaceDetection({ yaw: 0 }),
-        makeFaceDetection({ yaw: 0 }),
-        makeFaceDetection({ yaw: 0 }),
-        makeFaceDetection({ yaw: 0 }),
+        makeFaceDetection({ yaw: 0 }),  // turn1_start
+        makeFaceDetection({ yaw: 0 }),  // turn1_peak
+        makeFaceDetection({ yaw: 0 }),  // turn1_return
         makeFaceDetection({ yaw: 0 }),  // turn_start
         makeFaceDetection({ yaw: 20 }), // turn_peak (left = positive)
         makeFaceDetection({ yaw: 15 }), // turn_return — still turned (15° from start > 8° tolerance)
       ];
 
       const faceService = createMockFaceService(detections);
-      const result = await verifyMultiFrameLiveness(makeMetadata(), faceService);
+      const result = await verifyHeadTurnLiveness(makeMetadata(), faceService);
 
       expect(result.checks.return_to_center.passed).toBe(false);
     });
@@ -230,56 +222,55 @@ describe('MultiFrameLivenessVerifier', () => {
 
   describe('temporal plausibility', () => {
     it('passes with realistic challenge duration', async () => {
-      const detections = Array(7).fill(null).map(() => makeFaceDetection({ yaw: 0 }));
+      const detections = Array(6).fill(null).map(() => makeFaceDetection({ yaw: 0 }));
       const faceService = createMockFaceService(detections);
       const metadata = makeMetadata({
         start_timestamp: 0,
         end_timestamp: 15000, // 15s — realistic
       });
-      const result = await verifyMultiFrameLiveness(metadata, faceService);
+      const result = await verifyHeadTurnLiveness(metadata, faceService);
 
       expect(result.checks.temporal_plausibility.passed).toBe(true);
     });
 
     it('fails when challenge is too short', async () => {
-      const detections = Array(7).fill(null).map(() => makeFaceDetection({ yaw: 0 }));
+      const detections = Array(6).fill(null).map(() => makeFaceDetection({ yaw: 0 }));
       const faceService = createMockFaceService(detections);
       const metadata = makeMetadata({
         start_timestamp: 0,
         end_timestamp: 2000, // 2s — too fast (replay or manipulation)
       });
-      const result = await verifyMultiFrameLiveness(metadata, faceService);
+      const result = await verifyHeadTurnLiveness(metadata, faceService);
 
       expect(result.checks.temporal_plausibility.passed).toBe(false);
       expect(result.checks.temporal_plausibility.detail).toContain('2.0s');
     });
 
     it('fails when challenge is too long', async () => {
-      const detections = Array(7).fill(null).map(() => makeFaceDetection({ yaw: 0 }));
+      const detections = Array(6).fill(null).map(() => makeFaceDetection({ yaw: 0 }));
       const faceService = createMockFaceService(detections);
       const metadata = makeMetadata({
         start_timestamp: 0,
         end_timestamp: 100000, // 100s — too long
       });
-      const result = await verifyMultiFrameLiveness(metadata, faceService);
+      const result = await verifyHeadTurnLiveness(metadata, faceService);
 
       expect(result.checks.temporal_plausibility.passed).toBe(false);
     });
 
     it('fails when frame timestamps are not chronological', async () => {
-      const detections = Array(7).fill(null).map(() => makeFaceDetection({ yaw: 0 }));
+      const detections = Array(6).fill(null).map(() => makeFaceDetection({ yaw: 0 }));
       const faceService = createMockFaceService(detections);
       const frames: AnalysisFrame[] = [
-        { frame_base64: FAKE_FRAME_BASE64, timestamp: 5000, phase: 'color_red', color_rgb: [255, 0, 0] },
-        { frame_base64: FAKE_FRAME_BASE64, timestamp: 3000, phase: 'color_green', color_rgb: [0, 255, 0] }, // out of order
-        { frame_base64: FAKE_FRAME_BASE64, timestamp: 4000, phase: 'color_blue', color_rgb: [0, 0, 255] },
-        { frame_base64: FAKE_FRAME_BASE64, timestamp: 5500, phase: 'color_white', color_rgb: [255, 255, 255] },
-        { frame_base64: FAKE_FRAME_BASE64, timestamp: 7000, phase: 'turn_start' },
-        { frame_base64: FAKE_FRAME_BASE64, timestamp: 10000, phase: 'turn_peak' },
-        { frame_base64: FAKE_FRAME_BASE64, timestamp: 13000, phase: 'turn_return' },
+        { frame_base64: FAKE_FRAME_BASE64, timestamp: 5000, phase: 'turn1_start' },
+        { frame_base64: FAKE_FRAME_BASE64, timestamp: 3000, phase: 'turn1_peak' }, // out of order
+        { frame_base64: FAKE_FRAME_BASE64, timestamp: 7000, phase: 'turn1_return' },
+        { frame_base64: FAKE_FRAME_BASE64, timestamp: 8200, phase: 'turn_start' },
+        { frame_base64: FAKE_FRAME_BASE64, timestamp: 11200, phase: 'turn_peak' },
+        { frame_base64: FAKE_FRAME_BASE64, timestamp: 14200, phase: 'turn_return' },
       ];
       const metadata = makeMetadata({ frames, start_timestamp: 0, end_timestamp: 15000 });
-      const result = await verifyMultiFrameLiveness(metadata, faceService);
+      const result = await verifyHeadTurnLiveness(metadata, faceService);
 
       expect(result.checks.temporal_plausibility.passed).toBe(false);
       expect(result.checks.temporal_plausibility.detail).toContain('chronological: false');
@@ -294,13 +285,12 @@ describe('MultiFrameLivenessVerifier', () => {
         makeFaceDetection({ yaw: 0, bboxSize: 245 }),
         makeFaceDetection({ yaw: 0, bboxSize: 235 }),
         makeFaceDetection({ yaw: 0, bboxSize: 242 }),
-        makeFaceDetection({ yaw: 0, bboxSize: 238 }),
         makeFaceDetection({ yaw: 20, bboxSize: 250 }),
         makeFaceDetection({ yaw: 2, bboxSize: 240 }),
       ];
 
       const faceService = createMockFaceService(detections);
-      const result = await verifyMultiFrameLiveness(makeMetadata(), faceService);
+      const result = await verifyHeadTurnLiveness(makeMetadata(), faceService);
 
       expect(result.checks.face_bbox_consistency.passed).toBe(true);
     });
@@ -312,13 +302,12 @@ describe('MultiFrameLivenessVerifier', () => {
         makeFaceDetection({ yaw: 0, bboxSize: 100 }), // much smaller — different source
         makeFaceDetection({ yaw: 0, bboxSize: 240 }),
         makeFaceDetection({ yaw: 0, bboxSize: 400 }), // much larger — different source
-        makeFaceDetection({ yaw: 0, bboxSize: 240 }),
         makeFaceDetection({ yaw: 20, bboxSize: 120 }), // different source
         makeFaceDetection({ yaw: 2, bboxSize: 240 }),
       ];
 
       const faceService = createMockFaceService(detections);
-      const result = await verifyMultiFrameLiveness(makeMetadata(), faceService);
+      const result = await verifyHeadTurnLiveness(makeMetadata(), faceService);
 
       expect(result.checks.face_bbox_consistency.passed).toBe(false);
     });
@@ -326,8 +315,8 @@ describe('MultiFrameLivenessVerifier', () => {
 
   describe('virtual camera detection', () => {
     it('penalizes score when virtual camera detected', async () => {
-      const detections = Array(7).fill(null).map((_, i) => {
-        if (i === 5) return makeFaceDetection({ yaw: 20 }); // left = positive in front camera
+      const detections = Array(6).fill(null).map((_, i) => {
+        if (i === 4) return makeFaceDetection({ yaw: 20 }); // turn_peak: left = positive in front camera
         return makeFaceDetection({ yaw: 0 });
       });
 
@@ -338,14 +327,14 @@ describe('MultiFrameLivenessVerifier', () => {
           suspected_virtual: true,
         },
       });
-      const result = await verifyMultiFrameLiveness(metadata, faceService);
+      const result = await verifyHeadTurnLiveness(metadata, faceService);
 
       expect(result.checks.virtual_camera_not_detected.passed).toBe(false);
       expect(result.checks.virtual_camera_not_detected.detail).toContain('suspected: true');
     });
 
     it('passes when camera is real', async () => {
-      const detections = Array(7).fill(null).map(() =>
+      const detections = Array(6).fill(null).map(() =>
         makeFaceDetection({ yaw: 0 }),
       );
 
@@ -356,7 +345,7 @@ describe('MultiFrameLivenessVerifier', () => {
           suspected_virtual: false,
         },
       });
-      const result = await verifyMultiFrameLiveness(metadata, faceService);
+      const result = await verifyHeadTurnLiveness(metadata, faceService);
 
       expect(result.checks.virtual_camera_not_detected.passed).toBe(true);
     });
@@ -364,11 +353,11 @@ describe('MultiFrameLivenessVerifier', () => {
 
   describe('score calculation', () => {
     it('returns weighted score between 0 and 1', async () => {
-      const detections = Array(7).fill(null).map(() =>
+      const detections = Array(6).fill(null).map(() =>
         makeFaceDetection({ yaw: 0 }),
       );
       const faceService = createMockFaceService(detections);
-      const result = await verifyMultiFrameLiveness(makeMetadata(), faceService);
+      const result = await verifyHeadTurnLiveness(makeMetadata(), faceService);
 
       expect(result.score).toBeGreaterThanOrEqual(0);
       expect(result.score).toBeLessThanOrEqual(1);
@@ -376,8 +365,8 @@ describe('MultiFrameLivenessVerifier', () => {
 
     it('includes reason when failed', async () => {
       // All null detections → fails multiple checks
-      const faceService = createMockFaceService(Array(7).fill(null));
-      const result = await verifyMultiFrameLiveness(makeMetadata(), faceService);
+      const faceService = createMockFaceService(Array(6).fill(null));
+      const result = await verifyHeadTurnLiveness(makeMetadata(), faceService);
 
       expect(result.passed).toBe(false);
       expect(result.reason).toBeDefined();
@@ -386,8 +375,8 @@ describe('MultiFrameLivenessVerifier', () => {
 
     it('fails overall when score < 0.70', async () => {
       // No face in any frame → multiple checks fail
-      const faceService = createMockFaceService(Array(7).fill(null));
-      const result = await verifyMultiFrameLiveness(makeMetadata(), faceService);
+      const faceService = createMockFaceService(Array(6).fill(null));
+      const result = await verifyHeadTurnLiveness(makeMetadata(), faceService);
 
       expect(result.passed).toBe(false);
       expect(result.score).toBeLessThan(0.70);
@@ -399,13 +388,12 @@ describe('MultiFrameLivenessVerifier', () => {
         makeFaceDetection({ yaw: 0 }),
         makeFaceDetection({ yaw: 0 }),
         makeFaceDetection({ yaw: 0 }),
-        makeFaceDetection({ yaw: 0 }),
         makeFaceDetection({ yaw: 20 }),
         makeFaceDetection({ yaw: 2 }),
       ];
 
       const faceService = createMockFaceService(detections);
-      const result = await verifyMultiFrameLiveness(makeMetadata(), faceService);
+      const result = await verifyHeadTurnLiveness(makeMetadata(), faceService);
 
       expect(result.score).toBeCloseTo(1, 5);
       expect(result.passed).toBe(true);

@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, afterEach } from 'vitest';
 
 // Mock heavy optional deps required by TesseractProvider
 vi.mock('tesseract.js', () => ({
@@ -64,44 +64,28 @@ describe('OCRService provider delegation', () => {
     vi.restoreAllMocks();
   });
 
-  it('falls back to TesseractProvider when primary provider throws', async () => {
-    process.env.OPENAI_API_KEY = 'test-key'; // triggers openai provider by default
-
-    const { TesseractProvider } = await import('@/providers/ocr/TesseractProvider.js');
-    const tesseractSpy = vi.spyOn(TesseractProvider.prototype, 'processDocument')
-      .mockResolvedValue({ raw_text: 'JOHN DOE', confidence_scores: {} });
-
-    const { OpenAIProvider } = await import('@/providers/ocr/OpenAIProvider.js');
-    vi.spyOn(OpenAIProvider.prototype, 'processDocument')
-      .mockRejectedValue(new Error('OpenAI rate limit exceeded'));
+  it('throws when provider fails (no silent fallback)', async () => {
+    // Mock the provider factory to return a provider that throws
+    const { createOCRProvider } = await import('@/providers/ocr/index.js');
+    vi.spyOn(
+      await import('@/providers/ocr/index.js'),
+      'createOCRProvider',
+    ).mockReturnValue({
+      name: 'crashing-provider',
+      processDocument: vi.fn().mockRejectedValue(new Error('OCR engine crashed')),
+    });
 
     const { OCRService } = await import('../../services/ocr.js');
     const service = new OCRService();
 
-    const result = await service.processDocument('doc-1', '/fake/path.jpg', 'passport');
-
-    expect(tesseractSpy).toHaveBeenCalledOnce();
-    expect(result.raw_text).toBe('JOHN DOE');
-    expect(result.confidence_scores).toHaveProperty('fallback_used');
+    await expect(service.processDocument('doc-1', '/fake/path.jpg', 'passport'))
+      .rejects.toThrow('OCR processing failed');
   });
 
-  it('uses TesseractProvider directly when OPENAI_API_KEY is not set', async () => {
-    delete process.env.OPENAI_API_KEY;
-
-    const { TesseractProvider } = await import('@/providers/ocr/TesseractProvider.js');
-    const tesseractSpy = vi.spyOn(TesseractProvider.prototype, 'processDocument')
-      .mockResolvedValue({ raw_text: 'JANE SMITH', confidence_scores: {} });
-
-    const { OpenAIProvider } = await import('@/providers/ocr/OpenAIProvider.js');
-    const openaiSpy = vi.spyOn(OpenAIProvider.prototype, 'processDocument');
-
-    const { OCRService } = await import('../../services/ocr.js');
-    const service = new OCRService();
-
-    const result = await service.processDocument('doc-2', '/fake/path.jpg', 'drivers_license');
-
-    expect(openaiSpy).not.toHaveBeenCalled();
-    expect(tesseractSpy).toHaveBeenCalledOnce();
-    expect(result.raw_text).toBe('JANE SMITH');
+  it('defaults to paddle provider when OCR_PROVIDER is unset', async () => {
+    delete process.env.OCR_PROVIDER;
+    const { createOCRProvider } = await import('@/providers/ocr/index.js');
+    const provider = createOCRProvider();
+    expect(provider.name).toBe('paddle');
   });
 });

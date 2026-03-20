@@ -307,7 +307,7 @@ export interface AppConfig {
   providers: {
     ocr: 'tesseract' | 'openai' | 'azure' | 'aws-textract' | 'auto';
     face: 'tensorflow' | 'aws-rekognition' | 'custom';
-    liveness: 'heuristic' | 'custom';
+    liveness: 'enhanced-heuristic' | 'custom';
     customOcrEndpoint?: string;
     customFaceEndpoint?: string;
   };

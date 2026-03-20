@@ -28,6 +28,7 @@ import batchRoutes from './routes/batch.js';
 import addressVerificationRoutes from './routes/addressVerification.js';
 import monitoringRoutes from './routes/monitoring.js';
 import statusRoutes from './routes/status.js';
+import { API_DOCS_MARKDOWN } from './docs/apiDocsMarkdown.js';
 
 const app = express();
 
@@ -143,6 +144,13 @@ app.get('/', (req, res) => {
     documentation: '/api/docs',
     health: '/api/health'
   });
+});
+
+// LLM-friendly markdown documentation
+app.get('/api/docs/markdown', (_req, res) => {
+  res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=3600');
+  res.send(API_DOCS_MARKDOWN);
 });
 
 // API documentation endpoint - clean, user-facing routes

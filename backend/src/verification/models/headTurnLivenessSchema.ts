@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-// ─── Analysis Frame: one captured frame during the guided challenge ───
+// ─── Analysis Frame: one captured frame during the head-turn challenge ───
 
 export const AnalysisFrameSchema = z.object({
   /** Base64-encoded JPEG frame (~20-50KB each) */
@@ -9,27 +9,26 @@ export const AnalysisFrameSchema = z.object({
   timestamp: z.number(),
   /** Which phase of the challenge this frame was captured during */
   phase: z.enum([
-    'color_red', 'color_green', 'color_blue', 'color_white',
-    'turn_start', 'turn_peak', 'turn_return',
     'turn1_start', 'turn1_peak', 'turn1_return',
+    'turn_start', 'turn_peak', 'turn_return',
   ]),
-  /** RGB value of the color that was flashed on screen (color phases only) */
+  /** RGB value (legacy — optional, not required for head-turn) */
   color_rgb: z.tuple([z.number(), z.number(), z.number()]).optional(),
 });
 
 export type AnalysisFrame = z.infer<typeof AnalysisFrameSchema>;
 
-// ─── Multi-Frame Liveness Metadata: full challenge payload ───
+// ─── Head-Turn Liveness Metadata: full challenge payload ───
 
-export const MultiFrameLivenessMetadataSchema = z.object({
-  /** Challenge type — multi-frame with color reflection */
-  challenge_type: z.literal('multi_frame_color'),
+export const HeadTurnLivenessMetadataSchema = z.object({
+  /** Challenge type — head-turn with timed frame capture */
+  challenge_type: z.literal('head_turn'),
   /** Direction the user was asked to turn their head */
   challenge_direction: z.enum(['left', 'right']),
-  /** Analysis frames captured during the challenge (5-10 frames) */
+  /** Analysis frames captured during the challenge (5-12 frames) */
   frames: z.array(AnalysisFrameSchema).min(5).max(12),
-  /** Ordered list of RGB colors that were flashed on screen */
-  color_sequence: z.array(z.tuple([z.number(), z.number(), z.number()])),
+  /** Legacy color sequence — optional, clients can omit */
+  color_sequence: z.array(z.tuple([z.number(), z.number(), z.number()])).optional().default([]),
   /** Challenge start timestamp (ms) */
   start_timestamp: z.number(),
   /** Challenge end timestamp (ms) */
@@ -44,4 +43,4 @@ export const MultiFrameLivenessMetadataSchema = z.object({
   }).optional(),
 });
 
-export type MultiFrameLivenessMetadata = z.infer<typeof MultiFrameLivenessMetadataSchema>;
+export type HeadTurnLivenessMetadata = z.infer<typeof HeadTurnLivenessMetadataSchema>;

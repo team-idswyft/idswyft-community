@@ -1,10 +1,10 @@
-import type { MultiFrameLivenessMetadata, AnalysisFrame } from '../../verification/models/multiFrameLivenessSchema.js';
+import type { HeadTurnLivenessMetadata, AnalysisFrame } from '../../verification/models/headTurnLivenessSchema.js';
 import type { FaceBufferDetectionResult } from '../../services/faceRecognition.js';
 import { logger } from '@/utils/logger.js';
 
 // ─── Types ──────────────────────────────────────────────
 
-export interface MultiFrameLivenessResult {
+export interface HeadTurnLivenessResult {
   passed: boolean;
   score: number;
   checks: Record<string, { passed: boolean; weight: number; detail?: string }>;
@@ -81,10 +81,10 @@ function computeBboxCV(
 
 // ─── Main Verifier ──────────────────────────────────────
 
-export async function verifyMultiFrameLiveness(
-  metadata: MultiFrameLivenessMetadata,
+export async function verifyHeadTurnLiveness(
+  metadata: HeadTurnLivenessMetadata,
   faceService: FaceDetectionService,
-): Promise<MultiFrameLivenessResult> {
+): Promise<HeadTurnLivenessResult> {
   const checks: Record<string, { passed: boolean; weight: number; detail?: string }> = {};
 
   // Decode all frames once and detect faces (C2 fix: cache buffers)
@@ -210,7 +210,7 @@ export async function verifyMultiFrameLiveness(
     ? undefined
     : `Failed checks: ${failedChecks.join(', ')}`;
 
-  logger.info('Multi-frame liveness verification complete', {
+  logger.info('Head-turn liveness verification complete', {
     score: score.toFixed(3),
     passed,
     checks: Object.fromEntries(

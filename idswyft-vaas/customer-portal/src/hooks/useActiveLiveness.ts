@@ -21,10 +21,10 @@ export interface AnalysisFrame {
 }
 
 export interface LivenessMetadata {
-  challenge_type: 'multi_frame_color';
+  challenge_type: 'head_turn';
   challenge_direction: ChallengeDirection;
   frames: AnalysisFrame[];
-  color_sequence: [number, number, number][];
+  color_sequence?: [number, number, number][];
   start_timestamp: number;
   end_timestamp: number;
   screen_width?: number;
@@ -298,10 +298,9 @@ export function useActiveLiveness(options: UseActiveLivenessOptions): UseActiveL
         }
 
         const metadata: LivenessMetadata = {
-          challenge_type: 'multi_frame_color',
+          challenge_type: 'head_turn',
           challenge_direction: scoredDirectionRef.current,
           frames: framesRef.current,
-          color_sequence: [],
           start_timestamp: challengeStartRef.current,
           end_timestamp: performance.now(),
           screen_width: window.innerWidth,

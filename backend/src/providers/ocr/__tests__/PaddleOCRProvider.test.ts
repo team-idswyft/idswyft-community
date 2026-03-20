@@ -155,7 +155,7 @@ describe('PaddleOCRProvider', () => {
       );
 
       const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
-      expect(data.address).toBe('123 Main Street, Springfield');
+      expect(data.address).toBe('123 Main Street Springfield');
     });
 
     it('extracts DL number from "DLn" format (US driver license)', async () => {

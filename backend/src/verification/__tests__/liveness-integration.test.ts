@@ -2,7 +2,6 @@ import { describe, it, expect, vi } from 'vitest';
 import { evaluateGate4 } from '../gates/gate4-liveCapture.js';
 import { createLivenessProvider } from '@/providers/liveness/index.js';
 import { EnhancedHeuristicProvider } from '@/providers/liveness/EnhancedHeuristicProvider.js';
-import { HeuristicProvider } from '@/providers/liveness/HeuristicProvider.js';
 import { getLivenessThresholdSync } from '@/config/verificationThresholds.js';
 import type { LiveCaptureResult } from '../models/types.js';
 
@@ -21,13 +20,6 @@ describe('Liveness Integration: Provider → Gate 4', () => {
       delete process.env.LIVENESS_PROVIDER;
       const provider = createLivenessProvider();
       expect(provider.name).toBe('enhanced-heuristic');
-    });
-
-    it('returns HeuristicProvider when LIVENESS_PROVIDER=heuristic', () => {
-      process.env.LIVENESS_PROVIDER = 'heuristic';
-      const provider = createLivenessProvider();
-      expect(provider.name).toBe('heuristic');
-      delete process.env.LIVENESS_PROVIDER;
     });
 
     it('returns EnhancedHeuristicProvider when LIVENESS_PROVIDER=enhanced-heuristic', () => {

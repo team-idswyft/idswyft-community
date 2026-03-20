@@ -5,6 +5,15 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.2.0] - 2026-03-20
+
+### Changed
+- Liveness system cleanup: removed dead MediaPipe/ActiveLiveness code path, renamed MultiFrame → HeadTurn
+- Malformed `liveness_metadata` now returns HTTP 400 (`VALIDATION_ERROR`) instead of silently falling back to passive mode
+- Removed legacy `multi_frame_color` challenge type alias — only `head_turn` is accepted
+- `color_sequence` field is now optional (clients no longer need to send it)
+- Removed deprecated `HeuristicProvider` — only `EnhancedHeuristicProvider` remains
+
 ## [1.1.0] - 2026-03-19
 
 ### Added

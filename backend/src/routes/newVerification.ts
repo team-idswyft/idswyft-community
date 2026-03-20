@@ -15,12 +15,9 @@ import { validateFileType } from '@/middleware/fileValidation.js';
 import { supabase } from '@/config/database.js';
 import { VERIFICATION_THRESHOLDS, getFaceMatchingThresholdSync, getLivenessThresholdSync } from '@/config/verificationThresholds.js';
 import { createLivenessProvider } from '@/providers/liveness/index.js';
-import { verifyActiveLivenessMetadata } from '@/providers/liveness/ActiveLivenessVerifier.js';
-import { verifyMultiFrameLiveness } from '@/providers/liveness/MultiFrameLivenessVerifier.js';
-import { ActiveLivenessMetadataSchema } from '@/verification/models/activeLivenessSchema.js';
-import type { ActiveLivenessMetadata } from '@/verification/models/activeLivenessSchema.js';
-import { MultiFrameLivenessMetadataSchema } from '@/verification/models/multiFrameLivenessSchema.js';
-import type { MultiFrameLivenessMetadata } from '@/verification/models/multiFrameLivenessSchema.js';
+import { verifyHeadTurnLiveness } from '@/providers/liveness/HeadTurnVerifier.js';
+import { HeadTurnLivenessMetadataSchema } from '@/verification/models/headTurnLivenessSchema.js';
+import type { HeadTurnLivenessMetadata } from '@/verification/models/headTurnLivenessSchema.js';
 import { createAMLProvider } from '@/providers/aml/index.js';
 import { computeRiskScore } from '@/services/riskScoring.js';
 import { broadcastStatusChange } from '@/services/realtime.js';
@@ -372,8 +369,7 @@ async function extractLiveCapture(
   frontDocPath: string | null,
   selfieBuffer: Buffer,
   isSandbox: boolean = false,
-  activeLivenessMetadata?: ActiveLivenessMetadata,
-  multiFrameMetadata?: MultiFrameLivenessMetadata,
+  headTurnMetadata?: HeadTurnLivenessMetadata,
 ): Promise<LiveCaptureResult> {
   // Detect face from buffer — returns bounding box (reused for deepfake crop below)
   let faceConfidence = 0;
@@ -390,48 +386,31 @@ async function extractLiveCapture(
     faceConfidence = 0;
   }
 
-  // Liveness detection: multi-frame color, active head-turn, or passive heuristics
+  // Liveness detection: head-turn (active) or passive heuristics
   let livenessScore = 0;
   let livenessPassed = false;
 
-  if (multiFrameMetadata) {
-    // Multi-frame color liveness — server-side face analysis of captured frames
+  if (headTurnMetadata) {
+    // Head-turn liveness — server-side face analysis of captured frames
     try {
-      const multiResult = await verifyMultiFrameLiveness(multiFrameMetadata, faceRecognitionService);
-      livenessScore = multiResult.score;
-      livenessPassed = multiResult.passed;
-      logger.info('Multi-frame liveness verification complete', {
+      const headTurnResult = await verifyHeadTurnLiveness(headTurnMetadata, faceRecognitionService);
+      livenessScore = headTurnResult.score;
+      livenessPassed = headTurnResult.passed;
+      logger.info('Head-turn liveness verification complete', {
         score: livenessScore.toFixed(3),
         passed: livenessPassed,
-        reason: multiResult.reason,
-        challenge: multiFrameMetadata.challenge_direction,
-        frameCount: multiFrameMetadata.frames.length,
+        reason: headTurnResult.reason,
+        challenge: headTurnMetadata.challenge_direction,
+        frameCount: headTurnMetadata.frames.length,
       });
     } catch (err) {
-      logger.error('Multi-frame liveness verifier failed, falling back to passive', { error: err });
-      // Fall through to passive liveness below
-    }
-  } else if (activeLivenessMetadata) {
-    // Active liveness — verify temporal consistency of client-side head-pose data
-    try {
-      const activeResult = verifyActiveLivenessMetadata(activeLivenessMetadata);
-      livenessScore = activeResult.score;
-      livenessPassed = activeResult.passed;
-      logger.info('Active liveness verification complete', {
-        score: livenessScore.toFixed(3),
-        passed: livenessPassed,
-        reason: activeResult.reason,
-        challenge: activeLivenessMetadata.challenge_direction,
-        sampleCount: activeLivenessMetadata.samples.length,
-      });
-    } catch (err) {
-      logger.error('Active liveness verifier failed, falling back to passive', { error: err });
+      logger.error('Head-turn liveness verifier failed, falling back to passive', { error: err });
       // Fall through to passive liveness below
     }
   }
 
-  if ((!multiFrameMetadata && !activeLivenessMetadata) || (livenessScore === 0 && !livenessPassed)) {
-    // Passive liveness — image-based heuristics (original path)
+  if (!headTurnMetadata || (livenessScore === 0 && !livenessPassed)) {
+    // Passive liveness — image-based heuristics
     try {
       livenessScore = await livenessProvider.assessLiveness({
         buffer: selfieBuffer,
@@ -1078,36 +1057,29 @@ router.post('/:verification_id/live-capture',
       selfie_id: selfie.id,
     } as any);
 
-    // Parse optional liveness metadata from client — try multi-frame first, then head-turn
-    let activeLivenessMetadata: ActiveLivenessMetadata | undefined;
-    let multiFrameMetadata: MultiFrameLivenessMetadata | undefined;
+    // Parse optional liveness metadata from client
+    let headTurnMetadata: HeadTurnLivenessMetadata | undefined;
     if (req.body?.liveness_metadata) {
       try {
         const raw = typeof req.body.liveness_metadata === 'string'
           ? JSON.parse(req.body.liveness_metadata)
           : req.body.liveness_metadata;
-
-        if (raw.challenge_type === 'multi_frame_color') {
-          multiFrameMetadata = MultiFrameLivenessMetadataSchema.parse(raw);
-          logger.info('Multi-frame liveness metadata received', {
-            challenge: multiFrameMetadata.challenge_direction,
-            frames: multiFrameMetadata.frames.length,
-          });
-        } else {
-          activeLivenessMetadata = ActiveLivenessMetadataSchema.parse(raw);
-          logger.info('Active liveness metadata received', {
-            challenge: activeLivenessMetadata.challenge_direction,
-            samples: activeLivenessMetadata.samples.length,
-          });
-        }
+        headTurnMetadata = HeadTurnLivenessMetadataSchema.parse(raw);
+        logger.info('Head-turn liveness metadata received', {
+          challenge: headTurnMetadata.challenge_direction,
+          frames: headTurnMetadata.frames.length,
+        });
       } catch (err) {
-        // Invalid metadata → log warning, fall back to passive liveness
-        logger.warn('Invalid liveness metadata, falling back to passive', { error: err });
+        throw new ValidationError(
+          'Invalid liveness_metadata: expected head_turn challenge format with frames array',
+          'liveness_metadata',
+          req.body.liveness_metadata,
+        );
       }
     }
 
     // Run live capture extraction with real liveness detection
-    const liveResult = await extractLiveCapture(selfiePath, null, req.file.buffer, isSandbox, activeLivenessMetadata, multiFrameMetadata);
+    const liveResult = await extractLiveCapture(selfiePath, null, req.file.buffer, isSandbox, headTurnMetadata);
 
     // Ephemeral cleanup: demo selfie files are deleted immediately after extraction
     if (source === 'demo') {
@@ -1197,6 +1169,7 @@ router.post('/:verification_id/live-capture',
       liveness_results: {
         liveness_passed: liveResult.liveness_passed,
         liveness_score: liveResult.liveness_score,
+        liveness_mode: headTurnMetadata ? 'head_turn' : 'passive',
       },
       final_result: mapped.final_result,
       rejection_reason: state.rejection_reason,

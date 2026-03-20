@@ -29,6 +29,7 @@ function mockQuery(data: any[], error: any = null) {
     gte: vi.fn().mockReturnThis(),
     lte: vi.fn().mockReturnThis(),
     in: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
   };
   // Terminal: await returns { data, error }
   chain.then = (resolve: any) => resolve({ data, error });
@@ -42,6 +43,7 @@ function mockCountQuery(count: number | null) {
     gte: vi.fn().mockReturnThis(),
     lte: vi.fn().mockReturnThis(),
     in: vi.fn().mockReturnThis(),
+    limit: vi.fn().mockReturnThis(),
   };
   chain.then = (resolve: any) => resolve({ count, error: null });
   return chain;
