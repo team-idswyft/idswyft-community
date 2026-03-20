@@ -62,7 +62,7 @@ export default function Webhooks() {
   }, [webhooks, searchTerm, statusFilter]);
 
   const filterWebhooks = () => {
-    let filtered = webhooks;
+    let filtered = webhooks.filter(Boolean) as Webhook[];
 
     // Search filter
     if (searchTerm) {
@@ -272,9 +272,9 @@ export default function Webhooks() {
 
   const webhookStats = {
     total: webhooks.length,
-    active: webhooks.filter(w => w.enabled && w.failure_count === 0).length,
-    disabled: webhooks.filter(w => !w.enabled).length,
-    failing: webhooks.filter(w => w.enabled && w.failure_count > 0).length,
+    active: webhooks.filter(w => w?.enabled && w.failure_count === 0).length,
+    disabled: webhooks.filter(w => w && !w.enabled).length,
+    failing: webhooks.filter(w => w?.enabled && w.failure_count > 0).length,
   };
 
   return (
@@ -719,11 +719,18 @@ function WebhookFormModal({ webhook, onClose, onSuccess }: WebhookFormModalProps
         response = await apiClient.post('/webhooks', payload);
       }
 
-      onSuccess(response.data.webhook);
+      // POST returns { data: { webhook } }, PUT returns { data: webhook }
+      const body = response.data;
+      const saved = body?.data?.webhook ?? body?.data ?? body?.webhook;
+      onSuccess(saved);
     } catch (error: any) {
       console.error('Failed to save webhook:', error);
-      if (error.response?.data?.error?.details) {
-        setErrors(error.response.data.error.details);
+      if (error.fields) {
+        const fieldErrors: Record<string, string> = {};
+        for (const f of error.fields) fieldErrors[f.field] = f.message;
+        setErrors(fieldErrors);
+      } else if (error.message) {
+        setErrors({ url: error.message });
       }
     } finally {
       setLoading(false);
