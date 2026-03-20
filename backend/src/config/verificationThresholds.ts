@@ -47,6 +47,18 @@ export interface VerificationThresholds {
     minimum_confidence: number;
     high_confidence: number;
   };
+
+  // Document authenticity / tamper detection thresholds
+  DOCUMENT_AUTHENTICITY: {
+    /** FFT GAN score below this triggers soft flag */
+    fft_gan_threshold: number;
+    /** Color anomaly score below this triggers soft flag */
+    color_anomaly_threshold: number;
+    /** Minimum zone compliance score */
+    zone_compliance_min: number;
+    /** Minimum overall authenticity score (lenient initially) */
+    min_authenticity_score: number;
+  };
 }
 
 /**
@@ -94,6 +106,14 @@ export const VERIFICATION_THRESHOLDS: VerificationThresholds = {
   PDF417: {
     minimum_confidence: 0.70,  // Below this = potential parsing issues
     high_confidence: 0.90      // Above this = excellent parsing
+  },
+
+  // Document authenticity thresholds (soft flags initially — tune after traffic)
+  DOCUMENT_AUTHENTICITY: {
+    fft_gan_threshold: 0.70,       // GAN score below 0.70 → flag
+    color_anomaly_threshold: 0.60, // Color score below 0.60 → flag
+    zone_compliance_min: 0.75,     // Zone score below 0.75 → flag
+    min_authenticity_score: 0.50,  // Lenient — tighten after Phase 2 tuning
   }
 };
 
@@ -243,6 +263,10 @@ export async function getThresholdInfo(isSandbox: boolean = false, organizationI
     quality_minimum: thresholds.QUALITY.minimum_acceptable,
     ocr_minimum: thresholds.OCR_CONFIDENCE.minimum_acceptable,
     face_presence_minimum: thresholds.FACE_PRESENCE.minimum_confidence,
-    pdf417_minimum: thresholds.PDF417.minimum_confidence
+    pdf417_minimum: thresholds.PDF417.minimum_confidence,
+    authenticity_fft_threshold: thresholds.DOCUMENT_AUTHENTICITY.fft_gan_threshold,
+    authenticity_color_threshold: thresholds.DOCUMENT_AUTHENTICITY.color_anomaly_threshold,
+    authenticity_zone_min: thresholds.DOCUMENT_AUTHENTICITY.zone_compliance_min,
+    authenticity_min_score: thresholds.DOCUMENT_AUTHENTICITY.min_authenticity_score,
   };
 }

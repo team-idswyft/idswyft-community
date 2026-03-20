@@ -24,6 +24,10 @@ export interface DocumentQualityResult {
   authenticityScore: number;
   tamperFlags: string[];
   isAuthentic: boolean;
+  // Detailed sub-check results (from extended SharpTamperDetector)
+  frequencyAnalysis?: { ganScore: number; spectralAnomalies: string[] };
+  colorAnalysis?: { score: number; anomalies: string[] };
+  doubleCompression?: { detected: boolean; regionVariance: number };
 }
 
 export class DocumentQualityService {
@@ -133,6 +137,19 @@ export class DocumentQualityService {
         authenticityScore: tamperResult.score,
         tamperFlags: tamperResult.flags,
         isAuthentic: tamperResult.isAuthentic,
+        // Surface detailed sub-check results when available
+        ...(tamperResult.details?.frequency && {
+          frequencyAnalysis: {
+            ganScore: tamperResult.details.frequency.ganScore,
+            spectralAnomalies: tamperResult.details.frequency.spectralAnomalies,
+          },
+        }),
+        ...(tamperResult.details?.colorAnomaly && {
+          colorAnalysis: tamperResult.details.colorAnomaly,
+        }),
+        ...(tamperResult.details?.doubleCompression && {
+          doubleCompression: tamperResult.details.doubleCompression,
+        }),
       };
     } catch (error) {
       console.error('Error analyzing document quality:', error);

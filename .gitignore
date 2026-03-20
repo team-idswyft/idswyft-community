@@ -96,6 +96,7 @@ models/*.pkl
 backend/models/*.bin
 backend/models/*.json
 backend/models/*.shard*
+backend/models/*.onnx
 !backend/models/.gitkeep
 
 # Backup files

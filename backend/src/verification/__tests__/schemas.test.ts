@@ -294,8 +294,8 @@ describe('VerificationStatus enum', () => {
 });
 
 describe('RejectionReason enum', () => {
-  it('has exactly 12 reasons per spec', () => {
-    expect(Object.keys(RejectionReason).length).toBe(12);
+  it('has exactly 14 reasons (12 original + 2 security)', () => {
+    expect(Object.keys(RejectionReason).length).toBe(14);
   });
 
   it('includes all spec-defined reasons', () => {
@@ -311,6 +311,8 @@ describe('RejectionReason enum', () => {
     expect(RejectionReason.FACE_MATCH_FAILED).toBe('FACE_MATCH_FAILED');
     expect(RejectionReason.AML_MATCH_FOUND).toBe('AML_MATCH_FOUND');
     expect(RejectionReason.AML_POTENTIAL_MATCH).toBe('AML_POTENTIAL_MATCH');
+    expect(RejectionReason.DOCUMENT_TAMPERED).toBe('DOCUMENT_TAMPERED');
+    expect(RejectionReason.DEEPFAKE_DETECTED).toBe('DEEPFAKE_DETECTED');
   });
 });
 

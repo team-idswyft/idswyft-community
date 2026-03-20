@@ -109,6 +109,34 @@ export function evaluateGate1(front: FrontExtractionResult): GateResult {
     });
   }
 
+  // Soft check: document authenticity — warn but do not reject.
+  // All tamper signals start as soft flags (Phase 1). Promoted to hard gates
+  // after threshold tuning on real traffic (Phase 3).
+  if (front.authenticity) {
+    if (!front.authenticity.isAuthentic) {
+      logger.warn('Gate 1: document flagged for tampering (soft check — passing)', {
+        authenticityScore: front.authenticity.score,
+        flags: front.authenticity.flags,
+        // Future hard gate:
+        // return { passed: false, rejection_reason: 'DOCUMENT_TAMPERED', ... }
+      });
+    }
+    if (front.authenticity.ganScore !== undefined &&
+        front.authenticity.ganScore < VERIFICATION_THRESHOLDS.DOCUMENT_AUTHENTICITY.fft_gan_threshold) {
+      logger.warn('Gate 1: possible AI-generated document (soft check — passing)', {
+        ganScore: front.authenticity.ganScore,
+        threshold: VERIFICATION_THRESHOLDS.DOCUMENT_AUTHENTICITY.fft_gan_threshold,
+      });
+    }
+    if (front.authenticity.zoneScore !== undefined &&
+        front.authenticity.zoneScore < VERIFICATION_THRESHOLDS.DOCUMENT_AUTHENTICITY.zone_compliance_min) {
+      logger.warn('Gate 1: document zone validation issues (soft check — passing)', {
+        zoneScore: front.authenticity.zoneScore,
+        threshold: VERIFICATION_THRESHOLDS.DOCUMENT_AUTHENTICITY.zone_compliance_min,
+      });
+    }
+  }
+
   return {
     passed: true,
     rejection_reason: null,

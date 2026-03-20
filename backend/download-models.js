@@ -69,6 +69,13 @@ function downloadFile(url, filePath) {
   });
 }
 
+// Deepfake detector model (optional — system works without it)
+const deepfakeModel = {
+  fileName: 'deepfake-detector.onnx',
+  // Placeholder URL — replace with actual model hosting when available
+  url: process.env.DEEPFAKE_MODEL_URL || null,
+};
+
 /**
  * Main download function
  */
@@ -113,6 +120,22 @@ async function downloadModels() {
     }
   }
   
+  // Attempt to download deepfake detector model (optional)
+  const deepfakePath = path.join(modelsDir, deepfakeModel.fileName);
+  if (fs.existsSync(deepfakePath)) {
+    console.log(`⏭️  Skipped: ${deepfakeModel.fileName} (already exists)`);
+    skipped++;
+  } else if (deepfakeModel.url) {
+    try {
+      await downloadFile(deepfakeModel.url, deepfakePath);
+      downloaded++;
+    } catch (error) {
+      console.log(`⏭️  Skipped: ${deepfakeModel.fileName} (optional — download failed: ${error.message})`);
+    }
+  } else {
+    console.log(`⏭️  Skipped: ${deepfakeModel.fileName} (optional — no DEEPFAKE_MODEL_URL set)`);
+  }
+
   console.log('\n📊 Download Summary:');
   console.log(`✅ Downloaded: ${downloaded} files`);
   console.log(`⏭️  Skipped: ${skipped} files`);

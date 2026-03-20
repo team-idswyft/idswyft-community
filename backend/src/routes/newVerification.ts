@@ -36,6 +36,10 @@ import type { WebhookPayload, VerificationSource } from '@/types/index.js';
 import type { LLMProviderConfig } from '@/providers/ocr/LLMFieldExtractor.js';
 import { decryptSecret } from '@/utils/encryption.js';
 import { config } from '@/config/index.js';
+import sharp from 'sharp';
+import { SharpTamperDetector } from '@/providers/tampering/SharpTamperDetector.js';
+import { DocumentZoneValidator } from '@/providers/tampering/DocumentZoneValidator.js';
+import { createDeepfakeDetector } from '@/providers/deepfake/index.js';
 
 const router = express.Router();
 
@@ -181,6 +185,7 @@ async function extractFrontDocument(
   issuingCountry?: string,
   verificationId?: string,
   llmConfig?: LLMProviderConfig,
+  imageBuffer?: Buffer,
 ): Promise<FrontExtractionResult> {
   const ocrData = await ocrService.processDocument(documentId, documentPath, documentType, issuingCountry, verificationId, llmConfig);
 
@@ -189,13 +194,23 @@ async function extractFrontDocument(
   const values = Object.values(confidenceScores).filter((v): v is number => typeof v === 'number');
   const avgConfidence = values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0.5;
 
-  // Detect face and extract embedding from document photo
+  // Detect face — use buffer-based detection to get bounding box for zone validation
   let faceConfidence = 0;
   let faceEmbedding: number[] | null = null;
+  let faceBoundingBox: { x: number; y: number; width: number; height: number } | null = null;
   try {
-    const faceResult = await faceRecognitionService.detectFace(documentPath);
-    faceConfidence = faceResult.confidence;
-    faceEmbedding = faceResult.embedding;
+    if (imageBuffer) {
+      const faceResult = await faceRecognitionService.detectFaceFromBuffer(imageBuffer);
+      if (faceResult) {
+        faceConfidence = faceResult.confidence;
+        faceEmbedding = Array.from(faceResult.embedding);
+        faceBoundingBox = faceResult.boundingBox;
+      }
+    } else {
+      const faceResult = await faceRecognitionService.detectFace(documentPath);
+      faceConfidence = faceResult.confidence;
+      faceEmbedding = faceResult.embedding;
+    }
   } catch {
     faceConfidence = 0;
   }
@@ -220,6 +235,42 @@ async function extractFrontDocument(
     }
   }
 
+  // ── Tamper detection + zone validation (soft flags — Phase 1) ──────
+  let authenticity: FrontExtractionResult['authenticity'] = undefined;
+  if (imageBuffer) {
+    try {
+      const tamperResult = await new SharpTamperDetector().analyze(imageBuffer);
+      authenticity = {
+        score: tamperResult.score,
+        flags: tamperResult.flags,
+        isAuthentic: tamperResult.isAuthentic,
+        ganScore: tamperResult.details?.frequency?.ganScore,
+      };
+
+      // Zone validation if face bounding box is available
+      if (faceBoundingBox) {
+        const meta = await sharp(imageBuffer).metadata();
+        if (meta.width && meta.height) {
+          const zoneResult = new DocumentZoneValidator().validate(
+            faceBoundingBox,
+            meta.width,
+            meta.height,
+            documentType,
+            detectedCountry || 'US',
+          );
+          authenticity.zoneScore = zoneResult.score;
+          if (zoneResult.violations.length > 0) {
+            authenticity.flags = [...authenticity.flags, ...zoneResult.violations.map(v => v.split(':')[0])];
+          }
+        }
+      }
+    } catch (err) {
+      logger.warn('Tamper/zone detection failed (non-blocking)', {
+        error: err instanceof Error ? err.message : 'Unknown',
+      });
+    }
+  }
+
   return {
     ocr: {
       full_name: ocrData?.name || '',
@@ -234,6 +285,7 @@ async function extractFrontDocument(
     face_confidence: faceConfidence,
     ocr_confidence: avgConfidence,
     mrz_from_front: mrzFromFront,
+    authenticity,
   };
 }
 
@@ -323,13 +375,17 @@ async function extractLiveCapture(
   activeLivenessMetadata?: ActiveLivenessMetadata,
   multiFrameMetadata?: MultiFrameLivenessMetadata,
 ): Promise<LiveCaptureResult> {
-  // Detect face and extract embedding from selfie
+  // Detect face from buffer — returns bounding box (reused for deepfake crop below)
   let faceConfidence = 0;
   let faceEmbedding: number[] | null = null;
+  let faceBBox: { x: number; y: number; width: number; height: number } | null = null;
   try {
-    const faceResult = await faceRecognitionService.detectFace(selfiePath);
-    faceConfidence = faceResult.confidence;
-    faceEmbedding = faceResult.embedding;
+    const faceResult = await faceRecognitionService.detectFaceFromBuffer(selfieBuffer);
+    if (faceResult) {
+      faceConfidence = faceResult.confidence;
+      faceEmbedding = Array.from(faceResult.embedding);
+      faceBBox = faceResult.boundingBox;
+    }
   } catch {
     faceConfidence = 0;
   }
@@ -397,11 +453,34 @@ async function extractLiveCapture(
     }
   }
 
+  // ── Deepfake detection (Tier 2 — soft flag) ──────────────────────
+  // Reuses faceBBox from the buffer detection above (no redundant face detect)
+  let deepfake_check: LiveCaptureResult['deepfake_check'] = undefined;
+  try {
+    if (faceBBox) {
+      const detector = createDeepfakeDetector();
+      const crop = await detector.extractFaceCrop(selfieBuffer, faceBBox);
+      const dfResult = await detector.detect(crop);
+      deepfake_check = dfResult;
+      if (dfResult.fakeProbability > 0.80) {
+        logger.warn('Deepfake detected in live capture (soft flag)', {
+          realProbability: dfResult.realProbability.toFixed(3),
+          fakeProbability: dfResult.fakeProbability.toFixed(3),
+        });
+      }
+    }
+  } catch (err) {
+    logger.warn('Deepfake detection failed (non-blocking)', {
+      error: err instanceof Error ? err.message : 'Unknown',
+    });
+  }
+
   return {
     face_embedding: faceEmbedding,
     face_confidence: faceConfidence,
     liveness_passed: livenessPassed,
     liveness_score: livenessScore,
+    deepfake_check,
   };
 }
 
@@ -707,7 +786,7 @@ router.post('/:verification_id/front-document',
     const llmConfig = await getDeveloperLLMConfig(developerId);
 
     // Run front extraction (downloadFile resolves bucket from encoded path)
-    const frontResult = await extractFrontDocument(documentPath, document.id, document_type, resolvedCountry, verification_id, llmConfig);
+    const frontResult = await extractFrontDocument(documentPath, document.id, document_type, resolvedCountry, verification_id, llmConfig, req.file.buffer);
 
     // Ephemeral cleanup: demo files are deleted immediately after extraction
     if (source === 'demo') {

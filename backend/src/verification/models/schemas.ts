@@ -17,6 +17,8 @@ export const RejectionReason = {
   FACE_MATCH_FAILED: 'FACE_MATCH_FAILED',
   AML_MATCH_FOUND: 'AML_MATCH_FOUND',
   AML_POTENTIAL_MATCH: 'AML_POTENTIAL_MATCH',
+  DOCUMENT_TAMPERED: 'DOCUMENT_TAMPERED',
+  DEEPFAKE_DETECTED: 'DEEPFAKE_DETECTED',
 } as const;
 
 export type RejectionReasonType = typeof RejectionReason[keyof typeof RejectionReason];
@@ -34,6 +36,8 @@ const RejectionReasonEnum = z.enum([
   'FACE_MATCH_FAILED',
   'AML_MATCH_FOUND',
   'AML_POTENTIAL_MATCH',
+  'DOCUMENT_TAMPERED',
+  'DEEPFAKE_DETECTED',
 ]);
 
 // ─── Verification Status (10 states per spec) ───
@@ -62,6 +66,15 @@ const IDCardOCRSchema = z.object({
   issuing_country: z.string().length(2).optional(), // ISO 3166-1 alpha-2
 }).passthrough(); // Allow additional OCR fields
 
+// ─── Document Authenticity (from tamper detection + zone validation) ───
+const DocumentAuthenticitySchema = z.object({
+  score: z.number().min(0).max(1),
+  flags: z.array(z.string()),
+  isAuthentic: z.boolean(),
+  ganScore: z.number().min(0).max(1).optional(),
+  zoneScore: z.number().min(0).max(1).optional(),
+}).optional();
+
 // ─── Front Extraction Result ───
 export const FrontExtractionResultSchema = z.object({
   ocr: IDCardOCRSchema,
@@ -69,6 +82,7 @@ export const FrontExtractionResultSchema = z.object({
   face_confidence: confidence,
   ocr_confidence: confidence,
   mrz_from_front: z.array(z.string()).nullable(),
+  authenticity: DocumentAuthenticitySchema,
 });
 
 export type FrontExtractionResult = z.infer<typeof FrontExtractionResultSchema>;
@@ -135,6 +149,11 @@ export const LiveCaptureResultSchema = z.object({
   face_confidence: confidence,
   liveness_passed: z.boolean(),
   liveness_score: confidence,
+  deepfake_check: z.object({
+    isReal: z.boolean(),
+    realProbability: z.number().min(0).max(1),
+    fakeProbability: z.number().min(0).max(1),
+  }).optional(),
 });
 
 export type LiveCaptureResult = z.infer<typeof LiveCaptureResultSchema>;
