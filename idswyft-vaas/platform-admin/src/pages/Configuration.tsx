@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Download, Upload, Eye, EyeOff, Pencil, Trash2, ChevronDown, ChevronRight, Database, Info, ShieldAlert } from 'lucide-react';
+import { Download, Upload, Eye, EyeOff, Pencil, Trash2, ChevronDown, ChevronRight, Database, Info, ShieldAlert, Server } from 'lucide-react';
 import platformApi from '../services/api';
 import { cardSurface, tableHeaderClass, statusPill, monoXs, monoSm, sectionLabel, infoPanel, getStatusAccent } from '../styles/tokens';
 
@@ -75,12 +75,40 @@ export default function Configuration() {
     if (toast) { const t = setTimeout(() => setToast(null), 5000); return () => clearTimeout(t); }
   }, [toast]);
 
-  // Group by category
-  const categories = configs.reduce<Record<string, ConfigItem[]>>((acc, item) => {
-    if (!acc[item.category]) acc[item.category] = [];
-    acc[item.category].push(item);
+  // Group by service → category
+  const SERVICE_ORDER = ['VaaS', 'Main API', 'Platform Admin', 'VaaS Admin'];
+  const SERVICE_LABELS: Record<string, string> = {
+    'VaaS': 'VaaS Backend',
+    'Main API': 'Main API',
+    'Platform Admin': 'Platform Admin',
+    'VaaS Admin': 'VaaS Admin (Org Portal)',
+  };
+
+  const getService = (category: string): string => {
+    if (category.startsWith('Main API')) return 'Main API';
+    if (category.startsWith('Platform Admin')) return 'Platform Admin';
+    if (category.startsWith('VaaS Admin')) return 'VaaS Admin';
+    if (category.startsWith('VaaS')) return 'VaaS';
+    return 'Other';
+  };
+
+  const getSubcategory = (category: string): string => {
+    const service = getService(category);
+    const sub = category.slice(service.length).trim();
+    return sub || 'General';
+  };
+
+  // Build: { service: { subcategory: ConfigItem[] } }
+  const serviceGroups = configs.reduce<Record<string, Record<string, ConfigItem[]>>>((acc, item) => {
+    const svc = getService(item.category);
+    const sub = getSubcategory(item.category);
+    if (!acc[svc]) acc[svc] = {};
+    if (!acc[svc][sub]) acc[svc][sub] = [];
+    acc[svc][sub].push(item);
     return acc;
   }, {});
+
+  const sortedServices = [...SERVICE_ORDER.filter((s) => serviceGroups[s]), ...Object.keys(serviceGroups).filter((s) => !SERVICE_ORDER.includes(s))];
 
   const toggleCategory = (cat: string) => {
     setCollapsedCategories((prev) => {
@@ -284,91 +312,109 @@ export default function Configuration() {
         </div>
       </div>
 
-      {/* Config categories */}
+      {/* Config grouped by service → category */}
       {loading ? (
         <div className="flex items-center justify-center py-16">
           <div className="h-6 w-6 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent" />
         </div>
-      ) : Object.keys(categories).length === 0 ? (
+      ) : sortedServices.length === 0 ? (
         <div className={cardSurface}>
           <div className="py-16 text-center text-sm text-slate-500">
             No config values found. Click "Seed Defaults" to populate from environment variables.
           </div>
         </div>
       ) : (
-        Object.entries(categories).map(([category, items]) => {
-          const isCollapsed = collapsedCategories.has(category);
+        sortedServices.map((service) => {
+          const subcategories = serviceGroups[service];
+          const totalKeys = Object.values(subcategories).reduce((sum, arr) => sum + arr.length, 0);
+
           return (
-            <div key={category} className={cardSurface}>
-              <button
-                onClick={() => toggleCategory(category)}
-                className="flex w-full items-center justify-between px-5 py-3 border-b border-white/10 hover:bg-white/5 transition"
-              >
-                <span className={`${sectionLabel} text-slate-400`}>{category}</span>
-                <div className="flex items-center gap-2">
-                  <span className={`${monoXs} text-slate-500`}>{items.length} keys</span>
-                  {isCollapsed ? <ChevronRight className="h-4 w-4 text-slate-500" /> : <ChevronDown className="h-4 w-4 text-slate-500" />}
-                </div>
-              </button>
+            <div key={service} className="space-y-2">
+              {/* Service header */}
+              <div className="flex items-center gap-2 pt-2">
+                <Server className="h-4 w-4 text-cyan-400" />
+                <h3 className="text-sm font-semibold text-slate-200">{SERVICE_LABELS[service] || service}</h3>
+                <span className={`${monoXs} text-slate-500`}>{totalKeys} keys</span>
+              </div>
 
-              {!isCollapsed && (
-                <div className="divide-y divide-white/5">
-                  {items.map((item) => (
-                    <div key={item.key} className="flex items-center gap-4 px-5 py-3 hover:bg-white/5 transition">
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center gap-2">
-                          <span className={`${monoSm} text-slate-200`}>{item.key}</span>
-                          {item.description && (
-                            <span className="group relative">
-                              <Info className="h-3.5 w-3.5 text-slate-500 cursor-help" />
-                              <span className="pointer-events-none absolute bottom-full left-1/2 z-40 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-slate-800 px-3 py-2 text-xs text-slate-300 opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
-                                {item.description}
-                              </span>
-                            </span>
-                          )}
-                          {item.is_secret && (
-                            <span className={`${statusPill} bg-amber-500/15 text-amber-300 border-amber-500/30`}>secret</span>
-                          )}
-                          {item.requires_restart && (
-                            <span className={`${statusPill} bg-orange-500/15 text-orange-300 border-orange-500/30`}>restart</span>
-                          )}
-                        </div>
-                      </div>
-
+              {/* Subcategory cards */}
+              {Object.entries(subcategories).map(([subcategory, items]) => {
+                const catKey = `${service}:${subcategory}`;
+                const isCollapsed = collapsedCategories.has(catKey);
+                return (
+                  <div key={catKey} className={cardSurface}>
+                    <button
+                      onClick={() => toggleCategory(catKey)}
+                      className="flex w-full items-center justify-between px-5 py-3 border-b border-white/10 hover:bg-white/5 transition"
+                    >
+                      <span className={`${sectionLabel} text-slate-400`}>{subcategory}</span>
                       <div className="flex items-center gap-2">
-                        {item.is_secret ? (
-                          <div className="flex items-center gap-1">
-                            <span className={`${monoXs} text-slate-500`}>
-                              {visibleSecrets.has(item.key) ? revealedValues[item.key] || '' : '••••••••'}
-                            </span>
-                            <button
-                              onClick={() => toggleSecretVisibility(item.key)}
-                              className="rounded-md p-1 text-slate-400 hover:bg-white/10 hover:text-slate-200"
-                            >
-                              {visibleSecrets.has(item.key) ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                            </button>
-                          </div>
-                        ) : (
-                          <span className={`${monoXs} text-slate-400 max-w-xs truncate`}>{item.value}</span>
-                        )}
-
-                        <button
-                          onClick={() => openEditModal(item)}
-                          className="rounded-md p-1 text-slate-400 hover:bg-white/10 hover:text-slate-200"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                        <button
-                          onClick={() => handleDelete(item.key)}
-                          className="rounded-md p-1 text-slate-400 hover:bg-rose-500/10 hover:text-rose-400"
-                        >
-                          <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        <span className={`${monoXs} text-slate-500`}>{items.length} keys</span>
+                        {isCollapsed ? <ChevronRight className="h-4 w-4 text-slate-500" /> : <ChevronDown className="h-4 w-4 text-slate-500" />}
                       </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+                    </button>
+
+                    {!isCollapsed && (
+                      <div className="divide-y divide-white/5">
+                        {items.map((item) => (
+                          <div key={item.key} className="flex items-center gap-4 px-5 py-3 hover:bg-white/5 transition">
+                            <div className="min-w-0 flex-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className={`${monoSm} text-slate-200`}>{item.key}</span>
+                                {item.description && (
+                                  <span className="group relative">
+                                    <Info className="h-3.5 w-3.5 text-slate-500 cursor-help" />
+                                    <span className="pointer-events-none absolute bottom-full left-1/2 z-40 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-slate-800 px-3 py-2 text-xs text-slate-300 opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+                                      {item.description}
+                                    </span>
+                                  </span>
+                                )}
+                                {item.is_secret && (
+                                  <span className={`${statusPill} bg-amber-500/15 text-amber-300 border-amber-500/30`}>secret</span>
+                                )}
+                                {item.requires_restart && (
+                                  <span className={`${statusPill} bg-orange-500/15 text-orange-300 border-orange-500/30`}>restart</span>
+                                )}
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2 shrink-0">
+                              {item.is_secret ? (
+                                <div className="flex items-center gap-1">
+                                  <span className={`${monoXs} text-slate-500`}>
+                                    {visibleSecrets.has(item.key) ? revealedValues[item.key] || '' : '••••••••'}
+                                  </span>
+                                  <button
+                                    onClick={() => toggleSecretVisibility(item.key)}
+                                    className="rounded-md p-1 text-slate-400 hover:bg-white/10 hover:text-slate-200"
+                                  >
+                                    {visibleSecrets.has(item.key) ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className={`${monoXs} text-slate-400 max-w-xs truncate`}>{item.value}</span>
+                              )}
+
+                              <button
+                                onClick={() => openEditModal(item)}
+                                className="rounded-md p-1 text-slate-400 hover:bg-white/10 hover:text-slate-200"
+                              >
+                                <Pencil className="h-3.5 w-3.5" />
+                              </button>
+                              <button
+                                onClick={() => handleDelete(item.key)}
+                                className="rounded-md p-1 text-slate-400 hover:bg-rose-500/10 hover:text-rose-400"
+                              >
+                                <Trash2 className="h-3.5 w-3.5" />
+                              </button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
             </div>
           );
         })

@@ -65,39 +65,94 @@ interface ConfigRegistryEntry {
 }
 
 const CONFIG_REGISTRY: Record<string, ConfigRegistryEntry> = {
-  // Rate limiting (hot-reload)
-  VAAS_RATE_LIMIT_WINDOW_MS: { category: 'rate-limiting', is_secret: false, requires_restart: false, description: 'Rate limit window in milliseconds' , env_key: 'VAAS_RATE_LIMIT_WINDOW_MS' },
-  VAAS_RATE_LIMIT_MAX_REQUESTS_PER_ORG: { category: 'rate-limiting', is_secret: false, requires_restart: false, description: 'Max requests per org per window', env_key: 'VAAS_RATE_LIMIT_MAX_REQUESTS_PER_ORG' },
-  VAAS_RATE_LIMIT_MAX_REQUESTS_PER_USER: { category: 'rate-limiting', is_secret: false, requires_restart: false, description: 'Max requests per user per window', env_key: 'VAAS_RATE_LIMIT_MAX_REQUESTS_PER_USER' },
+  // ── VaaS Backend — Core ─────────────────────────────────────────────
+  NODE_ENV: { category: 'VaaS Core', is_secret: false, requires_restart: true, description: 'Runtime environment (development, production, test)', env_key: 'NODE_ENV' },
+  VAAS_PORT: { category: 'VaaS Core', is_secret: false, requires_restart: true, description: 'Server port for VaaS backend', env_key: 'VAAS_PORT' },
+  VAAS_CORS_ORIGINS: { category: 'VaaS Core', is_secret: false, requires_restart: true, description: 'Comma-separated allowed CORS origins (merged with built-in production domains)', env_key: 'VAAS_CORS_ORIGINS' },
+  VAAS_FRONTEND_URL: { category: 'VaaS Core', is_secret: false, requires_restart: true, description: 'VaaS admin frontend URL for redirects and email links', env_key: 'VAAS_FRONTEND_URL' },
+  VAAS_WEBHOOK_BASE_URL: { category: 'VaaS Core', is_secret: false, requires_restart: true, description: 'Base URL for outbound webhook deliveries', env_key: 'VAAS_WEBHOOK_BASE_URL' },
+  VAAS_SUPER_ADMIN_EMAILS: { category: 'VaaS Core', is_secret: false, requires_restart: true, description: 'Comma-separated emails auto-granted super_admin on first login', env_key: 'VAAS_SUPER_ADMIN_EMAILS' },
 
-  // Feature flags (hot-reload)
-  VAAS_WEBHOOKS_ENABLED: { category: 'feature-flags', is_secret: false, requires_restart: false, description: 'Enable webhook notifications', env_key: 'VAAS_WEBHOOKS_ENABLED' },
-  VAAS_BILLING_ENABLED: { category: 'feature-flags', is_secret: false, requires_restart: false, description: 'Enable billing features', env_key: 'VAAS_BILLING_ENABLED' },
-  VAAS_ANALYTICS_ENABLED: { category: 'feature-flags', is_secret: false, requires_restart: false, description: 'Enable analytics features', env_key: 'VAAS_ANALYTICS_ENABLED' },
-  VAAS_CUSTOM_DOMAINS_ENABLED: { category: 'feature-flags', is_secret: false, requires_restart: false, description: 'Enable custom domains', env_key: 'VAAS_CUSTOM_DOMAINS_ENABLED' },
+  // ── VaaS Backend — Database ─────────────────────────────────────────
+  VAAS_SUPABASE_URL: { category: 'VaaS Database', is_secret: false, requires_restart: true, description: 'VaaS Supabase project URL', env_key: 'VAAS_SUPABASE_URL' },
+  VAAS_SUPABASE_ANON_KEY: { category: 'VaaS Database', is_secret: true, requires_restart: true, description: 'VaaS Supabase anonymous/public key', env_key: 'VAAS_SUPABASE_ANON_KEY' },
+  VAAS_SUPABASE_SERVICE_ROLE_KEY: { category: 'VaaS Database', is_secret: true, requires_restart: true, description: 'VaaS Supabase service role key (full DB access)', env_key: 'VAAS_SUPABASE_SERVICE_ROLE_KEY' },
 
-  // API integration (requires restart)
-  IDSWYFT_API_URL: { category: 'api-integration', is_secret: false, requires_restart: true, description: 'Main Idswyft API base URL', env_key: 'IDSWYFT_API_URL' },
-  IDSWYFT_SERVICE_TOKEN: { category: 'api-integration', is_secret: true, requires_restart: true, description: 'Service-to-service auth token', env_key: 'IDSWYFT_SERVICE_TOKEN' },
-  IDSWYFT_API_TIMEOUT: { category: 'api-integration', is_secret: false, requires_restart: true, description: 'API call timeout in ms', env_key: 'IDSWYFT_API_TIMEOUT' },
+  // ── VaaS Backend — Security ─────────────────────────────────────────
+  VAAS_JWT_SECRET: { category: 'VaaS Security', is_secret: true, requires_restart: true, description: 'JWT signing secret for VaaS auth tokens', env_key: 'VAAS_JWT_SECRET' },
+  VAAS_API_KEY_SECRET: { category: 'VaaS Security', is_secret: true, requires_restart: true, description: 'Encryption key for API key hashing', env_key: 'VAAS_API_KEY_SECRET' },
+  IDSWYFT_WEBHOOK_SECRET: { category: 'VaaS Security', is_secret: true, requires_restart: true, description: 'HMAC signing secret for webhook payloads', env_key: 'IDSWYFT_WEBHOOK_SECRET' },
 
-  // Security (requires restart)
-  VAAS_JWT_SECRET: { category: 'security', is_secret: true, requires_restart: true, description: 'JWT signing secret', env_key: 'VAAS_JWT_SECRET' },
-  VAAS_API_KEY_SECRET: { category: 'security', is_secret: true, requires_restart: true, description: 'API key encryption secret', env_key: 'VAAS_API_KEY_SECRET' },
-  IDSWYFT_WEBHOOK_SECRET: { category: 'security', is_secret: true, requires_restart: true, description: 'Webhook signing secret', env_key: 'IDSWYFT_WEBHOOK_SECRET' },
+  // ── VaaS Backend — Email ────────────────────────────────────────────
+  RESEND_API_KEY: { category: 'VaaS Email', is_secret: true, requires_restart: false, description: 'Resend API key — primary email provider', env_key: 'RESEND_API_KEY' },
+  EMAIL_FROM: { category: 'VaaS Email', is_secret: false, requires_restart: false, description: 'Default sender address (e.g. noreply@mail.idswyft.app)', env_key: 'EMAIL_FROM' },
+  ADMIN_NOTIFICATION_EMAIL: { category: 'VaaS Email', is_secret: false, requires_restart: false, description: 'Email address for platform admin alerts', env_key: 'ADMIN_NOTIFICATION_EMAIL' },
+  MAILGUN_API_KEY: { category: 'VaaS Email', is_secret: true, requires_restart: false, description: 'Mailgun API key (fallback email provider)', env_key: 'MAILGUN_API_KEY' },
+  MAILGUN_DOMAIN: { category: 'VaaS Email', is_secret: false, requires_restart: false, description: 'Mailgun sending domain', env_key: 'MAILGUN_DOMAIN' },
+  MAILGUN_FROM: { category: 'VaaS Email', is_secret: false, requires_restart: false, description: 'Mailgun sender address', env_key: 'MAILGUN_FROM' },
+  SMTP_HOST: { category: 'VaaS Email', is_secret: false, requires_restart: false, description: 'SMTP server hostname', env_key: 'SMTP_HOST' },
+  SMTP_PORT: { category: 'VaaS Email', is_secret: false, requires_restart: false, description: 'SMTP server port (typically 587 for TLS)', env_key: 'SMTP_PORT' },
+  SMTP_USER: { category: 'VaaS Email', is_secret: false, requires_restart: false, description: 'SMTP authentication username', env_key: 'SMTP_USER' },
+  SMTP_PASS: { category: 'VaaS Email', is_secret: true, requires_restart: false, description: 'SMTP authentication password', env_key: 'SMTP_PASS' },
 
-  // Email (hot-reload)
-  RESEND_API_KEY: { category: 'email', is_secret: true, requires_restart: false, description: 'Resend API key for sending emails', env_key: 'RESEND_API_KEY' },
-  EMAIL_FROM: { category: 'email', is_secret: false, requires_restart: false, description: 'Default sender email address', env_key: 'EMAIL_FROM' },
-  ADMIN_NOTIFICATION_EMAIL: { category: 'email', is_secret: false, requires_restart: false, description: 'Email for admin notifications', env_key: 'ADMIN_NOTIFICATION_EMAIL' },
+  // ── VaaS Backend — Integration ──────────────────────────────────────
+  IDSWYFT_API_URL: { category: 'VaaS Integration', is_secret: false, requires_restart: true, description: 'Main Idswyft API base URL for service-to-service calls', env_key: 'IDSWYFT_API_URL' },
+  IDSWYFT_SERVICE_TOKEN: { category: 'VaaS Integration', is_secret: true, requires_restart: true, description: 'Service-to-service auth token (X-Service-Token header)', env_key: 'IDSWYFT_SERVICE_TOKEN' },
+  IDSWYFT_API_TIMEOUT: { category: 'VaaS Integration', is_secret: false, requires_restart: true, description: 'Main API call timeout in milliseconds', env_key: 'IDSWYFT_API_TIMEOUT' },
+  MAIN_API_SUPABASE_URL: { category: 'VaaS Integration', is_secret: false, requires_restart: true, description: 'Main project Supabase URL (for cross-project queries)', env_key: 'MAIN_API_SUPABASE_URL' },
+  MAIN_API_SUPABASE_ANON_KEY: { category: 'VaaS Integration', is_secret: true, requires_restart: true, description: 'Main project Supabase anon key', env_key: 'MAIN_API_SUPABASE_ANON_KEY' },
+  MAIN_API_SUPABASE_SERVICE_ROLE_KEY: { category: 'VaaS Integration', is_secret: true, requires_restart: true, description: 'Main project Supabase service role key', env_key: 'MAIN_API_SUPABASE_SERVICE_ROLE_KEY' },
 
-  // Storage (requires restart)
-  VAAS_STORAGE_PROVIDER: { category: 'storage', is_secret: false, requires_restart: true, description: 'Storage provider (local, s3, supabase)', env_key: 'VAAS_STORAGE_PROVIDER' },
-  VAAS_MAX_FILE_SIZE: { category: 'storage', is_secret: false, requires_restart: true, description: 'Max file upload size in bytes', env_key: 'VAAS_MAX_FILE_SIZE' },
+  // ── VaaS Backend — Features ─────────────────────────────────────────
+  VAAS_WEBHOOKS_ENABLED: { category: 'VaaS Features', is_secret: false, requires_restart: false, description: 'Enable outbound webhook notifications to org endpoints', env_key: 'VAAS_WEBHOOKS_ENABLED' },
+  VAAS_BILLING_ENABLED: { category: 'VaaS Features', is_secret: false, requires_restart: false, description: 'Enable Stripe billing and subscription features', env_key: 'VAAS_BILLING_ENABLED' },
+  VAAS_ANALYTICS_ENABLED: { category: 'VaaS Features', is_secret: false, requires_restart: false, description: 'Enable analytics dashboard and usage metrics', env_key: 'VAAS_ANALYTICS_ENABLED' },
+  VAAS_CUSTOM_DOMAINS_ENABLED: { category: 'VaaS Features', is_secret: false, requires_restart: false, description: 'Allow organizations to use custom domains', env_key: 'VAAS_CUSTOM_DOMAINS_ENABLED' },
 
-  // Monitoring (hot-reload)
-  SENTRY_DSN: { category: 'monitoring', is_secret: true, requires_restart: false, description: 'Sentry DSN for error tracking', env_key: 'SENTRY_DSN' },
-  LOG_LEVEL: { category: 'monitoring', is_secret: false, requires_restart: false, description: 'Application log level', env_key: 'LOG_LEVEL' },
+  // ── VaaS Backend — Rate Limits ──────────────────────────────────────
+  VAAS_RATE_LIMIT_WINDOW_MS: { category: 'VaaS Rate Limits', is_secret: false, requires_restart: false, description: 'Sliding window duration in ms (default: 3600000 = 1 hour)', env_key: 'VAAS_RATE_LIMIT_WINDOW_MS' },
+  VAAS_RATE_LIMIT_MAX_REQUESTS_PER_ORG: { category: 'VaaS Rate Limits', is_secret: false, requires_restart: false, description: 'Max API requests per organization per window', env_key: 'VAAS_RATE_LIMIT_MAX_REQUESTS_PER_ORG' },
+  VAAS_RATE_LIMIT_MAX_REQUESTS_PER_USER: { category: 'VaaS Rate Limits', is_secret: false, requires_restart: false, description: 'Max API requests per user per window', env_key: 'VAAS_RATE_LIMIT_MAX_REQUESTS_PER_USER' },
+
+  // ── VaaS Backend — Storage ──────────────────────────────────────────
+  VAAS_STORAGE_PROVIDER: { category: 'VaaS Storage', is_secret: false, requires_restart: true, description: 'File storage backend: local, s3, or supabase', env_key: 'VAAS_STORAGE_PROVIDER' },
+  VAAS_MAX_FILE_SIZE: { category: 'VaaS Storage', is_secret: false, requires_restart: true, description: 'Max upload size in bytes (default: 10485760 = 10 MB)', env_key: 'VAAS_MAX_FILE_SIZE' },
+
+  // ── VaaS Backend — Monitoring ───────────────────────────────────────
+  SENTRY_DSN: { category: 'VaaS Monitoring', is_secret: true, requires_restart: false, description: 'Sentry DSN for error tracking and performance monitoring', env_key: 'SENTRY_DSN' },
+  LOG_LEVEL: { category: 'VaaS Monitoring', is_secret: false, requires_restart: false, description: 'Log verbosity: debug, info, warn, error', env_key: 'LOG_LEVEL' },
+
+  // ── Main API — Core ─────────────────────────────────────────────────
+  CORS_ORIGINS: { category: 'Main API Core', is_secret: false, requires_restart: true, description: 'Comma-separated allowed CORS origins for main API', env_key: 'CORS_ORIGINS' },
+
+  // ── Main API — Database ─────────────────────────────────────────────
+  DATABASE_URL: { category: 'Main API Database', is_secret: true, requires_restart: true, description: 'Direct Postgres connection string for main API', env_key: 'DATABASE_URL' },
+  SUPABASE_URL: { category: 'Main API Database', is_secret: false, requires_restart: true, description: 'Main project Supabase URL', env_key: 'SUPABASE_URL' },
+  SUPABASE_ANON_KEY: { category: 'Main API Database', is_secret: true, requires_restart: true, description: 'Main project Supabase anonymous key', env_key: 'SUPABASE_ANON_KEY' },
+  SUPABASE_SERVICE_ROLE_KEY: { category: 'Main API Database', is_secret: true, requires_restart: true, description: 'Main project Supabase service role key (full DB access)', env_key: 'SUPABASE_SERVICE_ROLE_KEY' },
+
+  // ── Main API — Security ─────────────────────────────────────────────
+  JWT_SECRET: { category: 'Main API Security', is_secret: true, requires_restart: true, description: 'JWT signing secret for main API auth tokens', env_key: 'JWT_SECRET' },
+  API_KEY_SECRET: { category: 'Main API Security', is_secret: true, requires_restart: true, description: 'Encryption key for developer API key hashing', env_key: 'API_KEY_SECRET' },
+  SERVICE_TOKEN: { category: 'Main API Security', is_secret: true, requires_restart: true, description: 'Service-to-service auth token (must match IDSWYFT_SERVICE_TOKEN on VaaS)', env_key: 'SERVICE_TOKEN' },
+
+  // ── Main API — OAuth ────────────────────────────────────────────────
+  GITHUB_CLIENT_ID: { category: 'Main API OAuth', is_secret: false, requires_restart: true, description: 'GitHub OAuth app client ID for developer login', env_key: 'GITHUB_CLIENT_ID' },
+  GITHUB_CLIENT_SECRET: { category: 'Main API OAuth', is_secret: true, requires_restart: true, description: 'GitHub OAuth app client secret', env_key: 'GITHUB_CLIENT_SECRET' },
+  GITHUB_REDIRECT_URI: { category: 'Main API OAuth', is_secret: false, requires_restart: true, description: 'GitHub OAuth callback URL', env_key: 'GITHUB_REDIRECT_URI' },
+
+  // ── Main API — AI ───────────────────────────────────────────────────
+  OPENAI_API_KEY: { category: 'Main API AI', is_secret: true, requires_restart: true, description: 'OpenAI API key for document analysis assistance', env_key: 'OPENAI_API_KEY' },
+
+  // ── VaaS Admin (Frontend) ───────────────────────────────────────────
+  VAAS_ADMIN_VITE_API_URL: { category: 'VaaS Admin', is_secret: false, requires_restart: true, description: 'VaaS backend API URL used by the org admin frontend (build-time, requires redeploy)', env_key: 'VITE_API_URL' },
+  VAAS_ADMIN_VITE_API_TIMEOUT: { category: 'VaaS Admin', is_secret: false, requires_restart: true, description: 'API request timeout in ms for the org admin frontend (build-time)', env_key: 'VITE_API_TIMEOUT' },
+  VAAS_ADMIN_VITE_MOCK_AUTH_ENABLED: { category: 'VaaS Admin', is_secret: false, requires_restart: true, description: 'Enable mock auth bypass for local development (build-time)', env_key: 'VITE_MOCK_AUTH_ENABLED' },
+  VAAS_ADMIN_VITE_NODE_ENV: { category: 'VaaS Admin', is_secret: false, requires_restart: true, description: 'Node environment for the org admin frontend build (build-time)', env_key: 'VITE_NODE_ENV' },
+
+  // ── Platform Admin (Frontend) ───────────────────────────────────────
+  PLATFORM_ADMIN_VITE_API_URL: { category: 'Platform Admin', is_secret: false, requires_restart: true, description: 'VaaS backend API URL used by the platform admin frontend (build-time, requires redeploy)', env_key: 'VITE_API_URL' },
+  PLATFORM_ADMIN_VITE_NODE_ENV: { category: 'Platform Admin', is_secret: false, requires_restart: true, description: 'Node environment for the platform admin frontend build (build-time)', env_key: 'VITE_NODE_ENV' },
 };
 
 // ── Service ──────────────────────────────────────────────────────────────────
@@ -400,11 +455,22 @@ export class PlatformConfigService {
       // Check if already exists
       const { data: existing } = await vaasSupabase
         .from('platform_config')
-        .select('key')
+        .select('key, category, description')
         .eq('key', key)
         .single();
 
-      if (existing) continue; // Don't overwrite existing values
+      if (existing) {
+        // Update category/description if they changed (e.g. service regrouping)
+        if (existing.category !== entry.category || existing.description !== entry.description) {
+          await vaasSupabase.from('platform_config').update({
+            category: entry.category,
+            description: entry.description,
+            is_secret: entry.is_secret,
+            requires_restart: entry.requires_restart,
+          }).eq('key', key);
+        }
+        continue;
+      }
 
       const envValue = process.env[entry.env_key] || '';
       if (!envValue) continue; // Don't seed empty values
