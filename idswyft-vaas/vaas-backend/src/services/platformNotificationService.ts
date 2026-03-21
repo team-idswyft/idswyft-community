@@ -314,6 +314,63 @@ export class PlatformNotificationService {
       .eq('read', false);
   }
 
+  // ── Cleanup ─────────────────────────────────────────────────────────
+
+  /** Delete notifications older than `retentionDays`. Returns count of deleted rows. */
+  async cleanupOldNotifications(retentionDays: number = 7): Promise<number> {
+    try {
+      const cutoff = new Date(Date.now() - retentionDays * 24 * 60 * 60 * 1000).toISOString();
+
+      // Supabase JS .delete() doesn't return a count, so query first
+      const { data, error: findErr } = await vaasSupabase
+        .from('platform_notifications')
+        .select('id')
+        .lt('created_at', cutoff);
+
+      if (findErr || !data || data.length === 0) return 0;
+
+      const { error: delErr } = await vaasSupabase
+        .from('platform_notifications')
+        .delete()
+        .lt('created_at', cutoff);
+
+      if (delErr) {
+        console.error('[PlatformNotification] Cleanup error:', delErr.message);
+        return 0;
+      }
+
+      console.log(`[PlatformNotification] Cleaned up ${data.length} notifications older than ${retentionDays} days`);
+      return data.length;
+    } catch (err: any) {
+      console.error('[PlatformNotification] Cleanup unexpected error:', err.message);
+      return 0;
+    }
+  }
+
+  /** Start a weekly background job to purge notifications older than 7 days. */
+  private cleanupInterval: ReturnType<typeof setInterval> | null = null;
+
+  startCleanupJob(intervalMs: number = 7 * 24 * 60 * 60 * 1000, retentionDays: number = 7): void {
+    if (this.cleanupInterval) return;
+
+    console.log(`[PlatformNotification] Starting cleanup job (every ${Math.round(intervalMs / 86400000)}d, ${retentionDays}d retention)`);
+
+    // Run immediately on startup
+    this.cleanupOldNotifications(retentionDays).catch(() => {});
+
+    // Then run on schedule
+    this.cleanupInterval = setInterval(() => {
+      this.cleanupOldNotifications(retentionDays).catch(() => {});
+    }, intervalMs);
+  }
+
+  stopCleanupJob(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+  }
+
   // ── Channel CRUD ──────────────────────────────────────────────────────
 
   async listChannels(): Promise<PlatformNotificationChannel[]> {
