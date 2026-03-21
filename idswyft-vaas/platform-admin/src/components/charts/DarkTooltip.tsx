@@ -1,11 +1,18 @@
-import type { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
-import type { TooltipContentProps } from 'recharts/types/component/Tooltip';
-
 /**
  * Shared dark-themed tooltip for all recharts charts.
  * Matches the platform-admin glassmorphism aesthetic.
+ *
+ * Recharts injects props (active, payload, label) at runtime via the
+ * Tooltip `content` prop. We type them as optional to satisfy TSC when
+ * the component is instantiated as `<DarkTooltip />` with no explicit props.
  */
-export default function DarkTooltip({ active, payload, label }: TooltipContentProps<ValueType, NameType>) {
+interface DarkTooltipProps {
+  active?: boolean;
+  payload?: Array<{ name?: string; value?: number | string; color?: string }>;
+  label?: string | number;
+}
+
+export default function DarkTooltip({ active, payload, label }: DarkTooltipProps) {
   if (!active || !payload?.length) return null;
 
   return (
