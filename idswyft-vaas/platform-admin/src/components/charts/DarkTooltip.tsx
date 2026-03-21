@@ -1,10 +1,11 @@
-import type { TooltipProps } from 'recharts';
+import type { NameType, ValueType } from 'recharts/types/component/DefaultTooltipContent';
+import type { TooltipContentProps } from 'recharts/types/component/Tooltip';
 
 /**
  * Shared dark-themed tooltip for all recharts charts.
  * Matches the platform-admin glassmorphism aesthetic.
  */
-export default function DarkTooltip({ active, payload, label }: TooltipProps<number, string>) {
+export default function DarkTooltip({ active, payload, label }: TooltipContentProps<ValueType, NameType>) {
   if (!active || !payload?.length) return null;
 
   return (
