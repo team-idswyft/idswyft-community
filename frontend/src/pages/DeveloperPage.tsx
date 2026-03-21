@@ -2055,9 +2055,10 @@ if (expected !== req.headers['x-idswyft-signature']) {
           onClick={() => setShowSettings(false)}
         >
           <div
-            style={{ width: '100%', maxWidth: 480, background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 24 }}
+            style={{ width: '100%', maxWidth: 820, background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 28, maxHeight: '90vh', overflowY: 'auto' }}
             onClick={e => e.stopPropagation()}
           >
+            {/* Header */}
             <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <Cog6ToothIcon style={{ width: 18, height: 18, color: C.text }} />
@@ -2071,230 +2072,244 @@ if (expected !== req.headers['x-idswyft-signature']) {
               </button>
             </div>
 
-            {/* Profile */}
-            <div style={{ marginBottom: 24 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                <UserCircleIcon style={{ width: 16, height: 16, color: C.cyan }} />
-                <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>Profile</div>
-              </div>
+            {/* Two-column layout */}
+            <div style={{ display: 'flex', gap: 0 }}>
 
-              {profileLoading ? (
-                <div style={{ color: C.muted, fontSize: 13 }}>Loading...</div>
-              ) : (
-                <>
-                  {/* Avatar */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
-                    <div
-                      style={{ position: 'relative', width: 48, height: 48, borderRadius: '50%', overflow: 'hidden', cursor: 'pointer', flexShrink: 0, border: `1px solid ${C.border}` }}
-                      onClick={() => document.getElementById('avatar-input')?.click()}
-                    >
-                      {profileAvatarUrl ? (
-                        <img src={profileAvatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                      ) : (
-                        <div style={{ width: '100%', height: '100%', background: C.surface, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                          <UserCircleIcon style={{ width: 28, height: 28, color: C.dim }} />
-                        </div>
-                      )}
-                      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.15s' }}
-                        onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-                        onMouseLeave={e => (e.currentTarget.style.opacity = '0')}
-                      >
-                        <span style={{ fontSize: 10, color: '#fff', fontWeight: 600 }}>Change</span>
-                      </div>
-                    </div>
-                    <input
-                      id="avatar-input"
-                      type="file"
-                      accept="image/jpeg,image/png"
-                      style={{ display: 'none' }}
-                      onChange={e => {
-                        const file = e.target.files?.[0]
-                        if (file && file.size > 2 * 1024 * 1024) {
-                          toast.error('File must be under 2 MB')
-                          e.target.value = ''
-                          return
-                        }
-                        if (file) uploadAvatar(file)
-                        e.target.value = ''
-                      }}
-                    />
-                    <div style={{ flex: 1 }}>
-                      <div style={{ fontSize: 12, color: C.muted, marginBottom: 2 }}>Click avatar to change</div>
-                      <div style={{ fontSize: 11, color: C.dim }}>JPEG or PNG, max 2 MB</div>
-                    </div>
+              {/* ─── Left column: Profile + Danger Zone ─── */}
+              <div style={{ flex: 1, paddingRight: 28 }}>
+
+                {/* Profile */}
+                <div style={{ marginBottom: 24 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                    <UserCircleIcon style={{ width: 16, height: 16, color: C.cyan }} />
+                    <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>Profile</div>
                   </div>
 
-                  {/* Email (read-only) */}
-                  <label style={labelStyle}>Email</label>
-                  <input
-                    type="email"
-                    value={profileEmail}
-                    readOnly
-                    style={{ ...inputStyle, marginBottom: 12, opacity: 0.5, cursor: 'not-allowed' }}
-                  />
-
-                  {/* Name */}
-                  <label style={labelStyle}>Name</label>
-                  <input
-                    type="text"
-                    value={profileName}
-                    onChange={e => setProfileName(e.target.value)}
-                    style={{ ...inputStyle, marginBottom: 12 }}
-                    placeholder="Your name"
-                  />
-
-                  {/* Company */}
-                  <label style={labelStyle}>Company <span style={{ color: C.dim, fontWeight: 400 }}>(optional)</span></label>
-                  <input
-                    type="text"
-                    value={profileCompany}
-                    onChange={e => setProfileCompany(e.target.value)}
-                    style={{ ...inputStyle, marginBottom: 12 }}
-                    placeholder="Your company"
-                  />
-
-                  {/* Save button */}
-                  <button
-                    onClick={saveProfile}
-                    disabled={profileSaving || !profileName.trim()}
-                    style={{
-                      background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
-                      padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                      opacity: (profileSaving || !profileName.trim()) ? 0.5 : 1,
-                    }}
-                  >
-                    {profileSaving ? 'Saving...' : 'Save Profile'}
-                  </button>
-                </>
-              )}
-            </div>
-
-            <div style={{ borderTop: `1px solid ${C.border}`, marginBottom: 24 }} />
-
-            {/* OCR Enhancement (LLM Fallback) */}
-            <div style={{ marginBottom: 24 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <CodeBracketIcon style={{ width: 16, height: 16, color: C.cyan }} />
-                <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>OCR Enhancement</div>
-              </div>
-              <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
-                This is completely optional. Our OCR pipeline extracts document fields using fast heuristics.
-                When you provide an LLM key, it acts as a <strong style={{ color: C.text, fontWeight: 500 }}>second-pass fallback</strong> --
-                only called for fields where heuristic confidence is below 60%.
-                This can improve accuracy on unusual layouts or poor-quality scans, but most documents process fine without it.
-                Your key is encrypted at rest and only used during your verifications.
-              </div>
-
-              {llmLoading ? (
-                <div style={{ color: C.muted, fontSize: 13 }}>Loading...</div>
-              ) : (
-                <>
-                  {/* Provider select */}
-                  <label style={labelStyle}>Provider</label>
-                  <select
-                    value={llmProvider}
-                    onChange={e => { setLlmProvider(e.target.value); setLlmApiKey(''); setShowLlmKey(false) }}
-                    style={{ ...inputStyle, marginBottom: 12, cursor: 'pointer', appearance: 'auto' }}
-                  >
-                    <option value="">None (disabled)</option>
-                    <option value="openai">OpenAI (GPT-4o Vision)</option>
-                    <option value="anthropic">Anthropic (Claude Vision)</option>
-                    <option value="custom">Custom (OpenAI-compatible endpoint)</option>
-                  </select>
-
-                  {llmProvider && (
+                  {profileLoading ? (
+                    <div style={{ color: C.muted, fontSize: 13 }}>Loading...</div>
+                  ) : (
                     <>
-                      {/* API Key */}
-                      <label style={labelStyle}>
-                        API Key
-                        {llmConfigured && llmKeyPreview && !llmApiKey && (
-                          <span style={{ color: C.green, marginLeft: 8, fontWeight: 400 }}>
-                            configured: {llmKeyPreview}
-                          </span>
-                        )}
-                      </label>
-                      <div style={{ position: 'relative', marginBottom: 12 }}>
-                        <input
-                          type={showLlmKey ? 'text' : 'password'}
-                          style={{ ...inputStyle, paddingRight: 40 }}
-                          value={llmApiKey}
-                          onChange={e => setLlmApiKey(e.target.value)}
-                          placeholder={llmConfigured ? 'Enter new key to replace' : llmProvider === 'anthropic' ? 'sk-ant-...' : 'sk-...'}
-                        />
-                        <button
-                          type="button"
-                          onClick={() => setShowLlmKey(!showLlmKey)}
-                          style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 4 }}
+                      {/* Avatar */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+                        <div
+                          style={{ position: 'relative', width: 48, height: 48, borderRadius: '50%', overflow: 'hidden', cursor: 'pointer', flexShrink: 0, border: `1px solid ${C.border}` }}
+                          onClick={() => document.getElementById('avatar-input')?.click()}
                         >
-                          {showLlmKey
-                            ? <EyeSlashIcon style={{ width: 16, height: 16 }} />
-                            : <EyeIcon style={{ width: 16, height: 16 }} />
-                          }
-                        </button>
-                      </div>
-
-                      {/* Custom endpoint URL */}
-                      {llmProvider === 'custom' && (
-                        <>
-                          <label style={labelStyle}>Endpoint URL</label>
-                          <input
-                            type="url"
-                            style={{ ...inputStyle, marginBottom: 12 }}
-                            value={llmEndpointUrl}
-                            onChange={e => setLlmEndpointUrl(e.target.value)}
-                            placeholder="https://your-server.com/v1/chat/completions"
-                          />
-                        </>
-                      )}
-
-                      {/* Save / Clear buttons */}
-                      <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-                        <button
-                          onClick={saveLLMSettings}
-                          disabled={llmSaving || (!llmApiKey && !llmConfigured)}
-                          style={{
-                            background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
-                            padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                            opacity: (llmSaving || (!llmApiKey && !llmConfigured)) ? 0.5 : 1,
-                          }}
-                        >
-                          {llmSaving ? 'Saving...' : 'Save'}
-                        </button>
-                        {llmConfigured && (
-                          <button
-                            onClick={clearLLMSettings}
-                            disabled={llmSaving}
-                            style={{
-                              background: 'none', border: `1px solid ${C.border}`, color: C.muted,
-                              borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13,
-                            }}
+                          {profileAvatarUrl ? (
+                            <img src={profileAvatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            <div style={{ width: '100%', height: '100%', background: C.surface, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <UserCircleIcon style={{ width: 28, height: 28, color: C.dim }} />
+                            </div>
+                          )}
+                          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.15s' }}
+                            onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                            onMouseLeave={e => (e.currentTarget.style.opacity = '0')}
                           >
-                            Remove
-                          </button>
-                        )}
+                            <span style={{ fontSize: 10, color: '#fff', fontWeight: 600 }}>Change</span>
+                          </div>
+                        </div>
+                        <input
+                          id="avatar-input"
+                          type="file"
+                          accept="image/jpeg,image/png"
+                          style={{ display: 'none' }}
+                          onChange={e => {
+                            const file = e.target.files?.[0]
+                            if (file && file.size > 2 * 1024 * 1024) {
+                              toast.error('File must be under 2 MB')
+                              e.target.value = ''
+                              return
+                            }
+                            if (file) uploadAvatar(file)
+                            e.target.value = ''
+                          }}
+                        />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 12, color: C.muted, marginBottom: 2 }}>Click avatar to change</div>
+                          <div style={{ fontSize: 11, color: C.dim }}>JPEG or PNG, max 2 MB</div>
+                        </div>
                       </div>
+
+                      {/* Email (read-only) */}
+                      <label style={labelStyle}>Email</label>
+                      <input
+                        type="email"
+                        value={profileEmail}
+                        readOnly
+                        style={{ ...inputStyle, marginBottom: 12, opacity: 0.5, cursor: 'not-allowed' }}
+                      />
+
+                      {/* Name */}
+                      <label style={labelStyle}>Name</label>
+                      <input
+                        type="text"
+                        value={profileName}
+                        onChange={e => setProfileName(e.target.value)}
+                        style={{ ...inputStyle, marginBottom: 12 }}
+                        placeholder="Your name"
+                      />
+
+                      {/* Company */}
+                      <label style={labelStyle}>Company <span style={{ color: C.dim, fontWeight: 400 }}>(optional)</span></label>
+                      <input
+                        type="text"
+                        value={profileCompany}
+                        onChange={e => setProfileCompany(e.target.value)}
+                        style={{ ...inputStyle, marginBottom: 12 }}
+                        placeholder="Your company"
+                      />
+
+                      {/* Save button */}
+                      <button
+                        onClick={saveProfile}
+                        disabled={profileSaving || !profileName.trim()}
+                        style={{
+                          background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
+                          padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                          opacity: (profileSaving || !profileName.trim()) ? 0.5 : 1,
+                        }}
+                      >
+                        {profileSaving ? 'Saving...' : 'Save Profile'}
+                      </button>
                     </>
                   )}
-                </>
-              )}
-            </div>
+                </div>
 
-            {/* Danger Zone */}
-            <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 20 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                <ExclamationTriangleIcon style={{ width: 16, height: 16, color: C.red }} />
-                <div style={{ fontWeight: 600, fontSize: 14, color: C.red }}>Danger Zone</div>
+                {/* Danger Zone */}
+                <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 20 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <ExclamationTriangleIcon style={{ width: 16, height: 16, color: C.red }} />
+                    <div style={{ fontWeight: 600, fontSize: 14, color: C.red }}>Danger Zone</div>
+                  </div>
+                  <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
+                    Permanently delete your developer account and all associated data including API keys, webhooks, and verification records. This action cannot be undone.
+                  </div>
+                  <button
+                    style={{ background: 'none', border: `1px solid ${C.red}`, color: C.red, borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}
+                    onClick={() => { setShowSettings(false); setShowDeleteAccount(true) }}
+                  >
+                    Delete Account
+                  </button>
+                </div>
               </div>
-              <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
-                Permanently delete your developer account and all associated data including API keys, webhooks, and verification records. This action cannot be undone.
+
+              {/* ─── Vertical divider ─── */}
+              <div style={{ width: 1, background: C.border, flexShrink: 0 }} />
+
+              {/* ─── Right column: OCR Enhancement ─── */}
+              <div style={{ flex: 1, paddingLeft: 28 }}>
+
+                {/* OCR Enhancement (LLM Fallback) */}
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <CodeBracketIcon style={{ width: 16, height: 16, color: C.cyan }} />
+                    <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>OCR Enhancement</div>
+                  </div>
+                  <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
+                    This is completely optional. Our OCR pipeline extracts document fields using fast heuristics.
+                    When you provide an LLM key, it acts as a <strong style={{ color: C.text, fontWeight: 500 }}>second-pass fallback</strong> --
+                    only called for fields where heuristic confidence is below 60%.
+                    This can improve accuracy on unusual layouts or poor-quality scans, but most documents process fine without it.
+                    Your key is encrypted at rest and only used during your verifications.
+                  </div>
+
+                  {llmLoading ? (
+                    <div style={{ color: C.muted, fontSize: 13 }}>Loading...</div>
+                  ) : (
+                    <>
+                      {/* Provider select */}
+                      <label style={labelStyle}>Provider</label>
+                      <select
+                        value={llmProvider}
+                        onChange={e => { setLlmProvider(e.target.value); setLlmApiKey(''); setShowLlmKey(false) }}
+                        style={{ ...inputStyle, marginBottom: 12, cursor: 'pointer', appearance: 'auto' }}
+                      >
+                        <option value="">None (disabled)</option>
+                        <option value="openai">OpenAI (GPT-4o Vision)</option>
+                        <option value="anthropic">Anthropic (Claude Vision)</option>
+                        <option value="custom">Custom (OpenAI-compatible endpoint)</option>
+                      </select>
+
+                      {llmProvider && (
+                        <>
+                          {/* API Key */}
+                          <label style={labelStyle}>
+                            API Key
+                            {llmConfigured && llmKeyPreview && !llmApiKey && (
+                              <span style={{ color: C.green, marginLeft: 8, fontWeight: 400 }}>
+                                configured: {llmKeyPreview}
+                              </span>
+                            )}
+                          </label>
+                          <div style={{ position: 'relative', marginBottom: 12 }}>
+                            <input
+                              type={showLlmKey ? 'text' : 'password'}
+                              style={{ ...inputStyle, paddingRight: 40 }}
+                              value={llmApiKey}
+                              onChange={e => setLlmApiKey(e.target.value)}
+                              placeholder={llmConfigured ? 'Enter new key to replace' : llmProvider === 'anthropic' ? 'sk-ant-...' : 'sk-...'}
+                            />
+                            <button
+                              type="button"
+                              onClick={() => setShowLlmKey(!showLlmKey)}
+                              style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 4 }}
+                            >
+                              {showLlmKey
+                                ? <EyeSlashIcon style={{ width: 16, height: 16 }} />
+                                : <EyeIcon style={{ width: 16, height: 16 }} />
+                              }
+                            </button>
+                          </div>
+
+                          {/* Custom endpoint URL */}
+                          {llmProvider === 'custom' && (
+                            <>
+                              <label style={labelStyle}>Endpoint URL</label>
+                              <input
+                                type="url"
+                                style={{ ...inputStyle, marginBottom: 12 }}
+                                value={llmEndpointUrl}
+                                onChange={e => setLlmEndpointUrl(e.target.value)}
+                                placeholder="https://your-server.com/v1/chat/completions"
+                              />
+                            </>
+                          )}
+
+                          {/* Save / Clear buttons */}
+                          <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                            <button
+                              onClick={saveLLMSettings}
+                              disabled={llmSaving || (!llmApiKey && !llmConfigured)}
+                              style={{
+                                background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
+                                padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                                opacity: (llmSaving || (!llmApiKey && !llmConfigured)) ? 0.5 : 1,
+                              }}
+                            >
+                              {llmSaving ? 'Saving...' : 'Save'}
+                            </button>
+                            {llmConfigured && (
+                              <button
+                                onClick={clearLLMSettings}
+                                disabled={llmSaving}
+                                style={{
+                                  background: 'none', border: `1px solid ${C.border}`, color: C.muted,
+                                  borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13,
+                                }}
+                              >
+                                Remove
+                              </button>
+                            )}
+                          </div>
+                        </>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
-              <button
-                style={{ background: 'none', border: `1px solid ${C.red}`, color: C.red, borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}
-                onClick={() => { setShowSettings(false); setShowDeleteAccount(true) }}
-              >
-                Delete Account
-              </button>
-            </div>
+
+            </div>{/* end two-column layout */}
           </div>
         </div>
       )}
