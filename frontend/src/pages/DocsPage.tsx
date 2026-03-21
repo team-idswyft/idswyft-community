@@ -1185,6 +1185,31 @@ window.location.href = 'https://idswyft.app/user-verification'
   + '&user_id=user-123'
   + '&redirect_url=' + encodeURIComponent('https://yourapp.com/done')
   + '&theme=dark';`} />
+
+          <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 24 }}>
+            <div style={{ padding: '12px 20px', borderBottom: `1px solid ${C.border}`, fontFamily: C.mono, fontSize: '0.72rem', color: C.muted, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Redirect callback parameters</div>
+            <div style={{ padding: '12px 20px' }}>
+              <p style={{ fontFamily: C.sans, fontSize: '0.83rem', color: C.muted, lineHeight: 1.65, margin: '0 0 12px' }}>
+                When verification completes, the user is redirected back to your <code style={{ fontFamily: C.mono, color: C.cyan, fontSize: '0.82rem' }}>redirect_url</code> with these query parameters appended:
+              </p>
+              <FieldRow name="verification_id" type="UUID string" req={true} desc="The verification session ID. Use this to fetch full results via GET /api/v2/verify/:id/status." />
+              <FieldRow name="status" type="string" req={true} desc="Terminal status: 'COMPLETE' or 'HARD_REJECTED'." />
+              <FieldRow name="user_id" type="string" req={true} desc="The user_id you passed when starting verification." />
+            </div>
+          </div>
+
+          <Pre label="Example: handling the redirect callback" code={`// On your redirect_url page (e.g. https://yourapp.com/done)
+const params = new URLSearchParams(window.location.search);
+const verificationId = params.get('verification_id');
+const status = params.get('status');     // 'COMPLETE' or 'HARD_REJECTED'
+const userId = params.get('user_id');
+
+if (status === 'COMPLETE') {
+  // Fetch full results from your backend
+  const res = await fetch('/api/verification-result?id=' + verificationId);
+  // Update your user record, grant access, etc.
+}`} />
+
           <Pre label="Option 2: Iframe embed (HTML)" code={`<!-- Embed the verification page inline on your site -->
 <iframe
   src="https://idswyft.app/user-verification?api_key=sk_live_xxx&user_id=user-123&theme=dark"

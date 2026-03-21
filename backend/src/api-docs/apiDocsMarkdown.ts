@@ -193,6 +193,30 @@ window.location.href = 'https://idswyft.app/user-verification'
   + '&theme=dark';
 \`\`\`
 
+**Redirect callback parameters:** When verification completes, the user is redirected to your \`redirect_url\` with these query parameters appended:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| verification_id | UUID string | The verification session ID. Use this to fetch full results via \`GET /api/v2/verify/:id/status\` |
+| status | string | Terminal status: \`COMPLETE\` or \`HARD_REJECTED\` |
+| user_id | string | The user_id you passed when starting verification |
+
+**Example:** handling the redirect callback on your page:
+
+\`\`\`javascript
+// On your redirect_url page (e.g. https://yourapp.com/done)
+const params = new URLSearchParams(window.location.search);
+const verificationId = params.get('verification_id');
+const status = params.get('status');     // 'COMPLETE' or 'HARD_REJECTED'
+const userId = params.get('user_id');
+
+if (status === 'COMPLETE') {
+  // Fetch full results from your backend
+  const res = await fetch('/api/verification-result?id=' + verificationId);
+  // Update your user record, grant access, etc.
+}
+\`\`\`
+
 ### Option 2: Iframe Embed (No SDK needed)
 
 Embed the hosted page inside your app. Users never leave your site.

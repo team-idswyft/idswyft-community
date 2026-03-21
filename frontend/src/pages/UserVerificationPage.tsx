@@ -51,6 +51,15 @@ const UserVerificationPage: React.FC = () => {
   }, []);
 
   // ── Handlers ──────────────────────────────────────────────────────
+  /** Append verification result params to the redirect URL */
+  const buildRedirectUrl = (url: string, result: any) => {
+    const u = new URL(url);
+    if (result?.verification_id) u.searchParams.set('verification_id', result.verification_id);
+    if (result?.status) u.searchParams.set('status', result.status);
+    if (result?.user_id) u.searchParams.set('user_id', result.user_id);
+    return u.toString();
+  };
+
   const handleVerificationComplete = (result: any) => {
     // If address verification is enabled, go to address phase instead of finishing
     if (addressVerifEnabled) {
@@ -63,7 +72,7 @@ const UserVerificationPage: React.FC = () => {
       window.parent.postMessage({ type: 'VERIFICATION_COMPLETE', result }, '*');
     }
     if (redirectUrl) {
-      setTimeout(() => { window.location.href = redirectUrl; }, 1500);
+      setTimeout(() => { window.location.href = buildRedirectUrl(redirectUrl, result); }, 1500);
     }
   };
 
@@ -76,7 +85,8 @@ const UserVerificationPage: React.FC = () => {
       }, '*');
     }
     if (redirectUrl) {
-      setTimeout(() => { window.location.href = redirectUrl; }, 1500);
+      const fullResult = { ...result, address_verification: addressResult };
+      setTimeout(() => { window.location.href = buildRedirectUrl(redirectUrl, fullResult); }, 1500);
     }
   };
 
