@@ -3,7 +3,14 @@ import { AppConfig } from '../types/index.js';
 export const config: AppConfig = {
   port: parseInt(process.env.PORT || '3001'),
   nodeEnv: process.env.NODE_ENV || 'development',
-  corsOrigins: process.env.CORS_ORIGINS?.split(',') || ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176', 'http://localhost:3000'],
+  corsOrigins: [
+    ...new Set([
+      ...(process.env.CORS_ORIGINS?.split(',').map(s => s.trim()) || ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176', 'http://localhost:3000']),
+      // Always allow both bare and www production origins
+      'https://idswyft.app',
+      'https://www.idswyft.app',
+    ]),
+  ],
   railwayAllowedOrigins: process.env.RAILWAY_ALLOWED_ORIGINS?.split(',').map(s => s.trim()).filter(Boolean) ?? [],
   jwtSecret: process.env.JWT_SECRET || 'your-super-secret-jwt-key',
   apiKeySecret: process.env.API_KEY_SECRET || 'your-api-key-encryption-secret',
