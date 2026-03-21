@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Download, Upload, Eye, EyeOff, Pencil, Trash2, ChevronDown, ChevronRight, Database, Info } from 'lucide-react';
+import { Download, Upload, Eye, EyeOff, Pencil, Trash2, ChevronDown, ChevronRight, Database, Info, ShieldAlert } from 'lucide-react';
 import platformApi from '../services/api';
 import { cardSurface, tableHeaderClass, statusPill, monoXs, monoSm, sectionLabel, infoPanel, getStatusAccent } from '../styles/tokens';
 
@@ -259,6 +259,28 @@ export default function Configuration() {
           >
             <Database className="h-4 w-4" /> Seed Defaults
           </button>
+        </div>
+      </div>
+
+      {/* Encryption key notice */}
+      <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-5 py-4">
+        <div className="flex items-start gap-3">
+          <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
+          <div className="space-y-2 text-sm">
+            <p className="font-medium text-amber-200">Encryption Key &mdash; <code className={`${monoXs} text-amber-300`}>VAAS_CONFIG_ENCRYPTION_KEY</code></p>
+            <p className="text-slate-400">
+              All secret config values are encrypted at rest using AES-256-GCM, derived from the <code className={`${monoXs} text-slate-300`}>VAAS_CONFIG_ENCRYPTION_KEY</code> environment variable.
+              If you need to rotate this key:
+            </p>
+            <ol className="list-decimal list-inside space-y-1 text-slate-400">
+              <li><strong className="text-slate-300">Export</strong> all secrets first &mdash; use the Export button above with "Include secrets" checked</li>
+              <li><strong className="text-slate-300">Set the new key</strong> on your hosting provider (e.g. Railway env var)</li>
+              <li><strong className="text-slate-300">Re-import</strong> the exported file after the service restarts with the new key</li>
+            </ol>
+            <p className="text-rose-400/80 text-xs">
+              Changing the key without exporting first will make all existing encrypted values unreadable.
+            </p>
+          </div>
         </div>
       </div>
 
