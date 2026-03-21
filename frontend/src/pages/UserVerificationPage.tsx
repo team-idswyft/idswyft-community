@@ -53,11 +53,21 @@ const UserVerificationPage: React.FC = () => {
   // ── Handlers ──────────────────────────────────────────────────────
   /** Append verification result params to the redirect URL */
   const buildRedirectUrl = (url: string, result: any) => {
-    const u = new URL(url);
-    if (result?.verification_id) u.searchParams.set('verification_id', result.verification_id);
-    if (result?.status) u.searchParams.set('status', result.status);
-    if (result?.user_id) u.searchParams.set('user_id', result.user_id);
-    return u.toString();
+    try {
+      const u = new URL(url);
+      if (result?.verification_id) u.searchParams.set('verification_id', result.verification_id);
+      if (result?.status) u.searchParams.set('status', result.status);
+      if (result?.user_id) u.searchParams.set('user_id', result.user_id);
+      return u.toString();
+    } catch {
+      // Fallback for relative or malformed URLs
+      const sep = url.includes('?') ? '&' : '?';
+      const params = new URLSearchParams();
+      if (result?.verification_id) params.set('verification_id', result.verification_id);
+      if (result?.status) params.set('status', result.status);
+      if (result?.user_id) params.set('user_id', result.user_id);
+      return url + sep + params.toString();
+    }
   };
 
   const handleVerificationComplete = (result: any) => {

@@ -198,7 +198,7 @@ window.location.href = 'https://idswyft.app/user-verification'
 | Parameter | Type | Description |
 |-----------|------|-------------|
 | verification_id | UUID string | The verification session ID. Use this to fetch full results via \`GET /api/v2/verify/:id/status\` |
-| status | string | Terminal status: \`COMPLETE\` or \`HARD_REJECTED\` |
+| status | string | Result status: \`verified\`, \`failed\`, or \`manual_review\`. If \`manual_review\`, poll the status endpoint or listen for a webhook to get the final decision |
 | user_id | string | The user_id you passed when starting verification |
 
 **Example:** handling the redirect callback on your page:
@@ -207,13 +207,16 @@ window.location.href = 'https://idswyft.app/user-verification'
 // On your redirect_url page (e.g. https://yourapp.com/done)
 const params = new URLSearchParams(window.location.search);
 const verificationId = params.get('verification_id');
-const status = params.get('status');     // 'COMPLETE' or 'HARD_REJECTED'
+const status = params.get('status');   // 'verified', 'failed', or 'manual_review'
 const userId = params.get('user_id');
 
-if (status === 'COMPLETE') {
+if (status === 'verified' && verificationId) {
   // Fetch full results from your backend
-  const res = await fetch('/api/verification-result?id=' + verificationId);
+  const res = await fetch('/api/verification-result?id=' + encodeURIComponent(verificationId));
   // Update your user record, grant access, etc.
+} else if (status === 'manual_review') {
+  // Verification needs human review — poll GET /api/v2/verify/:id/status
+  // or wait for a webhook to get the final decision
 }
 \`\`\`
 
