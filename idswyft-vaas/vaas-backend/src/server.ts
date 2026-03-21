@@ -36,6 +36,7 @@ import platformProviderMetricsRoutes from './routes/platformProviderMetrics.js';
 import platformAuditLogsRoutes from './routes/platformAuditLogs.js';
 import platformThresholdsRoutes from './routes/platformThresholds.js';
 import platformStatusRoutes from './routes/platformStatus.js';
+import platformDeveloperRoutes from './routes/platformDevelopers.js';
 import publicStatusRoutes from './routes/publicStatus.js';
 import samlRoutes from './routes/saml.js';
 import notificationRoutes from './routes/notifications.js';
@@ -402,6 +403,7 @@ app.use('/api/platform/provider-metrics', platformProviderMetricsRoutes);
 app.use('/api/platform/audit-logs', platformAuditLogsRoutes);
 app.use('/api/platform/thresholds', platformThresholdsRoutes);
 app.use('/api/platform/status', platformStatusRoutes);
+app.use('/api/platform/developers', platformDeveloperRoutes);
 console.log('✅ Platform admin routes mounted');
 
 // 404 handler

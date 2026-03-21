@@ -16,6 +16,7 @@ import {
   EyeSlashIcon,
   ExclamationTriangleIcon,
   Cog6ToothIcon,
+  UserCircleIcon,
 } from '@heroicons/react/24/outline'
 
 // â"€â"€â"€ Types â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
@@ -664,6 +665,14 @@ export function DeveloperPage() {
   const [llmLoading, setLlmLoading] = useState(false)
   const [showLlmKey, setShowLlmKey] = useState(false)
 
+  // Profile settings
+  const [profileName, setProfileName] = useState('')
+  const [profileCompany, setProfileCompany] = useState('')
+  const [profileEmail, setProfileEmail] = useState('')
+  const [profileAvatarUrl, setProfileAvatarUrl] = useState('')
+  const [profileLoading, setProfileLoading] = useState(false)
+  const [profileSaving, setProfileSaving] = useState(false)
+
   const fetchKeys = async (t: string) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/api-keys`, {
@@ -758,12 +767,70 @@ export function DeveloperPage() {
     setLlmSaving(false)
   }
 
+  const fetchProfile = async (t: string) => {
+    setProfileLoading(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/profile`, {
+        headers: { Authorization: `Bearer ${t}` },
+      })
+      if (res.ok) {
+        const { data } = await res.json()
+        setProfileName(data.name || '')
+        setProfileCompany(data.company || '')
+        setProfileEmail(data.email || '')
+        setProfileAvatarUrl(data.avatar_url || '')
+      }
+    } catch { /* network error */ }
+    setProfileLoading(false)
+  }
+
+  const saveProfile = async () => {
+    if (!token) return
+    setProfileSaving(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/profile`, {
+        method: 'PUT',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ name: profileName, company: profileCompany || null }),
+      })
+      if (res.ok) {
+        toast.success('Profile updated')
+      } else {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.message || 'Failed to update profile')
+      }
+    } catch { toast.error('Network error') }
+    setProfileSaving(false)
+  }
+
+  const uploadAvatar = async (file: File) => {
+    if (!token) return
+    const formData = new FormData()
+    formData.append('file', file)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/avatar`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}` },
+        body: formData,
+      })
+      if (res.ok) {
+        const { data } = await res.json()
+        setProfileAvatarUrl(data.avatar_url)
+        toast.success('Avatar updated')
+      } else {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.message || 'Failed to upload avatar')
+      }
+    } catch { toast.error('Network error') }
+  }
+
   useEffect(() => {
     if (token) {
       fetchKeys(token)
       fetchStats(token)
       fetchWebhooks(token)
       fetchLLMSettings(token)
+      fetchProfile(token)
     }
   }, [token])
 
@@ -2003,6 +2070,106 @@ if (expected !== req.headers['x-idswyft-signature']) {
                 &times;
               </button>
             </div>
+
+            {/* Profile */}
+            <div style={{ marginBottom: 24 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
+                <UserCircleIcon style={{ width: 16, height: 16, color: C.cyan }} />
+                <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>Profile</div>
+              </div>
+
+              {profileLoading ? (
+                <div style={{ color: C.muted, fontSize: 13 }}>Loading...</div>
+              ) : (
+                <>
+                  {/* Avatar */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+                    <div
+                      style={{ position: 'relative', width: 48, height: 48, borderRadius: '50%', overflow: 'hidden', cursor: 'pointer', flexShrink: 0, border: `1px solid ${C.border}` }}
+                      onClick={() => document.getElementById('avatar-input')?.click()}
+                    >
+                      {profileAvatarUrl ? (
+                        <img src={profileAvatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                      ) : (
+                        <div style={{ width: '100%', height: '100%', background: C.surface, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <UserCircleIcon style={{ width: 28, height: 28, color: C.dim }} />
+                        </div>
+                      )}
+                      <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.15s' }}
+                        onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                        onMouseLeave={e => (e.currentTarget.style.opacity = '0')}
+                      >
+                        <span style={{ fontSize: 10, color: '#fff', fontWeight: 600 }}>Change</span>
+                      </div>
+                    </div>
+                    <input
+                      id="avatar-input"
+                      type="file"
+                      accept="image/jpeg,image/png"
+                      style={{ display: 'none' }}
+                      onChange={e => {
+                        const file = e.target.files?.[0]
+                        if (file && file.size > 2 * 1024 * 1024) {
+                          toast.error('File must be under 2 MB')
+                          e.target.value = ''
+                          return
+                        }
+                        if (file) uploadAvatar(file)
+                        e.target.value = ''
+                      }}
+                    />
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 12, color: C.muted, marginBottom: 2 }}>Click avatar to change</div>
+                      <div style={{ fontSize: 11, color: C.dim }}>JPEG or PNG, max 2 MB</div>
+                    </div>
+                  </div>
+
+                  {/* Email (read-only) */}
+                  <label style={labelStyle}>Email</label>
+                  <input
+                    type="email"
+                    value={profileEmail}
+                    readOnly
+                    style={{ ...inputStyle, marginBottom: 12, opacity: 0.5, cursor: 'not-allowed' }}
+                  />
+
+                  {/* Name */}
+                  <label style={labelStyle}>Name</label>
+                  <input
+                    type="text"
+                    value={profileName}
+                    onChange={e => setProfileName(e.target.value)}
+                    style={{ ...inputStyle, marginBottom: 12 }}
+                    placeholder="Your name"
+                  />
+
+                  {/* Company */}
+                  <label style={labelStyle}>Company <span style={{ color: C.dim, fontWeight: 400 }}>(optional)</span></label>
+                  <input
+                    type="text"
+                    value={profileCompany}
+                    onChange={e => setProfileCompany(e.target.value)}
+                    style={{ ...inputStyle, marginBottom: 12 }}
+                    placeholder="Your company"
+                  />
+
+                  {/* Save button */}
+                  <button
+                    onClick={saveProfile}
+                    disabled={profileSaving || !profileName.trim()}
+                    style={{
+                      background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
+                      padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                      opacity: (profileSaving || !profileName.trim()) ? 0.5 : 1,
+                    }}
+                  >
+                    {profileSaving ? 'Saving...' : 'Save Profile'}
+                  </button>
+                </>
+              )}
+            </div>
+
+            <div style={{ borderTop: `1px solid ${C.border}`, marginBottom: 24 }} />
 
             {/* OCR Enhancement (LLM Fallback) */}
             <div style={{ marginBottom: 24 }}>

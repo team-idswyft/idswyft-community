@@ -275,6 +275,60 @@ export class IdswyftApiService {
     }
   }
   
+  // ─── Developer Management (platform admin) ────────────────────────────────
+
+  async listDevelopers(params: Record<string, any>): Promise<any> {
+    try {
+      const response = await this.client.get('/api/vaas/developers', { params });
+      if (!response.data.success) {
+        throw new Error('Failed to list developers from main Idswyft API');
+      }
+      return response.data;
+    } catch (error: any) {
+      console.error('[IdswyftAPI] List developers failed:', error.response?.data || error.message);
+      throw new Error(`Failed to list developers: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
+  async getDeveloper(id: string): Promise<any> {
+    try {
+      const response = await this.client.get(`/api/vaas/developers/${id}`);
+      if (!response.data.success) {
+        throw new Error('Failed to get developer from main Idswyft API');
+      }
+      return response.data;
+    } catch (error: any) {
+      console.error('[IdswyftAPI] Get developer failed:', error.response?.data || error.message);
+      throw new Error(`Failed to get developer: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
+  async suspendDeveloper(id: string): Promise<any> {
+    try {
+      const response = await this.client.post(`/api/vaas/developers/${id}/suspend`);
+      if (!response.data.success) {
+        throw new Error('Failed to suspend developer');
+      }
+      return response.data;
+    } catch (error: any) {
+      console.error('[IdswyftAPI] Suspend developer failed:', error.response?.data || error.message);
+      throw new Error(`Failed to suspend developer: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
+  async unsuspendDeveloper(id: string): Promise<any> {
+    try {
+      const response = await this.client.post(`/api/vaas/developers/${id}/unsuspend`);
+      if (!response.data.success) {
+        throw new Error('Failed to unsuspend developer');
+      }
+      return response.data;
+    } catch (error: any) {
+      console.error('[IdswyftAPI] Unsuspend developer failed:', error.response?.data || error.message);
+      throw new Error(`Failed to unsuspend developer: ${error.response?.data?.error || error.message}`);
+    }
+  }
+
   async getApiHealth(): Promise<{ status: string; version: string; timestamp: string }> {
     try {
       const response = await this.client.get('/health');

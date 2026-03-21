@@ -99,7 +99,12 @@ export const authenticateAPIKey = catchAsync(async (req: Request, res: Response,
     // Attach API key and developer to request
     req.apiKey = apiKeyRecord as APIKey;
     req.developer = apiKeyRecord.developer as Developer;
-    
+
+    // Check if developer account is suspended
+    if (req.developer?.status === 'suspended') {
+      throw new AuthorizationError('Developer account suspended');
+    }
+
     logger.info('API key authenticated', {
       developerId: apiKeyRecord.developer_id,
       keyPrefix,
@@ -350,7 +355,12 @@ export const authenticateDeveloperJWT = catchAsync(async (req: Request, res: Res
     if (error || !developer) {
       throw new AuthenticationError('Invalid token or developer not found');
     }
-    
+
+    // Check if developer account is suspended
+    if (developer.status === 'suspended') {
+      throw new AuthorizationError('Your account has been suspended');
+    }
+
     req.developer = developer as Developer;
     next();
   } catch (error) {

@@ -120,6 +120,7 @@ export interface Developer {
   is_verified: boolean;
   github_id?: number;
   avatar_url?: string;
+  status?: 'active' | 'suspended';
   created_at: Date;
 }
 

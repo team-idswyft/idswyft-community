@@ -17,6 +17,7 @@ import {
   BarChart3,
   Activity,
   SlidersHorizontal,
+  Users,
 } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 
@@ -24,6 +25,7 @@ const navigationItems = [
   { name: 'Dashboard',         href: '/dashboard',         icon: LayoutDashboard },
   { name: 'System Status',     href: '/system-status',     icon: Activity },
   { name: 'Organizations',     href: '/organizations',     icon: Building },
+  { name: 'Developers',        href: '/developers',        icon: Users },
   { name: 'Verification',      href: '/verification-settings', icon: SlidersHorizontal },
   { name: 'Branding',          href: '/branding',          icon: Palette },
   { name: 'Email Templates',   href: '/email-templates',   icon: Mail },

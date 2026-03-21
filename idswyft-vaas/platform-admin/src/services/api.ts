@@ -29,6 +29,19 @@ export interface Organization {
   [key: string]: any;
 }
 
+export interface DeveloperInfo {
+  id: string;
+  email: string;
+  name: string;
+  company?: string;
+  status: 'active' | 'suspended';
+  is_verified: boolean;
+  avatar_url?: string;
+  created_at: string;
+  api_key_count: number;
+  verification_count: number;
+}
+
 // ── API Client ───────────────────────────────────────────────────────────────
 class PlatformApiClient {
   private client: AxiosInstance;
@@ -181,6 +194,50 @@ class PlatformApiClient {
     }
 
     return response.data.data!;
+  }
+
+  // ── Developers ─────────────────────────────────────────────────────────
+  async listDevelopers(params?: Record<string, any>): Promise<{ developers: DeveloperInfo[]; meta: any }> {
+    const response: AxiosResponse<ApiResponse<DeveloperInfo[]>> =
+      await this.client.get('/developers', { params });
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to list developers');
+    }
+
+    return {
+      developers: response.data.data!,
+      meta: response.data.meta || {},
+    };
+  }
+
+  async getDeveloper(id: string): Promise<DeveloperInfo> {
+    const response: AxiosResponse<ApiResponse<DeveloperInfo>> =
+      await this.client.get(`/developers/${id}`);
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to get developer');
+    }
+
+    return response.data.data!;
+  }
+
+  async suspendDeveloper(id: string): Promise<void> {
+    const response: AxiosResponse<ApiResponse> =
+      await this.client.post(`/developers/${id}/suspend`);
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to suspend developer');
+    }
+  }
+
+  async unsuspendDeveloper(id: string): Promise<void> {
+    const response: AxiosResponse<ApiResponse> =
+      await this.client.post(`/developers/${id}/unsuspend`);
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to unsuspend developer');
+    }
   }
 
   // ── Email ────────────────────────────────────────────────────────────────

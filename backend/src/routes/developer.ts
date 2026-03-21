@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import { body, param, validationResult } from 'express-validator';
 import validator from 'validator';
+import multer from 'multer';
 import { supabase } from '@/config/database.js';
 import { generateAPIKey, authenticateDeveloperJWT } from '@/middleware/auth.js';
 import { catchAsync, ValidationError, NotFoundError, AuthenticationError } from '@/middleware/errorHandler.js';
@@ -1447,6 +1448,138 @@ router.put('/settings/llm',
       api_key_preview: maskApiKey(api_key),
       endpoint_url: provider === 'custom' ? endpoint_url : null,
     });
+  })
+);
+
+// ─── Developer Profile ─────────────────────────────────────────────────────
+
+const avatarUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 2 * 1024 * 1024 }, // 2 MB
+  fileFilter: (_req, file, cb) => {
+    if (['image/jpeg', 'image/png'].includes(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Only JPEG and PNG images are allowed'));
+    }
+  },
+});
+
+// GET /api/developer/profile — return authenticated developer's record
+router.get('/profile',
+  authenticateDeveloperJWT,
+  catchAsync(async (req: Request, res: Response) => {
+    const developer = req.developer;
+    if (!developer) throw new AuthenticationError('Developer authentication required');
+
+    res.json({
+      success: true,
+      data: {
+        id: developer.id,
+        email: developer.email,
+        name: developer.name,
+        company: developer.company || null,
+        avatar_url: developer.avatar_url || null,
+        created_at: developer.created_at,
+      },
+    });
+  })
+);
+
+// PUT /api/developer/profile — update name, company
+router.put('/profile',
+  authenticateDeveloperJWT,
+  [
+    body('name')
+      .trim()
+      .escape()
+      .isLength({ min: 2, max: 100 })
+      .withMessage('Name must be between 2 and 100 characters'),
+    body('company')
+      .optional({ nullable: true })
+      .trim()
+      .escape()
+      .isLength({ max: 100 })
+      .withMessage('Company name must be less than 100 characters'),
+  ],
+  catchAsync(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw new ValidationError('Validation failed', 'multiple', errors.array());
+    }
+
+    const developer = req.developer;
+    if (!developer) throw new AuthenticationError('Developer authentication required');
+
+    const { name, company } = req.body;
+
+    const { data: updated, error } = await supabase
+      .from('developers')
+      .update({ name, company: company || null })
+      .eq('id', developer.id)
+      .select('id, email, name, company, avatar_url, created_at')
+      .single();
+
+    if (error) {
+      logger.error('Failed to update developer profile:', error);
+      throw new Error('Failed to update profile');
+    }
+
+    res.json({ success: true, data: updated });
+  })
+);
+
+// POST /api/developer/avatar — upload avatar image
+router.post('/avatar',
+  authenticateDeveloperJWT,
+  (avatarUpload.single('file') as any),
+  catchAsync(async (req: Request, res: Response) => {
+    const developer = req.developer;
+    if (!developer) throw new AuthenticationError('Developer authentication required');
+
+    const file = (req as any).file;
+    if (!file) throw new ValidationError('No file uploaded', 'file', null);
+
+    // Validate magic bytes — prevent spoofed Content-Type
+    const buf = file.buffer;
+    const isJpeg = buf[0] === 0xFF && buf[1] === 0xD8;
+    const isPng = buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47;
+    if (!isJpeg && !isPng) {
+      throw new ValidationError('File content does not match a valid JPEG or PNG image', 'file', null);
+    }
+
+    const storagePath = `avatars/${developer.id}`;
+
+    // Upload to Supabase Storage (upsert — overwrite on re-upload)
+    const { error: uploadError } = await supabase.storage
+      .from(config.supabase.storageBucket)
+      .upload(storagePath, file.buffer, {
+        contentType: file.mimetype,
+        upsert: true,
+        duplex: 'half',
+      });
+
+    if (uploadError) {
+      logger.error('Avatar upload failed:', uploadError);
+      throw new Error('Failed to upload avatar');
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from(config.supabase.storageBucket)
+      .getPublicUrl(storagePath);
+
+    const avatarUrl = urlData.publicUrl;
+
+    // Update developer record
+    await supabase
+      .from('developers')
+      .update({ avatar_url: avatarUrl })
+      .eq('id', developer.id);
+
+    logger.info('Developer avatar updated', { developerId: developer.id });
+
+    res.json({ success: true, data: { avatar_url: avatarUrl } });
   })
 );
 
