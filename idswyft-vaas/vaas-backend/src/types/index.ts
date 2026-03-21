@@ -411,7 +411,8 @@ export type PlatformNotificationType =
   | 'verification.anomaly'
   | 'webhook.delivery_failed'
   | 'security.failed_login' | 'security.admin_created' | 'security.admin_deleted'
-  | 'config.changed';
+  | 'config.changed'
+  | 'key_change.requested' | 'key_change.approved' | 'key_change.denied' | 'key_change.executed' | 'key_change.expired';
 
 export type PlatformNotificationSeverity = 'info' | 'warning' | 'error' | 'critical';
 
@@ -482,4 +483,21 @@ export interface PlatformConfigAudit {
   changed_by?: string;
   changed_at: string;
   change_type: 'create' | 'update' | 'delete' | 'import';
+}
+
+export interface KeyChangeRequest {
+  id: string;
+  scenario: 'rotate' | 'reset';
+  status: 'pending' | 'approved' | 'denied' | 'executed' | 'expired' | 'cancelled';
+  reason?: string;
+  requested_by: string;
+  requester_email?: string;
+  approved_by?: string;
+  approver_email?: string;
+  approved_at?: string;
+  denied_by?: string;
+  denied_at?: string;
+  executed_at?: string;
+  expires_at: string;
+  created_at: string;
 }

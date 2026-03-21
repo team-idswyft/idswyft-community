@@ -8,15 +8,24 @@
  * - Export/import for disaster recovery
  */
 
-import { createCipheriv, createDecipheriv, randomBytes, scryptSync } from 'crypto';
+import { createCipheriv, createDecipheriv, createHmac, randomBytes, scryptSync } from 'crypto';
 import { vaasSupabase } from '../config/database.js';
 import config from '../config/index.js';
 import { platformNotificationService } from './platformNotificationService.js';
-import type { PlatformConfigItem, PlatformConfigAudit } from '../types/index.js';
+import type { PlatformConfigItem, PlatformConfigAudit, KeyChangeRequest } from '../types/index.js';
 
 // ── Encryption helpers ───────────────────────────────────────────────────────
 
 let _cachedKey: Buffer | null = null;
+
+/** Derive a unique 16-byte salt from the passphrase via HMAC so each passphrase gets a distinct salt. */
+function deriveSalt(passphrase: string): Buffer {
+  return createHmac('sha256', passphrase).update('idswyft-vaas-config-v2').digest().subarray(0, 16);
+}
+
+function deriveKeyFromPassphrase(passphrase: string): Buffer {
+  return scryptSync(passphrase, deriveSalt(passphrase), 32);
+}
 
 function deriveKey(): Buffer {
   if (_cachedKey) return _cachedKey;
@@ -27,16 +36,15 @@ function deriveKey(): Buffer {
       throw new Error('[PlatformConfig] VAAS_CONFIG_ENCRYPTION_KEY is required in production');
     }
     // Development fallback only
-    _cachedKey = scryptSync(config.jwtSecret, 'idswyft-config-salt', 32);
+    _cachedKey = deriveKeyFromPassphrase(config.jwtSecret);
     return _cachedKey;
   }
 
-  _cachedKey = scryptSync(passphrase, 'idswyft-config-salt', 32);
+  _cachedKey = deriveKeyFromPassphrase(passphrase);
   return _cachedKey;
 }
 
-function encrypt(plaintext: string): string {
-  const key = deriveKey();
+function encryptWithKey(plaintext: string, key: Buffer): string {
   const iv = randomBytes(12);
   const cipher = createCipheriv('aes-256-gcm', key, iv);
   const encrypted = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
@@ -44,8 +52,7 @@ function encrypt(plaintext: string): string {
   return `${iv.toString('hex')}:${tag.toString('hex')}:${encrypted.toString('hex')}`;
 }
 
-function decrypt(ciphertext: string): string {
-  const key = deriveKey();
+function decryptWithKey(ciphertext: string, key: Buffer): string {
   const [ivHex, tagHex, encHex] = ciphertext.split(':');
   if (!ivHex || !tagHex || !encHex) throw new Error('Invalid encrypted value format');
   const decipher = createDecipheriv('aes-256-gcm', key, Buffer.from(ivHex, 'hex'));
@@ -53,6 +60,9 @@ function decrypt(ciphertext: string): string {
   const decrypted = Buffer.concat([decipher.update(Buffer.from(encHex, 'hex')), decipher.final()]);
   return decrypted.toString('utf8');
 }
+
+function encrypt(plaintext: string): string { return encryptWithKey(plaintext, deriveKey()); }
+function decrypt(ciphertext: string): string { return decryptWithKey(ciphertext, deriveKey()); }
 
 // ── Config registry — seeds defaults from env vars ──────────────────────────
 
@@ -490,6 +500,123 @@ export class PlatformConfigService {
     console.log('[PlatformConfig] Default config seeded from environment');
   }
 
+  // ── Key Rotation & Recovery ──────────────────────────────────────────
+
+  /**
+   * Rotate encryption key: decrypt all secrets with current key, re-encrypt with new key.
+   * Use when the current key still works but you want to change it.
+   * After calling this, update VAAS_CONFIG_ENCRYPTION_KEY on your hosting provider.
+   */
+  async rotateKey(newPassphrase: string, adminId: string): Promise<{ rotated: number; failed: string[] }> {
+    const currentKey = deriveKey();
+    const newKey = deriveKeyFromPassphrase(newPassphrase);
+
+    const { data } = await vaasSupabase
+      .from('platform_config')
+      .select('key, value, is_secret')
+      .eq('is_secret', true);
+
+    let rotated = 0;
+    const failed: string[] = [];
+
+    for (const item of data || []) {
+      if (!item.value) continue;
+      try {
+        const plaintext = decryptWithKey(item.value, currentKey);
+        const newCiphertext = encryptWithKey(plaintext, newKey);
+        await vaasSupabase.from('platform_config')
+          .update({ value: newCiphertext, updated_at: new Date().toISOString(), updated_by: adminId })
+          .eq('key', item.key);
+        rotated++;
+      } catch {
+        failed.push(item.key);
+      }
+    }
+
+    // Only switch in-memory key if ALL secrets rotated successfully.
+    // If any failed, keep old key so the un-rotated secrets remain readable.
+    if (failed.length === 0) {
+      _cachedKey = newKey;
+    } else {
+      console.warn(`[PlatformConfig] Key NOT switched — ${failed.length} secrets failed to rotate: ${failed.join(', ')}`);
+    }
+
+    // Audit
+    await vaasSupabase.from('platform_config_audit').insert({
+      config_key: '__ENCRYPTION_KEY__',
+      old_value: '***',
+      new_value: failed.length === 0 ? '*** (rotated)' : `*** (partial: ${failed.length} failed)`,
+      changed_by: adminId,
+      change_type: 'update',
+    });
+
+    console.log(`[PlatformConfig] Key rotated: ${rotated} secrets re-encrypted, ${failed.length} failed`);
+    return { rotated, failed };
+  }
+
+  /**
+   * Reset secrets after key loss: wipe all encrypted values, then re-seed from env vars.
+   * Use when the old key is lost and encrypted DB values are unreadable.
+   */
+  async resetSecrets(adminId: string): Promise<{ cleared: number; reseeded: number }> {
+    // 1. Delete all secret rows (they're unreadable anyway)
+    const { data: secrets } = await vaasSupabase
+      .from('platform_config')
+      .select('key')
+      .eq('is_secret', true);
+
+    const cleared = secrets?.length || 0;
+
+    if (cleared > 0) {
+      await vaasSupabase
+        .from('platform_config')
+        .delete()
+        .eq('is_secret', true);
+    }
+
+    // Audit
+    await vaasSupabase.from('platform_config_audit').insert({
+      config_key: '__SECRETS_RESET__',
+      old_value: `${cleared} secrets wiped`,
+      new_value: null,
+      changed_by: adminId,
+      change_type: 'delete',
+    });
+
+    // 2. Invalidate cached key so deriveKey() picks up the new env var
+    _cachedKey = null;
+
+    // 3. Re-seed from env vars (only inserts missing keys, encrypts with current key)
+    let reseeded = 0;
+    for (const [key, entry] of Object.entries(CONFIG_REGISTRY)) {
+      if (!entry.is_secret) continue;
+
+      const envValue = process.env[entry.env_key] || '';
+      if (!envValue) continue;
+
+      const storedValue = encrypt(envValue);
+      await vaasSupabase.from('platform_config').upsert({
+        key,
+        value: storedValue,
+        category: entry.category,
+        is_secret: true,
+        requires_restart: entry.requires_restart,
+        description: entry.description,
+        updated_at: new Date().toISOString(),
+        updated_by: adminId,
+      }, { onConflict: 'key' });
+      reseeded++;
+    }
+
+    console.log(`[PlatformConfig] Secrets reset: ${cleared} cleared, ${reseeded} re-seeded from env`);
+    return { cleared, reseeded };
+  }
+
+  /** Generate a new random encryption key (64-char hex = 256 bits). */
+  static generateKey(): string {
+    return randomBytes(32).toString('hex');
+  }
+
   // ── Audit History ─────────────────────────────────────────────────────
 
   async getAuditHistory(params: { key?: string; page?: number; per_page?: number } = {}): Promise<{ audits: PlatformConfigAudit[]; total: number }> {
@@ -508,6 +635,323 @@ export class PlatformConfigService {
 
     if (error) return { audits: [], total: 0 };
     return { audits: (data || []) as PlatformConfigAudit[], total: count || 0 };
+  }
+
+  // ── Key Change Request Workflow ──────────────────────────────────────
+
+  /**
+   * Submit a key change request. Only one pending request allowed at a time.
+   * Creates a 24h expiration window and notifies all super admins.
+   */
+  async requestKeyChange(scenario: 'rotate' | 'reset', reason: string, adminId: string): Promise<KeyChangeRequest> {
+    // Check for existing pending request
+    const { data: existing } = await vaasSupabase
+      .from('platform_key_change_requests')
+      .select('id, expires_at')
+      .eq('status', 'pending')
+      .limit(1)
+      .single();
+
+    if (existing) {
+      // Lazy-expire if past deadline
+      if (new Date(existing.expires_at) < new Date()) {
+        await vaasSupabase.from('platform_key_change_requests')
+          .update({ status: 'expired' })
+          .eq('id', existing.id);
+      } else {
+        throw new Error('A pending key change request already exists. Cancel or wait for it to expire.');
+      }
+    }
+
+    // approval_token: 256-bit random for future deep-link approval via email; JWT auth still required
+    const approvalToken = randomBytes(32).toString('hex');
+    const expiresAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+
+    const { data, error } = await vaasSupabase
+      .from('platform_key_change_requests')
+      .insert({
+        scenario,
+        reason,
+        requested_by: adminId,
+        approval_token: approvalToken,
+        expires_at: expiresAt,
+      })
+      .select('*')
+      .single();
+
+    // DB-level unique partial index (idx_kcr_one_pending) prevents race conditions
+    if (error) {
+      if (error.code === '23505') throw new Error('A pending key change request already exists. Cancel or wait for it to expire.');
+      throw new Error(error.message);
+    }
+
+    // Audit
+    await vaasSupabase.from('platform_config_audit').insert({
+      config_key: '__KEY_CHANGE_REQUEST__',
+      old_value: null,
+      new_value: `${scenario} request created`,
+      changed_by: adminId,
+      change_type: 'create',
+    });
+
+    // Notify
+    platformNotificationService.emit({
+      type: 'key_change.requested',
+      severity: 'critical',
+      title: `Encryption key ${scenario} requested`,
+      message: reason || `A ${scenario} of the encryption key has been requested and needs approval.`,
+      source: 'platform-config',
+      metadata: { request_id: data.id, scenario },
+    }).catch(() => {});
+
+    return data as KeyChangeRequest;
+  }
+
+  /**
+   * List all key change requests, newest first. Lazy-expires any pending request past its deadline.
+   */
+  async listKeyChangeRequests(page: number = 1, perPage: number = 10): Promise<{ requests: KeyChangeRequest[]; total: number }> {
+    // Lazy-expire pending requests
+    await vaasSupabase
+      .from('platform_key_change_requests')
+      .update({ status: 'expired' })
+      .eq('status', 'pending')
+      .lt('expires_at', new Date().toISOString());
+
+    const offset = (page - 1) * perPage;
+    const { data, error, count } = await vaasSupabase
+      .from('platform_key_change_requests')
+      .select('*', { count: 'exact' })
+      .order('created_at', { ascending: false })
+      .range(offset, offset + perPage - 1);
+
+    if (error) return { requests: [], total: 0 };
+
+    // Join requester/approver emails
+    const requests = await this.enrichRequestsWithEmails(data || []);
+    return { requests, total: count || 0 };
+  }
+
+  /**
+   * Get a single key change request with requester/approver emails.
+   */
+  async getKeyChangeRequest(id: string): Promise<KeyChangeRequest | null> {
+    // Lazy-expire
+    await vaasSupabase
+      .from('platform_key_change_requests')
+      .update({ status: 'expired' })
+      .eq('status', 'pending')
+      .eq('id', id)
+      .lt('expires_at', new Date().toISOString());
+
+    const { data, error } = await vaasSupabase
+      .from('platform_key_change_requests')
+      .select('*')
+      .eq('id', id)
+      .single();
+
+    if (error || !data) return null;
+
+    const [enriched] = await this.enrichRequestsWithEmails([data]);
+    return enriched;
+  }
+
+  /**
+   * Approve a pending key change request. Enforces dual-control: requester cannot approve their own request.
+   */
+  async approveKeyChange(requestId: string, adminId: string): Promise<KeyChangeRequest> {
+    const { data: req, error: fetchErr } = await vaasSupabase
+      .from('platform_key_change_requests')
+      .select('*')
+      .eq('id', requestId)
+      .single();
+
+    if (fetchErr || !req) throw new Error('Key change request not found');
+    if (req.status !== 'pending') throw new Error(`Cannot approve a request with status "${req.status}"`);
+    if (new Date(req.expires_at) < new Date()) {
+      await vaasSupabase.from('platform_key_change_requests').update({ status: 'expired' }).eq('id', requestId);
+      throw new Error('This request has expired');
+    }
+    if (req.requested_by === adminId) {
+      throw new Error('You cannot approve your own key change request (dual-control policy)');
+    }
+
+    const { data, error } = await vaasSupabase
+      .from('platform_key_change_requests')
+      .update({ status: 'approved', approved_by: adminId, approved_at: new Date().toISOString() })
+      .eq('id', requestId)
+      .select('*')
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    // Audit
+    await vaasSupabase.from('platform_config_audit').insert({
+      config_key: '__KEY_CHANGE_APPROVED__',
+      old_value: 'pending',
+      new_value: 'approved',
+      changed_by: adminId,
+      change_type: 'update',
+    });
+
+    platformNotificationService.emit({
+      type: 'key_change.approved',
+      severity: 'warning',
+      title: `Encryption key ${req.scenario} approved`,
+      message: `The ${req.scenario} request has been approved and is ready for execution.`,
+      source: 'platform-config',
+      metadata: { request_id: requestId, scenario: req.scenario },
+    }).catch(() => {});
+
+    return data as KeyChangeRequest;
+  }
+
+  /**
+   * Deny a pending key change request.
+   */
+  async denyKeyChange(requestId: string, adminId: string, reason?: string): Promise<KeyChangeRequest> {
+    const { data: req, error: fetchErr } = await vaasSupabase
+      .from('platform_key_change_requests')
+      .select('*')
+      .eq('id', requestId)
+      .single();
+
+    if (fetchErr || !req) throw new Error('Key change request not found');
+    if (req.status !== 'pending') throw new Error(`Cannot deny a request with status "${req.status}"`);
+
+    const { data, error } = await vaasSupabase
+      .from('platform_key_change_requests')
+      .update({ status: 'denied', denied_by: adminId, denied_at: new Date().toISOString() })
+      .eq('id', requestId)
+      .select('*')
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    // Audit
+    await vaasSupabase.from('platform_config_audit').insert({
+      config_key: '__KEY_CHANGE_DENIED__',
+      old_value: 'pending',
+      new_value: `denied${reason ? `: ${reason}` : ''}`,
+      changed_by: adminId,
+      change_type: 'update',
+    });
+
+    platformNotificationService.emit({
+      type: 'key_change.denied',
+      severity: 'info',
+      title: `Encryption key ${req.scenario} denied`,
+      message: reason || `The ${req.scenario} request was denied.`,
+      source: 'platform-config',
+      metadata: { request_id: requestId, scenario: req.scenario },
+    }).catch(() => {});
+
+    return data as KeyChangeRequest;
+  }
+
+  /**
+   * Cancel a pending key change request. Only the requester can cancel.
+   */
+  async cancelKeyChange(requestId: string, adminId: string): Promise<KeyChangeRequest> {
+    const { data: req, error: fetchErr } = await vaasSupabase
+      .from('platform_key_change_requests')
+      .select('*')
+      .eq('id', requestId)
+      .single();
+
+    if (fetchErr || !req) throw new Error('Key change request not found');
+    if (req.status !== 'pending') throw new Error(`Cannot cancel a request with status "${req.status}"`);
+    if (req.requested_by !== adminId) throw new Error('Only the requester can cancel their own request');
+
+    const { data, error } = await vaasSupabase
+      .from('platform_key_change_requests')
+      .update({ status: 'cancelled' })
+      .eq('id', requestId)
+      .select('*')
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    return data as KeyChangeRequest;
+  }
+
+  /**
+   * Execute an approved key change request.
+   * - Rotate: requires newKey, decrypts all secrets with current key and re-encrypts with new key.
+   * - Reset: wipes all encrypted values and re-seeds from environment variables.
+   * Note: any super admin can execute once approved — dual-control is enforced at the approve step.
+   */
+  async executeKeyChange(requestId: string, adminId: string, newKey?: string): Promise<KeyChangeRequest & { result?: any }> {
+    const { data: req, error: fetchErr } = await vaasSupabase
+      .from('platform_key_change_requests')
+      .select('*')
+      .eq('id', requestId)
+      .single();
+
+    if (fetchErr || !req) throw new Error('Key change request not found');
+    if (req.status !== 'approved') throw new Error(`Cannot execute a request with status "${req.status}"`);
+
+    let result: any;
+    if (req.scenario === 'rotate') {
+      if (!newKey) throw new Error('New key is required for rotation');
+      result = await this.rotateKey(newKey, adminId);
+    } else {
+      result = await this.resetSecrets(adminId);
+    }
+
+    const { data, error } = await vaasSupabase
+      .from('platform_key_change_requests')
+      .update({ status: 'executed', executed_at: new Date().toISOString() })
+      .eq('id', requestId)
+      .select('*')
+      .single();
+
+    if (error) throw new Error(error.message);
+
+    // Audit
+    await vaasSupabase.from('platform_config_audit').insert({
+      config_key: '__KEY_CHANGE_EXECUTED__',
+      old_value: 'approved',
+      new_value: `executed (${req.scenario})`,
+      changed_by: adminId,
+      change_type: 'update',
+    });
+
+    platformNotificationService.emit({
+      type: 'key_change.executed',
+      severity: 'critical',
+      title: `Encryption key ${req.scenario} executed`,
+      message: `The encryption key ${req.scenario} has been executed successfully.`,
+      source: 'platform-config',
+      metadata: { request_id: requestId, scenario: req.scenario, result },
+    }).catch(() => {});
+
+    return { ...(data as KeyChangeRequest), result };
+  }
+
+  /** Enrich requests array with requester/approver emails from platform_admins */
+  private async enrichRequestsWithEmails(requests: any[]): Promise<KeyChangeRequest[]> {
+    if (requests.length === 0) return [];
+
+    const adminIds = new Set<string>();
+    for (const r of requests) {
+      if (r.requested_by) adminIds.add(r.requested_by);
+      if (r.approved_by) adminIds.add(r.approved_by);
+      if (r.denied_by) adminIds.add(r.denied_by);
+    }
+
+    const { data: admins } = await vaasSupabase
+      .from('platform_admins')
+      .select('id, email')
+      .in('id', [...adminIds]);
+
+    const emailMap = new Map((admins || []).map((a: any) => [a.id, a.email]));
+
+    return requests.map((r) => ({
+      ...r,
+      requester_email: emailMap.get(r.requested_by),
+      approver_email: r.approved_by ? emailMap.get(r.approved_by) : undefined,
+    }));
   }
 }
 

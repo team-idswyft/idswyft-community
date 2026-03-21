@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Download, Upload, Eye, EyeOff, Pencil, Trash2, ChevronDown, ChevronRight, Database, Info, ShieldAlert, Server } from 'lucide-react';
+import { Download, Upload, Eye, EyeOff, Pencil, Trash2, ChevronDown, ChevronRight, Database, Info, ShieldAlert, Server, KeyRound, RotateCw, AlertTriangle, CheckCircle2, XCircle, Clock, Copy } from 'lucide-react';
 import platformApi from '../services/api';
 import { cardSurface, tableHeaderClass, statusPill, monoXs, monoSm, sectionLabel, infoPanel, getStatusAccent } from '../styles/tokens';
+import { useAuth } from '../contexts/AuthContext';
 
 interface ConfigItem {
   key: string;
@@ -23,7 +24,38 @@ interface AuditEntry {
   change_type: string;
 }
 
+interface KeyChangeRequest {
+  id: string;
+  scenario: 'rotate' | 'reset';
+  status: 'pending' | 'approved' | 'denied' | 'executed' | 'expired' | 'cancelled';
+  reason?: string;
+  requested_by: string;
+  requester_email?: string;
+  approved_by?: string;
+  approver_email?: string;
+  approved_at?: string;
+  denied_by?: string;
+  denied_at?: string;
+  executed_at?: string;
+  expires_at: string;
+  created_at: string;
+}
+
+// ── Status styling helpers ─────────────────────────────────────────────────
+
+const KCR_STATUS_STYLES: Record<string, string> = {
+  pending:   'bg-amber-500/15 text-amber-300 border-amber-500/30',
+  approved:  'bg-cyan-500/15 text-cyan-300 border-cyan-500/30',
+  denied:    'bg-rose-500/15 text-rose-300 border-rose-500/30',
+  executed:  'bg-emerald-500/15 text-emerald-300 border-emerald-500/30',
+  expired:   'bg-slate-500/15 text-slate-300 border-slate-500/30',
+  cancelled: 'bg-slate-500/15 text-slate-400 border-slate-500/30',
+};
+
 export default function Configuration() {
+  const { admin } = useAuth();
+  const currentAdminId = admin?.id;
+
   const [configs, setConfigs] = useState<ConfigItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null);
@@ -56,6 +88,28 @@ export default function Configuration() {
   const [visibleSecrets, setVisibleSecrets] = useState<Set<string>>(new Set());
   const [revealedValues, setRevealedValues] = useState<Record<string, string>>({});
 
+  // ── Key Management State ──────────────────────────────────────────────────
+  const [showKeySection, setShowKeySection] = useState(false);
+  const [showWizard, setShowWizard] = useState(false);
+  const [wizardStep, setWizardStep] = useState<1 | 2 | 3>(1);
+  const [wizardScenario, setWizardScenario] = useState<'rotate' | 'reset' | null>(null);
+  const [wizardReason, setWizardReason] = useState('');
+  const [wizardSubmitting, setWizardSubmitting] = useState(false);
+  const [wizardRequestId, setWizardRequestId] = useState<string | null>(null);
+
+  // Active/pending request
+  const [activeRequest, setActiveRequest] = useState<KeyChangeRequest | null>(null);
+  const [requestHistory, setRequestHistory] = useState<KeyChangeRequest[]>([]);
+  const [showHistory, setShowHistory] = useState(false);
+
+  // Execute state
+  const [executeNewKey, setExecuteNewKey] = useState('');
+  const [executing, setExecuting] = useState(false);
+
+  // Deny reason
+  const [denyReason, setDenyReason] = useState('');
+  const [showDenyModal, setShowDenyModal] = useState(false);
+
   const fetchConfigs = useCallback(async () => {
     setLoading(true);
     try {
@@ -68,7 +122,21 @@ export default function Configuration() {
     }
   }, []);
 
-  useEffect(() => { fetchConfigs(); }, [fetchConfigs]);
+  const fetchKeyRequests = useCallback(async () => {
+    try {
+      const { requests } = await platformApi.listKeyChangeRequests({ per_page: 10 });
+      // Find active request (pending or approved, not expired client-side)
+      const active = requests.find((r: KeyChangeRequest) =>
+        (r.status === 'pending' || r.status === 'approved') && new Date(r.expires_at) > new Date()
+      ) || null;
+      setActiveRequest(active);
+      setRequestHistory(requests);
+    } catch {
+      // best-effort
+    }
+  }, []);
+
+  useEffect(() => { fetchConfigs(); fetchKeyRequests(); }, [fetchConfigs, fetchKeyRequests]);
 
   // Auto-dismiss toast after 5s
   useEffect(() => {
@@ -225,7 +293,103 @@ export default function Configuration() {
     }
   };
 
+  // ── Key Management Handlers ────────────────────────────────────────────────
+
+  const openWizard = () => {
+    setWizardStep(1);
+    setWizardScenario(null);
+    setWizardReason('');
+    setWizardRequestId(null);
+    setShowWizard(true);
+  };
+
+  const handleWizardSubmit = async () => {
+    if (!wizardScenario) return;
+    setWizardSubmitting(true);
+    try {
+      const result = await platformApi.createKeyChangeRequest(wizardScenario, wizardReason);
+      setWizardRequestId(result.id);
+      setWizardStep(3);
+      fetchKeyRequests();
+    } catch (err: any) {
+      setToast({ message: err.message, type: 'error' });
+    } finally {
+      setWizardSubmitting(false);
+    }
+  };
+
+  const handleApprove = async (id: string) => {
+    try {
+      await platformApi.approveKeyChangeRequest(id);
+      setToast({ message: 'Key change request approved', type: 'success' });
+      fetchKeyRequests();
+    } catch (err: any) {
+      setToast({ message: err.message, type: 'error' });
+    }
+  };
+
+  const handleDeny = async (id: string) => {
+    try {
+      await platformApi.denyKeyChangeRequest(id, denyReason || undefined);
+      setToast({ message: 'Key change request denied', type: 'success' });
+      setShowDenyModal(false);
+      setDenyReason('');
+      fetchKeyRequests();
+    } catch (err: any) {
+      setToast({ message: err.message, type: 'error' });
+    }
+  };
+
+  const handleCancel = async (id: string) => {
+    if (!confirm('Cancel this key change request?')) return;
+    try {
+      await platformApi.cancelKeyChangeRequest(id);
+      setToast({ message: 'Request cancelled', type: 'success' });
+      fetchKeyRequests();
+    } catch (err: any) {
+      setToast({ message: err.message, type: 'error' });
+    }
+  };
+
+  const handleExecute = async (id: string) => {
+    setExecuting(true);
+    try {
+      const newKeyValue = activeRequest?.scenario === 'rotate' ? executeNewKey : undefined;
+      await platformApi.executeKeyChangeRequest(id, newKeyValue);
+      setToast({ message: 'Key change executed successfully', type: 'success' });
+      setExecuteNewKey('');
+      fetchKeyRequests();
+      fetchConfigs();
+    } catch (err: any) {
+      setToast({ message: err.message, type: 'error' });
+    } finally {
+      setExecuting(false);
+    }
+  };
+
+  const handleGenerateKey = async () => {
+    try {
+      const { key } = await platformApi.generateEncryptionKey();
+      setExecuteNewKey(key);
+    } catch (err: any) {
+      setToast({ message: err.message, type: 'error' });
+    }
+  };
+
+  const copyToClipboard = (text: string) => {
+    navigator.clipboard.writeText(text);
+    setToast({ message: 'Copied to clipboard', type: 'success' });
+  };
+
   const formatDate = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
+
+  const getTimeRemaining = (expiresAt: string): string => {
+    const ms = new Date(expiresAt).getTime() - Date.now();
+    if (ms <= 0) return 'Expired';
+    const hours = Math.floor(ms / 3600000);
+    const mins = Math.floor((ms % 3600000) / 60000);
+    return `${hours}h ${mins}m remaining`;
+  };
 
   const inputClass = 'w-full rounded-lg border border-white/10 bg-slate-800/60 px-3 py-2 text-sm text-slate-200 focus:border-cyan-400/50 focus:outline-none';
 
@@ -294,22 +458,198 @@ export default function Configuration() {
       <div className="rounded-xl border border-amber-500/20 bg-amber-500/5 px-5 py-4">
         <div className="flex items-start gap-3">
           <ShieldAlert className="mt-0.5 h-5 w-5 shrink-0 text-amber-400" />
-          <div className="space-y-2 text-sm">
+          <div className="space-y-2 text-sm flex-1">
             <p className="font-medium text-amber-200">Encryption Key &mdash; <code className={`${monoXs} text-amber-300`}>VAAS_CONFIG_ENCRYPTION_KEY</code></p>
             <p className="text-slate-400">
-              All secret config values are encrypted at rest using AES-256-GCM, derived from the <code className={`${monoXs} text-slate-300`}>VAAS_CONFIG_ENCRYPTION_KEY</code> environment variable.
-              If you need to rotate this key:
-            </p>
-            <ol className="list-decimal list-inside space-y-1 text-slate-400">
-              <li><strong className="text-slate-300">Export</strong> all secrets first &mdash; use the Export button above with "Include secrets" checked</li>
-              <li><strong className="text-slate-300">Set the new key</strong> on your hosting provider (e.g. Railway env var)</li>
-              <li><strong className="text-slate-300">Re-import</strong> the exported file after the service restarts with the new key</li>
-            </ol>
-            <p className="text-rose-400/80 text-xs">
-              Changing the key without exporting first will make all existing encrypted values unreadable.
+              All secret config values are encrypted at rest using AES-256-GCM. Use the guided wizard below to rotate or recover the encryption key with dual-admin approval.
             </p>
           </div>
+          <button
+            onClick={openWizard}
+            className="shrink-0 flex items-center gap-2 rounded-lg bg-amber-500/15 border border-amber-500/30 px-3 py-2 text-sm font-medium text-amber-200 transition hover:bg-amber-500/25"
+          >
+            <KeyRound className="h-4 w-4" /> Manage Key
+          </button>
         </div>
+      </div>
+
+      {/* ── Key Management Section ─────────────────────────────────────────── */}
+      <div>
+        <button
+          onClick={() => setShowKeySection(!showKeySection)}
+          className="flex items-center gap-2 text-sm text-slate-400 hover:text-cyan-400 transition"
+        >
+          {showKeySection ? <ChevronDown className="h-4 w-4" /> : <ChevronRight className="h-4 w-4" />}
+          <KeyRound className="h-4 w-4" />
+          Key Management
+          {activeRequest && (
+            <span className={`${statusPill} ${KCR_STATUS_STYLES[activeRequest.status]}`}>{activeRequest.status}</span>
+          )}
+        </button>
+
+        {showKeySection && (
+          <div className="mt-3 space-y-4">
+            {/* Active request card */}
+            {activeRequest && (
+              <div className={`${cardSurface} p-5`}>
+                <div className="flex items-start justify-between gap-4">
+                  <div className="space-y-2 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className={`${statusPill} ${KCR_STATUS_STYLES[activeRequest.status]}`}>{activeRequest.status}</span>
+                      <span className={`${statusPill} bg-slate-500/15 text-slate-300 border-slate-500/30`}>{activeRequest.scenario}</span>
+                      <span className={`${monoXs} text-slate-500`}>
+                        <Clock className="inline h-3 w-3 mr-1" />
+                        {getTimeRemaining(activeRequest.expires_at)}
+                      </span>
+                    </div>
+                    <p className="text-sm text-slate-300">{activeRequest.reason || 'No reason provided'}</p>
+                    <div className="flex gap-4 text-xs text-slate-500">
+                      <span>Requested by: <span className="text-slate-400">{activeRequest.requester_email || activeRequest.requested_by}</span></span>
+                      {activeRequest.approver_email && (
+                        <span>Approved by: <span className="text-slate-400">{activeRequest.approver_email}</span></span>
+                      )}
+                      <span>{formatDate(activeRequest.created_at)}</span>
+                    </div>
+                  </div>
+
+                  <div className="flex items-center gap-2 shrink-0">
+                    {/* Actions based on status and current admin */}
+                    {activeRequest.status === 'pending' && currentAdminId !== activeRequest.requested_by && (
+                      <>
+                        <button
+                          onClick={() => handleApprove(activeRequest.id)}
+                          className="flex items-center gap-1 rounded-lg bg-emerald-500/15 border border-emerald-500/30 px-3 py-1.5 text-xs font-medium text-emerald-300 transition hover:bg-emerald-500/25"
+                        >
+                          <CheckCircle2 className="h-3.5 w-3.5" /> Approve
+                        </button>
+                        <button
+                          onClick={() => { setShowDenyModal(true); setDenyReason(''); }}
+                          className="flex items-center gap-1 rounded-lg bg-rose-500/15 border border-rose-500/30 px-3 py-1.5 text-xs font-medium text-rose-300 transition hover:bg-rose-500/25"
+                        >
+                          <XCircle className="h-3.5 w-3.5" /> Deny
+                        </button>
+                      </>
+                    )}
+                    {activeRequest.status === 'pending' && currentAdminId === activeRequest.requested_by && (
+                      <button
+                        onClick={() => handleCancel(activeRequest.id)}
+                        className="flex items-center gap-1 rounded-lg border border-white/10 px-3 py-1.5 text-xs text-slate-400 transition hover:text-slate-200"
+                      >
+                        Cancel Request
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* Execute section (when approved) */}
+                {activeRequest.status === 'approved' && (
+                  <div className="mt-4 pt-4 border-t border-white/10 space-y-3">
+                    {activeRequest.scenario === 'rotate' ? (
+                      <>
+                        <p className="text-sm text-slate-300">Enter or generate a new encryption key to complete the rotation.</p>
+                        <div className="flex items-center gap-2">
+                          <input
+                            type="text"
+                            value={executeNewKey}
+                            onChange={(e) => setExecuteNewKey(e.target.value)}
+                            className={`${inputClass} font-mono text-xs`}
+                            placeholder="New encryption key (64-char hex)"
+                          />
+                          <button
+                            onClick={handleGenerateKey}
+                            className="shrink-0 flex items-center gap-1 rounded-lg border border-white/10 px-3 py-2 text-xs text-slate-300 transition hover:border-cyan-400/40"
+                          >
+                            <RotateCw className="h-3.5 w-3.5" /> Generate
+                          </button>
+                          {executeNewKey && (
+                            <button
+                              onClick={() => copyToClipboard(executeNewKey)}
+                              className="shrink-0 rounded-lg border border-white/10 p-2 text-slate-400 transition hover:text-slate-200"
+                            >
+                              <Copy className="h-3.5 w-3.5" />
+                            </button>
+                          )}
+                        </div>
+                        <div className="rounded-lg bg-amber-500/5 border border-amber-500/20 px-3 py-2 text-xs text-amber-300">
+                          After executing, update <code className="font-mono">VAAS_CONFIG_ENCRYPTION_KEY</code> on Railway to match this new key.
+                        </div>
+                      </>
+                    ) : (
+                      <>
+                        <div className="rounded-lg bg-rose-500/5 border border-rose-500/20 px-3 py-2 text-xs text-rose-300 space-y-1">
+                          <p className="font-medium">Before executing:</p>
+                          <ol className="list-decimal list-inside space-y-0.5">
+                            <li>Set the new <code className="font-mono">VAAS_CONFIG_ENCRYPTION_KEY</code> on Railway</li>
+                            <li>Restart the service so it picks up the new key</li>
+                            <li>Then click Execute below to wipe unreadable secrets and re-seed from env vars</li>
+                          </ol>
+                        </div>
+                      </>
+                    )}
+                    <button
+                      onClick={() => handleExecute(activeRequest.id)}
+                      disabled={executing || (activeRequest.scenario === 'rotate' && !executeNewKey)}
+                      className="flex items-center gap-2 rounded-lg bg-cyan-500/20 border border-cyan-500/30 px-4 py-2 text-sm font-medium text-cyan-200 transition hover:bg-cyan-500/30 disabled:opacity-50 disabled:cursor-not-allowed"
+                    >
+                      {executing ? (
+                        <div className="h-4 w-4 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent" />
+                      ) : (
+                        <KeyRound className="h-4 w-4" />
+                      )}
+                      Execute {activeRequest.scenario === 'rotate' ? 'Rotation' : 'Reset'}
+                    </button>
+                  </div>
+                )}
+              </div>
+            )}
+
+            {!activeRequest && (
+              <div className={`${infoPanel} text-sm text-slate-400`}>
+                No active key change requests. Click "Manage Key" above to start a rotation or recovery.
+              </div>
+            )}
+
+            {/* Request history */}
+            <button
+              onClick={() => setShowHistory(!showHistory)}
+              className="flex items-center gap-2 text-xs text-slate-500 hover:text-slate-300 transition"
+            >
+              {showHistory ? <ChevronDown className="h-3 w-3" /> : <ChevronRight className="h-3 w-3" />}
+              Request History ({requestHistory.length})
+            </button>
+
+            {showHistory && requestHistory.length > 0 && (
+              <div className={cardSurface}>
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead>
+                      <tr className="border-b border-white/10">
+                        <th className={tableHeaderClass}>Date</th>
+                        <th className={tableHeaderClass}>Scenario</th>
+                        <th className={tableHeaderClass}>Requester</th>
+                        <th className={tableHeaderClass}>Approver</th>
+                        <th className={tableHeaderClass}>Status</th>
+                        <th className={tableHeaderClass}>Executed</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {requestHistory.map((r) => (
+                        <tr key={r.id} className="border-b border-white/5">
+                          <td className="px-5 py-2"><span className={`${monoXs} text-slate-500`}>{formatDate(r.created_at)}</span></td>
+                          <td className="px-5 py-2"><span className={`${monoXs} text-slate-300`}>{r.scenario}</span></td>
+                          <td className="px-5 py-2"><span className={`${monoXs} text-slate-400`}>{r.requester_email || '—'}</span></td>
+                          <td className="px-5 py-2"><span className={`${monoXs} text-slate-400`}>{r.approver_email || '—'}</span></td>
+                          <td className="px-5 py-2"><span className={`${statusPill} ${KCR_STATUS_STYLES[r.status]}`}>{r.status}</span></td>
+                          <td className="px-5 py-2"><span className={`${monoXs} text-slate-500`}>{r.executed_at ? formatDate(r.executed_at) : '—'}</span></td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Config grouped by service → category */}
@@ -549,6 +889,177 @@ export default function Configuration() {
               </button>
               <button onClick={handleImport} className="rounded-lg bg-cyan-500/20 border border-cyan-500/30 px-4 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/30">
                 Import
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── Wizard Modal ──────────────────────────────────────────────────── */}
+      {showWizard && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm">
+          <div className="w-full max-w-lg rounded-xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
+            {/* Step indicator */}
+            <div className="flex items-center gap-3 mb-6">
+              {[1, 2, 3].map((step) => (
+                <div key={step} className="flex items-center gap-2">
+                  <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-medium border ${
+                    wizardStep === step
+                      ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300'
+                      : wizardStep > step
+                        ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                        : 'border-white/10 text-slate-500'
+                  }`}>
+                    {wizardStep > step ? <CheckCircle2 className="h-4 w-4" /> : step}
+                  </div>
+                  {step < 3 && <div className={`h-px w-8 ${wizardStep > step ? 'bg-emerald-500/50' : 'bg-white/10'}`} />}
+                </div>
+              ))}
+              <div className="flex-1" />
+              <button onClick={() => setShowWizard(false)} className="text-slate-400 hover:text-slate-200">&times;</button>
+            </div>
+
+            {/* Step 1: Choose scenario */}
+            {wizardStep === 1 && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-slate-100">What do you need to do?</h3>
+                <div className="grid gap-3">
+                  <button
+                    onClick={() => { setWizardScenario('rotate'); setWizardStep(2); }}
+                    className={`text-left rounded-xl border p-4 transition ${
+                      wizardScenario === 'rotate' ? 'border-cyan-500/50 bg-cyan-500/10' : 'border-white/10 hover:border-white/20 hover:bg-white/5'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <RotateCw className="h-5 w-5 text-cyan-400" />
+                      <div>
+                        <p className="font-medium text-slate-200">Rotate Key</p>
+                        <p className="text-xs text-slate-400 mt-0.5">I have the current key and want to change it for security</p>
+                      </div>
+                    </div>
+                  </button>
+                  <button
+                    onClick={() => { setWizardScenario('reset'); setWizardStep(2); }}
+                    className={`text-left rounded-xl border p-4 transition ${
+                      wizardScenario === 'reset' ? 'border-rose-500/50 bg-rose-500/10' : 'border-white/10 hover:border-white/20 hover:bg-white/5'
+                    }`}
+                  >
+                    <div className="flex items-center gap-3">
+                      <AlertTriangle className="h-5 w-5 text-rose-400" />
+                      <div>
+                        <p className="font-medium text-slate-200">Key Lost / Recovery</p>
+                        <p className="text-xs text-slate-400 mt-0.5">The encryption key was lost and secrets are unreadable</p>
+                      </div>
+                    </div>
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 2: Instructions + reason */}
+            {wizardStep === 2 && wizardScenario && (
+              <div className="space-y-4">
+                <h3 className="text-lg font-semibold text-slate-100">
+                  {wizardScenario === 'rotate' ? 'Rotate Encryption Key' : 'Key Recovery'}
+                </h3>
+
+                {wizardScenario === 'rotate' ? (
+                  <div className={`${infoPanel} text-sm text-slate-300`}>
+                    <p className="font-medium text-slate-200 mb-2">How rotation works:</p>
+                    <ol className="list-decimal list-inside space-y-1 text-slate-400">
+                      <li>A new key will be generated for you (or enter your own)</li>
+                      <li>After approval, all secrets are decrypted with the current key and re-encrypted with the new one</li>
+                      <li>Then update <code className="font-mono text-xs text-slate-300">VAAS_CONFIG_ENCRYPTION_KEY</code> on Railway</li>
+                    </ol>
+                  </div>
+                ) : (
+                  <div className="rounded-lg bg-rose-500/5 border border-rose-500/20 px-4 py-3 text-sm">
+                    <p className="font-medium text-rose-300 mb-2">How recovery works:</p>
+                    <ol className="list-decimal list-inside space-y-1 text-rose-300/80">
+                      <li>All encrypted values in the database will be <strong>wiped</strong> (they're already unreadable)</li>
+                      <li>After approval, set the new key on Railway and restart the service</li>
+                      <li>Then execute the reset &mdash; secrets will be re-seeded from environment variables</li>
+                    </ol>
+                  </div>
+                )}
+
+                <div>
+                  <label className={`${sectionLabel} block mb-1`}>Reason for this change</label>
+                  <textarea
+                    value={wizardReason}
+                    onChange={(e) => setWizardReason(e.target.value)}
+                    className={`${inputClass} min-h-[80px]`}
+                    placeholder="Provide a reason for the audit trail..."
+                  />
+                </div>
+
+                <div className="flex justify-between mt-6">
+                  <button
+                    onClick={() => { setWizardStep(1); setWizardScenario(null); }}
+                    className="rounded-lg border border-white/10 px-4 py-2 text-sm text-slate-400 hover:text-slate-200"
+                  >
+                    Back
+                  </button>
+                  <button
+                    onClick={handleWizardSubmit}
+                    disabled={wizardSubmitting}
+                    className="flex items-center gap-2 rounded-lg bg-cyan-500/20 border border-cyan-500/30 px-4 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/30 disabled:opacity-50"
+                  >
+                    {wizardSubmitting && <div className="h-4 w-4 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent" />}
+                    Submit for Approval
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {/* Step 3: Confirmation */}
+            {wizardStep === 3 && (
+              <div className="space-y-4 text-center py-4">
+                <div className="mx-auto h-12 w-12 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
+                  <CheckCircle2 className="h-6 w-6 text-emerald-400" />
+                </div>
+                <h3 className="text-lg font-semibold text-slate-100">Request Submitted</h3>
+                <p className="text-sm text-slate-400">
+                  A different super admin must approve before you can proceed. The request expires in 24 hours.
+                </p>
+                {wizardRequestId && (
+                  <p className={`${monoXs} text-slate-500`}>Request ID: {wizardRequestId}</p>
+                )}
+                <button
+                  onClick={() => { setShowWizard(false); setShowKeySection(true); }}
+                  className="rounded-lg bg-cyan-500/20 border border-cyan-500/30 px-4 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/30"
+                >
+                  Done
+                </button>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Deny Reason Modal ──────────────────────────────────────────── */}
+      {showDenyModal && activeRequest && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm">
+          <div className="w-full max-w-sm rounded-xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
+            <h3 className="text-lg font-semibold text-slate-100 mb-4">Deny Request</h3>
+            <div>
+              <label className={`${sectionLabel} block mb-1`}>Reason (optional)</label>
+              <textarea
+                value={denyReason}
+                onChange={(e) => setDenyReason(e.target.value)}
+                className={`${inputClass} min-h-[80px]`}
+                placeholder="Why are you denying this request?"
+              />
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button onClick={() => setShowDenyModal(false)} className="rounded-lg border border-white/10 px-4 py-2 text-sm text-slate-400 hover:text-slate-200">
+                Cancel
+              </button>
+              <button
+                onClick={() => handleDeny(activeRequest.id)}
+                className="rounded-lg bg-rose-500/20 border border-rose-500/30 px-4 py-2 text-sm font-medium text-rose-200 hover:bg-rose-500/30"
+              >
+                Deny
               </button>
             </div>
           </div>

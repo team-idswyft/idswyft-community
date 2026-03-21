@@ -10,6 +10,7 @@ const EVENT_GROUPS: Record<string, string[]> = {
   Organization: ['organization.created', 'organization.suspended', 'organization.status_changed'],
   Security: ['security.failed_login', 'security.admin_created', 'security.admin_deleted'],
   Config: ['config.changed'],
+  'Key Management': ['key_change.requested', 'key_change.approved', 'key_change.denied', 'key_change.executed', 'key_change.expired'],
   Verification: ['verification.anomaly'],
   Webhook: ['webhook.delivery_failed'],
 };

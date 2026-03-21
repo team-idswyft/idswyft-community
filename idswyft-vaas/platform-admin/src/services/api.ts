@@ -655,6 +655,96 @@ class PlatformApiClient {
     return { audits: response.data.data!, meta: response.data.meta || {} };
   }
 
+  // ── Key Management (Approval Workflow) ──────────────────────────────
+
+  async generateEncryptionKey(): Promise<{ key: string }> {
+    const response: AxiosResponse<ApiResponse<{ key: string }>> =
+      await this.client.get('/config/key/generate');
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to generate key');
+    }
+
+    return response.data.data!;
+  }
+
+  async listKeyChangeRequests(params?: Record<string, any>): Promise<{ requests: any[]; meta: any }> {
+    const response: AxiosResponse<ApiResponse<any[]>> =
+      await this.client.get('/config/key/requests', { params });
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to list key change requests');
+    }
+
+    return { requests: response.data.data!, meta: response.data.meta || {} };
+  }
+
+  async createKeyChangeRequest(scenario: string, reason: string): Promise<any> {
+    const response: AxiosResponse<ApiResponse> =
+      await this.client.post('/config/key/request', { scenario, reason });
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to create key change request');
+    }
+
+    return response.data.data!;
+  }
+
+  async getKeyChangeRequest(id: string): Promise<any> {
+    const response: AxiosResponse<ApiResponse> =
+      await this.client.get(`/config/key/requests/${id}`);
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to get key change request');
+    }
+
+    return response.data.data!;
+  }
+
+  async approveKeyChangeRequest(id: string): Promise<any> {
+    const response: AxiosResponse<ApiResponse> =
+      await this.client.post(`/config/key/requests/${id}/approve`);
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to approve key change request');
+    }
+
+    return response.data.data!;
+  }
+
+  async denyKeyChangeRequest(id: string, reason?: string): Promise<any> {
+    const response: AxiosResponse<ApiResponse> =
+      await this.client.post(`/config/key/requests/${id}/deny`, { reason });
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to deny key change request');
+    }
+
+    return response.data.data!;
+  }
+
+  async cancelKeyChangeRequest(id: string): Promise<any> {
+    const response: AxiosResponse<ApiResponse> =
+      await this.client.post(`/config/key/requests/${id}/cancel`);
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to cancel key change request');
+    }
+
+    return response.data.data!;
+  }
+
+  async executeKeyChangeRequest(id: string, newKey?: string): Promise<any> {
+    const response: AxiosResponse<ApiResponse> =
+      await this.client.post(`/config/key/requests/${id}/execute`, { new_key: newKey });
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to execute key change request');
+    }
+
+    return response.data.data!;
+  }
+
   // ── System Status ─────────────────────────────────────────────────────
   async getSystemStatus(): Promise<any> {
     const response: AxiosResponse<ApiResponse> =

@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import { VaasApiResponse } from '../types/index.js';
 import { requirePlatformAdmin, requirePlatformSuperAdmin, PlatformAdminRequest } from '../middleware/platformAuth.js';
-import { platformConfigService } from '../services/platformConfigService.js';
+import { platformConfigService, PlatformConfigService } from '../services/platformConfigService.js';
 
 const router = Router();
 
@@ -97,6 +97,108 @@ router.post('/seed', requirePlatformSuperAdmin as any, async (req: PlatformAdmin
     res.json({ success: true, data: { message: 'Config defaults seeded from environment' } } as VaasApiResponse);
   } catch (error: any) {
     res.status(500).json({ success: false, error: { code: 'SEED_FAILED', message: error.message } });
+  }
+});
+
+// ── Key Management (approval workflow) ──────────────────────────────────────
+
+// GET /key/generate — generate a new random encryption key
+router.get('/key/generate', requirePlatformSuperAdmin as any, async (_req: PlatformAdminRequest, res) => {
+  try {
+    res.json({ success: true, data: { key: PlatformConfigService.generateKey() } } as VaasApiResponse);
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: { code: 'GENERATE_KEY_FAILED', message: error.message } });
+  }
+});
+
+// GET /key/requests — list key change requests
+router.get('/key/requests', requirePlatformSuperAdmin as any, async (req: PlatformAdminRequest, res) => {
+  try {
+    const { page, per_page } = req.query as Record<string, string>;
+    const result = await platformConfigService.listKeyChangeRequests(
+      page ? parseInt(page) : 1,
+      per_page ? parseInt(per_page) : 10,
+    );
+    res.json({
+      success: true,
+      data: result.requests,
+      meta: { total: result.total, page: page ? parseInt(page) : 1, per_page: per_page ? parseInt(per_page) : 10 },
+    } as VaasApiResponse);
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: { code: 'LIST_KEY_REQUESTS_FAILED', message: error.message } });
+  }
+});
+
+// POST /key/request — create a new key change request
+router.post('/key/request', requirePlatformSuperAdmin as any, async (req: PlatformAdminRequest, res) => {
+  try {
+    const { scenario, reason } = req.body;
+    if (!scenario || !['rotate', 'reset'].includes(scenario)) {
+      return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'scenario must be "rotate" or "reset"' } });
+    }
+    const request = await platformConfigService.requestKeyChange(scenario, reason || '', req.platformAdmin!.id);
+    res.status(201).json({ success: true, data: request } as VaasApiResponse);
+  } catch (error: any) {
+    const status = error.message.includes('already exists') ? 409 : 500;
+    res.status(status).json({ success: false, error: { code: 'CREATE_KEY_REQUEST_FAILED', message: error.message } });
+  }
+});
+
+// GET /key/requests/:id — single key change request
+router.get('/key/requests/:id', requirePlatformSuperAdmin as any, async (req: PlatformAdminRequest, res) => {
+  try {
+    const request = await platformConfigService.getKeyChangeRequest(req.params.id);
+    if (!request) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Key change request not found' } });
+    }
+    res.json({ success: true, data: request } as VaasApiResponse);
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: { code: 'GET_KEY_REQUEST_FAILED', message: error.message } });
+  }
+});
+
+// POST /key/requests/:id/approve — approve (enforces dual-control)
+router.post('/key/requests/:id/approve', requirePlatformSuperAdmin as any, async (req: PlatformAdminRequest, res) => {
+  try {
+    const request = await platformConfigService.approveKeyChange(req.params.id, req.platformAdmin!.id);
+    res.json({ success: true, data: request } as VaasApiResponse);
+  } catch (error: any) {
+    const status = error.message.includes('dual-control') ? 403 : error.message.includes('expired') ? 410 : 400;
+    res.status(status).json({ success: false, error: { code: 'APPROVE_FAILED', message: error.message } });
+  }
+});
+
+// POST /key/requests/:id/deny — deny a pending request
+router.post('/key/requests/:id/deny', requirePlatformSuperAdmin as any, async (req: PlatformAdminRequest, res) => {
+  try {
+    const { reason } = req.body || {};
+    const request = await platformConfigService.denyKeyChange(req.params.id, req.platformAdmin!.id, reason);
+    res.json({ success: true, data: request } as VaasApiResponse);
+  } catch (error: any) {
+    res.status(400).json({ success: false, error: { code: 'DENY_FAILED', message: error.message } });
+  }
+});
+
+// POST /key/requests/:id/cancel — cancel (requester only)
+router.post('/key/requests/:id/cancel', requirePlatformSuperAdmin as any, async (req: PlatformAdminRequest, res) => {
+  try {
+    const request = await platformConfigService.cancelKeyChange(req.params.id, req.platformAdmin!.id);
+    res.json({ success: true, data: request } as VaasApiResponse);
+  } catch (error: any) {
+    const status = error.message.includes('Only the requester') ? 403 : 400;
+    res.status(status).json({ success: false, error: { code: 'CANCEL_FAILED', message: error.message } });
+  }
+});
+
+// POST /key/requests/:id/execute — execute an approved request
+router.post('/key/requests/:id/execute', requirePlatformSuperAdmin as any, async (req: PlatformAdminRequest, res) => {
+  try {
+    const { new_key } = req.body || {};
+    const request = await platformConfigService.executeKeyChange(req.params.id, req.platformAdmin!.id, new_key);
+    res.json({ success: true, data: request } as VaasApiResponse);
+  } catch (error: any) {
+    const status = error.message.includes('required for rotation') ? 400 : 500;
+    res.status(status).json({ success: false, error: { code: 'EXECUTE_FAILED', message: error.message } });
   }
 });
 
