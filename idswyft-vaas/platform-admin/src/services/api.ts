@@ -745,6 +745,54 @@ class PlatformApiClient {
     return response.data.data!;
   }
 
+  // ── Analytics ────────────────────────────────────────────────────────
+  async getAnalyticsSummary(): Promise<any> {
+    const response: AxiosResponse<ApiResponse> =
+      await this.client.get('/analytics/summary');
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to get analytics summary');
+    }
+
+    return response.data.data!;
+  }
+
+  async getVerificationTrend(days: number = 30, orgId?: string): Promise<any[]> {
+    const params: Record<string, any> = { days };
+    if (orgId) params.org_id = orgId;
+
+    const response: AxiosResponse<ApiResponse<any[]>> =
+      await this.client.get('/analytics/verification-trend', { params });
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to get verification trend');
+    }
+
+    return response.data.data!;
+  }
+
+  async getOrgHealth(limit: number = 10): Promise<any[]> {
+    const response: AxiosResponse<ApiResponse<any[]>> =
+      await this.client.get('/analytics/org-health', { params: { limit } });
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to get org health');
+    }
+
+    return response.data.data!;
+  }
+
+  async getWebhookHealth(days: number = 7): Promise<any[]> {
+    const response: AxiosResponse<ApiResponse<any[]>> =
+      await this.client.get('/analytics/webhook-health', { params: { days } });
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to get webhook health');
+    }
+
+    return response.data.data!;
+  }
+
   // ── System Status ─────────────────────────────────────────────────────
   async getSystemStatus(): Promise<any> {
     const response: AxiosResponse<ApiResponse> =

@@ -41,6 +41,7 @@ import platformStatusRoutes from './routes/platformStatus.js';
 import platformDeveloperRoutes from './routes/platformDevelopers.js';
 import platformNotificationAdminRoutes from './routes/platformNotifications.js';
 import platformConfigRoutes from './routes/platformConfig.js';
+import platformAnalyticsRoutes from './routes/platformAnalytics.js';
 import publicStatusRoutes from './routes/publicStatus.js';
 import samlRoutes from './routes/saml.js';
 import notificationRoutes from './routes/notifications.js';
@@ -410,6 +411,7 @@ app.use('/api/platform/status', platformStatusRoutes);
 app.use('/api/platform/developers', platformDeveloperRoutes);
 app.use('/api/platform/notifications', platformNotificationAdminRoutes);
 app.use('/api/platform/config', platformConfigRoutes);
+app.use('/api/platform/analytics', platformAnalyticsRoutes);
 console.log('✅ Platform admin routes mounted');
 
 // 404 handler
