@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { VaasApiResponse } from '../types/index.js';
 import { requirePlatformAdmin, PlatformAdminRequest } from '../middleware/platformAuth.js';
 import { idswyftApiService } from '../services/idswyftApiService.js';
+import { platformNotificationService } from '../services/platformNotificationService.js';
 
 const router = Router();
 
@@ -41,6 +42,16 @@ router.post('/:id/suspend', async (req: PlatformAdminRequest, res) => {
   try {
     const result = await idswyftApiService.suspendDeveloper(req.params.id);
     res.json(result);
+
+    // Fire-and-forget notification
+    platformNotificationService.emit({
+      type: 'developer.suspended',
+      severity: 'warning',
+      title: 'Developer suspended',
+      message: `Developer ${req.params.id} suspended by ${req.platformAdmin!.email}.`,
+      source: 'platform-admin',
+      metadata: { developer_id: req.params.id, suspended_by: req.platformAdmin!.id },
+    }).catch(() => {});
   } catch (error: any) {
     const response: VaasApiResponse = {
       success: false,
@@ -55,6 +66,16 @@ router.post('/:id/unsuspend', async (req: PlatformAdminRequest, res) => {
   try {
     const result = await idswyftApiService.unsuspendDeveloper(req.params.id);
     res.json(result);
+
+    // Fire-and-forget notification
+    platformNotificationService.emit({
+      type: 'developer.unsuspended',
+      severity: 'info',
+      title: 'Developer unsuspended',
+      message: `Developer ${req.params.id} unsuspended by ${req.platformAdmin!.email}.`,
+      source: 'platform-admin',
+      metadata: { developer_id: req.params.id, unsuspended_by: req.platformAdmin!.id },
+    }).catch(() => {});
   } catch (error: any) {
     const response: VaasApiResponse = {
       success: false,

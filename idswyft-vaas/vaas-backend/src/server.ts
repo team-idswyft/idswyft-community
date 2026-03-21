@@ -9,6 +9,7 @@ import config from './config/index.js';
 import { connectVaasDB, vaasSupabase } from './config/database.js';
 import { sessionExpirationService } from './services/sessionExpirationService.js';
 import { healthCheckService } from './services/healthCheckService.js';
+import { platformConfigService } from './services/platformConfigService.js';
 import { seedPlatformAdmin } from './scripts/seedPlatformAdmin.js';
 import { authRateLimit } from './middleware/rateLimit.js';
 import { logger } from './utils/logger.js';
@@ -37,6 +38,8 @@ import platformAuditLogsRoutes from './routes/platformAuditLogs.js';
 import platformThresholdsRoutes from './routes/platformThresholds.js';
 import platformStatusRoutes from './routes/platformStatus.js';
 import platformDeveloperRoutes from './routes/platformDevelopers.js';
+import platformNotificationAdminRoutes from './routes/platformNotifications.js';
+import platformConfigRoutes from './routes/platformConfig.js';
 import publicStatusRoutes from './routes/publicStatus.js';
 import samlRoutes from './routes/saml.js';
 import notificationRoutes from './routes/notifications.js';
@@ -404,6 +407,8 @@ app.use('/api/platform/audit-logs', platformAuditLogsRoutes);
 app.use('/api/platform/thresholds', platformThresholdsRoutes);
 app.use('/api/platform/status', platformStatusRoutes);
 app.use('/api/platform/developers', platformDeveloperRoutes);
+app.use('/api/platform/notifications', platformNotificationAdminRoutes);
+app.use('/api/platform/config', platformConfigRoutes);
 console.log('✅ Platform admin routes mounted');
 
 // 404 handler
@@ -486,6 +491,12 @@ const startVaasServer = async () => {
     sessionExpirationService.startExpirationJob(5); // Check every 5 minutes
     sessionExpirationService.startCleanupJob(24, 30); // Clean up daily, 30-day retention
     console.log('✅ Session expiration service started');
+
+    // Start platform config service (60s cache polling)
+    console.log('⚙️ Starting platform config service...');
+    await platformConfigService.seedDefaults();
+    await platformConfigService.start();
+    console.log('✅ Platform config service started');
 
     // Start persistent health check service (every 5 min, writes to DB)
     console.log('🩺 Starting health check service...');

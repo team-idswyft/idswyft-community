@@ -597,6 +597,25 @@ ${cfg.footer_text}`;
     const result = await this.testConnection();
     return result.connected;
   }
+
+  /** Send a platform alert email (used by notification channels). */
+  async sendPlatformAlert(to: string, title: string, message: string): Promise<boolean> {
+    const cfg = await this.getEmailConfig();
+    const accent = cfg.primary_color;
+
+    const htmlContent = this.emailWrap(`
+      ${this.emailHeader(accent, cfg.logo_url, 'Platform Alert', cfg.company_name)}
+      <div class="email-body" style="padding:32px 28px;color:${TEXT};font-family:'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif;">
+        <h2 style="color:${TEXT};font-size:18px;margin:0 0 12px;">${title}</h2>
+        <p style="font-size:15px;color:${MUTED};margin:0 0 20px;line-height:1.6;">${message}</p>
+      </div>
+      ${this.emailFooter('Platform Notification', cfg.company_name)}
+    `, accent);
+
+    const textContent = `${title}\n\n${message}\n\n— ${cfg.company_name}`;
+
+    return this.sendEmail({ to, subject: `[Platform Alert] ${title}`, html: htmlContent, text: textContent });
+  }
 }
 
 export const emailService = new EmailService();

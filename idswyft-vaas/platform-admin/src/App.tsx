@@ -18,6 +18,9 @@ import Settings from './pages/Settings';
 import VerificationSettings from './pages/VerificationSettings';
 import SystemStatus from './pages/SystemStatus';
 import Developers from './pages/Developers';
+import Notifications from './pages/Notifications';
+import NotificationSettings from './pages/NotificationSettings';
+import Configuration from './pages/Configuration';
 
 // ── Dynamic favicon from platform branding ───────────────────────────────────
 function usePlatformFavicon() {
@@ -66,6 +69,9 @@ export default function App() {
             <Route path="audit-logs" element={<AuditLogs />} />
             <Route path="verification-settings" element={<VerificationSettings />} />
             <Route path="system-status" element={<SystemStatus />} />
+            <Route path="notifications" element={<Notifications />} />
+            <Route path="notification-settings" element={<NotificationSettings />} />
+            <Route path="configuration" element={<Configuration />} />
             <Route path="settings" element={<Settings />} />
           </Route>
 

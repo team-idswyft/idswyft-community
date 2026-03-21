@@ -5,6 +5,7 @@ import { vaasSupabase } from '../config/database.js';
 import config from '../config/index.js';
 import { VaasApiResponse } from '../types/index.js';
 import { requirePlatformAdmin, PlatformAdminRequest } from '../middleware/platformAuth.js';
+import { platformNotificationService } from '../services/platformNotificationService.js';
 
 const router = Router();
 
@@ -49,7 +50,18 @@ router.post('/login', async (req, res) => {
         success: false,
         error: { code: 'INVALID_CREDENTIALS', message: 'Invalid email or password' }
       };
-      return res.status(401).json(response);
+      res.status(401).json(response);
+
+      // Fire-and-forget security notification
+      platformNotificationService.emit({
+        type: 'security.failed_login',
+        severity: 'warning',
+        title: 'Failed platform admin login attempt',
+        message: `Failed login attempt for ${email} from IP ${req.ip}.`,
+        source: 'platform-auth',
+        metadata: { email, ip: req.ip },
+      }).catch(() => {});
+      return;
     }
 
     // Generate JWT — `role: 'platform'` distinguishes from org admin tokens
@@ -281,6 +293,16 @@ router.post('/admins', requirePlatformAdmin as any, async (req: PlatformAdminReq
 
     const response: VaasApiResponse = { success: true, data: admin };
     res.status(201).json(response);
+
+    // Fire-and-forget security notification
+    platformNotificationService.emit({
+      type: 'security.admin_created',
+      severity: 'info',
+      title: 'Platform admin created',
+      message: `New platform admin "${email}" (${role || 'admin'}) created by ${req.platformAdmin!.email}.`,
+      source: 'platform-auth',
+      metadata: { new_admin_id: admin.id, new_admin_email: email, role: role || 'admin', created_by: req.platformAdmin!.id },
+    }).catch(() => {});
   } catch (error: any) {
     const response: VaasApiResponse = {
       success: false,
@@ -319,6 +341,16 @@ router.delete('/admins/:id', requirePlatformAdmin as any, async (req: PlatformAd
 
     const response: VaasApiResponse = { success: true, data: { message: 'Admin deleted' } };
     res.json(response);
+
+    // Fire-and-forget security notification
+    platformNotificationService.emit({
+      type: 'security.admin_deleted',
+      severity: 'warning',
+      title: 'Platform admin deleted',
+      message: `Platform admin ${req.params.id} deleted by ${req.platformAdmin!.email}.`,
+      source: 'platform-auth',
+      metadata: { deleted_admin_id: req.params.id, deleted_by: req.platformAdmin!.id },
+    }).catch(() => {});
   } catch (error: any) {
     const response: VaasApiResponse = {
       success: false,

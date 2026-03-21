@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { vaasSupabase } from '../config/database.js';
 import { VaasApiResponse } from '../types/index.js';
 import { requirePlatformAdmin, PlatformAdminRequest } from '../middleware/platformAuth.js';
+import { platformNotificationService } from '../services/platformNotificationService.js';
 
 const router = Router();
 
@@ -142,6 +143,16 @@ router.post('/', async (req: PlatformAdminRequest, res) => {
 
     const response: VaasApiResponse = { success: true, data: org };
     res.status(201).json(response);
+
+    // Fire-and-forget notification
+    platformNotificationService.emit({
+      type: 'organization.created',
+      severity: 'info',
+      title: `Organization created: ${name}`,
+      message: `New organization "${name}" (${slug}) created by ${req.platformAdmin!.email}.`,
+      source: 'platform-admin',
+      metadata: { organization_id: org.id, slug, created_by: req.platformAdmin!.id },
+    }).catch(() => {});
   } catch (error: any) {
     const response: VaasApiResponse = {
       success: false,
@@ -182,6 +193,18 @@ router.put('/:id/status', async (req: PlatformAdminRequest, res) => {
 
     const response: VaasApiResponse = { success: true, data: org };
     res.json(response);
+
+    // Fire-and-forget notification
+    const eventType = billing_status === 'suspended' ? 'organization.suspended' as const : 'organization.status_changed' as const;
+    const severity = billing_status === 'suspended' ? 'warning' as const : 'info' as const;
+    platformNotificationService.emit({
+      type: eventType,
+      severity,
+      title: `Organization ${billing_status}: ${org.name}`,
+      message: `Organization "${org.name}" status changed to ${billing_status} by ${req.platformAdmin!.email}.`,
+      source: 'platform-admin',
+      metadata: { organization_id: org.id, new_status: billing_status, changed_by: req.platformAdmin!.id },
+    }).catch(() => {});
   } catch (error: any) {
     const response: VaasApiResponse = {
       success: false,

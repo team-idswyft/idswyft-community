@@ -401,3 +401,85 @@ export interface PlatformBranding {
   portal_background_url: string | null;
   updated_at: string;
 }
+
+// ── Platform Notification Types ──────────────────────────────────────────────
+
+export type PlatformNotificationType =
+  | 'health.service_down' | 'health.service_degraded' | 'health.service_recovered'
+  | 'developer.signup' | 'developer.suspended' | 'developer.unsuspended'
+  | 'organization.created' | 'organization.suspended' | 'organization.status_changed'
+  | 'verification.anomaly'
+  | 'webhook.delivery_failed'
+  | 'security.failed_login' | 'security.admin_created' | 'security.admin_deleted'
+  | 'config.changed';
+
+export type PlatformNotificationSeverity = 'info' | 'warning' | 'error' | 'critical';
+
+export type NotificationChannelType = 'slack' | 'discord' | 'email' | 'webhook';
+
+export interface PlatformNotification {
+  id: string;
+  type: PlatformNotificationType;
+  severity: PlatformNotificationSeverity;
+  title: string;
+  message: string;
+  metadata: Record<string, any>;
+  source?: string;
+  read: boolean;
+  read_by?: string;
+  read_at?: string;
+  created_at: string;
+}
+
+export interface PlatformNotificationChannel {
+  id: string;
+  name: string;
+  type: NotificationChannelType;
+  config: Record<string, any>;
+  enabled: boolean;
+  last_success_at?: string;
+  last_failure_at?: string;
+  failure_count: number;
+  created_by?: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PlatformNotificationRule {
+  id: string;
+  channel_id: string;
+  event_type: string;
+  min_severity: PlatformNotificationSeverity;
+  enabled: boolean;
+  created_at: string;
+}
+
+export interface PlatformEvent {
+  type: PlatformNotificationType;
+  severity: PlatformNotificationSeverity;
+  title: string;
+  message: string;
+  source?: string;
+  metadata?: Record<string, any>;
+}
+
+export interface PlatformConfigItem {
+  key: string;
+  value: string | null;
+  category: string;
+  is_secret: boolean;
+  requires_restart: boolean;
+  description?: string;
+  updated_at: string;
+  updated_by?: string;
+}
+
+export interface PlatformConfigAudit {
+  id: string;
+  config_key: string;
+  old_value?: string;
+  new_value?: string;
+  changed_by?: string;
+  changed_at: string;
+  change_type: 'create' | 'update' | 'delete' | 'import';
+}

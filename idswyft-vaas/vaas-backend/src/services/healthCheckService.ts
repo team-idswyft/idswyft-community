@@ -9,6 +9,8 @@
 
 import { vaasSupabase } from '../config/database.js';
 import config from '../config/index.js';
+import { platformNotificationService } from './platformNotificationService.js';
+import type { PlatformNotificationSeverity } from '../types/index.js';
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -67,6 +69,7 @@ export class HealthCheckService {
   private static instance: HealthCheckService;
   private intervalId: ReturnType<typeof setInterval> | null = null;
   private cleanupIntervalId: ReturnType<typeof setInterval> | null = null;
+  private previousStates: Map<string, string> = new Map();
 
   static getInstance(): HealthCheckService {
     if (!HealthCheckService.instance) {
@@ -173,6 +176,32 @@ export class HealthCheckService {
       .then(({ error }) => {
         if (error) console.error('[HealthCheck] Failed to persist checks:', error.message);
       });
+
+    // Emit notifications on state transitions only
+    for (const check of checks) {
+      const prev = this.previousStates.get(check.service);
+      this.previousStates.set(check.service, check.status);
+
+      if (prev && prev !== check.status) {
+        const severity: PlatformNotificationSeverity =
+          check.status === 'down' ? 'critical' :
+          check.status === 'degraded' ? 'warning' : 'info';
+
+        const eventType =
+          check.status === 'down' ? 'health.service_down' as const :
+          check.status === 'degraded' ? 'health.service_degraded' as const :
+          'health.service_recovered' as const;
+
+        platformNotificationService.emit({
+          type: eventType,
+          severity,
+          title: `${check.service} ${check.status === 'operational' ? 'recovered' : check.status}`,
+          message: `${check.service} transitioned from ${prev} to ${check.status}. ${check.details || ''}`.trim(),
+          source: 'health-check',
+          metadata: { service: check.service, previous: prev, current: check.status, latency_ms: check.latency_ms },
+        }).catch(() => {}); // fire-and-forget
+      }
+    }
 
     return checks;
   }

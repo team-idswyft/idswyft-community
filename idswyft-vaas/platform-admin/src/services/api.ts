@@ -465,6 +465,196 @@ class PlatformApiClient {
     return response.data.data!;
   }
 
+  // ── Platform Notifications ──────────────────────────────────────────
+  async listNotifications(params?: Record<string, any>): Promise<{ notifications: any[]; meta: any }> {
+    const response: AxiosResponse<ApiResponse<any[]>> =
+      await this.client.get('/notifications', { params });
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to list notifications');
+    }
+
+    return { notifications: response.data.data!, meta: response.data.meta || {} };
+  }
+
+  async getUnreadCount(): Promise<number> {
+    const response: AxiosResponse<ApiResponse<{ count: number }>> =
+      await this.client.get('/notifications/unread-count');
+
+    if (!response.data.success) return 0;
+    return response.data.data!.count;
+  }
+
+  async markNotificationRead(id: string): Promise<void> {
+    await this.client.post(`/notifications/${id}/read`);
+  }
+
+  async markAllNotificationsRead(): Promise<void> {
+    await this.client.post('/notifications/read-all');
+  }
+
+  // ── Notification Channels ─────────────────────────────────────────────
+  async listNotificationChannels(): Promise<any[]> {
+    const response: AxiosResponse<ApiResponse<any[]>> =
+      await this.client.get('/notifications/channels');
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to list channels');
+    }
+
+    return response.data.data!;
+  }
+
+  async createNotificationChannel(data: Record<string, any>): Promise<any> {
+    const response: AxiosResponse<ApiResponse> =
+      await this.client.post('/notifications/channels', data);
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to create channel');
+    }
+
+    return response.data.data!;
+  }
+
+  async updateNotificationChannel(id: string, data: Record<string, any>): Promise<any> {
+    const response: AxiosResponse<ApiResponse> =
+      await this.client.put(`/notifications/channels/${id}`, data);
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to update channel');
+    }
+
+    return response.data.data!;
+  }
+
+  async deleteNotificationChannel(id: string): Promise<void> {
+    const response: AxiosResponse<ApiResponse> =
+      await this.client.delete(`/notifications/channels/${id}`);
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to delete channel');
+    }
+  }
+
+  async testNotificationChannel(id: string): Promise<void> {
+    const response: AxiosResponse<ApiResponse> =
+      await this.client.post(`/notifications/channels/${id}/test`);
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to test channel');
+    }
+  }
+
+  async getChannelRules(channelId: string): Promise<any[]> {
+    const response: AxiosResponse<ApiResponse<any[]>> =
+      await this.client.get(`/notifications/channels/${channelId}/rules`);
+
+    if (!response.data.success) return [];
+    return response.data.data!;
+  }
+
+  async updateChannelRules(channelId: string, rules: any[]): Promise<any[]> {
+    const response: AxiosResponse<ApiResponse<any[]>> =
+      await this.client.put(`/notifications/channels/${channelId}/rules`, { rules });
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to update rules');
+    }
+
+    return response.data.data!;
+  }
+
+  // ── Platform Config ─────────────────────────────────────────────────
+  async listConfig(): Promise<any[]> {
+    const response: AxiosResponse<ApiResponse<any[]>> =
+      await this.client.get('/config');
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to list config');
+    }
+
+    return response.data.data!;
+  }
+
+  async getConfigValue(key: string): Promise<{ key: string; value: string }> {
+    const response: AxiosResponse<ApiResponse<{ key: string; value: string }>> =
+      await this.client.get(`/config/${key}`);
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to get config value');
+    }
+
+    return response.data.data!;
+  }
+
+  async setConfigValue(key: string, data: Record<string, any>): Promise<void> {
+    const response: AxiosResponse<ApiResponse> =
+      await this.client.put(`/config/${key}`, data);
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to set config value');
+    }
+  }
+
+  async deleteConfigKey(key: string): Promise<void> {
+    const response: AxiosResponse<ApiResponse> =
+      await this.client.delete(`/config/${key}`);
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to delete config key');
+    }
+  }
+
+  async exportConfigEnv(includeSecrets: boolean = false): Promise<string> {
+    const response = await this.client.get('/config/export/env', {
+      params: { include_secrets: includeSecrets },
+      responseType: 'text',
+    });
+    return response.data;
+  }
+
+  async exportConfigJson(includeSecrets: boolean = false): Promise<Record<string, string>> {
+    const response: AxiosResponse<ApiResponse<Record<string, string>>> =
+      await this.client.get('/config/export/json', { params: { include_secrets: includeSecrets } });
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to export config');
+    }
+
+    return response.data.data!;
+  }
+
+  async importConfig(content: string): Promise<{ imported: number; skipped: number; errors: string[] }> {
+    const response: AxiosResponse<ApiResponse<{ imported: number; skipped: number; errors: string[] }>> =
+      await this.client.post('/config/import', { content });
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to import config');
+    }
+
+    return response.data.data!;
+  }
+
+  async seedConfigDefaults(): Promise<void> {
+    const response: AxiosResponse<ApiResponse> =
+      await this.client.post('/config/seed');
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to seed config');
+    }
+  }
+
+  async getConfigAudit(params?: Record<string, any>): Promise<{ audits: any[]; meta: any }> {
+    const response: AxiosResponse<ApiResponse<any[]>> =
+      await this.client.get('/config/audit', { params });
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to get config audit');
+    }
+
+    return { audits: response.data.data!, meta: response.data.meta || {} };
+  }
+
   // ── System Status ─────────────────────────────────────────────────────
   async getSystemStatus(): Promise<any> {
     const response: AxiosResponse<ApiResponse> =

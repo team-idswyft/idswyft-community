@@ -18,7 +18,11 @@ import {
   Activity,
   SlidersHorizontal,
   Users,
+  Bell,
+  BellRing,
+  Wrench,
 } from 'lucide-react';
+import NotificationBell from '../NotificationBell';
 import { useAuth } from '../../contexts/AuthContext';
 
 const navigationItems = [
@@ -33,6 +37,9 @@ const navigationItems = [
   { name: 'Sessions',          href: '/sessions',          icon: Monitor },
   { name: 'Provider Metrics',  href: '/provider-metrics',  icon: BarChart3 },
   { name: 'Audit Logs',        href: '/audit-logs',        icon: Shield },
+  { name: 'Notifications',     href: '/notifications',     icon: Bell },
+  { name: 'Alert Channels',    href: '/notification-settings', icon: BellRing },
+  { name: 'Configuration',     href: '/configuration',     icon: Wrench },
   { name: 'Settings',          href: '/settings',          icon: Settings },
 ];
 
@@ -232,6 +239,7 @@ export default function PlatformLayout() {
               </div>
 
               <div className="flex items-center gap-2 lg:gap-3">
+                <NotificationBell />
                 <div className="hidden lg:block">
                   <AdminMenu compact />
                 </div>
