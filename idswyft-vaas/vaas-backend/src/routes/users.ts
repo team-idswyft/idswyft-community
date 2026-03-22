@@ -7,6 +7,7 @@ import { vaasSupabase } from '../config/database.js';
 import { emailService } from '../services/emailService.js';
 import { v4 as uuidv4 } from 'uuid';
 import { auditService } from '../services/auditService.js';
+import { escapePostgrestValue } from '../utils/sanitize.js';
 
 const router = Router();
 
@@ -30,11 +31,18 @@ router.get('/', requireAuth, requirePermission('view_users'), validatePagination
       query = query.eq('verification_status', req.query.status as string);
     }
     
-    if (req.query.email) {
-      query = query.ilike('email', `%${req.query.email as string}%`);
+    if (req.query.search) {
+      const s = (req.query.search as string).trim();
+      if (s) {
+        const escaped = escapePostgrestValue(s);
+        query = query.or(`email.ilike.%${escaped}%,first_name.ilike.%${escaped}%,last_name.ilike.%${escaped}%,external_id.ilike.%${escaped}%`);
+      }
+    } else if (req.query.email) {
+      const emailEscaped = escapePostgrestValue((req.query.email as string).trim());
+      query = query.ilike('email', `%${emailEscaped}%`);
     }
-    
-    if (req.query.external_id) {
+
+    if (req.query.external_id && !req.query.search) {
       query = query.eq('external_id', req.query.external_id as string);
     }
     

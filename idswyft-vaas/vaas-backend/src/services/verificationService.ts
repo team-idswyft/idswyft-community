@@ -4,6 +4,7 @@ import { idswyftApiService } from './idswyftApiService.js';
 import { webhookService } from './webhookService.js';
 import { emailService } from './emailService.js';
 import { notificationService } from './notificationService.js';
+import { escapePostgrestValue } from '../utils/sanitize.js';
 import {
   VaasEndUser,
   VaasVerificationSession,
@@ -118,6 +119,7 @@ export class VerificationService {
   async listVerifications(organizationId: string, params: {
     status?: string;
     user_id?: string;
+    search?: string;
     page?: number;
     per_page?: number;
     start_date?: string;
@@ -129,7 +131,7 @@ export class VerificationService {
     const page = params.page || 1;
     const perPage = Math.min(params.per_page || 20, 100);
     const offset = (page - 1) * perPage;
-    
+
     let query = vaasSupabase
       .from('vaas_verification_sessions')
       .select(`
@@ -137,31 +139,87 @@ export class VerificationService {
         vaas_end_users!inner(*)
       `, { count: 'exact' })
       .eq('organization_id', organizationId);
-    
+
     if (params.status) {
       query = query.eq('status', params.status);
     }
-    
+
     if (params.user_id) {
       query = query.eq('end_user_id', params.user_id);
     }
-    
+
     if (params.start_date) {
       query = query.gte('created_at', params.start_date);
     }
-    
+
     if (params.end_date) {
       query = query.lte('created_at', params.end_date);
     }
-    
+
+    // Search: two-query-merge pattern (parent + joined table can't share a single .or())
+    // Supabase query builder mutates in place, so we must build independent queries.
+    const searchTerm = (params.search || '').trim();
+    if (searchTerm) {
+      const escaped = escapePostgrestValue(searchTerm);
+      const ilike = `%${escaped}%`;
+
+      // Helper to build a base query with all non-search filters applied
+      const buildBase = () => {
+        let q = vaasSupabase
+          .from('vaas_verification_sessions')
+          .select(`*, vaas_end_users!inner(*)`, { count: 'exact' })
+          .eq('organization_id', organizationId);
+        if (params.status) q = q.eq('status', params.status);
+        if (params.user_id) q = q.eq('end_user_id', params.user_id);
+        if (params.start_date) q = q.gte('created_at', params.start_date);
+        if (params.end_date) q = q.lte('created_at', params.end_date);
+        return q;
+      };
+
+      // Query 1: match by idswyft_user_id on parent table
+      const q1 = buildBase().ilike('idswyft_user_id', ilike);
+
+      // Query 2: match by email on joined vaas_end_users table
+      const q2 = buildBase().or(`email.ilike.${ilike}`, { referencedTable: 'vaas_end_users' });
+
+      const [result1, result2] = await Promise.all([
+        q1.order('created_at', { ascending: false }).range(offset, offset + perPage - 1),
+        q2.order('created_at', { ascending: false }).range(offset, offset + perPage - 1),
+      ]);
+
+      if (result1.error) throw new Error(`Failed to list verifications: ${result1.error.message}`);
+      if (result2.error) throw new Error(`Failed to list verifications: ${result2.error.message}`);
+
+      // Merge and deduplicate, preserving order
+      const seen = new Set<string>();
+      const merged: any[] = [];
+      for (const row of [...(result1.data || []), ...(result2.data || [])]) {
+        if (!seen.has(row.id)) {
+          seen.add(row.id);
+          merged.push(row);
+        }
+      }
+
+      // Sort merged results by created_at desc and apply page size
+      merged.sort((a: any, b: any) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+      // Approximate total — exact union count would require a dedicated SQL function
+      const approxTotal = Math.max(result1.count || 0, result2.count || 0);
+
+      return {
+        verifications: merged.slice(0, perPage),
+        total: approxTotal,
+      };
+    }
+
     const { data, count, error } = await query
       .order('created_at', { ascending: false })
       .range(offset, offset + perPage - 1);
-      
+
     if (error) {
       throw new Error(`Failed to list verifications: ${error.message}`);
     }
-    
+
     return {
       verifications: data || [],
       total: count || 0

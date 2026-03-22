@@ -3,6 +3,7 @@ import { body, param, query, validationResult } from 'express-validator';
 import { requireAuth, AuthenticatedRequest } from '../middleware/auth.js';
 import { VaasApiResponse } from '../types/index.js';
 import { vaasSupabase } from '../config/database.js';
+import { escapePostgrestValue } from '../utils/sanitize.js';
 
 const router = Router();
 
@@ -35,7 +36,25 @@ router.get('/:organizationId/audit-logs',
     query('end_date')
       .optional()
       .isISO8601()
-      .withMessage('End date must be in ISO8601 format')
+      .withMessage('End date must be in ISO8601 format'),
+    query('search')
+      .optional()
+      .isString()
+      .isLength({ max: 200 })
+      .withMessage('Search must be a string under 200 characters'),
+    query('resource_type')
+      .optional()
+      .isString()
+      .isLength({ max: 50 })
+      .withMessage('Resource type must be a string under 50 characters'),
+    query('date_from')
+      .optional()
+      .isISO8601()
+      .withMessage('date_from must be in ISO8601 format'),
+    query('date_to')
+      .optional()
+      .isISO8601()
+      .withMessage('date_to must be in ISO8601 format')
   ],
   requireAuth,
   async (req: AuthenticatedRequest, res: Response) => {
@@ -54,13 +73,17 @@ router.get('/:organizationId/audit-logs',
     }
 
     const { organizationId } = req.params;
-    const { 
-      page = 1, 
-      per_page = 20, 
-      action, 
-      admin_id, 
-      start_date, 
-      end_date 
+    const {
+      page = 1,
+      per_page = 20,
+      action,
+      admin_id,
+      start_date,
+      end_date,
+      search,
+      resource_type,
+      date_from,
+      date_to
     } = req.query;
 
     // Verify user has access to this organization
@@ -89,11 +112,27 @@ router.get('/:organizationId/audit-logs',
     if (admin_id) {
       query = query.eq('admin_id', admin_id);
     }
-    if (start_date) {
-      query = query.gte('created_at', start_date);
+    if (resource_type) {
+      query = query.eq('resource_type', resource_type);
     }
-    if (end_date) {
-      query = query.lte('created_at', end_date);
+
+    // Search across action, resource_type, ip_address
+    if (search) {
+      const s = (search as string).trim();
+      if (s) {
+        const escaped = escapePostgrestValue(s);
+        query = query.or(`action.ilike.%${escaped}%,resource_type.ilike.%${escaped}%,ip_address.ilike.%${escaped}%`);
+      }
+    }
+
+    // Date filters — support both naming conventions (start_date/end_date and date_from/date_to)
+    const effectiveStart = (date_from || start_date) as string | undefined;
+    const effectiveEnd = (date_to || end_date) as string | undefined;
+    if (effectiveStart) {
+      query = query.gte('created_at', effectiveStart);
+    }
+    if (effectiveEnd) {
+      query = query.lte('created_at', effectiveEnd);
     }
 
     // Apply pagination

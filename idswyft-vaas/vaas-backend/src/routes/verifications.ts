@@ -102,6 +102,7 @@ router.get('/', requireAuth, requirePermission('view_verifications'), validatePa
     const params = {
       status: req.query.status as string,
       user_id: req.query.user_id as string,
+      search: req.query.search ? (req.query.search as string).slice(0, 200) : undefined,
       page: parseInt(req.query.page as string) || 1,
       per_page: parseInt(req.query.per_page as string) || 20,
       start_date: req.query.start_date as string,

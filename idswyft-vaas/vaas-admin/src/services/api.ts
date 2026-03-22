@@ -219,6 +219,7 @@ class ApiClient {
   async listVerifications(params?: {
     status?: string;
     user_id?: string;
+    search?: string;
     start_date?: string;
     end_date?: string;
     page?: number;
@@ -632,18 +633,21 @@ class ApiClient {
     return response.data.data!;
   }
 
-  async getApiKeyUsage(id: string, params?: { 
-    start_date?: string; 
-    end_date?: string; 
-    granularity?: 'hour' | 'day' | 'month' 
+  async getApiKeyUsage(id: string, params?: {
+    start_date?: string;
+    end_date?: string;
+    granularity?: 'hour' | 'day' | 'month'
   }): Promise<ApiKeyUsage[]> {
-    const response: AxiosResponse<ApiResponse<ApiKeyUsage[]>> = await this.client.get(`/api-keys/${id}/usage`, { params });
-    
+    const response: AxiosResponse<ApiResponse<any>> = await this.client.get(`/api-keys/${id}/usage`, { params });
+
     if (!response.data.success) {
       throw new Error(response.data.error?.message || 'Failed to get API key usage');
     }
 
-    return response.data.data!;
+    // Backend may return { key_id, usage: {...} } instead of ApiKeyUsage[]
+    const raw = response.data.data;
+    if (Array.isArray(raw)) return raw;
+    return []; // Usage tracking not yet implemented — return empty array
   }
 
   // Billing
