@@ -10,15 +10,7 @@ import {
 } from 'recharts';
 import DarkTooltip from './DarkTooltip';
 import { cardSurface, sectionLabel } from '../../styles/tokens';
-
-interface TrendPoint {
-  day: string;
-  verified: number;
-  failed: number;
-  manual_review: number;
-  pending: number;
-  total: number;
-}
+import type { TrendPoint } from '../../types/analytics';
 
 interface VerificationTrendChartProps {
   data: TrendPoint[];

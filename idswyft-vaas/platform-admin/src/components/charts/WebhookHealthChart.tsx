@@ -10,15 +10,7 @@ import {
 } from 'recharts';
 import DarkTooltip from './DarkTooltip';
 import { cardSurface, sectionLabel } from '../../styles/tokens';
-
-interface WebhookHealthRow {
-  org_id: string;
-  org_name: string;
-  delivered: number;
-  failed: number;
-  total: number;
-  failure_rate: number;
-}
+import type { WebhookHealthRow } from '../../types/analytics';
 
 interface WebhookHealthChartProps {
   data: WebhookHealthRow[];

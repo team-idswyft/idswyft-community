@@ -1,5 +1,6 @@
 import type { AxiosInstance, AxiosRequestConfig, AxiosResponse } from 'axios';
 import { createApiClient, RetryAfterError, type ApiError } from '../lib/apiClient';
+import type { SummaryStats, TrendPoint, OrgHealthRow, WebhookHealthRow } from '../types/analytics';
 
 // ── Response envelope ────────────────────────────────────────────────────────
 interface ApiResponse<T = any> {
@@ -746,8 +747,8 @@ class PlatformApiClient {
   }
 
   // ── Analytics ────────────────────────────────────────────────────────
-  async getAnalyticsSummary(): Promise<any> {
-    const response: AxiosResponse<ApiResponse> =
+  async getAnalyticsSummary(): Promise<SummaryStats> {
+    const response: AxiosResponse<ApiResponse<SummaryStats>> =
       await this.client.get('/analytics/summary');
 
     if (!response.data.success) {
@@ -757,11 +758,11 @@ class PlatformApiClient {
     return response.data.data!;
   }
 
-  async getVerificationTrend(days: number = 30, orgId?: string): Promise<any[]> {
+  async getVerificationTrend(days: number = 30, orgId?: string): Promise<TrendPoint[]> {
     const params: Record<string, any> = { days };
     if (orgId) params.org_id = orgId;
 
-    const response: AxiosResponse<ApiResponse<any[]>> =
+    const response: AxiosResponse<ApiResponse<TrendPoint[]>> =
       await this.client.get('/analytics/verification-trend', { params });
 
     if (!response.data.success) {
@@ -771,8 +772,8 @@ class PlatformApiClient {
     return response.data.data!;
   }
 
-  async getOrgHealth(limit: number = 10): Promise<any[]> {
-    const response: AxiosResponse<ApiResponse<any[]>> =
+  async getOrgHealth(limit: number = 10): Promise<OrgHealthRow[]> {
+    const response: AxiosResponse<ApiResponse<OrgHealthRow[]>> =
       await this.client.get('/analytics/org-health', { params: { limit } });
 
     if (!response.data.success) {
@@ -782,8 +783,8 @@ class PlatformApiClient {
     return response.data.data!;
   }
 
-  async getWebhookHealth(days: number = 7): Promise<any[]> {
-    const response: AxiosResponse<ApiResponse<any[]>> =
+  async getWebhookHealth(days: number = 7): Promise<WebhookHealthRow[]> {
+    const response: AxiosResponse<ApiResponse<WebhookHealthRow[]>> =
       await this.client.get('/analytics/webhook-health', { params: { days } });
 
     if (!response.data.success) {

@@ -44,7 +44,8 @@ import {
   PlatformBranding,
   OrgAssets,
   AdminNotification,
-  SearchResults
+  SearchResults,
+  TrendPoint
 } from '../types.js';
 
 class ApiClient {
@@ -318,8 +319,8 @@ class ApiClient {
     return response.data.data!;
   }
 
-  async getVerificationTrend(days: number = 30): Promise<any[]> {
-    const response: AxiosResponse<ApiResponse<any[]>> = await this.client.get('/verifications/stats/verification-trend', {
+  async getVerificationTrend(days: number = 30): Promise<TrendPoint[]> {
+    const response: AxiosResponse<ApiResponse<TrendPoint[]>> = await this.client.get('/verifications/stats/verification-trend', {
       params: { days }
     });
 
