@@ -236,7 +236,7 @@ export default function DashboardLayout() {
         </div>
 
         <div className="flex min-w-0 flex-1 flex-col overflow-hidden">
-          <header className="header-glass">
+          <header className="header-glass relative z-10">
             <div className="flex items-center justify-between gap-4 px-5 py-4 lg:px-6">
               <div className="flex min-w-0 items-center gap-3">
                 <button
