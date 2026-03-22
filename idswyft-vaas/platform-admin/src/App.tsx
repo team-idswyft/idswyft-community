@@ -21,6 +21,7 @@ import Developers from './pages/Developers';
 import Notifications from './pages/Notifications';
 import NotificationSettings from './pages/NotificationSettings';
 import Configuration from './pages/Configuration';
+import DatabaseManagement from './pages/DatabaseManagement';
 
 // ── Dynamic favicon from platform branding ───────────────────────────────────
 function usePlatformFavicon() {
@@ -72,6 +73,7 @@ export default function App() {
             <Route path="notifications" element={<Notifications />} />
             <Route path="notification-settings" element={<NotificationSettings />} />
             <Route path="configuration" element={<Configuration />} />
+            <Route path="database" element={<DatabaseManagement />} />
             <Route path="settings" element={<Settings />} />
           </Route>
 

@@ -43,6 +43,38 @@ export interface DeveloperInfo {
   verification_count: number;
 }
 
+// ── Database Management types ────────────────────────────────────────────
+export interface TableStat {
+  name: string;
+  category: string;
+  risk: 'safe' | 'caution' | 'protected';
+  rowCount: number;
+}
+
+export interface DatabaseStats {
+  tables: TableStat[];
+  totalRows: number;
+  tablesTracked: number;
+  lastCleanup: string | null;
+  protectedTables: string[];
+  categories: Record<string, {
+    label: string;
+    risk: string;
+    vaasTables: string[];
+    mainTables: string[];
+  }>;
+}
+
+export interface PurgeResult {
+  deletedCounts: Record<string, number>;
+  totalDeleted: number;
+}
+
+export interface WipeResult {
+  wipedTables: string[];
+  totalDeleted: number;
+}
+
 // ── API Client ───────────────────────────────────────────────────────────────
 class PlatformApiClient {
   private client: AxiosInstance;
@@ -789,6 +821,44 @@ class PlatformApiClient {
 
     if (!response.data.success) {
       throw new Error(response.data.error?.message || 'Failed to get webhook health');
+    }
+
+    return response.data.data!;
+  }
+
+  // ── Database Management ──────────────────────────────────────────────
+  async getDatabaseStats(target: 'vaas' | 'main'): Promise<DatabaseStats> {
+    const response: AxiosResponse<ApiResponse<DatabaseStats>> =
+      await this.client.get('/database/stats', { params: { target } });
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to get database stats');
+    }
+
+    return response.data.data!;
+  }
+
+  async purgeDatabaseCategories(
+    target: 'vaas' | 'main',
+    categories: string[],
+    olderThanDays: number
+  ): Promise<PurgeResult> {
+    const response: AxiosResponse<ApiResponse<PurgeResult>> =
+      await this.client.post('/database/purge', { target, categories, olderThanDays });
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to purge data');
+    }
+
+    return response.data.data!;
+  }
+
+  async wipeDatabaseFull(target: 'vaas' | 'main', confirmPhrase: string): Promise<WipeResult> {
+    const response: AxiosResponse<ApiResponse<WipeResult>> =
+      await this.client.post('/database/wipe', { target, confirmPhrase });
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to wipe database');
     }
 
     return response.data.data!;
