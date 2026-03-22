@@ -1,7 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Users, Search, ShieldOff, ShieldCheck, X } from 'lucide-react';
+import { Users, Search, ShieldOff, ShieldCheck } from 'lucide-react';
 import { platformApi } from '../services/api';
 import type { DeveloperInfo } from '../services/api';
+import Modal from '../components/ui/Modal';
 import {
   sectionLabel,
   monoXs,
@@ -269,53 +270,39 @@ export default function Developers() {
       </div>
 
       {/* Confirm Action Modal */}
-      {confirmAction && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="fixed inset-0 bg-slate-950/65 backdrop-blur-[2px]"
+      <Modal
+        isOpen={!!confirmAction}
+        onClose={() => setConfirmAction(null)}
+        title={confirmAction?.action === 'suspend' ? 'Suspend Developer' : 'Unsuspend Developer'}
+        size="sm"
+      >
+        <p className="text-sm text-slate-400 mb-5">
+          {confirmAction?.action === 'suspend'
+            ? `Are you sure you want to suspend ${confirmAction?.name}? They will be unable to use the API until unsuspended.`
+            : `Are you sure you want to unsuspend ${confirmAction?.name}? Their API access will be restored immediately.`}
+        </p>
+        <div className="flex items-center justify-end gap-3">
+          <button
             onClick={() => setConfirmAction(null)}
-          />
-          <div className="relative glass-panel rounded-xl p-6 w-full max-w-sm animate-scale-in">
-            <div className="flex items-center justify-between mb-4">
-              <p className="text-slate-100 font-semibold">
-                {confirmAction.action === 'suspend' ? 'Suspend Developer' : 'Unsuspend Developer'}
-              </p>
-              <button
-                onClick={() => setConfirmAction(null)}
-                className="text-slate-400 hover:text-slate-200 transition"
-              >
-                <X className="h-4 w-4" />
-              </button>
-            </div>
-            <p className="text-sm text-slate-400 mb-5">
-              {confirmAction.action === 'suspend'
-                ? `Are you sure you want to suspend ${confirmAction.name}? They will be unable to use the API until unsuspended.`
-                : `Are you sure you want to unsuspend ${confirmAction.name}? Their API access will be restored immediately.`}
-            </p>
-            <div className="flex items-center justify-end gap-3">
-              <button
-                onClick={() => setConfirmAction(null)}
-                className="btn btn-ghost text-sm"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={handleAction}
-                disabled={actionLoading}
-                className={`btn text-sm ${
-                  confirmAction.action === 'suspend' ? 'btn-danger' : 'btn-primary'
-                }`}
-              >
-                {actionLoading
-                  ? 'Processing...'
-                  : confirmAction.action === 'suspend'
-                    ? 'Suspend'
-                    : 'Unsuspend'}
-              </button>
-            </div>
-          </div>
+            className="btn btn-ghost text-sm"
+          >
+            Cancel
+          </button>
+          <button
+            onClick={handleAction}
+            disabled={actionLoading}
+            className={`btn text-sm ${
+              confirmAction?.action === 'suspend' ? 'btn-danger' : 'btn-primary'
+            }`}
+          >
+            {actionLoading
+              ? 'Processing...'
+              : confirmAction?.action === 'suspend'
+                ? 'Suspend'
+                : 'Unsuspend'}
+          </button>
         </div>
-      )}
+      </Modal>
     </div>
   );
 }

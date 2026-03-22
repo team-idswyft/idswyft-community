@@ -18,9 +18,9 @@ export default function DarkTooltip({ active, payload, label }: DarkTooltipProps
   return (
     <div className="bg-slate-800 border border-white/10 rounded-lg px-3 py-2 shadow-xl">
       <p className="font-mono text-[0.65rem] text-slate-400 mb-1">{label}</p>
-      {payload.map((entry) => (
+      {payload.map((entry, i) => (
         <p
-          key={entry.name}
+          key={entry.name || i}
           className="font-mono text-xs"
           style={{ color: entry.color }}
         >

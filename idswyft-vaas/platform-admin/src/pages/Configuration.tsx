@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Download, Upload, Eye, EyeOff, Pencil, Trash2, ChevronDown, ChevronRight, Database, Info, ShieldAlert, Server, KeyRound, RotateCw, AlertTriangle, CheckCircle2, XCircle, Clock, Copy } from 'lucide-react';
 import platformApi from '../services/api';
+import Modal from '../components/ui/Modal';
 import { cardSurface, tableHeaderClass, statusPill, monoXs, monoSm, sectionLabel, infoPanel, getStatusAccent } from '../styles/tokens';
 import { useAuth } from '../contexts/AuthContext';
 
@@ -799,11 +800,9 @@ export default function Configuration() {
       )}
 
       {/* Edit Modal */}
-      {editItem && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
-            <h3 className="text-lg font-semibold text-slate-100 mb-4">Edit Config</h3>
-
+      <Modal isOpen={!!editItem} onClose={() => setEditItem(null)} title="Edit Config" size="md">
+        {editItem && (
+          <>
             <div className="space-y-4">
               <div>
                 <label className={`${sectionLabel} block mb-1`}>Key</label>
@@ -847,224 +846,209 @@ export default function Configuration() {
                 Save
               </button>
             </div>
-          </div>
-        </div>
-      )}
+          </>
+        )}
+      </Modal>
 
       {/* Import Modal */}
-      {showImport && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
-            <h3 className="text-lg font-semibold text-slate-100 mb-4">Import Configuration</h3>
+      <Modal isOpen={showImport} onClose={() => setShowImport(false)} title="Import Configuration" size="lg">
+        <div className="space-y-4">
+          <div>
+            <label className={`${sectionLabel} block mb-1`}>Paste .env content</label>
+            <textarea
+              value={importContent}
+              onChange={(e) => setImportContent(e.target.value)}
+              className={`${inputClass} min-h-[200px] font-mono text-xs`}
+              placeholder={"# Category\nKEY=value\nANOTHER_KEY=another_value"}
+            />
+          </div>
 
-            <div className="space-y-4">
-              <div>
-                <label className={`${sectionLabel} block mb-1`}>Paste .env content</label>
-                <textarea
-                  value={importContent}
-                  onChange={(e) => setImportContent(e.target.value)}
-                  className={`${inputClass} min-h-[200px] font-mono text-xs`}
-                  placeholder={"# Category\nKEY=value\nANOTHER_KEY=another_value"}
-                />
+          {importResult && (
+            <div className={infoPanel}>
+              <div className="text-sm text-slate-200">
+                Imported: <strong className="text-emerald-300">{importResult.imported}</strong>,
+                Skipped: <strong className="text-amber-300">{importResult.skipped}</strong>
               </div>
-
-              {importResult && (
-                <div className={infoPanel}>
-                  <div className="text-sm text-slate-200">
-                    Imported: <strong className="text-emerald-300">{importResult.imported}</strong>,
-                    Skipped: <strong className="text-amber-300">{importResult.skipped}</strong>
-                  </div>
-                  {importResult.errors.length > 0 && (
-                    <div className="mt-2 text-xs text-rose-400">
-                      {importResult.errors.map((e, i) => <div key={i}>{e}</div>)}
-                    </div>
-                  )}
+              {importResult.errors.length > 0 && (
+                <div className="mt-2 text-xs text-rose-400">
+                  {importResult.errors.map((e, i) => <div key={i}>{e}</div>)}
                 </div>
               )}
             </div>
-
-            <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setShowImport(false)} className="rounded-lg border border-white/10 px-4 py-2 text-sm text-slate-400 hover:text-slate-200">
-                Close
-              </button>
-              <button onClick={handleImport} className="rounded-lg bg-cyan-500/20 border border-cyan-500/30 px-4 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/30">
-                Import
-              </button>
-            </div>
-          </div>
+          )}
         </div>
-      )}
+
+        <div className="flex justify-end gap-3 mt-6">
+          <button onClick={() => setShowImport(false)} className="rounded-lg border border-white/10 px-4 py-2 text-sm text-slate-400 hover:text-slate-200">
+            Close
+          </button>
+          <button onClick={handleImport} className="rounded-lg bg-cyan-500/20 border border-cyan-500/30 px-4 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/30">
+            Import
+          </button>
+        </div>
+      </Modal>
 
       {/* ── Wizard Modal ──────────────────────────────────────────────────── */}
-      {showWizard && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm">
-          <div className="w-full max-w-lg rounded-xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
-            {/* Step indicator */}
-            <div className="flex items-center gap-3 mb-6">
-              {[1, 2, 3].map((step) => (
-                <div key={step} className="flex items-center gap-2">
-                  <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-medium border ${
-                    wizardStep === step
-                      ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300'
-                      : wizardStep > step
-                        ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
-                        : 'border-white/10 text-slate-500'
-                  }`}>
-                    {wizardStep > step ? <CheckCircle2 className="h-4 w-4" /> : step}
-                  </div>
-                  {step < 3 && <div className={`h-px w-8 ${wizardStep > step ? 'bg-emerald-500/50' : 'bg-white/10'}`} />}
-                </div>
-              ))}
-              <div className="flex-1" />
-              <button onClick={() => setShowWizard(false)} className="text-slate-400 hover:text-slate-200">&times;</button>
+      <Modal isOpen={showWizard} onClose={() => setShowWizard(false)} showCloseButton={false} size="lg">
+        {/* Step indicator */}
+        <div className="flex items-center gap-3 mb-6">
+          {[1, 2, 3].map((step) => (
+            <div key={step} className="flex items-center gap-2">
+              <div className={`h-7 w-7 rounded-full flex items-center justify-center text-xs font-medium border ${
+                wizardStep === step
+                  ? 'bg-cyan-500/20 border-cyan-500/50 text-cyan-300'
+                  : wizardStep > step
+                    ? 'bg-emerald-500/20 border-emerald-500/50 text-emerald-300'
+                    : 'border-white/10 text-slate-500'
+              }`}>
+                {wizardStep > step ? <CheckCircle2 className="h-4 w-4" /> : step}
+              </div>
+              {step < 3 && <div className={`h-px w-8 ${wizardStep > step ? 'bg-emerald-500/50' : 'bg-white/10'}`} />}
             </div>
-
-            {/* Step 1: Choose scenario */}
-            {wizardStep === 1 && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-slate-100">What do you need to do?</h3>
-                <div className="grid gap-3">
-                  <button
-                    onClick={() => { setWizardScenario('rotate'); setWizardStep(2); }}
-                    className={`text-left rounded-xl border p-4 transition ${
-                      wizardScenario === 'rotate' ? 'border-cyan-500/50 bg-cyan-500/10' : 'border-white/10 hover:border-white/20 hover:bg-white/5'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <RotateCw className="h-5 w-5 text-cyan-400" />
-                      <div>
-                        <p className="font-medium text-slate-200">Rotate Key</p>
-                        <p className="text-xs text-slate-400 mt-0.5">I have the current key and want to change it for security</p>
-                      </div>
-                    </div>
-                  </button>
-                  <button
-                    onClick={() => { setWizardScenario('reset'); setWizardStep(2); }}
-                    className={`text-left rounded-xl border p-4 transition ${
-                      wizardScenario === 'reset' ? 'border-rose-500/50 bg-rose-500/10' : 'border-white/10 hover:border-white/20 hover:bg-white/5'
-                    }`}
-                  >
-                    <div className="flex items-center gap-3">
-                      <AlertTriangle className="h-5 w-5 text-rose-400" />
-                      <div>
-                        <p className="font-medium text-slate-200">Key Lost / Recovery</p>
-                        <p className="text-xs text-slate-400 mt-0.5">The encryption key was lost and secrets are unreadable</p>
-                      </div>
-                    </div>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Step 2: Instructions + reason */}
-            {wizardStep === 2 && wizardScenario && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold text-slate-100">
-                  {wizardScenario === 'rotate' ? 'Rotate Encryption Key' : 'Key Recovery'}
-                </h3>
-
-                {wizardScenario === 'rotate' ? (
-                  <div className={`${infoPanel} text-sm text-slate-300`}>
-                    <p className="font-medium text-slate-200 mb-2">How rotation works:</p>
-                    <ol className="list-decimal list-inside space-y-1 text-slate-400">
-                      <li>A new key will be generated for you (or enter your own)</li>
-                      <li>After approval, all secrets are decrypted with the current key and re-encrypted with the new one</li>
-                      <li>Then update <code className="font-mono text-xs text-slate-300">VAAS_CONFIG_ENCRYPTION_KEY</code> on Railway</li>
-                    </ol>
-                  </div>
-                ) : (
-                  <div className="rounded-lg bg-rose-500/5 border border-rose-500/20 px-4 py-3 text-sm">
-                    <p className="font-medium text-rose-300 mb-2">How recovery works:</p>
-                    <ol className="list-decimal list-inside space-y-1 text-rose-300/80">
-                      <li>All encrypted values in the database will be <strong>wiped</strong> (they're already unreadable)</li>
-                      <li>After approval, set the new key on Railway and restart the service</li>
-                      <li>Then execute the reset &mdash; secrets will be re-seeded from environment variables</li>
-                    </ol>
-                  </div>
-                )}
-
-                <div>
-                  <label className={`${sectionLabel} block mb-1`}>Reason for this change</label>
-                  <textarea
-                    value={wizardReason}
-                    onChange={(e) => setWizardReason(e.target.value)}
-                    className={`${inputClass} min-h-[80px]`}
-                    placeholder="Provide a reason for the audit trail..."
-                  />
-                </div>
-
-                <div className="flex justify-between mt-6">
-                  <button
-                    onClick={() => { setWizardStep(1); setWizardScenario(null); }}
-                    className="rounded-lg border border-white/10 px-4 py-2 text-sm text-slate-400 hover:text-slate-200"
-                  >
-                    Back
-                  </button>
-                  <button
-                    onClick={handleWizardSubmit}
-                    disabled={wizardSubmitting}
-                    className="flex items-center gap-2 rounded-lg bg-cyan-500/20 border border-cyan-500/30 px-4 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/30 disabled:opacity-50"
-                  >
-                    {wizardSubmitting && <div className="h-4 w-4 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent" />}
-                    Submit for Approval
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Step 3: Confirmation */}
-            {wizardStep === 3 && (
-              <div className="space-y-4 text-center py-4">
-                <div className="mx-auto h-12 w-12 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
-                  <CheckCircle2 className="h-6 w-6 text-emerald-400" />
-                </div>
-                <h3 className="text-lg font-semibold text-slate-100">Request Submitted</h3>
-                <p className="text-sm text-slate-400">
-                  A different super admin must approve before you can proceed. The request expires in 24 hours.
-                </p>
-                {wizardRequestId && (
-                  <p className={`${monoXs} text-slate-500`}>Request ID: {wizardRequestId}</p>
-                )}
-                <button
-                  onClick={() => { setShowWizard(false); setShowKeySection(true); }}
-                  className="rounded-lg bg-cyan-500/20 border border-cyan-500/30 px-4 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/30"
-                >
-                  Done
-                </button>
-              </div>
-            )}
-          </div>
+          ))}
+          <div className="flex-1" />
+          <button onClick={() => setShowWizard(false)} className="text-slate-400 hover:text-slate-200">&times;</button>
         </div>
-      )}
 
-      {/* ── Deny Reason Modal ──────────────────────────────────────────── */}
-      {showDenyModal && activeRequest && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm">
-          <div className="w-full max-w-sm rounded-xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
-            <h3 className="text-lg font-semibold text-slate-100 mb-4">Deny Request</h3>
-            <div>
-              <label className={`${sectionLabel} block mb-1`}>Reason (optional)</label>
-              <textarea
-                value={denyReason}
-                onChange={(e) => setDenyReason(e.target.value)}
-                className={`${inputClass} min-h-[80px]`}
-                placeholder="Why are you denying this request?"
-              />
-            </div>
-            <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setShowDenyModal(false)} className="rounded-lg border border-white/10 px-4 py-2 text-sm text-slate-400 hover:text-slate-200">
-                Cancel
+        {/* Step 1: Choose scenario */}
+        {wizardStep === 1 && (
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-slate-100">What do you need to do?</h3>
+            <div className="grid gap-3">
+              <button
+                onClick={() => { setWizardScenario('rotate'); setWizardStep(2); }}
+                className={`text-left rounded-xl border p-4 transition ${
+                  wizardScenario === 'rotate' ? 'border-cyan-500/50 bg-cyan-500/10' : 'border-white/10 hover:border-white/20 hover:bg-white/5'
+                }`}
+              >
+                <div className="flex items-center gap-3">
+                  <RotateCw className="h-5 w-5 text-cyan-400" />
+                  <div>
+                    <p className="font-medium text-slate-200">Rotate Key</p>
+                    <p className="text-xs text-slate-400 mt-0.5">I have the current key and want to change it for security</p>
+                  </div>
+                </div>
               </button>
               <button
-                onClick={() => handleDeny(activeRequest.id)}
-                className="rounded-lg bg-rose-500/20 border border-rose-500/30 px-4 py-2 text-sm font-medium text-rose-200 hover:bg-rose-500/30"
+                onClick={() => { setWizardScenario('reset'); setWizardStep(2); }}
+                className={`text-left rounded-xl border p-4 transition ${
+                  wizardScenario === 'reset' ? 'border-rose-500/50 bg-rose-500/10' : 'border-white/10 hover:border-white/20 hover:bg-white/5'
+                }`}
               >
-                Deny
+                <div className="flex items-center gap-3">
+                  <AlertTriangle className="h-5 w-5 text-rose-400" />
+                  <div>
+                    <p className="font-medium text-slate-200">Key Lost / Recovery</p>
+                    <p className="text-xs text-slate-400 mt-0.5">The encryption key was lost and secrets are unreadable</p>
+                  </div>
+                </div>
               </button>
             </div>
           </div>
+        )}
+
+        {/* Step 2: Instructions + reason */}
+        {wizardStep === 2 && wizardScenario && (
+          <div className="space-y-4">
+            <h3 className="text-lg font-semibold text-slate-100">
+              {wizardScenario === 'rotate' ? 'Rotate Encryption Key' : 'Key Recovery'}
+            </h3>
+
+            {wizardScenario === 'rotate' ? (
+              <div className={`${infoPanel} text-sm text-slate-300`}>
+                <p className="font-medium text-slate-200 mb-2">How rotation works:</p>
+                <ol className="list-decimal list-inside space-y-1 text-slate-400">
+                  <li>A new key will be generated for you (or enter your own)</li>
+                  <li>After approval, all secrets are decrypted with the current key and re-encrypted with the new one</li>
+                  <li>Then update <code className="font-mono text-xs text-slate-300">VAAS_CONFIG_ENCRYPTION_KEY</code> on Railway</li>
+                </ol>
+              </div>
+            ) : (
+              <div className="rounded-lg bg-rose-500/5 border border-rose-500/20 px-4 py-3 text-sm">
+                <p className="font-medium text-rose-300 mb-2">How recovery works:</p>
+                <ol className="list-decimal list-inside space-y-1 text-rose-300/80">
+                  <li>All encrypted values in the database will be <strong>wiped</strong> (they're already unreadable)</li>
+                  <li>After approval, set the new key on Railway and restart the service</li>
+                  <li>Then execute the reset &mdash; secrets will be re-seeded from environment variables</li>
+                </ol>
+              </div>
+            )}
+
+            <div>
+              <label className={`${sectionLabel} block mb-1`}>Reason for this change</label>
+              <textarea
+                value={wizardReason}
+                onChange={(e) => setWizardReason(e.target.value)}
+                className={`${inputClass} min-h-[80px]`}
+                placeholder="Provide a reason for the audit trail..."
+              />
+            </div>
+
+            <div className="flex justify-between mt-6">
+              <button
+                onClick={() => { setWizardStep(1); setWizardScenario(null); }}
+                className="rounded-lg border border-white/10 px-4 py-2 text-sm text-slate-400 hover:text-slate-200"
+              >
+                Back
+              </button>
+              <button
+                onClick={handleWizardSubmit}
+                disabled={wizardSubmitting}
+                className="flex items-center gap-2 rounded-lg bg-cyan-500/20 border border-cyan-500/30 px-4 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/30 disabled:opacity-50"
+              >
+                {wizardSubmitting && <div className="h-4 w-4 animate-spin rounded-full border-2 border-cyan-400 border-t-transparent" />}
+                Submit for Approval
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Step 3: Confirmation */}
+        {wizardStep === 3 && (
+          <div className="space-y-4 text-center py-4">
+            <div className="mx-auto h-12 w-12 rounded-full bg-emerald-500/15 border border-emerald-500/30 flex items-center justify-center">
+              <CheckCircle2 className="h-6 w-6 text-emerald-400" />
+            </div>
+            <h3 className="text-lg font-semibold text-slate-100">Request Submitted</h3>
+            <p className="text-sm text-slate-400">
+              A different super admin must approve before you can proceed. The request expires in 24 hours.
+            </p>
+            {wizardRequestId && (
+              <p className={`${monoXs} text-slate-500`}>Request ID: {wizardRequestId}</p>
+            )}
+            <button
+              onClick={() => { setShowWizard(false); setShowKeySection(true); }}
+              className="rounded-lg bg-cyan-500/20 border border-cyan-500/30 px-4 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/30"
+            >
+              Done
+            </button>
+          </div>
+        )}
+      </Modal>
+
+      {/* ── Deny Reason Modal ──────────────────────────────────────────── */}
+      <Modal isOpen={!!(showDenyModal && activeRequest)} onClose={() => setShowDenyModal(false)} title="Deny Request" size="sm">
+        <div>
+          <label className={`${sectionLabel} block mb-1`}>Reason (optional)</label>
+          <textarea
+            value={denyReason}
+            onChange={(e) => setDenyReason(e.target.value)}
+            className={`${inputClass} min-h-[80px]`}
+            placeholder="Why are you denying this request?"
+          />
         </div>
-      )}
+        <div className="flex justify-end gap-3 mt-6">
+          <button onClick={() => setShowDenyModal(false)} className="rounded-lg border border-white/10 px-4 py-2 text-sm text-slate-400 hover:text-slate-200">
+            Cancel
+          </button>
+          <button
+            onClick={() => { if (activeRequest) handleDeny(activeRequest.id); }}
+            className="rounded-lg bg-rose-500/20 border border-rose-500/30 px-4 py-2 text-sm font-medium text-rose-200 hover:bg-rose-500/30"
+          >
+            Deny
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

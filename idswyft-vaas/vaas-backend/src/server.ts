@@ -11,6 +11,7 @@ import { sessionExpirationService } from './services/sessionExpirationService.js
 import { healthCheckService } from './services/healthCheckService.js';
 import { platformConfigService } from './services/platformConfigService.js';
 import { platformNotificationService } from './services/platformNotificationService.js';
+import { analyticsCleanupService } from './services/analyticsCleanupService.js';
 import { seedPlatformAdmin } from './scripts/seedPlatformAdmin.js';
 import { authRateLimit } from './middleware/rateLimit.js';
 import { logger } from './utils/logger.js';
@@ -508,6 +509,9 @@ const startVaasServer = async () => {
 
     // Start weekly notification cleanup (7-day retention)
     platformNotificationService.startCleanupJob();
+
+    // Start daily analytics cleanup (30-day retention)
+    analyticsCleanupService.start();
     
     // Start HTTP server
     const server = app.listen(config.port, () => {

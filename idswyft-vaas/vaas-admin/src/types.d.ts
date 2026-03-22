@@ -1,5 +1,14 @@
 // TypeScript declarations for types.js
 
+export interface TrendPoint {
+  day: string;
+  verified: number;
+  failed: number;
+  manual_review: number;
+  pending: number;
+  total: number;
+}
+
 export interface AdminPermissions {
   manage_organization: boolean;
   manage_admins: boolean;

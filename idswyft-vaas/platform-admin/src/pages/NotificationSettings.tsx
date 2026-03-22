@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Trash2, Zap, ChevronDown, ChevronRight } from 'lucide-react';
 import platformApi from '../services/api';
+import Modal from '../components/ui/Modal';
 import { cardSurface, tableHeaderClass, statusPill, getStatusAccent, monoXs, monoSm, sectionLabel, infoPanel } from '../styles/tokens';
 
 const CHANNEL_TYPES = ['slack', 'discord', 'email', 'webhook'] as const;
@@ -376,85 +377,77 @@ export default function NotificationSettings() {
       </div>
 
       {/* Create/Edit Modal */}
-      {showModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/70 backdrop-blur-sm">
-          <div className="w-full max-w-md rounded-xl border border-white/10 bg-slate-900 p-6 shadow-2xl">
-            <h3 className="text-lg font-semibold text-slate-100 mb-4">
-              {editChannel ? 'Edit Channel' : 'Add Channel'}
-            </h3>
+      <Modal isOpen={showModal} onClose={() => setShowModal(false)} title={editChannel ? 'Edit Channel' : 'Add Channel'} size="md">
+        <div className="space-y-4">
+          <div>
+            <label className={`${sectionLabel} block mb-1`}>Name</label>
+            <input value={formName} onChange={(e) => setFormName(e.target.value)} className={inputClass} placeholder="My Slack Channel" />
+          </div>
 
-            <div className="space-y-4">
+          {!editChannel && (
+            <div>
+              <label className={`${sectionLabel} block mb-1`}>Type</label>
+              <select value={formType} onChange={(e) => setFormType(e.target.value)} className={inputClass}>
+                {CHANNEL_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
+              </select>
+            </div>
+          )}
+
+          {/* Dynamic config form */}
+          {(formType === 'slack' || formType === 'discord') && (
+            <div>
+              <label className={`${sectionLabel} block mb-1`}>Webhook URL</label>
+              <input value={formWebhookUrl} onChange={(e) => setFormWebhookUrl(e.target.value)} className={inputClass} placeholder="https://hooks.slack.com/..." />
+            </div>
+          )}
+
+          {formType === 'email' && (
+            <div>
+              <label className={`${sectionLabel} block mb-1`}>Recipients (comma-separated)</label>
+              <input value={formRecipients} onChange={(e) => setFormRecipients(e.target.value)} className={inputClass} placeholder="admin@example.com, ops@example.com" />
+            </div>
+          )}
+
+          {formType === 'webhook' && (
+            <>
               <div>
-                <label className={`${sectionLabel} block mb-1`}>Name</label>
-                <input value={formName} onChange={(e) => setFormName(e.target.value)} className={inputClass} placeholder="My Slack Channel" />
+                <label className={`${sectionLabel} block mb-1`}>URL</label>
+                <input value={formCustomUrl} onChange={(e) => setFormCustomUrl(e.target.value)} className={inputClass} placeholder="https://api.example.com/webhook" />
               </div>
-
-              {!editChannel && (
-                <div>
-                  <label className={`${sectionLabel} block mb-1`}>Type</label>
-                  <select value={formType} onChange={(e) => setFormType(e.target.value)} className={inputClass}>
-                    {CHANNEL_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
-                  </select>
-                </div>
-              )}
-
-              {/* Dynamic config form */}
-              {(formType === 'slack' || formType === 'discord') && (
-                <div>
-                  <label className={`${sectionLabel} block mb-1`}>Webhook URL</label>
-                  <input value={formWebhookUrl} onChange={(e) => setFormWebhookUrl(e.target.value)} className={inputClass} placeholder="https://hooks.slack.com/..." />
-                </div>
-              )}
-
-              {formType === 'email' && (
-                <div>
-                  <label className={`${sectionLabel} block mb-1`}>Recipients (comma-separated)</label>
-                  <input value={formRecipients} onChange={(e) => setFormRecipients(e.target.value)} className={inputClass} placeholder="admin@example.com, ops@example.com" />
-                </div>
-              )}
-
-              {formType === 'webhook' && (
-                <>
-                  <div>
-                    <label className={`${sectionLabel} block mb-1`}>URL</label>
-                    <input value={formCustomUrl} onChange={(e) => setFormCustomUrl(e.target.value)} className={inputClass} placeholder="https://api.example.com/webhook" />
-                  </div>
-                  <div>
-                    <label className={`${sectionLabel} block mb-1`}>Method</label>
-                    <select value={formCustomMethod} onChange={(e) => setFormCustomMethod(e.target.value)} className={inputClass}>
-                      <option value="POST">POST</option>
-                      <option value="PUT">PUT</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className={`${sectionLabel} block mb-1`}>Headers (JSON)</label>
-                    <input value={formCustomHeaders} onChange={(e) => setFormCustomHeaders(e.target.value)} className={inputClass} placeholder='{"Authorization": "Bearer ..."}' />
-                  </div>
-                </>
-              )}
-
-              <div className="flex items-center gap-2">
-                <input
-                  type="checkbox"
-                  checked={formEnabled}
-                  onChange={(e) => setFormEnabled(e.target.checked)}
-                  className="rounded border-white/20 bg-slate-800 text-cyan-400"
-                />
-                <span className="text-sm text-slate-300">Enabled</span>
+              <div>
+                <label className={`${sectionLabel} block mb-1`}>Method</label>
+                <select value={formCustomMethod} onChange={(e) => setFormCustomMethod(e.target.value)} className={inputClass}>
+                  <option value="POST">POST</option>
+                  <option value="PUT">PUT</option>
+                </select>
               </div>
-            </div>
+              <div>
+                <label className={`${sectionLabel} block mb-1`}>Headers (JSON)</label>
+                <input value={formCustomHeaders} onChange={(e) => setFormCustomHeaders(e.target.value)} className={inputClass} placeholder='{"Authorization": "Bearer ..."}' />
+              </div>
+            </>
+          )}
 
-            <div className="flex justify-end gap-3 mt-6">
-              <button onClick={() => setShowModal(false)} className="rounded-lg border border-white/10 px-4 py-2 text-sm text-slate-400 hover:text-slate-200">
-                Cancel
-              </button>
-              <button onClick={handleSave} className="rounded-lg bg-cyan-500/20 border border-cyan-500/30 px-4 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/30">
-                {editChannel ? 'Update' : 'Create'}
-              </button>
-            </div>
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              checked={formEnabled}
+              onChange={(e) => setFormEnabled(e.target.checked)}
+              className="rounded border-white/20 bg-slate-800 text-cyan-400"
+            />
+            <span className="text-sm text-slate-300">Enabled</span>
           </div>
         </div>
-      )}
+
+        <div className="flex justify-end gap-3 mt-6">
+          <button onClick={() => setShowModal(false)} className="rounded-lg border border-white/10 px-4 py-2 text-sm text-slate-400 hover:text-slate-200">
+            Cancel
+          </button>
+          <button onClick={handleSave} className="rounded-lg bg-cyan-500/20 border border-cyan-500/30 px-4 py-2 text-sm font-medium text-cyan-200 hover:bg-cyan-500/30">
+            {editChannel ? 'Update' : 'Create'}
+          </button>
+        </div>
+      </Modal>
     </div>
   );
 }

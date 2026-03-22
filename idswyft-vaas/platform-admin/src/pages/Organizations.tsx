@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Search, Plus, X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Search, Plus, ChevronLeft, ChevronRight } from 'lucide-react';
 import { platformApi } from '../services/api';
 import type { Organization } from '../services/api';
+import Modal from '../components/ui/Modal';
 import {
   sectionLabel,
   monoXs,
@@ -184,100 +185,82 @@ export default function Organizations() {
       </div>
 
       {/* Create Organization Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="fixed inset-0 bg-slate-950/65 backdrop-blur-[2px]"
-            onClick={() => setShowCreateModal(false)}
-          />
-          <div className="relative glass-panel rounded-xl p-6 w-full max-w-md animate-scale-in">
-            <div className="flex items-center justify-between mb-6">
-              <p className={sectionLabel}>Create Organization</p>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="text-slate-400 hover:text-slate-200 transition"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {createError && (
-              <div className="bg-rose-500/12 border border-rose-400/30 rounded-lg p-3 mb-4">
-                <span className={`${monoXs} text-rose-300`}>{createError}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleCreate} className="space-y-4">
-              <div className="form-group">
-                <label className="form-label">Organization Name</label>
-                <input
-                  type="text"
-                  required
-                  value={createForm.name}
-                  onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
-                  className="form-input"
-                  placeholder="Acme Corp"
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Slug</label>
-                <input
-                  type="text"
-                  required
-                  value={createForm.slug}
-                  onChange={(e) => setCreateForm({ ...createForm, slug: e.target.value })}
-                  className="form-input"
-                  placeholder="acme-corp"
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Contact Email</label>
-                <input
-                  type="email"
-                  required
-                  value={createForm.contact_email}
-                  onChange={(e) => setCreateForm({ ...createForm, contact_email: e.target.value })}
-                  className="form-input"
-                  placeholder="admin@acme.com"
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Subscription Tier</label>
-                <select
-                  value={createForm.subscription_tier}
-                  onChange={(e) => setCreateForm({ ...createForm, subscription_tier: e.target.value })}
-                  className="form-input"
-                >
-                  <option value="free">Free</option>
-                  <option value="starter">Starter</option>
-                  <option value="growth">Growth</option>
-                  <option value="enterprise">Enterprise</option>
-                </select>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="btn btn-ghost text-sm"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={creating}
-                  className="btn btn-primary text-sm"
-                >
-                  {creating ? 'Creating...' : 'Create'}
-                </button>
-              </div>
-            </form>
+      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Create Organization" size="md">
+        {createError && (
+          <div className="bg-rose-500/12 border border-rose-400/30 rounded-lg p-3 mb-4">
+            <span className={`${monoXs} text-rose-300`}>{createError}</span>
           </div>
-        </div>
-      )}
+        )}
+
+        <form onSubmit={handleCreate} className="space-y-4">
+          <div className="form-group">
+            <label className="form-label">Organization Name</label>
+            <input
+              type="text"
+              required
+              value={createForm.name}
+              onChange={(e) => setCreateForm({ ...createForm, name: e.target.value })}
+              className="form-input"
+              placeholder="Acme Corp"
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Slug</label>
+            <input
+              type="text"
+              required
+              value={createForm.slug}
+              onChange={(e) => setCreateForm({ ...createForm, slug: e.target.value })}
+              className="form-input"
+              placeholder="acme-corp"
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Contact Email</label>
+            <input
+              type="email"
+              required
+              value={createForm.contact_email}
+              onChange={(e) => setCreateForm({ ...createForm, contact_email: e.target.value })}
+              className="form-input"
+              placeholder="admin@acme.com"
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Subscription Tier</label>
+            <select
+              value={createForm.subscription_tier}
+              onChange={(e) => setCreateForm({ ...createForm, subscription_tier: e.target.value })}
+              className="form-input"
+            >
+              <option value="free">Free</option>
+              <option value="starter">Starter</option>
+              <option value="growth">Growth</option>
+              <option value="enterprise">Enterprise</option>
+            </select>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowCreateModal(false)}
+              className="btn btn-ghost text-sm"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={creating}
+              className="btn btn-primary text-sm"
+            >
+              {creating ? 'Creating...' : 'Create'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

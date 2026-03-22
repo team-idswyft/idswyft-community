@@ -318,6 +318,18 @@ class ApiClient {
     return response.data.data!;
   }
 
+  async getVerificationTrend(days: number = 30): Promise<any[]> {
+    const response: AxiosResponse<ApiResponse<any[]>> = await this.client.get('/verifications/stats/verification-trend', {
+      params: { days }
+    });
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to get verification trend');
+    }
+
+    return response.data.data!;
+  }
+
   // Webhooks
   async listWebhooks(): Promise<Webhook[]> {
     const response: AxiosResponse<ApiResponse<Webhook[]>> = await this.client.get('/webhooks');

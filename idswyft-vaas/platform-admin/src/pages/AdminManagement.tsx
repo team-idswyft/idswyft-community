@@ -1,8 +1,9 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Trash2, X, Shield } from 'lucide-react';
+import { Plus, Trash2, Shield } from 'lucide-react';
 import { platformApi } from '../services/api';
 import type { PlatformAdmin } from '../services/api';
 import { useAuth } from '../contexts/AuthContext';
+import Modal, { ConfirmationModal } from '../components/ui/Modal';
 import {
   sectionLabel,
   monoXs,
@@ -194,141 +195,103 @@ export default function AdminManagement() {
       </div>
 
       {/* Delete Confirmation */}
-      {deleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="fixed inset-0 bg-slate-950/65 backdrop-blur-[2px]"
-            onClick={() => setDeleteConfirm(null)}
-          />
-          <div className="relative glass-panel rounded-xl p-6 w-full max-w-sm animate-scale-in">
-            <p className="text-slate-100 font-semibold mb-2">Delete Admin</p>
-            <p className="text-sm text-slate-400 mb-5">
-              Are you sure you want to delete this admin? This action cannot be undone.
-            </p>
-            <div className="flex items-center justify-end gap-3">
-              <button
-                onClick={() => setDeleteConfirm(null)}
-                className="btn btn-ghost text-sm"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={() => handleDelete(deleteConfirm)}
-                disabled={deleting}
-                className="btn btn-danger text-sm"
-              >
-                {deleting ? 'Deleting...' : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+      <ConfirmationModal
+        isOpen={!!deleteConfirm}
+        onClose={() => setDeleteConfirm(null)}
+        onConfirm={() => { if (deleteConfirm) handleDelete(deleteConfirm); }}
+        title="Delete Admin"
+        message="Are you sure you want to delete this admin? This action cannot be undone."
+        confirmText={deleting ? 'Deleting...' : 'Delete'}
+        confirmVariant="danger"
+      />
 
       {/* Create Admin Modal */}
-      {showCreateModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center">
-          <div
-            className="fixed inset-0 bg-slate-950/65 backdrop-blur-[2px]"
-            onClick={() => setShowCreateModal(false)}
-          />
-          <div className="relative glass-panel rounded-xl p-6 w-full max-w-md animate-scale-in">
-            <div className="flex items-center justify-between mb-6">
-              <p className={sectionLabel}>Add Admin</p>
-              <button
-                onClick={() => setShowCreateModal(false)}
-                className="text-slate-400 hover:text-slate-200 transition"
-              >
-                <X className="h-5 w-5" />
-              </button>
-            </div>
-
-            {createError && (
-              <div className="bg-rose-500/12 border border-rose-400/30 rounded-lg p-3 mb-4">
-                <span className={`${monoXs} text-rose-300`}>{createError}</span>
-              </div>
-            )}
-
-            <form onSubmit={handleCreate} className="space-y-4">
-              <div className="form-group">
-                <label className="form-label">Email</label>
-                <input
-                  type="email"
-                  required
-                  value={createForm.email}
-                  onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
-                  className="form-input"
-                  placeholder="admin@idswyft.app"
-                />
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Password</label>
-                <input
-                  type="password"
-                  required
-                  minLength={8}
-                  value={createForm.password}
-                  onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
-                  className="form-input"
-                  placeholder="Min 8 characters"
-                />
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="form-group">
-                  <label className="form-label">First Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={createForm.first_name}
-                    onChange={(e) => setCreateForm({ ...createForm, first_name: e.target.value })}
-                    className="form-input"
-                  />
-                </div>
-                <div className="form-group">
-                  <label className="form-label">Last Name</label>
-                  <input
-                    type="text"
-                    required
-                    value={createForm.last_name}
-                    onChange={(e) => setCreateForm({ ...createForm, last_name: e.target.value })}
-                    className="form-input"
-                  />
-                </div>
-              </div>
-
-              <div className="form-group">
-                <label className="form-label">Role</label>
-                <select
-                  value={createForm.role}
-                  onChange={(e) => setCreateForm({ ...createForm, role: e.target.value })}
-                  className="form-input"
-                >
-                  <option value="admin">Admin</option>
-                  <option value="super_admin">Super Admin</option>
-                </select>
-              </div>
-
-              <div className="flex items-center justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateModal(false)}
-                  className="btn btn-ghost text-sm"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={creating}
-                  className="btn btn-primary text-sm"
-                >
-                  {creating ? 'Creating...' : 'Create Admin'}
-                </button>
-              </div>
-            </form>
+      <Modal isOpen={showCreateModal} onClose={() => setShowCreateModal(false)} title="Add Admin" size="md">
+        {createError && (
+          <div className="bg-rose-500/12 border border-rose-400/30 rounded-lg p-3 mb-4">
+            <span className={`${monoXs} text-rose-300`}>{createError}</span>
           </div>
-        </div>
-      )}
+        )}
+
+        <form onSubmit={handleCreate} className="space-y-4">
+          <div className="form-group">
+            <label className="form-label">Email</label>
+            <input
+              type="email"
+              required
+              value={createForm.email}
+              onChange={(e) => setCreateForm({ ...createForm, email: e.target.value })}
+              className="form-input"
+              placeholder="admin@idswyft.app"
+            />
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Password</label>
+            <input
+              type="password"
+              required
+              minLength={8}
+              value={createForm.password}
+              onChange={(e) => setCreateForm({ ...createForm, password: e.target.value })}
+              className="form-input"
+              placeholder="Min 8 characters"
+            />
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="form-group">
+              <label className="form-label">First Name</label>
+              <input
+                type="text"
+                required
+                value={createForm.first_name}
+                onChange={(e) => setCreateForm({ ...createForm, first_name: e.target.value })}
+                className="form-input"
+              />
+            </div>
+            <div className="form-group">
+              <label className="form-label">Last Name</label>
+              <input
+                type="text"
+                required
+                value={createForm.last_name}
+                onChange={(e) => setCreateForm({ ...createForm, last_name: e.target.value })}
+                className="form-input"
+              />
+            </div>
+          </div>
+
+          <div className="form-group">
+            <label className="form-label">Role</label>
+            <select
+              value={createForm.role}
+              onChange={(e) => setCreateForm({ ...createForm, role: e.target.value })}
+              className="form-input"
+            >
+              <option value="admin">Admin</option>
+              <option value="super_admin">Super Admin</option>
+            </select>
+          </div>
+
+          <div className="flex items-center justify-end gap-3 pt-2">
+            <button
+              type="button"
+              onClick={() => setShowCreateModal(false)}
+              className="btn btn-ghost text-sm"
+            >
+              Cancel
+            </button>
+            <button
+              type="submit"
+              disabled={creating}
+              className="btn btn-primary text-sm"
+            >
+              {creating ? 'Creating...' : 'Create Admin'}
+            </button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

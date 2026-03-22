@@ -609,6 +609,78 @@ router.get('/stats/overview', requireAuth, requirePermission('view_analytics'), 
   }
 });
 
+// Get verification trend (admin only) — daily buckets by status
+router.get('/stats/verification-trend', requireAuth, requirePermission('view_analytics'), async (req: AuthenticatedRequest, res) => {
+  try {
+    const organizationId = req.admin!.organization_id;
+    const days = Math.min(Math.max(parseInt(req.query.days as string) || 30, 1), 90);
+    const QUERY_ROW_LIMIT = 10_000;
+
+    const since = new Date(Date.now() - days * 86_400_000).toISOString();
+
+    const { data: sessions, error } = await vaasSupabase
+      .from('vaas_verification_sessions')
+      .select('status, created_at')
+      .eq('organization_id', organizationId)
+      .gte('created_at', since)
+      .limit(QUERY_ROW_LIMIT);
+
+    if (error) {
+      throw new Error('Failed to get verification trend');
+    }
+
+    if ((sessions || []).length >= QUERY_ROW_LIMIT) {
+      console.warn(`[Analytics] verification-trend returned ${sessions!.length} rows (limit ${QUERY_ROW_LIMIT}) — results may be truncated`);
+    }
+
+    // Bucket by day
+    const buckets = new Map<string, { verified: number; failed: number; manual_review: number; pending: number }>();
+
+    for (const s of sessions || []) {
+      const day = s.created_at.substring(0, 10);
+      if (!buckets.has(day)) {
+        buckets.set(day, { verified: 0, failed: 0, manual_review: 0, pending: 0 });
+      }
+      const bucket = buckets.get(day)!;
+      const status = s.status as keyof typeof bucket;
+      if (status in bucket) {
+        bucket[status]++;
+      }
+    }
+
+    // Pad missing days
+    const result: Array<{ day: string; verified: number; failed: number; manual_review: number; pending: number; total: number }> = [];
+    const startDate = new Date(Date.now() - days * 86_400_000);
+    for (let i = 0; i <= days; i++) {
+      const d = new Date(startDate.getTime() + i * 86_400_000);
+      const day = d.toISOString().substring(0, 10);
+      const b = buckets.get(day) || { verified: 0, failed: 0, manual_review: 0, pending: 0 };
+      result.push({
+        day,
+        ...b,
+        total: b.verified + b.failed + b.manual_review + b.pending,
+      });
+    }
+
+    const response: VaasApiResponse = {
+      success: true,
+      data: result,
+    };
+
+    res.json(response);
+  } catch (error: any) {
+    const response: VaasApiResponse = {
+      success: false,
+      error: {
+        code: 'GET_TREND_FAILED',
+        message: error.message
+      }
+    };
+
+    res.status(500).json(response);
+  }
+});
+
 // Get verification session by token (public endpoint for customer portal)
 router.get('/session/:token', async (req, res) => {
   try {

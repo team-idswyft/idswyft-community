@@ -1,7 +1,20 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../services/api';
-import { DashboardStats, UsageStats, VerificationSession } from '../types.js';
+import { DashboardStats, UsageStats, VerificationSession, TrendPoint } from '../types.js';
+import VerificationTrendChart from '../components/charts/VerificationTrendChart';
+import DarkTooltip from '../components/charts/DarkTooltip';
+import {
+  LineChart,
+  Line,
+  BarChart as RBarChart,
+  Bar,
+  XAxis,
+  YAxis,
+  CartesianGrid,
+  Tooltip,
+  ResponsiveContainer,
+} from 'recharts';
 import {
   BarChart3,
   TrendingUp,
@@ -20,6 +33,8 @@ export default function Analytics() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [usage, setUsage] = useState<UsageStats | null>(null);
   const [recentVerifications, setRecentVerifications] = useState<VerificationSession[]>([]);
+  const [trendData, setTrendData] = useState<TrendPoint[]>([]);
+  const [trendLoading, setTrendLoading] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
@@ -32,21 +47,26 @@ export default function Analytics() {
       setRefreshing(true);
 
       // Fetch analytics data in parallel
-      const [statsResponse, usageResponse, verificationsResponse] = await Promise.all([
+      setTrendLoading(true);
+      const [statsResponse, usageResponse, verificationsResponse, trendResponse] = await Promise.all([
         apiClient.getVerificationStats(selectedPeriod),
         organization ? apiClient.getOrganizationUsage(organization.id) : Promise.resolve(null),
-        apiClient.listVerifications({ page: 1, per_page: 10 })
+        apiClient.listVerifications({ page: 1, per_page: 10 }),
+        apiClient.getVerificationTrend(selectedPeriod)
       ]);
 
       setStats(statsResponse);
       setUsage(usageResponse);
       setRecentVerifications(verificationsResponse.verifications);
+      setTrendData(trendResponse);
+      setTrendLoading(false);
     } catch (err: any) {
       console.error('Failed to fetch analytics data:', err);
       setError(err.message || 'Failed to load analytics data');
     } finally {
       setLoading(false);
       setRefreshing(false);
+      setTrendLoading(false);
     }
   };
 
@@ -230,7 +250,7 @@ export default function Analytics() {
       )}
 
       {activeTab === 'trends' && (
-        <TrendsTab stats={stats} selectedPeriod={selectedPeriod} />
+        <TrendsTab stats={stats} selectedPeriod={selectedPeriod} trendData={trendData} trendLoading={trendLoading} />
       )}
 
       {activeTab === 'users' && (
@@ -249,6 +269,8 @@ interface TabProps {
   usage?: UsageStats | null;
   recentVerifications?: VerificationSession[];
   selectedPeriod: number;
+  trendData?: TrendPoint[];
+  trendLoading?: boolean;
 }
 
 function OverviewTab({ stats, usage, selectedPeriod }: TabProps) {
@@ -381,52 +403,67 @@ function OverviewTab({ stats, usage, selectedPeriod }: TabProps) {
   );
 }
 
-function TrendsTab({ stats, selectedPeriod }: TabProps) {
+function TrendsTab({ stats, selectedPeriod, trendData = [], trendLoading }: TabProps) {
+  // Compute derived data for sub-charts
+  const successRateData = trendData.map(d => ({
+    day: d.day,
+    rate: d.total > 0 ? Math.round((d.verified / d.total) * 100) : 0,
+  }));
+
+  const volumeData = trendData.map(d => ({
+    day: d.day,
+    total: d.total,
+  }));
+
+  const tickFormatter = (v: string) => {
+    const d = new Date(v);
+    return `${d.getMonth() + 1}/${d.getDate()}`;
+  };
+
   return (
     <div className="space-y-6">
-      <div className={cardSurface}>
-        <div className="p-6 border-b border-white/10">
-          <p className={sectionLabel}>Verification Trends</p>
-          <p className="text-sm text-slate-400 mt-1">
-            Performance trends over the last {selectedPeriod} days
-          </p>
-        </div>
-        <div className="p-6">
-          <div className="h-64 flex items-center justify-center border-2 border-white/10 border-dashed rounded-lg">
-            <div className="text-center">
-              <TrendingUp className="mx-auto h-12 w-12 text-slate-500" />
-              <span className="mt-2 block text-sm font-medium text-slate-100">
-                Trend Charts Coming Soon
-              </span>
-              <span className="block text-sm text-slate-500">
-                Historical verification trends and patterns will be displayed here
-              </span>
-            </div>
-          </div>
-        </div>
-      </div>
+      {/* Main stacked area chart */}
+      <VerificationTrendChart data={trendData} loading={trendLoading} />
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        {/* Success Rate Line Chart */}
         <div className={cardSurface}>
           <div className="p-6 border-b border-white/10">
             <p className={sectionLabel}>Success Rate Trend</p>
+            <p className="text-sm text-slate-400 mt-1">Daily verification success rate (%)</p>
           </div>
           <div className="p-6">
-            <div className="text-center py-12">
-              <Target className="mx-auto h-8 w-8 text-slate-500 mb-2" />
-              <p className="text-sm text-slate-500">Success rate timeline chart</p>
+            <div className="h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={successRateData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                  <XAxis dataKey="day" tick={{ fill: '#64748b', fontSize: 10, fontFamily: 'IBM Plex Mono, monospace' }} tickFormatter={tickFormatter} axisLine={{ stroke: 'rgba(255,255,255,0.1)' }} tickLine={false} />
+                  <YAxis domain={[0, 100]} tick={{ fill: '#64748b', fontSize: 10, fontFamily: 'IBM Plex Mono, monospace' }} axisLine={{ stroke: 'rgba(255,255,255,0.1)' }} tickLine={false} />
+                  <Tooltip content={<DarkTooltip />} />
+                  <Line type="monotone" dataKey="rate" stroke="#34d399" strokeWidth={2} dot={false} name="Success %" />
+                </LineChart>
+              </ResponsiveContainer>
             </div>
           </div>
         </div>
 
+        {/* Volume Bar Chart */}
         <div className={cardSurface}>
           <div className="p-6 border-b border-white/10">
             <p className={sectionLabel}>Volume Trend</p>
+            <p className="text-sm text-slate-400 mt-1">Daily total verification count</p>
           </div>
           <div className="p-6">
-            <div className="text-center py-12">
-              <BarChart3 className="mx-auto h-8 w-8 text-slate-500 mb-2" />
-              <p className="text-sm text-slate-500">Volume trend chart</p>
+            <div className="h-48">
+              <ResponsiveContainer width="100%" height="100%">
+                <RBarChart data={volumeData} margin={{ top: 4, right: 4, left: -20, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.05)" />
+                  <XAxis dataKey="day" tick={{ fill: '#64748b', fontSize: 10, fontFamily: 'IBM Plex Mono, monospace' }} tickFormatter={tickFormatter} axisLine={{ stroke: 'rgba(255,255,255,0.1)' }} tickLine={false} />
+                  <YAxis tick={{ fill: '#64748b', fontSize: 10, fontFamily: 'IBM Plex Mono, monospace' }} axisLine={{ stroke: 'rgba(255,255,255,0.1)' }} tickLine={false} allowDecimals={false} />
+                  <Tooltip content={<DarkTooltip />} />
+                  <Bar dataKey="total" fill="#22d3ee" radius={[2, 2, 0, 0]} name="Verifications" />
+                </RBarChart>
+              </ResponsiveContainer>
             </div>
           </div>
         </div>
