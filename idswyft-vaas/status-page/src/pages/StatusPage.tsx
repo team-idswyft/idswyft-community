@@ -6,7 +6,11 @@ import { StatusBanner } from '../components/StatusBanner';
 import { ServiceGrid } from '../components/ServiceGrid';
 import { IncidentList } from '../components/IncidentList';
 
-export function StatusPage() {
+interface StatusPageProps {
+  logoUrl?: string;
+}
+
+export function StatusPage({ logoUrl }: StatusPageProps) {
   const [status, setStatus] = useState<StatusResponse | null>(null);
   const [history, setHistory] = useState<DailySummary[]>([]);
   const [incidents, setIncidents] = useState<Incident[]>([]);
@@ -78,6 +82,13 @@ export function StatusPage() {
       <div style={{ maxWidth: 720, margin: '0 auto', padding: '48px 20px' }}>
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          {logoUrl && (
+            <img
+              src={logoUrl}
+              alt="Idswyft"
+              style={{ height: 32, width: 'auto', marginBottom: 12 }}
+            />
+          )}
           <div style={{
             fontSize: 11, color: theme.muted, letterSpacing: '0.12em',
             textTransform: 'uppercase', fontFamily: theme.mono,
