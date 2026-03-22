@@ -889,7 +889,7 @@ export default function Configuration() {
       </Modal>
 
       {/* ── Wizard Modal ──────────────────────────────────────────────────── */}
-      <Modal isOpen={showWizard} onClose={() => setShowWizard(false)} showCloseButton={false} size="lg">
+      <Modal isOpen={showWizard} onClose={() => setShowWizard(false)} title="Manage Encryption Key" size="lg">
         {/* Step indicator */}
         <div className="flex items-center gap-3 mb-6">
           {[1, 2, 3].map((step) => (
@@ -906,8 +906,6 @@ export default function Configuration() {
               {step < 3 && <div className={`h-px w-8 ${wizardStep > step ? 'bg-emerald-500/50' : 'bg-white/10'}`} />}
             </div>
           ))}
-          <div className="flex-1" />
-          <button onClick={() => setShowWizard(false)} className="text-slate-400 hover:text-slate-200">&times;</button>
         </div>
 
         {/* Step 1: Choose scenario */}
