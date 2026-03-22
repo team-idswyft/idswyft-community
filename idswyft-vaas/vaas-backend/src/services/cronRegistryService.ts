@@ -13,7 +13,7 @@ export interface CronJobEntry {
   id: string;
   name: string;
   service: string;
-  backend: 'vaas' | 'main';
+  backend: 'vaas' | 'main' | 'status';
   schedule: string;
   status: 'running' | 'stopped';
   lastRunAt: string | null;
@@ -74,10 +74,10 @@ class CronRegistryService {
   /**
    * Called by services after each execution to update runtime state.
    */
-  reportRun(id: string, result: 'success' | 'error', error?: string): void {
+  reportRun(id: string, result: 'success' | 'error', error?: string, timestamp?: string): void {
     const job = this.jobs.get(id);
     if (!job) return;
-    job.lastRunAt = new Date().toISOString();
+    job.lastRunAt = timestamp || new Date().toISOString();
     job.lastResult = result;
     job.lastError = result === 'error' ? (error ?? 'Unknown error') : null;
   }

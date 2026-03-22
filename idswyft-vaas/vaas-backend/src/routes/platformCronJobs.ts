@@ -2,10 +2,27 @@ import { Router } from 'express';
 import { VaasApiResponse } from '../types/index.js';
 import { requirePlatformSuperAdmin, PlatformAdminRequest } from '../middleware/platformAuth.js';
 import { cronRegistry } from '../services/cronRegistryService.js';
+import config from '../config/index.js';
 
 const router = Router();
 
-// All cron job routes require platform super admin
+// Service-token auth for external cron reporters (must be before requirePlatformSuperAdmin)
+router.post('/report', (req, res) => {
+  const token = req.headers['x-service-token'];
+  if (!token || token !== config.idswyftApi.serviceToken) {
+    return res.status(401).json({ success: false, error: { code: 'UNAUTHORIZED', message: 'Invalid service token' } } as VaasApiResponse);
+  }
+
+  const { id, lastRunAt, lastResult, lastError } = req.body;
+  if (!id || !lastRunAt || !lastResult) {
+    return res.status(400).json({ success: false, error: { code: 'VALIDATION', message: 'id, lastRunAt, lastResult required' } } as VaasApiResponse);
+  }
+
+  cronRegistry.reportRun(id, lastResult, lastError || undefined, lastRunAt);
+  res.json({ success: true } as VaasApiResponse);
+});
+
+// Apply platform admin auth to all routes below this line
 router.use(requirePlatformSuperAdmin as any);
 
 // GET /api/platform/cron-jobs — list all registered cron jobs
