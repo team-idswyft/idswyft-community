@@ -42,7 +42,8 @@ export function Layout({ children }: LayoutProps) {
     location.pathname.startsWith('/docs') ||
     location.pathname.startsWith('/developer') ||
     location.pathname.startsWith('/demo') ||
-    location.pathname.startsWith('/status')
+    location.pathname.startsWith('/status') ||
+    location.pathname.startsWith('/legal')
 
   if (isAdminRoute && location.pathname !== '/admin/login') {
     // Admin layout will be handled separately
@@ -280,10 +281,14 @@ export function Layout({ children }: LayoutProps) {
                 Legal
               </h3>
               <ul className="space-y-2">
-                {['Privacy Policy', 'Terms of Service', 'GDPR Compliance'].map(l => (
-                  <li key={l}>
-                    <a href="#" style={{ color: '#8896aa', fontSize: 14 }}
-                      className="hover:text-white transition-colors">{l}</a>
+                {[
+                  { label: 'Privacy Policy', href: '/legal#privacy' },
+                  { label: 'Terms of Service', href: '/legal#terms' },
+                  { label: 'GDPR Compliance', href: '/legal#gdpr' },
+                ].map(({ label, href }) => (
+                  <li key={label}>
+                    <Link to={href} style={{ color: '#8896aa', fontSize: 14 }}
+                      className="hover:text-white transition-colors">{label}</Link>
                   </li>
                 ))}
               </ul>

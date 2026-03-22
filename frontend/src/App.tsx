@@ -10,6 +10,7 @@ import { AdminPage } from './pages/AdminPage'
 import { AdminLogin } from './pages/AdminLogin'
 import { DocsPage } from './pages/DocsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
+import { LegalPage } from './pages/LegalPage'
 import { Status } from './pages/Status'
 import { PatternShowcase } from './components/PatternShowcase'
 
@@ -26,6 +27,7 @@ function App() {
         <Route path="/verify/mobile" element={<MobileVerificationPage />} />
         <Route path="/docs" element={<DocsPage />} />
         <Route path="/status" element={<Status />} />
+        <Route path="/legal" element={<LegalPage />} />
         <Route path="/patterns" element={<PatternShowcase />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin/*" element={<AdminPage />} />
