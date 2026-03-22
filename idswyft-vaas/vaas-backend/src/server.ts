@@ -46,6 +46,7 @@ import platformConfigRoutes from './routes/platformConfig.js';
 import platformAnalyticsRoutes from './routes/platformAnalytics.js';
 import platformDatabaseRoutes from './routes/platformDatabase.js';
 import platformCronJobsRoutes from './routes/platformCronJobs.js';
+import platformIncidentProxyRoutes from './routes/platformIncidentProxy.js';
 import publicStatusRoutes from './routes/publicStatus.js';
 import samlRoutes from './routes/saml.js';
 import notificationRoutes from './routes/notifications.js';
@@ -418,6 +419,7 @@ app.use('/api/platform/config', platformConfigRoutes);
 app.use('/api/platform/analytics', platformAnalyticsRoutes);
 app.use('/api/platform/database', platformDatabaseRoutes);
 app.use('/api/platform/cron-jobs', platformCronJobsRoutes);
+app.use('/api/platform/incidents', platformIncidentProxyRoutes);
 console.log('✅ Platform admin routes mounted');
 
 // 404 handler
@@ -686,6 +688,29 @@ const startVaasServer = async () => {
       controllable: false,
       envGate: 'production only',
       description: 'Processes scheduled re-verification requests',
+    });
+
+    // Status service jobs (view-only, updated via /report endpoint)
+    cronRegistry.register('status-health-poller', {
+      name: 'Status Health Poller',
+      service: 'healthPoller',
+      backend: 'status',
+      schedule: 'Every 60 seconds',
+      status: 'running',
+      controllable: false,
+      envGate: null,
+      description: 'Polls all Idswyft services for health status',
+    });
+
+    cronRegistry.register('status-data-cleanup', {
+      name: 'Status Data Cleanup',
+      service: 'dataCleanup',
+      backend: 'status',
+      schedule: 'Every 24 hours',
+      status: 'running',
+      controllable: false,
+      envGate: null,
+      description: 'Removes service checks older than 30 days and resolved incidents older than 90 days',
     });
 
     console.log(`✅ Cron registry: ${cronRegistry.getAll().length} jobs registered`);
