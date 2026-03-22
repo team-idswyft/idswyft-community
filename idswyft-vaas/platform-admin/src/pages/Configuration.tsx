@@ -289,8 +289,8 @@ export default function Configuration() {
       const { value } = await platformApi.getConfigValue(key);
       setRevealedValues((prev) => ({ ...prev, [key]: value }));
       setVisibleSecrets((prev) => new Set(prev).add(key));
-    } catch {
-      setToast({ message: 'Failed to reveal value', type: 'error' });
+    } catch (err: any) {
+      setToast({ message: err?.message || 'Failed to reveal value', type: 'error' });
     }
   };
 

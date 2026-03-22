@@ -142,8 +142,8 @@ export default function NotificationBell() {
       </button>
 
       {dropdownOpen && (
-        <div className="absolute right-0 top-full z-50 mt-2 w-80 animate-scale-in">
-          <div className="glass-panel rounded-xl border border-white/10 bg-slate-900/95 shadow-2xl backdrop-blur-xl">
+        <div className="absolute right-0 top-full z-[60] mt-2 w-80 animate-scale-in">
+          <div className="rounded-xl border border-white/10 shadow-2xl backdrop-blur-xl" style={{ background: 'rgba(11, 17, 32, 0.98)' }}>
             <div className="flex items-center justify-between border-b border-white/10 px-4 py-3">
               <span className="text-sm font-semibold text-slate-100">Notifications</span>
               {unreadCount > 0 && (

@@ -266,9 +266,9 @@ export class PlatformConfigService {
     if (data.is_secret && data.value) {
       try {
         return decrypt(data.value);
-      } catch {
-        console.error(`[PlatformConfig] Failed to decrypt key: ${key}`);
-        return null;
+      } catch (err) {
+        console.error(`[PlatformConfig] Failed to decrypt key: ${key}`, err);
+        throw new Error(`Failed to decrypt secret "${key}". The encryption key may be missing or incorrect.`);
       }
     }
     return data.value;
