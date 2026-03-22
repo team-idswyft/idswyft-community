@@ -260,7 +260,7 @@ export function Layout({ children }: LayoutProps) {
                 {[
                   { label: 'API Documentation', href: '/docs' },
                   { label: 'Get API Key', href: '/developer' },
-                  { label: 'System Status', href: '/status' },
+                  { label: 'System Status', href: 'https://status.idswyft.app' },
                   { label: 'GitHub', href: 'https://github.com/doobee46/idswyft' },
                 ].map(({ label, href }) => (
                   <li key={label}>
