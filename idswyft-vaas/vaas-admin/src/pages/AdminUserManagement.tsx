@@ -194,7 +194,7 @@ export default function AdminUserManagement() {
     try {
       const [rolesData, permissionsData] = await Promise.all([
         apiClient.getAdminRoles(organization.id),
-        apiClient.getAdminPermissions(),
+        apiClient.getAdminPermissions(organization.id),
       ]);
       setRoles(rolesData);
       setPermissions(permissionsData);

@@ -1,5 +1,7 @@
 import { Router } from 'express';
 import jwt from 'jsonwebtoken';
+import bcrypt from 'bcrypt';
+import crypto from 'crypto';
 import { organizationService } from '../services/organizationService.js';
 import { emailService } from '../services/emailService.js';
 import config from '../config/index.js';
@@ -10,6 +12,7 @@ import { requireAuth, requireSuperAdmin } from '../middleware/auth.js';
 import { auditService } from '../services/auditService.js';
 import { orgStorageService } from '../services/orgStorageService.js';
 import { vaasSupabase } from '../config/database.js';
+import { escapePostgrestValue } from '../utils/sanitize.js';
 
 const router = Router();
 
@@ -612,6 +615,601 @@ router.post('/:id/storage-config', requireAuth as any, async (req, res) => {
       error: { code: 'UPDATE_STORAGE_CONFIG_FAILED', message: error.message },
     };
     res.status(500).json(response);
+  }
+});
+
+// ── Predefined roles with default permission sets ──────────────────────────
+const SYSTEM_PERMISSIONS = [
+  { id: 'manage_organization', name: 'manage_organization', display_name: 'Manage Organization', description: 'Create, update, and delete organization settings', category: 'organization' as const, is_system_permission: true },
+  { id: 'manage_admins', name: 'manage_admins', display_name: 'Manage Admins', description: 'Invite, edit, and remove admin users', category: 'admin_management' as const, is_system_permission: true },
+  { id: 'manage_billing', name: 'manage_billing', display_name: 'Manage Billing', description: 'View and manage billing, plans, and invoices', category: 'billing' as const, is_system_permission: true },
+  { id: 'view_users', name: 'view_users', display_name: 'View Users', description: 'View end-user profiles and verification history', category: 'users' as const, is_system_permission: true },
+  { id: 'manage_users', name: 'manage_users', display_name: 'Manage Users', description: 'Create, edit, and delete end users', category: 'users' as const, is_system_permission: true },
+  { id: 'export_users', name: 'export_users', display_name: 'Export Users', description: 'Export end-user data in CSV or JSON', category: 'users' as const, is_system_permission: true },
+  { id: 'view_verifications', name: 'view_verifications', display_name: 'View Verifications', description: 'View verification sessions and results', category: 'verifications' as const, is_system_permission: true },
+  { id: 'review_verifications', name: 'review_verifications', display_name: 'Review Verifications', description: 'Review flagged and manual-review verifications', category: 'verifications' as const, is_system_permission: true },
+  { id: 'approve_verifications', name: 'approve_verifications', display_name: 'Approve Verifications', description: 'Approve or reject verification outcomes', category: 'verifications' as const, is_system_permission: true },
+  { id: 'manage_settings', name: 'manage_settings', display_name: 'Manage Settings', description: 'Configure verification settings and thresholds', category: 'settings' as const, is_system_permission: true },
+  { id: 'manage_webhooks', name: 'manage_webhooks', display_name: 'Manage Webhooks', description: 'Create, edit, and delete webhook endpoints', category: 'webhooks' as const, is_system_permission: true },
+  { id: 'manage_integrations', name: 'manage_integrations', display_name: 'Manage Integrations', description: 'Manage API keys and third-party integrations', category: 'api_keys' as const, is_system_permission: true },
+  { id: 'view_analytics', name: 'view_analytics', display_name: 'View Analytics', description: 'View dashboards, charts, and reports', category: 'analytics' as const, is_system_permission: true },
+  { id: 'export_analytics', name: 'export_analytics', display_name: 'Export Analytics', description: 'Export analytics data and reports', category: 'analytics' as const, is_system_permission: true },
+];
+
+const ALL_PERMISSION_NAMES = SYSTEM_PERMISSIONS.map(p => p.name);
+
+function buildRole(id: string, name: string, displayName: string, description: string, permissionNames: string[]) {
+  const now = new Date().toISOString();
+  return {
+    id,
+    name,
+    display_name: displayName,
+    description,
+    permissions: SYSTEM_PERMISSIONS.filter(p => permissionNames.includes(p.name)),
+    is_system_role: true,
+    created_at: now,
+    updated_at: now,
+  };
+}
+
+const SYSTEM_ROLES = [
+  buildRole('owner', 'owner', 'Owner', 'Full access to all organization features', ALL_PERMISSION_NAMES),
+  buildRole('admin', 'admin', 'Admin', 'Manage most organization features except billing and admin management', [
+    'manage_organization', 'view_users', 'manage_users', 'export_users',
+    'view_verifications', 'review_verifications', 'approve_verifications',
+    'manage_settings', 'manage_webhooks', 'manage_integrations',
+    'view_analytics', 'export_analytics',
+  ]),
+  buildRole('operator', 'operator', 'Operator', 'Day-to-day operations — manage users, review verifications, view analytics', [
+    'view_users', 'manage_users',
+    'view_verifications', 'review_verifications',
+    'manage_webhooks',
+    'view_analytics',
+  ]),
+  buildRole('verification_reviewer', 'verification_reviewer', 'Verification Reviewer', 'Review and approve identity verifications', [
+    'view_users',
+    'view_verifications', 'review_verifications', 'approve_verifications',
+    'view_analytics',
+  ]),
+  buildRole('viewer', 'viewer', 'Viewer', 'Read-only access to users, verifications, and analytics', [
+    'view_users', 'view_verifications', 'view_analytics',
+  ]),
+];
+
+// Get admin roles for organization
+router.get('/:id/admin-roles', requireAuth as any, async (req: any, res) => {
+  try {
+    if (req.admin!.organization_id !== req.params.id) {
+      return res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Access denied' } });
+    }
+    res.json({ success: true, data: SYSTEM_ROLES });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: { code: 'FETCH_ROLES_FAILED', message: error.message } });
+  }
+});
+
+// Get all available permissions
+router.get('/:id/admin-permissions', requireAuth as any, async (req: any, res) => {
+  try {
+    if (req.admin!.organization_id !== req.params.id) {
+      return res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Access denied' } });
+    }
+    res.json({ success: true, data: SYSTEM_PERMISSIONS });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: { code: 'FETCH_PERMISSIONS_FAILED', message: error.message } });
+  }
+});
+
+// ── Helpers for admin-users CRUD ─────────────────────────────────────────────
+
+/** Map a SYSTEM_ROLES entry name to the JSONB permissions the DB stores. */
+function permissionsForRole(roleName: string): Record<string, boolean> {
+  const role = SYSTEM_ROLES.find(r => r.name === roleName);
+  if (!role) return {};
+  const perms: Record<string, boolean> = {};
+  for (const p of SYSTEM_PERMISSIONS) {
+    perms[p.name] = role.permissions.some(rp => rp.name === p.name);
+  }
+  return perms;
+}
+
+/** Transform a raw DB admin row into the shape the frontend's AdminUser type expects. */
+function toAdminUser(row: any) {
+  const roleName = row.role || 'viewer';
+  const systemRole = SYSTEM_ROLES.find(r => r.name === roleName);
+  return {
+    id: row.id,
+    organization_id: row.organization_id,
+    email: row.email,
+    first_name: row.first_name || '',
+    last_name: row.last_name || '',
+    role_id: roleName,
+    role: systemRole || buildRole(roleName, roleName, roleName, '', []),
+    status: row.status || 'active',
+    last_login_at: row.last_login_at || null,
+    last_ip_address: null,
+    failed_login_attempts: row.failed_login_attempts || 0,
+    locked_until: row.locked_until || null,
+    email_verified: row.email_verified || false,
+    phone_number: null,
+    avatar_url: null,
+    timezone: null,
+    language: 'en',
+    two_factor_enabled: false,
+    invite_token: null,
+    invite_expires_at: null,
+    invited_by: null,
+    created_at: row.created_at,
+    updated_at: row.updated_at,
+  };
+}
+
+// ── Admin Users CRUD ─────────────────────────────────────────────────────────
+
+// GET /:id/admin-users — list admin users with search, filter, pagination
+router.get('/:id/admin-users/stats', requireAuth as any, async (req: any, res) => {
+  try {
+    const orgId = req.params.id;
+    if (req.admin!.organization_id !== orgId) {
+      return res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Access denied' } });
+    }
+
+    const { data: admins, error } = await vaasSupabase
+      .from('vaas_admins')
+      .select('id, role, status')
+      .eq('organization_id', orgId);
+
+    if (error) throw error;
+    const all = admins || [];
+
+    const admins_by_role = SYSTEM_ROLES.map(r => ({
+      role_name: r.display_name,
+      count: all.filter(a => a.role === r.name).length,
+    }));
+
+    res.json({
+      success: true,
+      data: {
+        total_admins: all.length,
+        active_admins: all.filter(a => a.status === 'active').length,
+        pending_invites: all.filter(a => a.status === 'invited').length,
+        suspended_admins: all.filter(a => a.status === 'inactive').length,
+        admins_by_role,
+        recent_logins: [],
+        recent_invites: [],
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: { code: 'FETCH_STATS_FAILED', message: error.message } });
+  }
+});
+
+router.get('/:id/admin-users', requireAuth as any, async (req: any, res) => {
+  try {
+    const orgId = req.params.id;
+    if (req.admin!.organization_id !== orgId) {
+      return res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Access denied' } });
+    }
+
+    const page = Math.max(1, parseInt(req.query.page as string) || 1);
+    const perPage = Math.min(100, Math.max(1, parseInt(req.query.per_page as string) || 20));
+    const search = (req.query.search as string || '').trim();
+    const roleFilter = req.query.role_id as string | undefined;
+    const statusFilter = req.query.status as string | undefined;
+
+    let query = vaasSupabase
+      .from('vaas_admins')
+      .select('id, organization_id, email, first_name, last_name, role, permissions, status, email_verified, email_verified_at, last_login_at, login_count, failed_login_attempts, locked_until, created_at, updated_at', { count: 'exact' })
+      .eq('organization_id', orgId);
+
+    if (roleFilter) query = query.eq('role', roleFilter);
+    if (statusFilter) query = query.eq('status', statusFilter);
+    if (search) {
+      const escaped = escapePostgrestValue(search);
+      query = query.or(`email.ilike.%${escaped}%,first_name.ilike.%${escaped}%,last_name.ilike.%${escaped}%`);
+    }
+
+    query = query.order('created_at', { ascending: false })
+      .range((page - 1) * perPage, page * perPage - 1);
+
+    const { data, error, count } = await query;
+    if (error) throw error;
+
+    const totalCount = count || 0;
+    const totalPages = Math.ceil(totalCount / perPage);
+
+    res.json({
+      success: true,
+      data: {
+        users: (data || []).map(toAdminUser),
+        total: totalCount,
+        page,
+        per_page: perPage,
+        total_pages: totalPages,
+        has_next_page: page < totalPages,
+        has_prev_page: page > 1,
+      },
+    });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: { code: 'FETCH_ADMIN_USERS_FAILED', message: error.message } });
+  }
+});
+
+// POST /:id/admin-users — create a new admin user
+router.post('/:id/admin-users', requireAuth as any, async (req: any, res) => {
+  try {
+    const orgId = req.params.id;
+    if (req.admin!.organization_id !== orgId) {
+      return res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Access denied' } });
+    }
+
+    // Only owners and admins with manage_admins can create users
+    if (req.admin!.role !== 'owner' && !req.admin!.permissions?.manage_admins) {
+      return res.status(403).json({ success: false, error: { code: 'INSUFFICIENT_PERMISSIONS', message: 'Permission manage_admins required' } });
+    }
+
+    const { email, first_name, last_name, role_id, send_invite } = req.body;
+    if (!email || !first_name || !last_name || !role_id) {
+      return res.status(400).json({ success: false, error: { code: 'VALIDATION_ERROR', message: 'email, first_name, last_name, and role_id are required' } });
+    }
+
+    // Validate role
+    const validRoles = SYSTEM_ROLES.map(r => r.name);
+    if (!validRoles.includes(role_id)) {
+      return res.status(400).json({ success: false, error: { code: 'INVALID_ROLE', message: `Invalid role. Must be one of: ${validRoles.join(', ')}` } });
+    }
+
+    // Prevent non-owners from creating owners
+    if (role_id === 'owner' && req.admin!.role !== 'owner') {
+      return res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Only owners can create owner accounts' } });
+    }
+
+    // Check for duplicate email in this org
+    const { data: existing } = await vaasSupabase
+      .from('vaas_admins')
+      .select('id')
+      .eq('organization_id', orgId)
+      .eq('email', email.toLowerCase().trim())
+      .maybeSingle();
+
+    if (existing) {
+      return res.status(409).json({ success: false, error: { code: 'DUPLICATE_EMAIL', message: 'An admin with this email already exists in this organization' } });
+    }
+
+    // Generate a random temporary password
+    const tempPassword = crypto.randomBytes(16).toString('base64url');
+    const passwordHash = await bcrypt.hash(tempPassword, 12);
+
+    const permissions = permissionsForRole(role_id);
+
+    const { data: newAdmin, error } = await vaasSupabase
+      .from('vaas_admins')
+      .insert({
+        organization_id: orgId,
+        email: email.toLowerCase().trim(),
+        password_hash: passwordHash,
+        first_name: first_name.trim(),
+        last_name: last_name.trim(),
+        role: role_id,
+        permissions,
+        status: send_invite !== false ? 'invited' : 'active',
+        email_verified: false,
+      })
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    auditService.logAuditEvent({
+      organizationId: orgId,
+      adminId: req.admin!.id,
+      action: 'admin.created',
+      resourceType: 'admin',
+      resourceId: newAdmin.id,
+      details: { email, role: role_id, invited: send_invite !== false },
+      req,
+    });
+
+    res.status(201).json({ success: true, data: toAdminUser(newAdmin) });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: { code: 'CREATE_ADMIN_FAILED', message: error.message } });
+  }
+});
+
+// PUT /:id/admin-users/:adminId — update an admin user
+router.put('/:id/admin-users/:adminId', requireAuth as any, async (req: any, res) => {
+  try {
+    const orgId = req.params.id;
+    const adminId = req.params.adminId;
+    if (req.admin!.organization_id !== orgId) {
+      return res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Access denied' } });
+    }
+
+    if (req.admin!.role !== 'owner' && !req.admin!.permissions?.manage_admins) {
+      return res.status(403).json({ success: false, error: { code: 'INSUFFICIENT_PERMISSIONS', message: 'Permission manage_admins required' } });
+    }
+
+    const { first_name, last_name, role_id, status } = req.body;
+    const updates: Record<string, any> = {};
+
+    if (first_name !== undefined) updates.first_name = first_name.trim();
+    if (last_name !== undefined) updates.last_name = last_name.trim();
+    if (status !== undefined) updates.status = status;
+
+    if (role_id !== undefined) {
+      const validRoles = SYSTEM_ROLES.map(r => r.name);
+      if (!validRoles.includes(role_id)) {
+        return res.status(400).json({ success: false, error: { code: 'INVALID_ROLE', message: `Invalid role. Must be one of: ${validRoles.join(', ')}` } });
+      }
+      if (role_id === 'owner' && req.admin!.role !== 'owner') {
+        return res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Only owners can assign the owner role' } });
+      }
+      updates.role = role_id;
+      updates.permissions = permissionsForRole(role_id);
+    }
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ success: false, error: { code: 'NO_UPDATES', message: 'No fields to update' } });
+    }
+
+    const { data: updated, error } = await vaasSupabase
+      .from('vaas_admins')
+      .update(updates)
+      .eq('id', adminId)
+      .eq('organization_id', orgId)
+      .select()
+      .single();
+
+    if (error) throw error;
+    if (!updated) {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Admin user not found' } });
+    }
+
+    auditService.logAuditEvent({
+      organizationId: orgId,
+      adminId: req.admin!.id,
+      action: 'admin.updated',
+      resourceType: 'admin',
+      resourceId: adminId,
+      details: { updates: Object.keys(updates) },
+      req,
+    });
+
+    res.json({ success: true, data: toAdminUser(updated) });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: { code: 'UPDATE_ADMIN_FAILED', message: error.message } });
+  }
+});
+
+// DELETE /:id/admin-users/:adminId — delete an admin user
+router.delete('/:id/admin-users/:adminId', requireAuth as any, async (req: any, res) => {
+  try {
+    const orgId = req.params.id;
+    const adminId = req.params.adminId;
+    if (req.admin!.organization_id !== orgId) {
+      return res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Access denied' } });
+    }
+
+    if (req.admin!.role !== 'owner' && !req.admin!.permissions?.manage_admins) {
+      return res.status(403).json({ success: false, error: { code: 'INSUFFICIENT_PERMISSIONS', message: 'Permission manage_admins required' } });
+    }
+
+    // Prevent self-deletion
+    if (req.admin!.id === adminId) {
+      return res.status(400).json({ success: false, error: { code: 'SELF_DELETE', message: 'You cannot delete your own account' } });
+    }
+
+    const { data: deleted, error } = await vaasSupabase
+      .from('vaas_admins')
+      .delete()
+      .eq('id', adminId)
+      .eq('organization_id', orgId)
+      .select('id')
+      .single();
+
+    if (error?.code === 'PGRST116') {
+      return res.status(404).json({ success: false, error: { code: 'NOT_FOUND', message: 'Admin user not found' } });
+    }
+    if (error) throw error;
+
+    auditService.logAuditEvent({
+      organizationId: orgId,
+      adminId: req.admin!.id,
+      action: 'admin.deleted',
+      resourceType: 'admin',
+      resourceId: adminId,
+      details: {},
+      req,
+    });
+
+    res.json({ success: true, data: null });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: { code: 'DELETE_ADMIN_FAILED', message: error.message } });
+  }
+});
+
+// POST /:id/admin-users/:adminId/suspend
+router.post('/:id/admin-users/:adminId/suspend', requireAuth as any, async (req: any, res) => {
+  try {
+    const orgId = req.params.id;
+    const adminId = req.params.adminId;
+    if (req.admin!.organization_id !== orgId) {
+      return res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Access denied' } });
+    }
+    if (req.admin!.role !== 'owner' && !req.admin!.permissions?.manage_admins) {
+      return res.status(403).json({ success: false, error: { code: 'INSUFFICIENT_PERMISSIONS', message: 'Permission manage_admins required' } });
+    }
+    if (req.admin!.id === adminId) {
+      return res.status(400).json({ success: false, error: { code: 'SELF_SUSPEND', message: 'You cannot suspend your own account' } });
+    }
+
+    const { data: updated, error } = await vaasSupabase
+      .from('vaas_admins')
+      .update({ status: 'inactive' })
+      .eq('id', adminId)
+      .eq('organization_id', orgId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    auditService.logAuditEvent({
+      organizationId: orgId, adminId: req.admin!.id,
+      action: 'admin.suspended', resourceType: 'admin', resourceId: adminId,
+      details: { reason: req.body.reason || '' }, req,
+    });
+
+    res.json({ success: true, data: toAdminUser(updated) });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: { code: 'SUSPEND_FAILED', message: error.message } });
+  }
+});
+
+// POST /:id/admin-users/:adminId/activate
+router.post('/:id/admin-users/:adminId/activate', requireAuth as any, async (req: any, res) => {
+  try {
+    const orgId = req.params.id;
+    const adminId = req.params.adminId;
+    if (req.admin!.organization_id !== orgId) {
+      return res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Access denied' } });
+    }
+    if (req.admin!.role !== 'owner' && !req.admin!.permissions?.manage_admins) {
+      return res.status(403).json({ success: false, error: { code: 'INSUFFICIENT_PERMISSIONS', message: 'Permission manage_admins required' } });
+    }
+
+    const { data: updated, error } = await vaasSupabase
+      .from('vaas_admins')
+      .update({ status: 'active' })
+      .eq('id', adminId)
+      .eq('organization_id', orgId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    auditService.logAuditEvent({
+      organizationId: orgId, adminId: req.admin!.id,
+      action: 'admin.activated', resourceType: 'admin', resourceId: adminId,
+      details: {}, req,
+    });
+
+    res.json({ success: true, data: toAdminUser(updated) });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: { code: 'ACTIVATE_FAILED', message: error.message } });
+  }
+});
+
+// POST /:id/admin-users/:adminId/unlock
+router.post('/:id/admin-users/:adminId/unlock', requireAuth as any, async (req: any, res) => {
+  try {
+    const orgId = req.params.id;
+    const adminId = req.params.adminId;
+    if (req.admin!.organization_id !== orgId) {
+      return res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Access denied' } });
+    }
+    if (req.admin!.role !== 'owner' && !req.admin!.permissions?.manage_admins) {
+      return res.status(403).json({ success: false, error: { code: 'INSUFFICIENT_PERMISSIONS', message: 'Permission manage_admins required' } });
+    }
+
+    const { data: updated, error } = await vaasSupabase
+      .from('vaas_admins')
+      .update({ locked_until: null, failed_login_attempts: 0, status: 'active' })
+      .eq('id', adminId)
+      .eq('organization_id', orgId)
+      .select()
+      .single();
+
+    if (error) throw error;
+
+    auditService.logAuditEvent({
+      organizationId: orgId, adminId: req.admin!.id,
+      action: 'admin.unlocked', resourceType: 'admin', resourceId: adminId,
+      details: {}, req,
+    });
+
+    res.json({ success: true, data: toAdminUser(updated) });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: { code: 'UNLOCK_FAILED', message: error.message } });
+  }
+});
+
+// GET /:id/admin-invites — return pending invites (admins with status='invited')
+router.get('/:id/admin-invites', requireAuth as any, async (req: any, res) => {
+  try {
+    const orgId = req.params.id;
+    if (req.admin!.organization_id !== orgId) {
+      return res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Access denied' } });
+    }
+
+    const { data, error } = await vaasSupabase
+      .from('vaas_admins')
+      .select('id, organization_id, email, first_name, last_name, role, created_at, updated_at')
+      .eq('organization_id', orgId)
+      .eq('status', 'invited')
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+
+    // Transform to AdminUserInvite shape
+    const invites = (data || []).map(row => {
+      const systemRole = SYSTEM_ROLES.find(r => r.name === row.role) || buildRole(row.role, row.role, row.role, '', []);
+      return {
+        id: row.id,
+        organization_id: row.organization_id,
+        email: row.email,
+        role_id: row.role,
+        role: systemRole,
+        invited_by: req.admin!.id,
+        invited_by_name: 'Admin',
+        invite_token: '',
+        expires_at: new Date(Date.now() + 7 * 86400000).toISOString(),
+        accepted_at: null,
+        status: 'pending' as const,
+        created_at: row.created_at,
+      };
+    });
+
+    res.json({ success: true, data: invites });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: { code: 'FETCH_INVITES_FAILED', message: error.message } });
+  }
+});
+
+// POST /:id/admin-invites/:inviteId/resend — stub (no email integration yet)
+router.post('/:id/admin-invites/:inviteId/resend', requireAuth as any, async (req: any, res) => {
+  const orgId = req.params.id;
+  if (req.admin!.organization_id !== orgId) {
+    return res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Access denied' } });
+  }
+  if (req.admin!.role !== 'owner' && !req.admin!.permissions?.manage_admins) {
+    return res.status(403).json({ success: false, error: { code: 'INSUFFICIENT_PERMISSIONS', message: 'Permission manage_admins required' } });
+  }
+  // Invite email sending not yet implemented — acknowledge without error
+  res.json({ success: true, data: null });
+});
+
+// DELETE /:id/admin-invites/:inviteId — revoke invite (delete the invited admin)
+router.delete('/:id/admin-invites/:inviteId', requireAuth as any, async (req: any, res) => {
+  try {
+    const orgId = req.params.id;
+    if (req.admin!.organization_id !== orgId) {
+      return res.status(403).json({ success: false, error: { code: 'FORBIDDEN', message: 'Access denied' } });
+    }
+    if (req.admin!.role !== 'owner' && !req.admin!.permissions?.manage_admins) {
+      return res.status(403).json({ success: false, error: { code: 'INSUFFICIENT_PERMISSIONS', message: 'Permission manage_admins required' } });
+    }
+
+    const { error } = await vaasSupabase
+      .from('vaas_admins')
+      .delete()
+      .eq('id', req.params.inviteId)
+      .eq('organization_id', orgId)
+      .eq('status', 'invited');
+
+    if (error) throw error;
+    res.json({ success: true, data: null });
+  } catch (error: any) {
+    res.status(500).json({ success: false, error: { code: 'REVOKE_INVITE_FAILED', message: error.message } });
   }
 });
 

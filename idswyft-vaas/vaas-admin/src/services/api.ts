@@ -861,9 +861,9 @@ class ApiClient {
     return response.data.data!;
   }
 
-  async getAdminPermissions(): Promise<AdminPermission[]> {
-    const response: AxiosResponse<ApiResponse<AdminPermission[]>> = await this.client.get('/admin-permissions');
-    
+  async getAdminPermissions(organizationId: string): Promise<AdminPermission[]> {
+    const response: AxiosResponse<ApiResponse<AdminPermission[]>> = await this.client.get(`/organizations/${organizationId}/admin-permissions`);
+
     if (!response.data.success) {
       throw new Error(response.data.error?.message || 'Failed to get admin permissions');
     }

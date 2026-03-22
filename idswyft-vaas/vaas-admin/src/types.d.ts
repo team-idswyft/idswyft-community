@@ -32,9 +32,9 @@ export interface Admin {
   email: string;
   first_name: string;
   last_name: string;
-  role: 'owner' | 'admin' | 'operator' | 'viewer';
+  role: 'owner' | 'admin' | 'operator' | 'verification_reviewer' | 'viewer';
   permissions: AdminPermissions;
-  status: 'active' | 'inactive' | 'pending';
+  status: 'active' | 'inactive' | 'pending' | 'invited';
   email_verified: boolean;
   email_verified_at?: string;
   last_login_at?: string;
