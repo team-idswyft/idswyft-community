@@ -23,6 +23,7 @@ import {
   Wrench,
   Database,
   Timer,
+  AlertTriangle,
 } from 'lucide-react';
 import NotificationBell from '../NotificationBell';
 import { useAuth } from '../../contexts/AuthContext';
@@ -44,6 +45,7 @@ const navigationItems = [
   { name: 'Configuration',     href: '/configuration',     icon: Wrench },
   { name: 'Database',          href: '/database',          icon: Database },
   { name: 'Background Jobs',   href: '/background-jobs',   icon: Timer },
+  { name: 'Incidents',         href: '/incidents',         icon: AlertTriangle },
   { name: 'Settings',          href: '/settings',          icon: Settings },
 ];
 

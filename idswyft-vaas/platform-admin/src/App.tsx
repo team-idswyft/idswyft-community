@@ -23,6 +23,7 @@ import NotificationSettings from './pages/NotificationSettings';
 import Configuration from './pages/Configuration';
 import DatabaseManagement from './pages/DatabaseManagement';
 import CronJobManagement from './pages/CronJobManagement';
+import IncidentManagement from './pages/IncidentManagement';
 
 // ── Dynamic favicon from platform branding ───────────────────────────────────
 function usePlatformFavicon() {
@@ -76,6 +77,7 @@ export default function App() {
             <Route path="configuration" element={<Configuration />} />
             <Route path="database" element={<DatabaseManagement />} />
             <Route path="background-jobs" element={<CronJobManagement />} />
+            <Route path="incidents" element={<IncidentManagement />} />
             <Route path="settings" element={<Settings />} />
           </Route>
 

@@ -188,6 +188,19 @@ export default function SystemStatus() {
   return (
     <div className="p-6" style={{ maxWidth: 800, margin: '0 auto' }}>
 
+      {/* ── Public status page link ────────────────────────────────── */}
+      <a
+        href="https://status.idswyft.app"
+        target="_blank"
+        rel="noopener noreferrer"
+        className="flex items-center gap-2 rounded-lg border border-cyan-500/15 bg-cyan-500/5 px-4 py-3 mb-6 no-underline hover:bg-cyan-500/10 transition-colors"
+      >
+        <span className="text-sm font-medium text-cyan-400">
+          Public status page &rarr; status.idswyft.app
+        </span>
+        <span className="text-xs text-slate-500">&nearr;</span>
+      </a>
+
       {/* ── Header row ────────────────────────────────────────────── */}
       <div className="flex items-center justify-between mb-8">
         <div>
