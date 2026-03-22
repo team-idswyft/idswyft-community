@@ -17,6 +17,9 @@ router.post('/report', (req, res) => {
   if (!id || !lastRunAt || !lastResult) {
     return res.status(400).json({ success: false, error: { code: 'VALIDATION', message: 'id, lastRunAt, lastResult required' } } as VaasApiResponse);
   }
+  if (lastResult !== 'success' && lastResult !== 'error') {
+    return res.status(400).json({ success: false, error: { code: 'VALIDATION', message: 'lastResult must be "success" or "error"' } } as VaasApiResponse);
+  }
 
   cronRegistry.reportRun(id, lastResult, lastError || undefined, lastRunAt);
   res.json({ success: true } as VaasApiResponse);

@@ -9,7 +9,7 @@ const getStatusUrl = () => {
 
 export function Status() {
   useEffect(() => {
-    window.location.href = getStatusUrl();
+    window.location.replace(getStatusUrl());
   }, []);
 
   return (
