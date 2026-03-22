@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
 import { apiClient } from '../services/api';
 import { DashboardStats, UsageStats, VerificationSession, TrendPoint } from '../types.js';
@@ -473,6 +474,7 @@ function TrendsTab({ stats, selectedPeriod, trendData = [], trendLoading }: TabP
 }
 
 function UsersTab({ stats, recentVerifications }: TabProps) {
+  const navigate = useNavigate();
   const userStats = [
     {
       name: 'Total Users',
@@ -553,8 +555,13 @@ function UsersTab({ stats, recentVerifications }: TabProps) {
                   <td className={`px-5 py-4 whitespace-nowrap ${monoXs} text-slate-100`}>
                     {new Date(verification.created_at).toLocaleDateString()}
                   </td>
-                  <td className="px-5 py-4 whitespace-nowrap text-sm text-slate-500">
-                    <button className="text-indigo-600 hover:text-indigo-900">
+                  <td className="px-5 py-4 whitespace-nowrap text-sm">
+                    <button
+                      onClick={() => navigate('/verifications')}
+                      className="p-1.5 text-slate-400 hover:text-cyan-300 hover:bg-slate-800/40 rounded transition-colors"
+                      title="View Verifications"
+                      aria-label="View verifications"
+                    >
                       <Eye className="w-4 h-4" />
                     </button>
                   </td>
