@@ -292,28 +292,25 @@ export default function Dashboard() {
   const statCards: StatCard[] = [
     {
       title: 'Total Verifications',
-      value: stats?.verification_sessions.total || 0,
-      change: { value: 12, trend: 'up', period: 'vs last month' },
+      value: stats?.verification_sessions.total ?? 0,
       icon: <CheckCircle className="h-5 w-5" />,
       iconClass: 'border-cyan-500/40 bg-cyan-500/15 text-cyan-300'
     },
     {
       title: 'Success Rate',
-      value: `${stats?.verification_sessions.success_rate || 0}%`,
-      change: { value: 2.4, trend: 'up', period: 'vs last month' },
+      value: `${stats?.verification_sessions.success_rate ?? 0}%`,
       icon: <TrendingUp className="h-5 w-5" />,
       iconClass: 'border-emerald-500/40 bg-emerald-500/15 text-emerald-300'
     },
     {
       title: 'Pending Reviews',
-      value: stats?.end_users.manual_review || 0,
+      value: stats?.end_users.manual_review ?? 0,
       icon: <Clock className="h-5 w-5" />,
       iconClass: 'border-amber-500/40 bg-amber-500/15 text-amber-300'
     },
     {
       title: 'Active Users',
-      value: stats?.end_users.total || 0,
-      change: { value: 8.1, trend: 'up', period: 'vs last month' },
+      value: stats?.end_users.total ?? 0,
       icon: <Users className="h-5 w-5" />,
       iconClass: 'border-violet-500/40 bg-violet-500/15 text-violet-300'
     }

@@ -545,12 +545,12 @@ router.get('/stats/overview', requireAuth, requirePermission('view_analytics'), 
       throw new Error('Failed to get verification statistics');
     }
     
-    // Get end user counts by status
+    // Get end user counts by status (all-time, not date-filtered —
+    // "Active Users" and "Pending Reviews" reflect current state)
     const { data: userCounts, error: userError } = await vaasSupabase
       .from('vaas_end_users')
       .select('verification_status')
-      .eq('organization_id', organizationId)
-      .gte('created_at', startDate.toISOString());
+      .eq('organization_id', organizationId);
       
     if (userError) {
       throw new Error('Failed to get user statistics');
