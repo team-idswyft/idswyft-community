@@ -48,7 +48,7 @@ export interface CronJobEntry {
   id: string;
   name: string;
   service: string;
-  backend: 'vaas' | 'main';
+  backend: 'vaas' | 'main' | 'status';
   schedule: string;
   status: 'running' | 'stopped';
   lastRunAt: string | null;
@@ -57,6 +57,27 @@ export interface CronJobEntry {
   controllable: boolean;
   envGate: string | null;
   description: string;
+}
+
+// ── Status Incident types ────────────────────────────────────────────────
+export interface StatusIncident {
+  id: string;
+  title: string;
+  status: 'investigating' | 'identified' | 'monitoring' | 'resolved';
+  severity: 'minor' | 'major' | 'critical';
+  affected_services: string[];
+  created_at: string;
+  resolved_at: string | null;
+  created_by: string | null;
+  updates?: StatusIncidentUpdate[];
+}
+
+export interface StatusIncidentUpdate {
+  id: string;
+  message: string;
+  status: string | null;
+  created_at: string;
+  created_by: string | null;
 }
 
 // ── Database Management types ────────────────────────────────────────────
@@ -923,6 +944,37 @@ class PlatformApiClient {
     }
 
     return response.data.data!;
+  }
+
+  // ── Status Incidents ──────────────────────────────────────────────────
+
+  async getStatusIncidents(): Promise<StatusIncident[]> {
+    const response = await this.client.get('/incidents');
+    if (!response.data.success) throw new Error(response.data.error?.message || 'Failed');
+    return response.data.data;
+  }
+
+  async createStatusIncident(data: { title: string; severity: string; affected_services: string[] }): Promise<StatusIncident> {
+    const response = await this.client.post('/incidents', data);
+    if (!response.data.success) throw new Error(response.data.error?.message || 'Failed');
+    return response.data.data;
+  }
+
+  async updateStatusIncident(id: string, data: Record<string, any>): Promise<StatusIncident> {
+    const response = await this.client.patch(`/incidents/${id}`, data);
+    if (!response.data.success) throw new Error(response.data.error?.message || 'Failed');
+    return response.data.data;
+  }
+
+  async addIncidentUpdate(id: string, data: { message: string; status?: string }): Promise<StatusIncidentUpdate> {
+    const response = await this.client.post(`/incidents/${id}/updates`, data);
+    if (!response.data.success) throw new Error(response.data.error?.message || 'Failed');
+    return response.data.data;
+  }
+
+  async deleteStatusIncident(id: string): Promise<void> {
+    const response = await this.client.delete(`/incidents/${id}`);
+    if (!response.data.success) throw new Error(response.data.error?.message || 'Failed');
   }
 
   // ── System Status ─────────────────────────────────────────────────────

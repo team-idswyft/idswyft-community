@@ -24,7 +24,13 @@ import {
   statusPill,
 } from '../styles/tokens';
 
-type BackendTab = 'vaas' | 'main';
+type BackendTab = 'vaas' | 'main' | 'status';
+
+const tabLabels: Record<BackendTab, string> = {
+  vaas: 'VaaS Backend',
+  main: 'Main API',
+  status: 'Status Service',
+};
 
 export default function CronJobManagement() {
   const [jobs, setJobs] = useState<CronJobEntry[]>([]);
@@ -226,7 +232,7 @@ export default function CronJobManagement() {
 
       {/* ── Tab selector ───────────────────────────────────────────────── */}
       <div className="flex gap-1 rounded-lg border border-white/10 bg-slate-900/40 p-1">
-        {(['vaas', 'main'] as const).map((tab) => {
+        {(['vaas', 'main', 'status'] as const).map((tab) => {
           const count = jobs.filter((j) => j.backend === tab).length;
           const isActive = activeTab === tab;
           return (
@@ -240,7 +246,7 @@ export default function CronJobManagement() {
               }`}
             >
               <Server className="mr-2 inline h-4 w-4" />
-              {tab === 'vaas' ? 'VaaS Backend' : 'Main API'}
+              {tabLabels[tab]}
               <span className={`ml-2 ${monoXs} ${isActive ? 'text-cyan-400' : 'text-slate-500'}`}>
                 ({count})
               </span>
