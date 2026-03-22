@@ -888,16 +888,16 @@ export default function AdminUserManagement() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
             <div>
               <label className="form-label">First Name</label>
-              <input type="text" value={createFormData.first_name} onChange={(e) => setCreateFormData({ ...createFormData, first_name: e.target.value })} className="form-input" />
+              <input type="text" placeholder="Jane" value={createFormData.first_name} onChange={(e) => setCreateFormData({ ...createFormData, first_name: e.target.value })} className="form-input" />
             </div>
             <div>
               <label className="form-label">Last Name</label>
-              <input type="text" value={createFormData.last_name} onChange={(e) => setCreateFormData({ ...createFormData, last_name: e.target.value })} className="form-input" />
+              <input type="text" placeholder="Smith" value={createFormData.last_name} onChange={(e) => setCreateFormData({ ...createFormData, last_name: e.target.value })} className="form-input" />
             </div>
           </div>
           <div>
             <label className="form-label">Email</label>
-            <input type="email" value={createFormData.email} onChange={(e) => setCreateFormData({ ...createFormData, email: e.target.value })} className="form-input" />
+            <input type="email" placeholder="jane@company.com" value={createFormData.email} onChange={(e) => setCreateFormData({ ...createFormData, email: e.target.value })} className="form-input" />
           </div>
           <div>
             <label className="form-label">Role</label>

@@ -1,4 +1,4 @@
-import React, { useEffect, useCallback } from 'react';
+import React, { useEffect, useCallback, useRef } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 
@@ -34,11 +34,13 @@ export default function Modal({
   closeOnEscape = true,
   className = ''
 }: ModalProps) {
-  const handleKeyDown = useCallback((event: KeyboardEvent) => {
-    if (closeOnEscape && event.key === 'Escape') {
-      onClose();
-    }
-  }, [closeOnEscape, onClose]);
+  // Use refs for callbacks so the effect doesn't re-run (and re-steal
+  // focus) every time the parent re-renders with a new inline handler.
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
+
+  const closeOnEscapeRef = useRef(closeOnEscape);
+  closeOnEscapeRef.current = closeOnEscape;
 
   const handleOverlayClick = useCallback((event: React.MouseEvent<HTMLDivElement>) => {
     if (closeOnOverlayClick && event.target === event.currentTarget) {
@@ -46,12 +48,20 @@ export default function Modal({
     }
   }, [closeOnOverlayClick, onClose]);
 
+  // Effect for keyboard events and body overflow — depends only on isOpen
   useEffect(() => {
     if (!isOpen) return;
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (closeOnEscapeRef.current && event.key === 'Escape') {
+        onCloseRef.current();
+      }
+    };
 
     document.addEventListener('keydown', handleKeyDown);
     document.body.style.overflow = 'hidden';
 
+    // Focus the modal container only on initial open
     const modalContainer = document.querySelector('[role="dialog"]');
     if (modalContainer) {
       (modalContainer as HTMLElement).focus();
@@ -61,7 +71,7 @@ export default function Modal({
       document.removeEventListener('keydown', handleKeyDown);
       document.body.style.overflow = 'unset';
     };
-  }, [isOpen, handleKeyDown]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
