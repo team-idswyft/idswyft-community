@@ -150,7 +150,7 @@ export default function Configuration() {
     'VaaS': { label: 'VaaS Backend', domain: 'api-vaas.idswyft.app', accent: 'border-cyan-500/30 bg-cyan-500/5', iconBg: 'bg-cyan-500/15 text-cyan-400' },
     'Main API': { label: 'Main API', domain: 'api.idswyft.app', accent: 'border-violet-500/30 bg-violet-500/5', iconBg: 'bg-violet-500/15 text-violet-400' },
     'Platform Admin': { label: 'Platform Admin', domain: 'platform.idswyft.app', accent: 'border-emerald-500/30 bg-emerald-500/5', iconBg: 'bg-emerald-500/15 text-emerald-400' },
-    'VaaS Admin': { label: 'VaaS Admin (Org Portal)', domain: 'vaas.idswyft.app', accent: 'border-amber-500/30 bg-amber-500/5', iconBg: 'bg-amber-500/15 text-amber-400' },
+    'VaaS Admin': { label: 'VaaS Admin (Org Portal)', domain: 'app.idswyft.app', accent: 'border-amber-500/30 bg-amber-500/5', iconBg: 'bg-amber-500/15 text-amber-400' },
   };
 
   const TYPE_ICONS: Record<string, { icon: typeof Server; color: string }> = {

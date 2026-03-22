@@ -113,6 +113,8 @@ const CONFIG_REGISTRY: Record<string, ConfigRegistryEntry> = {
   MAIN_API_SUPABASE_URL: { category: 'VaaS Integration', is_secret: false, requires_restart: true, description: 'Main project Supabase URL (for cross-project queries)', env_key: 'MAIN_API_SUPABASE_URL' },
   MAIN_API_SUPABASE_ANON_KEY: { category: 'VaaS Integration', is_secret: true, requires_restart: true, description: 'Main project Supabase anon key', env_key: 'MAIN_API_SUPABASE_ANON_KEY' },
   MAIN_API_SUPABASE_SERVICE_ROLE_KEY: { category: 'VaaS Integration', is_secret: true, requires_restart: true, description: 'Main project Supabase service role key', env_key: 'MAIN_API_SUPABASE_SERVICE_ROLE_KEY' },
+  STATUS_API_URL: { category: 'VaaS Integration', is_secret: false, requires_restart: true, description: 'Status page backend URL for health check integration', env_key: 'STATUS_API_URL' },
+  STATUS_SERVICE_TOKEN: { category: 'VaaS Security', is_secret: true, requires_restart: true, description: 'Auth token for status page backend communication', env_key: 'STATUS_SERVICE_TOKEN' },
 
   // ── VaaS Backend — Features ─────────────────────────────────────────
   VAAS_WEBHOOKS_ENABLED: { category: 'VaaS Features', is_secret: false, requires_restart: false, description: 'Enable outbound webhook notifications to org endpoints', env_key: 'VAAS_WEBHOOKS_ENABLED' },
@@ -134,6 +136,7 @@ const CONFIG_REGISTRY: Record<string, ConfigRegistryEntry> = {
   LOG_LEVEL: { category: 'VaaS Monitoring', is_secret: false, requires_restart: false, description: 'Log verbosity: debug, info, warn, error', env_key: 'LOG_LEVEL' },
 
   // ── Main API — Core ─────────────────────────────────────────────────
+  MAIN_API_NODE_ENV: { category: 'Main API Core', is_secret: false, requires_restart: true, description: 'Runtime environment for Main API (development, production, test)', env_key: 'NODE_ENV' },
   CORS_ORIGINS: { category: 'Main API Core', is_secret: false, requires_restart: true, description: 'Comma-separated allowed CORS origins for main API', env_key: 'CORS_ORIGINS' },
 
   // ── Main API — Database ─────────────────────────────────────────────
@@ -151,6 +154,9 @@ const CONFIG_REGISTRY: Record<string, ConfigRegistryEntry> = {
   GITHUB_CLIENT_ID: { category: 'Main API OAuth', is_secret: false, requires_restart: true, description: 'GitHub OAuth app client ID for developer login', env_key: 'GITHUB_CLIENT_ID' },
   GITHUB_CLIENT_SECRET: { category: 'Main API OAuth', is_secret: true, requires_restart: true, description: 'GitHub OAuth app client secret', env_key: 'GITHUB_CLIENT_SECRET' },
   GITHUB_REDIRECT_URI: { category: 'Main API OAuth', is_secret: false, requires_restart: true, description: 'GitHub OAuth callback URL', env_key: 'GITHUB_REDIRECT_URI' },
+
+  // ── Main API — Email ───────────────────────────────────────────────
+  MAIN_API_RESEND_API_KEY: { category: 'Main API Email', is_secret: true, requires_restart: false, description: 'Resend API key used by Main API for developer email notifications', env_key: 'RESEND_API_KEY' },
 
   // ── Main API — AI ───────────────────────────────────────────────────
   OPENAI_API_KEY: { category: 'Main API AI', is_secret: true, requires_restart: true, description: 'OpenAI API key for document analysis assistance', env_key: 'OPENAI_API_KEY' },
