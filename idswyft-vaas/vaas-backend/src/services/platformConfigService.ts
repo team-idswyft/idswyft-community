@@ -12,6 +12,7 @@ import { createCipheriv, createDecipheriv, createHmac, randomBytes, scryptSync }
 import { vaasSupabase } from '../config/database.js';
 import config from '../config/index.js';
 import { platformNotificationService } from './platformNotificationService.js';
+import { cronRegistry } from './cronRegistryService.js';
 import type { PlatformConfigItem, PlatformConfigAudit, KeyChangeRequest } from '../types/index.js';
 
 // ── Encryption helpers ───────────────────────────────────────────────────────
@@ -187,7 +188,11 @@ export class PlatformConfigService {
     if (this.pollInterval) return;
     console.log('[PlatformConfig] Starting config cache (60s poll)');
     await this.refreshCache();
-    this.pollInterval = setInterval(() => this.refreshCache(), POLL_INTERVAL_MS);
+    this.pollInterval = setInterval(() => {
+      this.refreshCache()
+        .then(() => cronRegistry.reportRun('platform-config-poll', 'success'))
+        .catch((err) => cronRegistry.reportRun('platform-config-poll', 'error', err.message));
+    }, POLL_INTERVAL_MS);
   }
 
   stop(): void {
@@ -196,6 +201,11 @@ export class PlatformConfigService {
       this.pollInterval = null;
     }
     console.log('[PlatformConfig] Stopped');
+  }
+
+  /** Manually trigger a cache refresh (called by cron registry trigger). */
+  async triggerRefresh(): Promise<void> {
+    await this.refreshCache();
   }
 
   private async refreshCache(): Promise<void> {

@@ -10,6 +10,7 @@
 import { vaasSupabase } from '../config/database.js';
 import config from '../config/index.js';
 import { platformNotificationService } from './platformNotificationService.js';
+import { cronRegistry } from './cronRegistryService.js';
 import type { PlatformNotificationSeverity } from '../types/index.js';
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -83,7 +84,11 @@ export class HealthCheckService {
     if (this.intervalId) return; // already running
     console.log('[HealthCheck] Starting persistent health check service (every 5 min, 30-day retention)');
     this.runChecks(); // first check immediately
-    this.intervalId = setInterval(() => this.runChecks(), CHECK_INTERVAL_MS);
+    this.intervalId = setInterval(() => {
+      this.runChecks()
+        .then(() => cronRegistry.reportRun('health-check', 'success'))
+        .catch((err) => cronRegistry.reportRun('health-check', 'error', err.message));
+    }, CHECK_INTERVAL_MS);
 
     // Daily cleanup of old records
     this.cleanupOldChecks(); // run immediately on startup

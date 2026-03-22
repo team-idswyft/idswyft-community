@@ -10,6 +10,7 @@
  */
 
 import { vaasSupabase } from '../config/database.js';
+import { cronRegistry } from './cronRegistryService.js';
 
 class AnalyticsCleanupService {
   private static instance: AnalyticsCleanupService;
@@ -27,7 +28,11 @@ class AnalyticsCleanupService {
   start(): void {
     console.log(`🧹 Analytics cleanup service started (${this.RETENTION_DAYS}-day retention, 24h interval)`);
     this.runCleanup().catch(err => console.error('[Cleanup] Initial run failed:', err.message));
-    this.intervalId = setInterval(() => this.runCleanup(), this.CLEANUP_INTERVAL_MS);
+    this.intervalId = setInterval(() => {
+      this.runCleanup()
+        .then(() => cronRegistry.reportRun('analytics-cleanup', 'success'))
+        .catch((err) => cronRegistry.reportRun('analytics-cleanup', 'error', err.message));
+    }, this.CLEANUP_INTERVAL_MS);
   }
 
   stop(): void {
@@ -37,7 +42,7 @@ class AnalyticsCleanupService {
     }
   }
 
-  private async runCleanup(): Promise<void> {
+  async runCleanup(): Promise<void> {
     const cutoff = new Date(Date.now() - this.RETENTION_DAYS * 86_400_000).toISOString();
 
     try {

@@ -43,6 +43,22 @@ export interface DeveloperInfo {
   verification_count: number;
 }
 
+// ── Cron Job types ───────────────────────────────────────────────────────
+export interface CronJobEntry {
+  id: string;
+  name: string;
+  service: string;
+  backend: 'vaas' | 'main';
+  schedule: string;
+  status: 'running' | 'stopped';
+  lastRunAt: string | null;
+  lastResult: 'success' | 'error' | null;
+  lastError: string | null;
+  controllable: boolean;
+  envGate: string | null;
+  description: string;
+}
+
 // ── Database Management types ────────────────────────────────────────────
 export interface TableStat {
   name: string;
@@ -859,6 +875,51 @@ class PlatformApiClient {
 
     if (!response.data.success) {
       throw new Error(response.data.error?.message || 'Failed to wipe database');
+    }
+
+    return response.data.data!;
+  }
+
+  // ── Cron Jobs ──────────────────────────────────────────────────────────
+  async getCronJobs(): Promise<CronJobEntry[]> {
+    const response: AxiosResponse<ApiResponse<{ jobs: CronJobEntry[] }>> =
+      await this.client.get('/cron-jobs');
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to get cron jobs');
+    }
+
+    return response.data.data!.jobs;
+  }
+
+  async pauseCronJob(id: string): Promise<CronJobEntry> {
+    const response: AxiosResponse<ApiResponse<{ job: CronJobEntry }>> =
+      await this.client.post(`/cron-jobs/${id}/pause`);
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to pause job');
+    }
+
+    return response.data.data!.job;
+  }
+
+  async resumeCronJob(id: string): Promise<CronJobEntry> {
+    const response: AxiosResponse<ApiResponse<{ job: CronJobEntry }>> =
+      await this.client.post(`/cron-jobs/${id}/resume`);
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to resume job');
+    }
+
+    return response.data.data!.job;
+  }
+
+  async triggerCronJob(id: string): Promise<{ message: string }> {
+    const response: AxiosResponse<ApiResponse<{ message: string }>> =
+      await this.client.post(`/cron-jobs/${id}/trigger`);
+
+    if (!response.data.success) {
+      throw new Error(response.data.error?.message || 'Failed to trigger job');
     }
 
     return response.data.data!;

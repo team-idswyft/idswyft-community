@@ -12,6 +12,7 @@ import { healthCheckService } from './services/healthCheckService.js';
 import { platformConfigService } from './services/platformConfigService.js';
 import { platformNotificationService } from './services/platformNotificationService.js';
 import { analyticsCleanupService } from './services/analyticsCleanupService.js';
+import { cronRegistry } from './services/cronRegistryService.js';
 import { seedPlatformAdmin } from './scripts/seedPlatformAdmin.js';
 import { authRateLimit } from './middleware/rateLimit.js';
 import { logger } from './utils/logger.js';
@@ -44,6 +45,7 @@ import platformNotificationAdminRoutes from './routes/platformNotifications.js';
 import platformConfigRoutes from './routes/platformConfig.js';
 import platformAnalyticsRoutes from './routes/platformAnalytics.js';
 import platformDatabaseRoutes from './routes/platformDatabase.js';
+import platformCronJobsRoutes from './routes/platformCronJobs.js';
 import publicStatusRoutes from './routes/publicStatus.js';
 import samlRoutes from './routes/saml.js';
 import notificationRoutes from './routes/notifications.js';
@@ -415,6 +417,7 @@ app.use('/api/platform/notifications', platformNotificationAdminRoutes);
 app.use('/api/platform/config', platformConfigRoutes);
 app.use('/api/platform/analytics', platformAnalyticsRoutes);
 app.use('/api/platform/database', platformDatabaseRoutes);
+app.use('/api/platform/cron-jobs', platformCronJobsRoutes);
 console.log('✅ Platform admin routes mounted');
 
 // 404 handler
@@ -514,7 +517,179 @@ const startVaasServer = async () => {
 
     // Start daily analytics cleanup (30-day retention)
     analyticsCleanupService.start();
-    
+
+    // ── Register all background jobs with the cron registry ────────────
+    // VaaS jobs (controllable)
+    cronRegistry.register('session-expiration', {
+      name: 'Session Expiration',
+      service: 'sessionExpirationService',
+      backend: 'vaas',
+      schedule: 'Every 5 minutes',
+      status: 'running',
+      controllable: true,
+      envGate: null,
+      description: 'Marks expired verification sessions as expired',
+    }, {
+      startFn: () => sessionExpirationService.startExpirationJob(5),
+      stopFn: () => sessionExpirationService.stopExpirationJob(),
+      triggerFn: () => sessionExpirationService.expireExpiredSessions().then(() => {}),
+    });
+
+    cronRegistry.register('session-cleanup', {
+      name: 'Session Cleanup',
+      service: 'sessionExpirationService',
+      backend: 'vaas',
+      schedule: 'Every 24 hours',
+      status: 'running',
+      controllable: true,
+      envGate: null,
+      description: 'Deletes expired/terminated sessions older than 30 days',
+    }, {
+      startFn: () => sessionExpirationService.startCleanupJob(24, 30),
+      stopFn: () => sessionExpirationService.stopCleanupJob(),
+      triggerFn: () => sessionExpirationService.cleanupOldSessions(30).then(() => {}),
+    });
+
+    cronRegistry.register('platform-config-poll', {
+      name: 'Platform Config Poll',
+      service: 'platformConfigService',
+      backend: 'vaas',
+      schedule: 'Every 60 seconds',
+      status: 'running',
+      controllable: true,
+      envGate: null,
+      description: 'Refreshes platform configuration cache from database',
+    }, {
+      startFn: () => { platformConfigService.start(); },
+      stopFn: () => platformConfigService.stop(),
+      triggerFn: () => platformConfigService.triggerRefresh(),
+    });
+
+    cronRegistry.register('health-check', {
+      name: 'Health Check',
+      service: 'healthCheckService',
+      backend: 'vaas',
+      schedule: 'Every 5 minutes',
+      status: 'running',
+      controllable: true,
+      envGate: null,
+      description: 'Checks service and database health, persists results',
+    }, {
+      startFn: () => healthCheckService.start(),
+      stopFn: () => healthCheckService.stop(),
+      triggerFn: () => healthCheckService.runChecks().then(() => {}),
+    });
+
+    cronRegistry.register('notification-cleanup', {
+      name: 'Notification Cleanup',
+      service: 'platformNotificationService',
+      backend: 'vaas',
+      schedule: 'Every 7 days',
+      status: 'running',
+      controllable: true,
+      envGate: null,
+      description: 'Purges platform notifications older than 7 days',
+    }, {
+      startFn: () => platformNotificationService.startCleanupJob(),
+      stopFn: () => platformNotificationService.stopCleanupJob(),
+      triggerFn: () => platformNotificationService.cleanupOldNotifications(7).then(() => {}),
+    });
+
+    cronRegistry.register('analytics-cleanup', {
+      name: 'Analytics Cleanup',
+      service: 'analyticsCleanupService',
+      backend: 'vaas',
+      schedule: 'Every 24 hours',
+      status: 'running',
+      controllable: true,
+      envGate: null,
+      description: 'Purges webhook deliveries older than 30 days',
+    }, {
+      startFn: () => analyticsCleanupService.start(),
+      stopFn: () => analyticsCleanupService.stop(),
+      triggerFn: () => analyticsCleanupService.runCleanup(),
+    });
+
+    // Main API jobs (view-only)
+    cronRegistry.register('main-consistency-monitor', {
+      name: 'Consistency Monitor',
+      service: 'consistencyMonitor',
+      backend: 'main',
+      schedule: 'Every 5 minutes',
+      status: 'running',
+      controllable: false,
+      envGate: 'production only',
+      description: 'Monitors data consistency across main API tables',
+    });
+
+    cronRegistry.register('main-temp-cleanup', {
+      name: 'Temp File Cleanup',
+      service: 'tempCleanup',
+      backend: 'main',
+      schedule: 'Every 15 minutes',
+      status: 'running',
+      controllable: false,
+      envGate: null,
+      description: 'Removes temporary upload files from processing pipeline',
+    });
+
+    cronRegistry.register('main-data-retention', {
+      name: 'Data Retention',
+      service: 'dataRetention',
+      backend: 'main',
+      schedule: 'Daily 2 AM UTC',
+      status: 'running',
+      controllable: false,
+      envGate: 'production + DATA_RETENTION_DAYS',
+      description: 'Enforces data retention policy, deletes old verification records',
+    });
+
+    cronRegistry.register('main-demo-cleanup', {
+      name: 'Demo Cleanup',
+      service: 'dataRetention',
+      backend: 'main',
+      schedule: 'Every hour',
+      status: 'running',
+      controllable: false,
+      envGate: null,
+      description: 'Cleans up demo/sandbox verification data',
+    });
+
+    cronRegistry.register('main-activity-log-cleanup', {
+      name: 'Activity Log Cleanup',
+      service: 'dataRetention',
+      backend: 'main',
+      schedule: 'Daily 1 AM UTC',
+      status: 'running',
+      controllable: false,
+      envGate: null,
+      description: 'Removes old activity log entries beyond retention window',
+    });
+
+    cronRegistry.register('main-document-expiry', {
+      name: 'Document Expiry Check',
+      service: 'monitoringService',
+      backend: 'main',
+      schedule: 'Daily 3 AM UTC',
+      status: 'running',
+      controllable: false,
+      envGate: 'production only',
+      description: 'Checks for expiring identity documents and flags them',
+    });
+
+    cronRegistry.register('main-reverification', {
+      name: 'Re-verification Processing',
+      service: 'monitoringService',
+      backend: 'main',
+      schedule: 'Daily 3 AM UTC',
+      status: 'running',
+      controllable: false,
+      envGate: 'production only',
+      description: 'Processes scheduled re-verification requests',
+    });
+
+    console.log(`✅ Cron registry: ${cronRegistry.getAll().length} jobs registered`);
+
     // Start HTTP server
     const server = app.listen(config.port, () => {
       console.log(`🚀 Idswyft VaaS API server running on port ${config.port}`);

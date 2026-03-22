@@ -1,8 +1,11 @@
 import { vaasSupabase } from '../config/database.js';
+import { cronRegistry } from './cronRegistryService.js';
 
 export class SessionExpirationService {
   private static instance: SessionExpirationService;
-  
+  private expirationIntervalId: ReturnType<typeof setInterval> | null = null;
+  private cleanupIntervalId: ReturnType<typeof setInterval> | null = null;
+
   public static getInstance(): SessionExpirationService {
     if (!SessionExpirationService.instance) {
       SessionExpirationService.instance = new SessionExpirationService();
@@ -176,31 +179,59 @@ export class SessionExpirationService {
   /**
    * Start the background job to regularly expire sessions
    */
-  startExpirationJob(intervalMinutes: number = 5): NodeJS.Timeout {
+  startExpirationJob(intervalMinutes: number = 5): void {
+    if (this.expirationIntervalId) return; // already running
     console.log(`[SessionExpiration] Starting session expiration job (every ${intervalMinutes} minutes)`);
-    
+
     // Run immediately
     this.expireExpiredSessions();
-    
+
     // Then run on schedule
-    return setInterval(async () => {
-      await this.expireExpiredSessions();
+    this.expirationIntervalId = setInterval(async () => {
+      try {
+        await this.expireExpiredSessions();
+        cronRegistry.reportRun('session-expiration', 'success');
+      } catch (err: any) {
+        cronRegistry.reportRun('session-expiration', 'error', err.message);
+      }
     }, intervalMinutes * 60 * 1000);
+  }
+
+  /** Stop the session expiration background job. */
+  stopExpirationJob(): void {
+    if (this.expirationIntervalId) {
+      clearInterval(this.expirationIntervalId);
+      this.expirationIntervalId = null;
+    }
   }
 
   /**
    * Start the background job to regularly clean up old sessions
    */
-  startCleanupJob(intervalHours: number = 24, retentionDays: number = 30): NodeJS.Timeout {
+  startCleanupJob(intervalHours: number = 24, retentionDays: number = 30): void {
+    if (this.cleanupIntervalId) return; // already running
     console.log(`[SessionExpiration] Starting session cleanup job (every ${intervalHours} hours, ${retentionDays} day retention)`);
-    
+
     // Run immediately
     this.cleanupOldSessions(retentionDays);
-    
+
     // Then run on schedule
-    return setInterval(async () => {
-      await this.cleanupOldSessions(retentionDays);
+    this.cleanupIntervalId = setInterval(async () => {
+      try {
+        await this.cleanupOldSessions(retentionDays);
+        cronRegistry.reportRun('session-cleanup', 'success');
+      } catch (err: any) {
+        cronRegistry.reportRun('session-cleanup', 'error', err.message);
+      }
     }, intervalHours * 60 * 60 * 1000);
+  }
+
+  /** Stop the session cleanup background job. */
+  stopCleanupJob(): void {
+    if (this.cleanupIntervalId) {
+      clearInterval(this.cleanupIntervalId);
+      this.cleanupIntervalId = null;
+    }
   }
 }
 

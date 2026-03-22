@@ -22,6 +22,7 @@ import {
   BellRing,
   Wrench,
   Database,
+  Timer,
 } from 'lucide-react';
 import NotificationBell from '../NotificationBell';
 import { useAuth } from '../../contexts/AuthContext';
@@ -42,6 +43,7 @@ const navigationItems = [
   { name: 'Alert Channels',    href: '/notification-settings', icon: BellRing },
   { name: 'Configuration',     href: '/configuration',     icon: Wrench },
   { name: 'Database',          href: '/database',          icon: Database },
+  { name: 'Background Jobs',   href: '/background-jobs',   icon: Timer },
   { name: 'Settings',          href: '/settings',          icon: Settings },
 ];
 

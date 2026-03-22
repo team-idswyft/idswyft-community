@@ -9,6 +9,7 @@
 import { Response } from 'express';
 import { vaasSupabase } from '../config/database.js';
 import { emailService } from './emailService.js';
+import { cronRegistry } from './cronRegistryService.js';
 import type {
   PlatformEvent,
   PlatformNotification,
@@ -360,7 +361,11 @@ export class PlatformNotificationService {
 
     // Then run on schedule
     this.cleanupInterval = setInterval(() => {
-      this.cleanupOldNotifications(retentionDays).catch(() => {});
+      this.cleanupOldNotifications(retentionDays)
+        .then(() => cronRegistry.reportRun('notification-cleanup', 'success'))
+        .catch((err) => {
+          cronRegistry.reportRun('notification-cleanup', 'error', err.message);
+        });
     }, intervalMs);
   }
 
