@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Download, Upload, Eye, EyeOff, Pencil, Trash2, ChevronDown, ChevronRight, Database, Info, ShieldAlert, Server, KeyRound, RotateCw, AlertTriangle, CheckCircle2, XCircle, Clock, Copy } from 'lucide-react';
+import { Download, Upload, Eye, EyeOff, Pencil, Trash2, ChevronDown, ChevronRight, Database, Info, ShieldAlert, Server, KeyRound, RotateCw, AlertTriangle, CheckCircle2, XCircle, Clock, Copy, Shield, Mail, Link2, ToggleLeft, Gauge, HardDrive, Activity, Sparkles, Globe } from 'lucide-react';
 import platformApi from '../services/api';
 import Modal from '../components/ui/Modal';
 import { cardSurface, tableHeaderClass, statusPill, monoXs, monoSm, sectionLabel, infoPanel, getStatusAccent } from '../styles/tokens';
@@ -146,11 +146,25 @@ export default function Configuration() {
 
   // Group by service → category
   const SERVICE_ORDER = ['VaaS', 'Main API', 'Platform Admin', 'VaaS Admin'];
-  const SERVICE_LABELS: Record<string, string> = {
-    'VaaS': 'VaaS Backend',
-    'Main API': 'Main API',
-    'Platform Admin': 'Platform Admin',
-    'VaaS Admin': 'VaaS Admin (Org Portal)',
+  const SERVICE_META: Record<string, { label: string; domain: string; accent: string; iconBg: string }> = {
+    'VaaS': { label: 'VaaS Backend', domain: 'api-vaas.idswyft.app', accent: 'border-cyan-500/30 bg-cyan-500/5', iconBg: 'bg-cyan-500/15 text-cyan-400' },
+    'Main API': { label: 'Main API', domain: 'api.idswyft.app', accent: 'border-violet-500/30 bg-violet-500/5', iconBg: 'bg-violet-500/15 text-violet-400' },
+    'Platform Admin': { label: 'Platform Admin', domain: 'platform.idswyft.app', accent: 'border-emerald-500/30 bg-emerald-500/5', iconBg: 'bg-emerald-500/15 text-emerald-400' },
+    'VaaS Admin': { label: 'VaaS Admin (Org Portal)', domain: 'vaas.idswyft.app', accent: 'border-amber-500/30 bg-amber-500/5', iconBg: 'bg-amber-500/15 text-amber-400' },
+  };
+
+  const TYPE_ICONS: Record<string, { icon: typeof Server; color: string }> = {
+    'Core': { icon: Server, color: 'text-slate-400' },
+    'Database': { icon: Database, color: 'text-blue-400' },
+    'Security': { icon: Shield, color: 'text-rose-400' },
+    'Email': { icon: Mail, color: 'text-pink-400' },
+    'Integration': { icon: Link2, color: 'text-indigo-400' },
+    'Features': { icon: ToggleLeft, color: 'text-green-400' },
+    'Rate Limits': { icon: Gauge, color: 'text-orange-400' },
+    'Storage': { icon: HardDrive, color: 'text-teal-400' },
+    'Monitoring': { icon: Activity, color: 'text-yellow-400' },
+    'OAuth': { icon: Shield, color: 'text-purple-400' },
+    'AI': { icon: Sparkles, color: 'text-fuchsia-400' },
   };
 
   const getService = (category: string): string => {
@@ -167,13 +181,11 @@ export default function Configuration() {
     return sub || 'General';
   };
 
-  // Build: { service: { subcategory: ConfigItem[] } }
-  const serviceGroups = configs.reduce<Record<string, Record<string, ConfigItem[]>>>((acc, item) => {
+  // Group configs flat by service
+  const serviceGroups = configs.reduce<Record<string, ConfigItem[]>>((acc, item) => {
     const svc = getService(item.category);
-    const sub = getSubcategory(item.category);
-    if (!acc[svc]) acc[svc] = {};
-    if (!acc[svc][sub]) acc[svc][sub] = [];
-    acc[svc][sub].push(item);
+    if (!acc[svc]) acc[svc] = [];
+    acc[svc].push(item);
     return acc;
   }, {});
 
@@ -666,96 +678,113 @@ export default function Configuration() {
         </div>
       ) : (
         sortedServices.map((service) => {
-          const subcategories = serviceGroups[service];
-          const totalKeys = Object.values(subcategories).reduce((sum, arr) => sum + arr.length, 0);
+          const items = serviceGroups[service];
+          const meta = SERVICE_META[service] || { label: service, domain: '', accent: 'border-slate-500/30 bg-slate-500/5', iconBg: 'bg-slate-500/15 text-slate-400' };
+          const isCollapsed = collapsedCategories.has(service);
 
           return (
-            <div key={service} className="space-y-2">
-              {/* Service header */}
-              <div className="flex items-center gap-2 pt-2">
-                <Server className="h-4 w-4 text-cyan-400" />
-                <h3 className="text-sm font-semibold text-slate-200">{SERVICE_LABELS[service] || service}</h3>
-                <span className={`${monoXs} text-slate-500`}>{totalKeys} keys</span>
-              </div>
+            <div key={service}>
+              {/* Service header — collapsible */}
+              <button
+                onClick={() => toggleCategory(service)}
+                className={`w-full border ${meta.accent} px-5 py-4 mt-6 first:mt-0 text-left transition hover:brightness-110 ${isCollapsed ? 'rounded-xl' : 'rounded-t-xl'}`}
+              >
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className={`flex h-9 w-9 items-center justify-center rounded-lg ${meta.iconBg}`}>
+                      <Server className="h-4 w-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-semibold text-slate-100">{meta.label}</h3>
+                      {meta.domain && (
+                        <div className="flex items-center gap-1.5 mt-0.5">
+                          <Globe className="h-3 w-3 text-slate-500" />
+                          <span className={`${monoXs} text-slate-500`}>{meta.domain}</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className={`${monoXs} text-slate-500`}>{items.length} keys</span>
+                    {isCollapsed ? <ChevronRight className="h-4 w-4 text-slate-500" /> : <ChevronDown className="h-4 w-4 text-slate-500" />}
+                  </div>
+                </div>
+              </button>
 
-              {/* Subcategory cards */}
-              {Object.entries(subcategories).map(([subcategory, items]) => {
-                const catKey = `${service}:${subcategory}`;
-                const isCollapsed = collapsedCategories.has(catKey);
-                return (
-                  <div key={catKey} className={cardSurface}>
-                    <button
-                      onClick={() => toggleCategory(catKey)}
-                      className="flex w-full items-center justify-between px-5 py-3 border-b border-white/10 hover:bg-white/5 transition"
-                    >
-                      <span className={`${sectionLabel} text-slate-400`}>{subcategory}</span>
-                      <div className="flex items-center gap-2">
-                        <span className={`${monoXs} text-slate-500`}>{items.length} keys</span>
-                        {isCollapsed ? <ChevronRight className="h-4 w-4 text-slate-500" /> : <ChevronDown className="h-4 w-4 text-slate-500" />}
-                      </div>
-                    </button>
+              {/* Flat config list */}
+              {!isCollapsed && (
+                <div className="rounded-b-xl border border-t-0 border-white/10 bg-slate-900/40">
+                  <div className="divide-y divide-white/5">
+                    {items.map((item) => {
+                      const typeName = getSubcategory(item.category);
+                      const typeInfo = TYPE_ICONS[typeName] || { icon: Server, color: 'text-slate-500' };
+                      const TypeIcon = typeInfo.icon;
+                      return (
+                        <div key={item.key} className="flex items-center gap-3 px-5 py-3 hover:bg-white/5 transition">
+                          {/* Type icon with tooltip */}
+                          <span className="group relative shrink-0">
+                            <TypeIcon className={`h-4 w-4 ${typeInfo.color}`} />
+                            <span className="pointer-events-none absolute bottom-full left-1/2 z-40 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-slate-800 px-2 py-1 text-[10px] text-slate-300 opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+                              {typeName}
+                            </span>
+                          </span>
 
-                    {!isCollapsed && (
-                      <div className="divide-y divide-white/5">
-                        {items.map((item) => (
-                          <div key={item.key} className="flex items-center gap-4 px-5 py-3 hover:bg-white/5 transition">
-                            <div className="min-w-0 flex-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <span className={`${monoSm} text-slate-200`}>{item.key}</span>
-                                {item.description && (
-                                  <span className="group relative">
-                                    <Info className="h-3.5 w-3.5 text-slate-500 cursor-help" />
-                                    <span className="pointer-events-none absolute bottom-full left-1/2 z-40 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-slate-800 px-3 py-2 text-xs text-slate-300 opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
-                                      {item.description}
-                                    </span>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <span className={`${monoSm} text-slate-200`}>{item.key}</span>
+                              {item.description && (
+                                <span className="group relative">
+                                  <Info className="h-3.5 w-3.5 text-slate-500 cursor-help" />
+                                  <span className="pointer-events-none absolute bottom-full left-1/2 z-40 mb-2 -translate-x-1/2 whitespace-nowrap rounded-lg border border-white/10 bg-slate-800 px-3 py-2 text-xs text-slate-300 opacity-0 shadow-xl transition-opacity group-hover:opacity-100">
+                                    {item.description}
                                   </span>
-                                )}
-                                {item.is_secret && (
-                                  <span className={`${statusPill} bg-amber-500/15 text-amber-300 border-amber-500/30`}>secret</span>
-                                )}
-                                {item.requires_restart && (
-                                  <span className={`${statusPill} bg-orange-500/15 text-orange-300 border-orange-500/30`}>restart</span>
-                                )}
-                              </div>
-                            </div>
-
-                            <div className="flex items-center gap-2 shrink-0">
-                              {item.is_secret ? (
-                                <div className="flex items-center gap-1">
-                                  <span className={`${monoXs} text-slate-500`}>
-                                    {visibleSecrets.has(item.key) ? revealedValues[item.key] || '' : '••••••••'}
-                                  </span>
-                                  <button
-                                    onClick={() => toggleSecretVisibility(item.key)}
-                                    className="rounded-md p-1 text-slate-400 hover:bg-white/10 hover:text-slate-200"
-                                  >
-                                    {visibleSecrets.has(item.key) ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
-                                  </button>
-                                </div>
-                              ) : (
-                                <span className={`${monoXs} text-slate-400 max-w-xs truncate`}>{item.value}</span>
+                                </span>
                               )}
-
-                              <button
-                                onClick={() => openEditModal(item)}
-                                className="rounded-md p-1 text-slate-400 hover:bg-white/10 hover:text-slate-200"
-                              >
-                                <Pencil className="h-3.5 w-3.5" />
-                              </button>
-                              <button
-                                onClick={() => handleDelete(item.key)}
-                                className="rounded-md p-1 text-slate-400 hover:bg-rose-500/10 hover:text-rose-400"
-                              >
-                                <Trash2 className="h-3.5 w-3.5" />
-                              </button>
+                              {item.is_secret && (
+                                <span className={`${statusPill} bg-amber-500/15 text-amber-300 border-amber-500/30`}>secret</span>
+                              )}
+                              {item.requires_restart && (
+                                <span className={`${statusPill} bg-orange-500/15 text-orange-300 border-orange-500/30`}>restart</span>
+                              )}
                             </div>
                           </div>
-                        ))}
-                      </div>
-                    )}
+
+                          <div className="flex items-center gap-2 shrink-0">
+                            {item.is_secret ? (
+                              <div className="flex items-center gap-1">
+                                <span className={`${monoXs} text-slate-500`}>
+                                  {visibleSecrets.has(item.key) ? revealedValues[item.key] || '' : '••••••••'}
+                                </span>
+                                <button
+                                  onClick={() => toggleSecretVisibility(item.key)}
+                                  className="rounded-md p-1 text-slate-400 hover:bg-white/10 hover:text-slate-200"
+                                >
+                                  {visibleSecrets.has(item.key) ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+                                </button>
+                              </div>
+                            ) : (
+                              <span className={`${monoXs} text-slate-400 max-w-xs truncate`}>{item.value}</span>
+                            )}
+
+                            <button
+                              onClick={() => openEditModal(item)}
+                              className="rounded-md p-1 text-slate-400 hover:bg-white/10 hover:text-slate-200"
+                            >
+                              <Pencil className="h-3.5 w-3.5" />
+                            </button>
+                            <button
+                              onClick={() => handleDelete(item.key)}
+                              className="rounded-md p-1 text-slate-400 hover:bg-rose-500/10 hover:text-rose-400"
+                            >
+                              <Trash2 className="h-3.5 w-3.5" />
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
-                );
-              })}
+                </div>
+              )}
             </div>
           );
         })
