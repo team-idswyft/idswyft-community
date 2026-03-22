@@ -7,7 +7,9 @@
     "vaas-backend",
     "vaas-admin",
     "platform-admin",
-    "customer-portal"
+    "customer-portal",
+    "status-backend",
+    "status-page"
   ],
   "scripts": {
     "install:all": "npm install --workspaces",
