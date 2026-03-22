@@ -475,7 +475,7 @@ export class PlatformConfigService {
       // Check if already exists
       const { data: existing } = await vaasSupabase
         .from('platform_config')
-        .select('key, category, description')
+        .select('key, value, category, description')
         .eq('key', key)
         .single();
 
@@ -489,6 +489,22 @@ export class PlatformConfigService {
             requires_restart: entry.requires_restart,
           }).eq('key', key);
         }
+
+        // If it's a secret that can't be decrypted, re-encrypt with the current key
+        if (entry.is_secret && existing.value) {
+          try {
+            decrypt(existing.value);
+          } catch {
+            const envValue = process.env[entry.env_key] || '';
+            if (envValue) {
+              console.warn(`[PlatformConfig] Re-encrypting broken secret: ${key}`);
+              await vaasSupabase.from('platform_config').update({
+                value: encrypt(envValue),
+              }).eq('key', key);
+            }
+          }
+        }
+
         continue;
       }
 
