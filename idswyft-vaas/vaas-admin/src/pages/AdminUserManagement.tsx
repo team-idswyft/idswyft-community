@@ -4,7 +4,6 @@ import apiClient from '../services/api';
 import Modal, { ConfirmationModal } from '../components/ui/Modal';
 import type {
   AdminRole,
-  AdminPermission,
   AdminUser,
   AdminUserFormData,
   AdminUserUpdateData,
@@ -24,29 +23,21 @@ import {
   UserCheck,
   UserX,
   UserPlus,
-  Shield,
+
   Unlock,
   RefreshCw,
   MoreHorizontal,
-  LayoutGrid,
-  List,
-  Crown,
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  X
+  X,
+  Send,
+  Clock
 } from 'lucide-react';
 
-import { sectionLabel, statNumber, monoXs, monoSm, statusPill, cardSurface, statusAccent } from '../styles/tokens';
+import { sectionLabel, monoXs, monoSm, statusPill, cardSurface, statusAccent } from '../styles/tokens';
 
 const ITEMS_PER_PAGE = 20;
-
-// Role icon mapping
-const roleIcon: Record<string, React.ElementType> = {
-  super_admin: Crown,
-  admin: Shield,
-  viewer: Eye,
-};
 
 // ─── ActionDropdown component ───────────────────────────────────────────────
 function ActionDropdown({ user, canModify, onView, onEdit, onSuspend, onActivate, onUnlock, onDelete, actionLoading }: {
@@ -117,12 +108,50 @@ function ActionDropdown({ user, canModify, onView, onEdit, onSuspend, onActivate
   );
 }
 
+// ─── InviteActionDropdown ───────────────────────────────────────────────────
+function InviteActionDropdown({ onResend, onRevoke }: {
+  onResend: () => void;
+  onRevoke: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    const handler = (e: MouseEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [open]);
+
+  return (
+    <div className="relative" ref={ref}>
+      <button
+        onClick={() => setOpen(!open)}
+        className="p-1.5 rounded-lg hover:bg-slate-800/80 transition-colors text-slate-400 hover:text-slate-200"
+      >
+        <MoreHorizontal className="h-4 w-4" />
+      </button>
+      {open && (
+        <div className="absolute right-0 top-full mt-1 z-50 w-36 bg-slate-900/95 backdrop-blur-sm border border-white/10 rounded-xl shadow-xl py-1 animate-scale-in">
+          <button onClick={() => { onResend(); setOpen(false); }} className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm text-cyan-300 hover:bg-slate-800/80 rounded-lg mx-1" style={{ width: 'calc(100% - 0.5rem)' }}>
+            <Send className="h-3.5 w-3.5" /> Resend
+          </button>
+          <button onClick={() => { onRevoke(); setOpen(false); }} className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm text-rose-300 hover:bg-slate-800/80 rounded-lg mx-1" style={{ width: 'calc(100% - 0.5rem)' }}>
+            <X className="h-3.5 w-3.5" /> Revoke
+          </button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── Main component ─────────────────────────────────────────────────────────
 export default function AdminUserManagement() {
   const { organization, admin } = useAuth();
   const [users, setUsers] = useState<AdminUser[]>([]);
   const [roles, setRoles] = useState<AdminRole[]>([]);
-  const [permissions, setPermissions] = useState<AdminPermission[]>([]);
   const [invites, setInvites] = useState<AdminUserInvite[]>([]);
   const [stats, setStats] = useState<AdminUserStats | null>(null);
 
@@ -130,10 +159,6 @@ export default function AdminUserManagement() {
   const [statsLoading, setStatsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [actionLoading, setActionLoading] = useState<Record<string, boolean>>({});
-
-  // View & filter state
-  const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
-  const [activeRoleFilter, setActiveRoleFilter] = useState<string | null>(null);
 
   // Pagination
   const [currentPage, setCurrentPage] = useState(1);
@@ -192,12 +217,8 @@ export default function AdminUserManagement() {
   const loadRoles = useCallback(async () => {
     if (!organization?.id) return;
     try {
-      const [rolesData, permissionsData] = await Promise.all([
-        apiClient.getAdminRoles(organization.id),
-        apiClient.getAdminPermissions(organization.id),
-      ]);
+      const rolesData = await apiClient.getAdminRoles(organization.id);
       setRoles(rolesData);
-      setPermissions(permissionsData);
     } catch (error) {
       console.error('Failed to load roles and permissions:', error);
     }
@@ -257,22 +278,6 @@ export default function AdminUserManagement() {
     setRefreshing(true);
     await Promise.all([loadUsers(currentPage), loadRoles(), loadInvites(), loadStats()]);
     setRefreshing(false);
-  };
-
-  // Role filter (click role card → filter)
-  const handleRoleFilter = (roleId: string) => {
-    if (activeRoleFilter === roleId) {
-      setActiveRoleFilter(null);
-      const newFilters = { ...filters };
-      delete newFilters.role_id;
-      setFilters(newFilters);
-      loadUsers(1, newFilters);
-    } else {
-      setActiveRoleFilter(roleId);
-      const newFilters = { ...filters, role_id: roleId };
-      setFilters(newFilters);
-      loadUsers(1, newFilters);
-    }
   };
 
   // ─── CRUD handlers ─────────────────────────────────────────────────────
@@ -393,30 +398,21 @@ export default function AdminUserManagement() {
 
   const getInitials = (u: AdminUser) => `${u.first_name.charAt(0)}${u.last_name.charAt(0)}`;
 
-  // Count members per role
-  const roleMemberCounts = roles.reduce<Record<string, number>>((acc, role) => {
-    acc[role.id] = users.filter(u => u.role_id === role.id).length;
-    return acc;
-  }, {});
-
   // ─── Loading skeleton ──────────────────────────────────────────────────
   if (loading && users.length === 0) {
     return (
       <div className="p-6 max-w-7xl mx-auto">
-        <div className="animate-pulse space-y-8">
-          {/* Section label skeleton */}
-          <div className="h-3 bg-slate-700/50 rounded w-28" />
-          {/* Stat cards */}
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {[1, 2, 3, 4].map(i => (
-              <div key={i} className={`${cardSurface} border-l-[3px] border-l-slate-700/50 p-5`}>
-                <div className="h-3 bg-slate-700/50 rounded w-16 mb-3" />
-                <div className="h-7 bg-slate-700/50 rounded w-10" />
-              </div>
-            ))}
+        <div className="animate-pulse space-y-6">
+          {/* Header skeleton */}
+          <div className="flex items-center justify-between">
+            <div>
+              <div className="h-5 bg-slate-700/50 rounded w-16 mb-2" />
+              <div className="h-3 bg-slate-700/50 rounded w-48" />
+            </div>
+            <div className="h-9 bg-slate-700/50 rounded w-28" />
           </div>
-          {/* Section label */}
-          <div className="h-3 bg-slate-700/50 rounded w-20" />
+          {/* Search skeleton */}
+          <div className="h-10 bg-slate-700/50 rounded-xl" />
           {/* Grid cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
             {[1, 2, 3, 4, 5, 6].map(i => (
@@ -437,445 +433,274 @@ export default function AdminUserManagement() {
     );
   }
 
+  // Pending invites that should appear in the grid
+  const pendingInvites = invites.filter(i => i.status === 'pending');
+
   // ─── Render ─────────────────────────────────────────────────────────────
   return (
-    <div className="p-6 space-y-6 max-w-7xl mx-auto">
+    <div className="p-6 space-y-4 max-w-7xl mx-auto">
 
-      {/* ══════ TEAM OVERVIEW stats ══════ */}
-      {stats && !statsLoading && (
-        <section>
-          <p className={`${sectionLabel} mb-3`}>Team Overview</p>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            {([
-              { label: 'Total', value: stats.total_admins, color: 'border-l-cyan-400', textColor: 'text-slate-100' },
-              { label: 'Active', value: stats.active_admins, color: 'border-l-emerald-400', textColor: 'text-emerald-400' },
-              { label: 'Pending', value: stats.pending_invites, color: 'border-l-amber-400', textColor: 'text-amber-400' },
-              { label: 'Suspended', value: stats.suspended_admins, color: 'border-l-rose-400', textColor: 'text-rose-400' },
-            ] as const).map(s => (
-              <div key={s.label} className={`${cardSurface} border-l-[3px] ${s.color} p-5 hover:bg-slate-800/40 transition-colors`}>
-                <p className={`${sectionLabel} mb-1`}>{s.label}</p>
-                <p className={`${statNumber} ${s.textColor}`}>{s.value}</p>
-              </div>
-            ))}
+      {/* ══════ INLINE HEADER ══════ */}
+      <div className="flex flex-col sm:flex-row sm:items-start sm:justify-between gap-3">
+        <div>
+          <h1 className="text-lg font-semibold text-slate-100">Team</h1>
+          {stats && !statsLoading && (
+            <p className={`${monoXs} text-slate-500 mt-1`}>
+              {stats.total_admins} members
+              {stats.active_admins > 0 && <> · <span className="text-emerald-400">{stats.active_admins} active</span></>}
+              {stats.pending_invites > 0 && <> · <span className="text-amber-400">{stats.pending_invites} pending</span></>}
+              {stats.suspended_admins > 0 && <> · <span className="text-rose-400">{stats.suspended_admins} suspended</span></>}
+            </p>
+          )}
+        </div>
+        <button
+          onClick={handleRefresh}
+          disabled={refreshing}
+          className="p-2 border border-white/10 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 disabled:opacity-50 transition-colors self-start"
+          title="Refresh"
+        >
+          <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
+        </button>
+      </div>
+
+      {/* ══════ SEARCH + FILTERS + ADD ══════ */}
+      <div className="flex flex-col sm:flex-row gap-3">
+        <div className="flex-1 relative">
+          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
+          <input
+            type="text"
+            placeholder="Search by name, email, or role..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+            className="form-input pl-10"
+          />
+        </div>
+        <div className="flex gap-2">
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`btn ${showFilters ? 'bg-cyan-500/12 border-cyan-400/35 text-cyan-200' : 'btn-secondary'}`}
+          >
+            <Filter className="h-4 w-4" />
+            Filters
+            <ChevronDown className={`h-4 w-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
+          </button>
+          <button onClick={() => setShowCreateModal(true)} className="btn btn-primary">
+            <Plus className="h-4 w-4" />
+            Add Member
+          </button>
+        </div>
+      </div>
+
+      {/* Advanced filters panel */}
+      {showFilters && (
+        <div className={`${cardSurface} p-4`}>
+          <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
+            <div>
+              <label className="form-label">Role</label>
+              <select value={filters.role_id || ''} onChange={(e) => handleFilterChange('role_id', e.target.value)} className="form-input">
+                <option value="">All Roles</option>
+                {roles.map(role => <option key={role.id} value={role.id}>{role.display_name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Status</label>
+              <select value={filters.status || ''} onChange={(e) => handleFilterChange('status', e.target.value)} className="form-input">
+                <option value="">All Statuses</option>
+                <option value="active">Active</option>
+                <option value="inactive">Inactive</option>
+                <option value="pending">Pending</option>
+                <option value="suspended">Suspended</option>
+                <option value="locked">Locked</option>
+              </select>
+            </div>
+            <div>
+              <label className="form-label">Last Login From</label>
+              <input type="datetime-local" value={filters.last_login_from || ''} onChange={(e) => handleFilterChange('last_login_from', e.target.value)} className="form-input" />
+            </div>
+            <div className="flex items-end">
+              <button
+                onClick={() => { setFilters({}); setSearch(''); loadUsers(1, {}); }}
+                className="w-full btn btn-secondary"
+              >
+                Clear All
+              </button>
+            </div>
           </div>
-        </section>
+        </div>
       )}
 
-      {/* ══════ ROLES section ══════ */}
-      {roles.length > 0 && (
-        <section>
-          <p className={`${sectionLabel} mb-3`}>Roles</p>
-          <div className="flex flex-wrap gap-3">
-            {roles.map(role => {
-              const Icon = roleIcon[role.name] || Shield;
-              const isActive = activeRoleFilter === role.id;
-              return (
-                <button
-                  key={role.id}
-                  onClick={() => handleRoleFilter(role.id)}
-                  className={`${cardSurface} px-4 py-3 text-left hover:bg-slate-800/40 transition-all cursor-pointer flex items-start gap-3 min-w-[180px] ${
-                    isActive ? 'border-cyan-400/50 bg-cyan-500/8' : ''
-                  }`}
-                >
-                  <div className="mt-0.5">
-                    <Icon className={`h-4 w-4 ${isActive ? 'text-cyan-300' : 'text-slate-500'}`} />
+      {/* Loading indicator */}
+      {loading && users.length > 0 && (
+        <div className="flex items-center gap-2 text-slate-500">
+          <RefreshCw className="h-3.5 w-3.5 animate-spin" />
+          <span className={monoXs}>Loading...</span>
+        </div>
+      )}
+
+      {/* ══════ UNIFIED GRID (members + invites) ══════ */}
+      {(users.length > 0 || pendingInvites.length > 0) && (
+        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {/* ── Member cards ── */}
+          {users.map(user => {
+            const accent = statusAccent[user.status] || statusAccent.inactive;
+            const canModify = admin?.id !== user.id;
+            return (
+              <div
+                key={user.id}
+                className={`${cardSurface} border-l-[3px] ${accent.border} p-4 hover:bg-slate-800/40 transition-colors`}
+              >
+                <div className="flex items-start justify-between">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="h-9 w-9 shrink-0 rounded-full bg-cyan-500/15 border border-cyan-400/30 flex items-center justify-center">
+                      <span className="text-cyan-300 font-medium text-xs font-mono">
+                        {getInitials(user)}
+                      </span>
+                    </div>
+                    <div className="min-w-0">
+                      <p className="text-sm font-semibold text-slate-100 truncate">
+                        {user.first_name} {user.last_name}
+                      </p>
+                      <p className={`${monoXs} text-slate-500 truncate`}>{user.email}</p>
+                    </div>
+                  </div>
+                  <ActionDropdown
+                    user={user}
+                    canModify={canModify}
+                    onView={() => openViewModal(user)}
+                    onEdit={() => openEditModal(user)}
+                    onSuspend={() => handleSuspendUser(user)}
+                    onActivate={() => handleActivateUser(user)}
+                    onUnlock={() => handleUnlockUser(user)}
+                    onDelete={() => openDeleteModal(user)}
+                    actionLoading={!!actionLoading[user.id]}
+                  />
+                </div>
+
+                <div className="flex items-center gap-2 mt-3">
+                  <span className={`${statusPill} ${accent.pill}`}>
+                    {user.status}
+                  </span>
+                  {user.two_factor_enabled && (
+                    <span className="font-mono text-[0.65rem] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
+                      2FA
+                    </span>
+                  )}
+                  <span className={`${monoXs} text-slate-600 ml-auto`}>
+                    {user.role.display_name}
+                  </span>
+                </div>
+
+                <p className={`${monoXs} text-slate-600 mt-2`}>
+                  {user.last_login_at ? `Last login: ${getRelativeTime(user.last_login_at)}` : 'Never logged in'}
+                </p>
+              </div>
+            );
+          })}
+
+          {/* ── Invite cards (amber accent) ── */}
+          {pendingInvites.map(invite => (
+            <div
+              key={`invite-${invite.id}`}
+              className={`${cardSurface} border-l-[3px] border-l-amber-400 p-4 hover:bg-slate-800/40 transition-colors`}
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex items-center gap-3 min-w-0">
+                  <div className="h-9 w-9 shrink-0 rounded-full bg-amber-500/15 border border-amber-400/30 flex items-center justify-center">
+                    <Send className="h-4 w-4 text-amber-300" />
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-100">{role.display_name}</p>
-                    <p className={`${monoXs} text-slate-500 mt-0.5`}>
-                      <span className={`inline-block px-1.5 py-0.5 rounded text-[0.6rem] mr-1 ${isActive ? 'bg-cyan-500/15 text-cyan-300' : 'bg-slate-800 text-slate-400'}`}>
-                        {roleMemberCounts[role.id] || 0}
-                      </span>
-                      members
+                    <p className="text-sm font-semibold text-slate-100 truncate">
+                      {invite.email}
                     </p>
-                    <p className="text-xs text-slate-500 mt-1 truncate max-w-[160px]">{role.description}</p>
+                    <p className={`${monoXs} text-slate-500`}>
+                      Invited by {invite.invited_by_name}
+                    </p>
                   </div>
-                </button>
-              );
-            })}
-          </div>
-        </section>
+                </div>
+                <InviteActionDropdown
+                  onResend={() => handleResendInvite(invite)}
+                  onRevoke={() => handleRevokeInvite(invite)}
+                />
+              </div>
+
+              <div className="flex items-center gap-2 mt-3">
+                <span className={`${statusPill} bg-amber-500/15 text-amber-300 border-amber-500/30`}>
+                  Invited
+                </span>
+                <span className={`${monoXs} text-slate-600 ml-auto`}>
+                  {invite.role?.display_name ?? 'Unknown'}
+                </span>
+              </div>
+
+              <p className={`${monoXs} text-slate-600 mt-2 flex items-center gap-1`}>
+                <Clock className="h-3 w-3" />
+                Expires {formatTimestamp(invite.expires_at)}
+              </p>
+            </div>
+          ))}
+        </div>
       )}
 
-      {/* ══════ MEMBERS header + search ══════ */}
-      <section>
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-4">
-          <div className="flex items-center gap-3">
-            <p className={sectionLabel}>
-              Members{' '}
-              <span className="text-slate-600">· {total} total</span>
-            </p>
-            {activeRoleFilter && (
-              <button
-                onClick={() => handleRoleFilter(activeRoleFilter)}
-                className="inline-flex items-center gap-1 font-mono text-[0.65rem] uppercase tracking-[0.06em] px-2 py-0.5 rounded-full bg-cyan-500/12 border border-cyan-400/30 text-cyan-300 hover:bg-cyan-500/20 transition-colors"
-              >
-                {roles.find(r => r.id === activeRoleFilter)?.display_name}
-                <X className="h-3 w-3" />
-              </button>
-            )}
-          </div>
-          <div className="flex items-center gap-2">
-            {/* View toggle — hidden on mobile */}
-            <div className="hidden sm:flex border border-white/10 rounded-lg overflow-hidden">
-              <button
-                onClick={() => setViewMode('grid')}
-                className={`p-2 transition-colors ${viewMode === 'grid' ? 'bg-cyan-500/12 text-cyan-200' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/60'}`}
-                title="Grid view"
-              >
-                <LayoutGrid className="h-4 w-4" />
-              </button>
-              <button
-                onClick={() => setViewMode('table')}
-                className={`p-2 transition-colors ${viewMode === 'table' ? 'bg-cyan-500/12 text-cyan-200' : 'text-slate-500 hover:text-slate-300 hover:bg-slate-800/60'}`}
-                title="Table view"
-              >
-                <List className="h-4 w-4" />
-              </button>
-            </div>
-            <button
-              onClick={handleRefresh}
-              disabled={refreshing}
-              className="p-2 border border-white/10 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 disabled:opacity-50 transition-colors"
-              title="Refresh"
-            >
-              <RefreshCw className={`h-4 w-4 ${refreshing ? 'animate-spin' : ''}`} />
-            </button>
-          </div>
-        </div>
-
-        {/* Search bar + filters + add */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-4">
-          <div className="flex-1 relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-500" />
-            <input
-              type="text"
-              placeholder="Search by name, email, or role..."
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              className="form-input pl-10"
-            />
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowFilters(!showFilters)}
-              className={`btn ${showFilters ? 'bg-cyan-500/12 border-cyan-400/35 text-cyan-200' : 'btn-secondary'}`}
-            >
-              <Filter className="h-4 w-4" />
-              Filters
-              <ChevronDown className={`h-4 w-4 transition-transform ${showFilters ? 'rotate-180' : ''}`} />
-            </button>
-            <button onClick={() => setShowCreateModal(true)} className="btn btn-primary">
-              <Plus className="h-4 w-4" />
+      {/* ══════ Empty state ══════ */}
+      {users.length === 0 && pendingInvites.length === 0 && !loading && (
+        <div className="text-center py-16">
+          <Users className="mx-auto h-10 w-10 text-slate-600" />
+          <p className={`${sectionLabel} mt-4`}>No Members Found</p>
+          <p className="text-sm text-slate-500 mt-2 max-w-sm mx-auto">
+            {Object.keys(filters).length > 0 || search
+              ? 'Try adjusting your search criteria or filters.'
+              : 'Get started by adding your first team member.'}
+          </p>
+          {!Object.keys(filters).length && !search && (
+            <button onClick={() => setShowCreateModal(true)} className="btn btn-primary mt-6">
+              <UserPlus className="h-4 w-4" />
               Add Member
             </button>
-          </div>
+          )}
         </div>
+      )}
 
-        {/* Advanced filters panel */}
-        {showFilters && (
-          <div className={`${cardSurface} p-4 mb-4`}>
-            <div className="grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-4">
-              <div>
-                <label className="form-label">Role</label>
-                <select value={filters.role_id || ''} onChange={(e) => handleFilterChange('role_id', e.target.value)} className="form-input">
-                  <option value="">All Roles</option>
-                  {roles.map(role => <option key={role.id} value={role.id}>{role.display_name}</option>)}
-                </select>
-              </div>
-              <div>
-                <label className="form-label">Status</label>
-                <select value={filters.status || ''} onChange={(e) => handleFilterChange('status', e.target.value)} className="form-input">
-                  <option value="">All Statuses</option>
-                  <option value="active">Active</option>
-                  <option value="inactive">Inactive</option>
-                  <option value="pending">Pending</option>
-                  <option value="suspended">Suspended</option>
-                  <option value="locked">Locked</option>
-                </select>
-              </div>
-              <div>
-                <label className="form-label">Last Login From</label>
-                <input type="datetime-local" value={filters.last_login_from || ''} onChange={(e) => handleFilterChange('last_login_from', e.target.value)} className="form-input" />
-              </div>
-              <div className="flex items-end">
-                <button
-                  onClick={() => { setFilters({}); setSearch(''); setActiveRoleFilter(null); loadUsers(1, {}); }}
-                  className="w-full btn btn-secondary"
-                >
-                  Clear All
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {/* Loading indicator */}
-        {loading && users.length > 0 && (
-          <div className="flex items-center gap-2 text-slate-500 mb-4">
-            <RefreshCw className="h-3.5 w-3.5 animate-spin" />
-            <span className={monoXs}>Loading...</span>
-          </div>
-        )}
-
-        {/* ══════ GRID VIEW ══════ */}
-        {viewMode === 'grid' && users.length > 0 && (
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-            {users.map(user => {
-              const accent = statusAccent[user.status] || statusAccent.inactive;
-              const canModify = admin?.id !== user.id;
+      {/* ══════ Pagination ══════ */}
+      {totalPages > 1 && (
+        <div className="flex items-center justify-between pt-2">
+          <p className={`${monoXs} text-slate-500`}>
+            {((currentPage - 1) * ITEMS_PER_PAGE) + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, total)} of {total.toLocaleString()}
+          </p>
+          <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => loadUsers(currentPage - 1)}
+              disabled={currentPage === 1 || loading}
+              className="p-1.5 border border-white/10 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronLeft className="h-4 w-4" />
+            </button>
+            {[...Array(Math.min(5, totalPages))].map((_, i) => {
+              const page = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
               return (
-                <div
-                  key={user.id}
-                  className={`${cardSurface} border-l-[3px] ${accent.border} p-4 hover:bg-slate-800/40 transition-colors`}
+                <button
+                  key={page}
+                  onClick={() => loadUsers(page)}
+                  disabled={loading}
+                  className={`h-8 w-8 rounded-lg text-sm font-mono transition-colors ${
+                    page === currentPage
+                      ? 'bg-cyan-500/20 border border-cyan-400/40 text-cyan-200'
+                      : 'text-slate-400 border border-white/10 hover:bg-slate-800/60 hover:text-slate-200'
+                  } disabled:opacity-40`}
                 >
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-3 min-w-0">
-                      <div className="h-9 w-9 shrink-0 rounded-full bg-cyan-500/15 border border-cyan-400/30 flex items-center justify-center">
-                        <span className="text-cyan-300 font-medium text-xs font-mono">
-                          {getInitials(user)}
-                        </span>
-                      </div>
-                      <div className="min-w-0">
-                        <p className="text-sm font-semibold text-slate-100 truncate">
-                          {user.first_name} {user.last_name}
-                        </p>
-                        <p className={`${monoXs} text-slate-500 truncate`}>{user.email}</p>
-                      </div>
-                    </div>
-                    <ActionDropdown
-                      user={user}
-                      canModify={canModify}
-                      onView={() => openViewModal(user)}
-                      onEdit={() => openEditModal(user)}
-                      onSuspend={() => handleSuspendUser(user)}
-                      onActivate={() => handleActivateUser(user)}
-                      onUnlock={() => handleUnlockUser(user)}
-                      onDelete={() => openDeleteModal(user)}
-                      actionLoading={!!actionLoading[user.id]}
-                    />
-                  </div>
-
-                  <div className="flex items-center gap-2 mt-3">
-                    <span className={`${statusPill} ${accent.pill}`}>
-                      {user.status}
-                    </span>
-                    {user.two_factor_enabled && (
-                      <span className="font-mono text-[0.65rem] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                        2FA
-                      </span>
-                    )}
-                    <span className={`${monoXs} text-slate-600 ml-auto`}>
-                      {user.role.display_name}
-                    </span>
-                  </div>
-
-                  <p className={`${monoXs} text-slate-600 mt-2`}>
-                    {user.last_login_at ? `Last login: ${getRelativeTime(user.last_login_at)}` : 'Never logged in'}
-                  </p>
-                </div>
+                  {page}
+                </button>
               );
             })}
+            <button
+              onClick={() => loadUsers(currentPage + 1)}
+              disabled={currentPage === totalPages || loading}
+              className="p-1.5 border border-white/10 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <ChevronRight className="h-4 w-4" />
+            </button>
           </div>
-        )}
-
-        {/* ══════ TABLE VIEW ══════ */}
-        {viewMode === 'table' && users.length > 0 && (
-          <div className={`${cardSurface} overflow-hidden`}>
-            <div className="overflow-x-auto">
-              <table className="w-full">
-                <thead className="bg-slate-900/80">
-                  <tr>
-                    <th className={`px-5 py-3 text-left ${sectionLabel}`}>User</th>
-                    <th className={`px-5 py-3 text-left ${sectionLabel}`}>Role</th>
-                    <th className={`px-5 py-3 text-left ${sectionLabel}`}>Status</th>
-                    <th className={`px-5 py-3 text-left ${sectionLabel}`}>Last Login</th>
-                    <th className={`px-5 py-3 text-left ${sectionLabel}`}>Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-white/10">
-                  {users.map(user => {
-                    const accent = statusAccent[user.status] || statusAccent.inactive;
-                    const canModify = admin?.id !== user.id;
-                    return (
-                      <tr key={user.id} className="hover:bg-slate-800/40 transition-colors">
-                        <td className="px-5 py-3.5">
-                          <div className="flex items-center gap-3">
-                            <div className="h-8 w-8 shrink-0 rounded-full bg-cyan-500/15 border border-cyan-400/30 flex items-center justify-center">
-                              <span className="text-cyan-300 font-medium text-xs font-mono">{getInitials(user)}</span>
-                            </div>
-                            <div>
-                              <p className="text-sm font-medium text-slate-100">{user.first_name} {user.last_name}</p>
-                              <p className={`${monoXs} text-slate-500`}>{user.email}</p>
-                            </div>
-                          </div>
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <p className="text-sm text-slate-200">{user.role.display_name}</p>
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <span className={`${statusPill} ${accent.pill}`}>{user.status}</span>
-                          {user.two_factor_enabled && (
-                            <span className="ml-2 font-mono text-[0.65rem] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                              2FA
-                            </span>
-                          )}
-                        </td>
-                        <td className="px-5 py-3.5">
-                          {user.last_login_at ? (
-                            <div>
-                              <p className={`${monoXs} text-slate-200`}>{getRelativeTime(user.last_login_at)}</p>
-                              <p className={`${monoXs} text-slate-600`}>{formatTimestamp(user.last_login_at)}</p>
-                              {user.last_ip_address && <p className={`${monoXs} text-slate-600`}>{user.last_ip_address}</p>}
-                            </div>
-                          ) : (
-                            <span className={`${monoXs} text-slate-600`}>Never</span>
-                          )}
-                        </td>
-                        <td className="px-5 py-3.5">
-                          <div className="flex items-center gap-1.5">
-                            <button onClick={() => openViewModal(user)} className="p-1.5 rounded-lg hover:bg-slate-800/80 text-cyan-400 hover:text-cyan-300 transition-colors" title="View Details">
-                              <Eye className="h-4 w-4" />
-                            </button>
-                            {canModify && (
-                              <>
-                                <button onClick={() => openEditModal(user)} className="p-1.5 rounded-lg hover:bg-slate-800/80 text-cyan-400 hover:text-cyan-300 transition-colors" title="Edit">
-                                  <Edit className="h-4 w-4" />
-                                </button>
-                                {user.status === 'active' && (
-                                  <button onClick={() => handleSuspendUser(user)} disabled={!!actionLoading[user.id]} className="p-1.5 rounded-lg hover:bg-slate-800/80 text-rose-400 hover:text-rose-300 disabled:opacity-50 transition-colors" title="Suspend">
-                                    <UserX className="h-4 w-4" />
-                                  </button>
-                                )}
-                                {user.status === 'suspended' && (
-                                  <button onClick={() => handleActivateUser(user)} disabled={!!actionLoading[user.id]} className="p-1.5 rounded-lg hover:bg-slate-800/80 text-emerald-400 hover:text-emerald-300 disabled:opacity-50 transition-colors" title="Activate">
-                                    <UserCheck className="h-4 w-4" />
-                                  </button>
-                                )}
-                                {user.status === 'locked' && (
-                                  <button onClick={() => handleUnlockUser(user)} disabled={!!actionLoading[user.id]} className="p-1.5 rounded-lg hover:bg-slate-800/80 text-amber-400 hover:text-amber-300 disabled:opacity-50 transition-colors" title="Unlock">
-                                    <Unlock className="h-4 w-4" />
-                                  </button>
-                                )}
-                                <button onClick={() => openDeleteModal(user)} className="p-1.5 rounded-lg hover:bg-slate-800/80 text-rose-400 hover:text-rose-300 transition-colors" title="Delete">
-                                  <Trash2 className="h-4 w-4" />
-                                </button>
-                              </>
-                            )}
-                          </div>
-                        </td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-
-        {/* ══════ Empty state ══════ */}
-        {users.length === 0 && !loading && (
-          <div className="text-center py-16">
-            <Users className="mx-auto h-10 w-10 text-slate-600" />
-            <p className={`${sectionLabel} mt-4`}>No Members Found</p>
-            <p className="text-sm text-slate-500 mt-2 max-w-sm mx-auto">
-              {Object.keys(filters).length > 0 || search
-                ? 'Try adjusting your search criteria or filters.'
-                : 'Get started by adding your first team member.'}
-            </p>
-            {!Object.keys(filters).length && !search && (
-              <button onClick={() => setShowCreateModal(true)} className="btn btn-primary mt-6">
-                <UserPlus className="h-4 w-4" />
-                Add Member
-              </button>
-            )}
-          </div>
-        )}
-
-        {/* ══════ Pagination ══════ */}
-        {totalPages > 1 && (
-          <div className="flex items-center justify-between pt-4">
-            <p className={`${monoXs} text-slate-500`}>
-              {((currentPage - 1) * ITEMS_PER_PAGE) + 1}–{Math.min(currentPage * ITEMS_PER_PAGE, total)} of {total.toLocaleString()}
-            </p>
-            <div className="flex items-center gap-1.5">
-              <button
-                onClick={() => loadUsers(currentPage - 1)}
-                disabled={currentPage === 1 || loading}
-                className="p-1.5 border border-white/10 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronLeft className="h-4 w-4" />
-              </button>
-              {[...Array(Math.min(5, totalPages))].map((_, i) => {
-                const page = Math.max(1, Math.min(totalPages - 4, currentPage - 2)) + i;
-                return (
-                  <button
-                    key={page}
-                    onClick={() => loadUsers(page)}
-                    disabled={loading}
-                    className={`h-8 w-8 rounded-lg text-sm font-mono transition-colors ${
-                      page === currentPage
-                        ? 'bg-cyan-500/20 border border-cyan-400/40 text-cyan-200'
-                        : 'text-slate-400 border border-white/10 hover:bg-slate-800/60 hover:text-slate-200'
-                    } disabled:opacity-40`}
-                  >
-                    {page}
-                  </button>
-                );
-              })}
-              <button
-                onClick={() => loadUsers(currentPage + 1)}
-                disabled={currentPage === totalPages || loading}
-                className="p-1.5 border border-white/10 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800/60 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-              >
-                <ChevronRight className="h-4 w-4" />
-              </button>
-            </div>
-          </div>
-        )}
-      </section>
-
-      {/* ══════ PENDING INVITES ══════ */}
-      {invites.length > 0 && (
-        <section>
-          <p className={`${sectionLabel} mb-3`}>
-            Pending Invites{' '}
-            <span className="text-slate-600">· {invites.length}</span>
-          </p>
-          <div className={`${cardSurface} divide-y divide-white/10`}>
-            {invites.map(invite => (
-              <div key={invite.id} className="px-5 py-4 flex flex-col sm:flex-row sm:items-center gap-3 hover:bg-slate-800/40 transition-colors">
-                <div className="flex-1 min-w-0">
-                  <p className={`${monoSm} text-slate-200 truncate`}>{invite.email}</p>
-                  <p className="text-sm text-slate-500 mt-0.5">
-                    {invite.role.display_name} · Invited by {invite.invited_by_name}
-                  </p>
-                  <p className={`${monoXs} text-slate-600 mt-0.5`}>Expires {formatTimestamp(invite.expires_at)}</p>
-                </div>
-                <div className="flex items-center gap-3">
-                  <span className={`${statusPill} ${
-                    invite.status === 'pending' ? 'bg-amber-500/15 text-amber-300 border-amber-500/30' :
-                    invite.status === 'expired' ? 'bg-rose-500/15 text-rose-300 border-rose-500/30' :
-                    'bg-slate-500/15 text-slate-300 border-slate-500/30'
-                  }`}>
-                    {invite.status}
-                  </span>
-                  {invite.status === 'pending' && (
-                    <>
-                      <button onClick={() => handleResendInvite(invite)} className={`${monoXs} text-cyan-400 hover:text-cyan-300 transition-colors`}>
-                        Resend
-                      </button>
-                      <button onClick={() => handleRevokeInvite(invite)} className={`${monoXs} text-rose-400 hover:text-rose-300 transition-colors`}>
-                        Revoke
-                      </button>
-                    </>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
+        </div>
       )}
 
       {/* ══════════════════════════════════════════════════════════════════
