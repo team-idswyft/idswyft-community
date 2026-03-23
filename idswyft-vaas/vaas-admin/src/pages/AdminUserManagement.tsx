@@ -539,8 +539,7 @@ export default function AdminUserManagement() {
 
       {/* ══════ TABLE (members + invites) ══════ */}
       {(users.length > 0 || pendingInvites.length > 0) && (
-        <div className={`${cardSurface} overflow-hidden`}>
-          <div className="overflow-x-auto">
+        <div className={`${cardSurface}`}>
             <table className="min-w-full divide-y divide-white/10">
               <thead className="bg-slate-900/60 backdrop-blur-sm">
                 <tr>
@@ -637,7 +636,6 @@ export default function AdminUserManagement() {
                 ))}
               </tbody>
             </table>
-          </div>
         </div>
       )}
 
