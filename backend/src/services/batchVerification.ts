@@ -164,7 +164,7 @@ export async function processBatch(
     // Check for cancellation
     if (!activeBatches.has(batchId)) {
       // Mark remaining items as cancelled
-      const remainingIds = items.slice(i).map(it => it.id);
+      const remainingIds = items.slice(i).map((it: any) => it.id);
       if (remainingIds.length > 0) {
         await supabase.from('batch_items').update({ status: 'cancelled' }).in('id', remainingIds);
       }
@@ -174,7 +174,7 @@ export async function processBatch(
     const chunk = items.slice(i, i + MAX_CONCURRENT);
 
     const results = await Promise.allSettled(
-      chunk.map(async (item) => {
+      chunk.map(async (item: any) => {
         // Mark item as processing
         await supabase.from('batch_items').update({ status: 'processing' }).eq('id', item.id);
 

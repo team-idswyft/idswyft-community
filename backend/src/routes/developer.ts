@@ -385,7 +385,7 @@ router.get('/api-keys',
     }
     
     res.json({
-      api_keys: apiKeys.map(key => {
+      api_keys: apiKeys.map((key: any) => {
         const isExpired = key.expires_at && new Date(key.expires_at) < new Date();
         const daysSinceLastUse = key.last_used_at 
           ? Math.floor((Date.now() - new Date(key.last_used_at).getTime()) / (1000 * 60 * 60 * 24))
@@ -409,7 +409,7 @@ router.get('/api-keys',
         };
       }),
       total_keys: apiKeys.length,
-      active_keys: apiKeys.filter(k => k.is_active && (!k.expires_at || new Date(k.expires_at) >= new Date())).length,
+      active_keys: apiKeys.filter((k: any) => k.is_active && (!k.expires_at || new Date(k.expires_at) >= new Date())).length,
       security_recommendations: {
         rotate_unused_keys: 'Consider rotating API keys that haven\'t been used in 90+ days',
         monitor_usage: 'Regularly monitor API key usage and revoke unused keys',
@@ -523,10 +523,10 @@ router.get('/stats',
     }
 
     const totalRequests = stats.length;
-    const successfulRequests = stats.filter(s => s.status === 'verified').length;
-    const failedRequests = stats.filter(s => s.status === 'failed').length;
-    const pendingRequests = stats.filter(s => s.status === 'pending').length;
-    const manualReviewRequests = stats.filter(s => s.status === 'manual_review').length;
+    const successfulRequests = stats.filter((s: any) => s.status === 'verified').length;
+    const failedRequests = stats.filter((s: any) => s.status === 'failed').length;
+    const pendingRequests = stats.filter((s: any) => s.status === 'pending').length;
+    const manualReviewRequests = stats.filter((s: any) => s.status === 'manual_review').length;
 
     res.json({
       period: '30_days',
@@ -1055,10 +1055,10 @@ router.get('/activity',
     // Calculate statistics
     const stats = {
       total_requests: verificationStats?.length || 0,
-      successful_requests: verificationStats?.filter(v => v.status === 'verified').length || 0,
-      failed_requests: verificationStats?.filter(v => v.status === 'failed').length || 0,
-      pending_requests: verificationStats?.filter(v => v.status === 'pending').length || 0,
-      manual_review_requests: verificationStats?.filter(v => v.status === 'manual_review').length || 0
+      successful_requests: verificationStats?.filter((v: any) => v.status === 'verified').length || 0,
+      failed_requests: verificationStats?.filter((v: any) => v.status === 'failed').length || 0,
+      pending_requests: verificationStats?.filter((v: any) => v.status === 'pending').length || 0,
+      manual_review_requests: verificationStats?.filter((v: any) => v.status === 'manual_review').length || 0
     };
 
     // Format recent activities for frontend

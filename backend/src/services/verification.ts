@@ -443,7 +443,7 @@ export class VerificationService {
       manual_review: 0
     };
     
-    verifications.forEach(v => {
+    verifications.forEach((v: any) => {
       stats[v.status as keyof typeof stats]++;
     });
 

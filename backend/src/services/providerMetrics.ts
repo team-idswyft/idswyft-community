@@ -44,9 +44,9 @@ export class ProviderMetricsService {
 
     return {
       totalRequests: data.length,
-      successRate: data.filter(d => d.success).length / data.length,
-      avgLatencyMs: data.reduce((s, d) => s + (d.latency_ms ?? 0), 0) / data.length,
-      avgConfidence: data.reduce((s, d) => s + (d.confidence_score ?? 0), 0) / data.length,
+      successRate: data.filter((d: any) => d.success).length / data.length,
+      avgLatencyMs: data.reduce((s: any, d: any) => s + (d.latency_ms ?? 0), 0) / data.length,
+      avgConfidence: data.reduce((s: any, d: any) => s + (d.confidence_score ?? 0), 0) / data.length,
     };
   }
 }

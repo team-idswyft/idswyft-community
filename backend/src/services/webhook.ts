@@ -424,7 +424,7 @@ export class WebhookService {
     };
     
     if (deliveryStats) {
-      deliveryStats.forEach(delivery => {
+      deliveryStats.forEach((delivery: any) => {
         switch (delivery.status) {
           case 'delivered':
             stats.successful_deliveries++;

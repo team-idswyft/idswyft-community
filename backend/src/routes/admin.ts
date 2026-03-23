@@ -245,7 +245,7 @@ router.get('/developers',
     
     // Get verification stats for each developer
     const developersWithStats = await Promise.all(
-      developers.map(async (dev) => {
+      developers.map(async (dev: any) => {
         const stats = await verificationService.getVerificationStats(dev.id);
         const webhookStats = await webhookService.getWebhookStats(dev.id);
         return {
@@ -418,7 +418,7 @@ async function getAnalytics(period: string, developerId?: string): Promise<any> 
   }
   
   // Count verifications by day and status
-  verifications.forEach(v => {
+  verifications.forEach((v: any) => {
     const dateStr = v.created_at.split('T')[0];
     if (dailyStats[dateStr]) {
       dailyStats[dateStr][v.status as keyof typeof dailyStats[string]]++;
@@ -429,10 +429,10 @@ async function getAnalytics(period: string, developerId?: string): Promise<any> 
     period,
     daily_stats: Object.values(dailyStats).sort((a, b) => a.date.localeCompare(b.date)),
     totals: {
-      verified: verifications.filter(v => v.status === 'verified').length,
-      failed: verifications.filter(v => v.status === 'failed').length,
-      pending: verifications.filter(v => v.status === 'pending').length,
-      manual_review: verifications.filter(v => v.status === 'manual_review').length
+      verified: verifications.filter((v: any) => v.status === 'verified').length,
+      failed: verifications.filter((v: any) => v.status === 'failed').length,
+      pending: verifications.filter((v: any) => v.status === 'pending').length,
+      manual_review: verifications.filter((v: any) => v.status === 'manual_review').length
     }
   };
 }

@@ -75,7 +75,7 @@ export function subscribeToVerification(
 ): { unsubscribe: () => void } {
   const channel = supabase
     .channel(`verification:${verificationId}`)
-    .on('broadcast', { event: 'status_change' }, (message) => {
+    .on('broadcast', { event: 'status_change' }, (message: any) => {
       onStatusChange(message.payload as StatusChangePayload);
     })
     .subscribe();

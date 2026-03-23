@@ -171,12 +171,12 @@ router.get('/developers', authenticateServiceToken, catchAsync(async (req: Reque
   }
 
   // Enrich with api_key_count and verification_count via lightweight HEAD queries
-  const devIds = (developers || []).map(d => d.id);
+  const devIds = (developers || []).map((d: any) => d.id);
   let apiKeyCounts: Record<string, number> = {};
   let verificationCounts: Record<string, number> = {};
 
   if (devIds.length > 0) {
-    const counts = await Promise.all(devIds.map(async (devId) => {
+    const counts = await Promise.all(devIds.map(async (devId: any) => {
       const [keyRes, verRes] = await Promise.all([
         supabase.from('api_keys').select('id', { count: 'exact', head: true }).eq('developer_id', devId).eq('is_active', true),
         supabase.from('verification_requests').select('id', { count: 'exact', head: true }).eq('developer_id', devId),
@@ -189,7 +189,7 @@ router.get('/developers', authenticateServiceToken, catchAsync(async (req: Reque
     }
   }
 
-  const enriched = (developers || []).map(d => ({
+  const enriched = (developers || []).map((d: any) => ({
     ...d,
     api_key_count: apiKeyCounts[d.id] || 0,
     verification_count: verificationCounts[d.id] || 0,
