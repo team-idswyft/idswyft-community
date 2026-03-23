@@ -7,21 +7,23 @@ import {
   BuildingOfficeIcon
 } from '@heroicons/react/24/outline'
 import { clsx } from 'clsx'
+import { isCommunity } from '../../config/edition'
 
 interface LayoutProps {
   children: ReactNode
 }
 
 const getEnterpriseUrl = () => {
-  // In production, use the enterprise subdomain (check for any idswyft.app subdomain)
   if (window.location.hostname.endsWith('.idswyft.app') || window.location.hostname === 'idswyft.app') {
     return 'https://enterprise.idswyft.app'
   }
-  // In development, use localhost
   return 'http://localhost:3015'
 }
 
-const navigation = [
+const getGitHubUrl = () => 'https://github.com/team-idswyft/idswyft'
+
+// Cloud navigation — full marketing nav with Enterprise link
+const cloudNavigation = [
   { name: 'Home', href: '/', icon: ShieldCheckIcon },
   { name: 'Developer', href: '/developer', icon: CodeBracketIcon },
   { name: 'Demo', href: '/demo', icon: DocumentTextIcon },
@@ -46,15 +48,49 @@ export function Layout({ children }: LayoutProps) {
     location.pathname.startsWith('/legal')
 
   if (isAdminRoute && location.pathname !== '/admin/login') {
-    // Admin layout will be handled separately
     return <>{children}</>
   }
 
   if (isStandaloneRoute) {
-    // Standalone pages (mobile verification, user verification) — no navbar or footer
     return <>{children}</>
   }
 
+  // ─────────────────────────────────────────
+  // Community edition: no navbar, minimal footer
+  // ─────────────────────────────────────────
+  if (isCommunity) {
+    return (
+      <div className="min-h-screen bg-[#080c14] flex flex-col">
+        <main className="flex-1">
+          {children}
+        </main>
+
+        <footer style={{ background: '#0b0f19', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+          <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
+            <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3">
+                <img src="/idswyft-logo.png" alt="Idswyft" className="h-6 w-auto" />
+                <span style={{ color: '#4a5568', fontSize: 13 }}>Community Edition</span>
+              </div>
+              <div className="flex items-center gap-6">
+                <Link to="/docs" style={{ color: '#8896aa', fontSize: 13 }}
+                  className="hover:text-white transition-colors">Docs</Link>
+                <Link to="/demo" style={{ color: '#8896aa', fontSize: 13 }}
+                  className="hover:text-white transition-colors">Demo</Link>
+                <a href={getGitHubUrl()} target="_blank" rel="noopener noreferrer"
+                  style={{ color: '#8896aa', fontSize: 13 }}
+                  className="hover:text-white transition-colors">GitHub</a>
+              </div>
+            </div>
+          </div>
+        </footer>
+      </div>
+    )
+  }
+
+  // ─────────────────────────────────────────
+  // Cloud edition: full navbar + full footer
+  // ─────────────────────────────────────────
   return (
     <div className={clsx('min-h-screen', isDarkRoute ? 'bg-[#080c14]' : 'bg-gray-50')}>
       {/* Floating Pill Navigation */}
@@ -79,7 +115,7 @@ export function Layout({ children }: LayoutProps) {
 
             {/* Navigation links - Centered */}
             <div className="hidden lg:flex items-center space-x-8">
-              {navigation.slice(0, -1).map((item) => {
+              {cloudNavigation.slice(0, -1).map((item) => {
                 const isActive = !item.external && (location.pathname === item.href ||
                   (item.href !== '/' && location.pathname.startsWith(item.href)))
 
@@ -123,7 +159,7 @@ export function Layout({ children }: LayoutProps) {
               </a>
 
               <a
-                href="https://github.com/doobee46/idswyft"
+                href={getGitHubUrl()}
                 target="_blank"
                 rel="noopener noreferrer"
                 className={clsx(
@@ -182,7 +218,7 @@ export function Layout({ children }: LayoutProps) {
                 ? 'bg-[#0b0f19]/98 border-white/10 shadow-black/40'
                 : 'bg-white/95 border-white/30 shadow-black/5'
             )}>
-              {navigation.map((item) => {
+              {cloudNavigation.map((item) => {
                 const Icon = item.icon
                 const isActive = !item.external && (location.pathname === item.href ||
                   (item.href !== '/' && location.pathname.startsWith(item.href)))
@@ -261,7 +297,7 @@ export function Layout({ children }: LayoutProps) {
                   { label: 'API Documentation', href: '/docs' },
                   { label: 'Get API Key', href: '/developer' },
                   { label: 'System Status', href: 'https://status.idswyft.app' },
-                  { label: 'GitHub', href: 'https://github.com/doobee46/idswyft' },
+                  { label: 'GitHub', href: getGitHubUrl() },
                 ].map(({ label, href }) => (
                   <li key={label}>
                     {href.startsWith('http') ? (

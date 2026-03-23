@@ -14,15 +14,26 @@ import { NotFoundPage } from './pages/NotFoundPage'
 import { LegalPage } from './pages/LegalPage'
 import { Status } from './pages/Status'
 import { PatternShowcase } from './components/PatternShowcase'
+import { isCommunity, isCloud } from './config/edition'
 
 function App() {
   return (
     <Layout>
       <Routes>
-        <Route path="/" element={<HomePage />} />
+        {/* Root route: community → Dev Portal, cloud → Marketing homepage */}
+        <Route path="/" element={isCommunity ? <DeveloperPage /> : <HomePage />} />
+
+        {/* Dev Portal — always available */}
         <Route path="/developer" element={<DeveloperPage />} />
-        <Route path="/verify" element={<Navigate to="/demo" replace />} />
+
+        {/* Demo — available in both editions */}
         <Route path="/demo" element={<DemoPage />} />
+        <Route path="/verify" element={<Navigate to="/demo" replace />} />
+
+        {/* Cloud-only marketing routes — redirect to portal in community */}
+        <Route path="/patterns" element={isCloud ? <PatternShowcase /> : <Navigate to="/" replace />} />
+
+        {/* Shared routes — both editions */}
         <Route path="/user-verification" element={<UserVerificationPage />} />
         <Route path="/live-capture" element={<LiveCapturePage />} />
         <Route path="/verify/mobile" element={<MobileVerificationPage />} />
@@ -30,7 +41,6 @@ function App() {
         <Route path="/docs" element={<DocsPage />} />
         <Route path="/status" element={<Status />} />
         <Route path="/legal" element={<LegalPage />} />
-        <Route path="/patterns" element={<PatternShowcase />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin/*" element={<AdminPage />} />
         <Route path="*" element={<NotFoundPage />} />

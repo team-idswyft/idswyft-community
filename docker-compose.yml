@@ -1,123 +1,79 @@
-version: '3.9'
+# ─────────────────────────────────────────────────
+# Idswyft Community Edition — Self-Hosted Install
+# ─────────────────────────────────────────────────
+# Quick start:
+#   ./install.sh        (interactive setup)
+#   docker compose up -d
+#   Visit http://localhost
+# ─────────────────────────────────────────────────
 
 services:
   # ─────────────────────────────────────────
+  # PostgreSQL database
+  # ─────────────────────────────────────────
+  postgres:
+    image: postgres:16-alpine
+    restart: unless-stopped
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    environment:
+      POSTGRES_DB: idswyft
+      POSTGRES_USER: idswyft
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme-in-production}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U idswyft"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  # ─────────────────────────────────────────
   # Core identity verification API
   # ─────────────────────────────────────────
-  backend:
+  api:
     build:
       context: ./backend
       dockerfile: Dockerfile
-    ports:
-      - "3001:3001"
-    environment:
-      - NODE_ENV=production
-      - PORT=3001
-      - SUPABASE_URL=${SUPABASE_URL}
-      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
-      - SUPABASE_ANON_KEY=${SUPABASE_ANON_KEY}
-      - SUPABASE_STORAGE_BUCKET=${SUPABASE_STORAGE_BUCKET:-identity-documents}
-      - JWT_SECRET=${JWT_SECRET}
-      - API_KEY_SECRET=${API_KEY_SECRET}
-      - ENCRYPTION_KEY=${ENCRYPTION_KEY}
-      - SERVICE_TOKEN=${SERVICE_TOKEN}
-      - CORS_ORIGINS=${CORS_ORIGINS}
-      - RAILWAY_ALLOWED_ORIGINS=${RAILWAY_ALLOWED_ORIGINS:-}
-      - STORAGE_PROVIDER=${STORAGE_PROVIDER:-supabase}
-      - OPENAI_API_KEY=${OPENAI_API_KEY:-}
-      - SANDBOX_MODE=${SANDBOX_MODE:-false}
-    volumes:
-      - backend_temp:/app/temp
-      - backend_uploads:/app/uploads
-      - backend_models:/app/models
     restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      NODE_ENV: production
+      PORT: "3001"
+      DATABASE_URL: postgresql://idswyft:${DB_PASSWORD:-changeme-in-production}@postgres:5432/idswyft
+      JWT_SECRET: ${JWT_SECRET:-change-this-jwt-secret}
+      API_KEY_SECRET: ${API_KEY_SECRET:-change-this-api-key-secret}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change-this-32-char-encrypt-key!}
+      SERVICE_TOKEN: ${SERVICE_TOKEN:-change-this-service-token}
+      STORAGE_PROVIDER: local
+      SANDBOX_MODE: ${SANDBOX_MODE:-false}
+    volumes:
+      - uploads:/app/uploads
+      - temp:/app/temp
     healthcheck:
-      test: ["CMD", "wget", "-qO-", "http://localhost:3001/api/health"]
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
       interval: 30s
       timeout: 10s
       retries: 3
       start_period: 40s
 
   # ─────────────────────────────────────────
-  # VaaS multi-tenant backend
-  # ─────────────────────────────────────────
-  vaas-backend:
-    build:
-      context: ./idswyft-vaas/vaas-backend
-      dockerfile: Dockerfile
-    ports:
-      - "3002:3002"
-    environment:
-      - NODE_ENV=production
-      - VAAS_PORT=3002
-      - VAAS_SUPABASE_URL=${VAAS_SUPABASE_URL}
-      - VAAS_SUPABASE_SERVICE_ROLE_KEY=${VAAS_SUPABASE_SERVICE_ROLE_KEY}
-      - VAAS_SUPABASE_ANON_KEY=${VAAS_SUPABASE_ANON_KEY}
-      - VAAS_JWT_SECRET=${VAAS_JWT_SECRET}
-      - VAAS_API_KEY_SECRET=${VAAS_API_KEY_SECRET}
-      - IDSWYFT_API_URL=http://backend:3001
-      - IDSWYFT_SERVICE_TOKEN=${SERVICE_TOKEN}
-      - VAAS_SUPER_ADMIN_EMAILS=${VAAS_SUPER_ADMIN_EMAILS}
-      - MAILGUN_API_KEY=${MAILGUN_API_KEY:-}
-      - MAILGUN_DOMAIN=${MAILGUN_DOMAIN:-}
-    depends_on:
-      backend:
-        condition: service_healthy
-    restart: unless-stopped
-    healthcheck:
-      test: ["CMD", "node", "healthcheck.js"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 30s
-
-  # ─────────────────────────────────────────
-  # Admin dashboard (static, served by nginx)
+  # Dev Portal frontend (community edition)
   # ─────────────────────────────────────────
   frontend:
     build:
       context: ./frontend
       dockerfile: Dockerfile
+      args:
+        VITE_EDITION: community
+        VITE_API_URL: /api
     restart: unless-stopped
-
-  # ─────────────────────────────────────────
-  # VaaS admin panel
-  # ─────────────────────────────────────────
-  vaas-admin:
-    build:
-      context: ./idswyft-vaas/vaas-admin
-      dockerfile: Dockerfile
-    restart: unless-stopped
-
-  # ─────────────────────────────────────────
-  # Customer portal
-  # ─────────────────────────────────────────
-  customer-portal:
-    build:
-      context: ./idswyft-vaas/customer-portal
-      dockerfile: Dockerfile
-    restart: unless-stopped
-
-  # ─────────────────────────────────────────
-  # Nginx reverse proxy (HTTP → HTTPS + routing)
-  # ─────────────────────────────────────────
-  nginx:
-    image: nginx:alpine
-    ports:
-      - "80:80"
-      - "443:443"
-    volumes:
-      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
-      - ./nginx/ssl:/etc/nginx/ssl:ro  # Mount your TLS certificates here
     depends_on:
-      - backend
-      - vaas-backend
-      - frontend
-      - vaas-admin
-      - customer-portal
-    restart: unless-stopped
+      - api
+    ports:
+      - "${PORT:-80}:80"
 
 volumes:
-  backend_temp:
-  backend_uploads:
-  backend_models:
+  pgdata:
+  uploads:
+  temp:
