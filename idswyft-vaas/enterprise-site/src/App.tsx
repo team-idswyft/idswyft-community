@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import {
   Shield, Zap, Users, ArrowRight, CheckCircle, X,
-  Code2, Building2, Activity, ChevronRight, ExternalLink,
+  Code2, Building2, Activity, ChevronRight, ChevronDown, ExternalLink,
   GitBranch, Fingerprint, FileCheck, Layers, Globe,
   BarChart2, Terminal, User, Mail, Briefcase, ArrowLeft,
   Sparkles, Rocket, Crown, Clock
@@ -168,6 +168,94 @@ const accentClasses: Record<string, { bg: string; border: string; icon: string }
   emerald: { bg: 'bg-emerald-400/10', border: 'border-emerald-400/20', icon: 'text-emerald-400' },
   violet:  { bg: 'bg-violet-400/10', border: 'border-violet-400/20', icon: 'text-violet-400' },
 }
+
+// ── FAQ data ───────────────────────────────────────────────────────────────
+const FAQ_CATEGORIES = [
+  {
+    category: 'KYC & Verification',
+    items: [
+      {
+        q: 'What document types are supported?',
+        a: 'Idswyft supports passports, driver\'s licenses, and national IDs across 20+ countries. Documents are processed via PaddleOCR with MRZ parsing for international documents and PDF417 barcode reading for US IDs.',
+      },
+      {
+        q: 'How accurate is the OCR extraction?',
+        a: 'We target >90% document validation accuracy using PaddleOCR with cross-validation — front-of-document fields are automatically checked against barcode or MRZ data on the back to catch extraction errors.',
+      },
+      {
+        q: 'What is liveness detection?',
+        a: 'Our live capture system uses a real-time camera feed with anti-spoof scoring to detect printed photos, screen replays, and masks. This isn\'t a simple selfie upload — it\'s an active liveness check.',
+      },
+      {
+        q: 'How long does verification take?',
+        a: 'Under 3 minutes end-to-end for the user. The process is 3 steps: front of document, back of document, and live capture. Cross-validation and face matching happen automatically.',
+      },
+      {
+        q: 'Do you support back-of-ID scanning?',
+        a: 'Yes. We read PDF417 barcodes on US driver\'s licenses and MRZ zones on international documents, then cross-validate extracted data against the front of the document.',
+      },
+    ],
+  },
+  {
+    category: 'Compliance & Privacy',
+    items: [
+      {
+        q: 'Is Idswyft GDPR compliant?',
+        a: 'Yes. We provide configurable data retention policies, deletion endpoints for data subject requests, and AES-256 encrypted storage.',
+      },
+      {
+        q: 'Is Idswyft CCPA compliant?',
+        a: 'Yes. No personal data is sold to third parties. We support deletion rights, transparent data handling, and provide a privacy policy that meets CCPA requirements.',
+      },
+      {
+        q: 'How long is verification data retained?',
+        a: 'Data retention is configurable per organization. The default is 90 days, after which documents and personal data are automatically deleted. You can adjust this in your admin dashboard.',
+      },
+      {
+        q: 'Is data encrypted?',
+        a: 'All data is encrypted with AES-256 at rest and HTTPS-only communication in transit. Document images and personal data are never stored in plaintext.',
+      },
+      {
+        q: 'What about SOC 2 certification?',
+        a: 'Security controls are implemented and in use today — including RBAC, audit logging, encryption, and access controls. Formal SOC 2 Type II certification is planned.',
+      },
+      {
+        q: 'Where is data stored?',
+        a: 'Idswyft is designed for self-hosting — you control the infrastructure. Deploy on your own cloud or on-premise environment. For managed deployments, data stays in the region you configure.',
+      },
+    ],
+  },
+  {
+    category: 'Integration',
+    items: [
+      {
+        q: 'How long does integration take?',
+        a: 'Under 30 minutes with our SDK — just install the package, add your API key, and redirect users to the hosted verification page. For custom API integration, most teams are live within a day.',
+      },
+      {
+        q: 'Is there a sandbox environment?',
+        a: 'Yes. Every account gets a full sandbox with test API keys and test credentials. You can run the complete verification flow without processing real documents.',
+      },
+      {
+        q: 'Do you support webhooks?',
+        a: 'Yes. We send real-time webhook callbacks on verification status changes (pending, verified, failed, manual_review). Failed deliveries are retried up to 3 times with exponential backoff.',
+      },
+    ],
+  },
+  {
+    category: 'Security',
+    items: [
+      {
+        q: 'Who can access verification data?',
+        a: 'Access is controlled via role-based access control (RBAC). Only authorized admins within your organization can view verification data. All access is recorded in audit logs.',
+      },
+      {
+        q: 'Do you perform security audits?',
+        a: 'Yes. We maintain ongoing security testing practices. Formal third-party penetration testing is planned alongside our SOC 2 certification process.',
+      },
+    ],
+  },
+]
 
 // ── Hero verification illustration ────────────────────────────────────────
 function HeroIllustration() {
@@ -373,6 +461,7 @@ function App() {
   const [activeTab, setActiveTab] = useState<CodeTab>('curl')
   const [scrolled, setScrolled] = useState(false)
   const [logoUrl, setLogoUrl] = useState(fallbackLogoUrl)
+  const [openFaq, setOpenFaq] = useState<string | null>(null)
   const modalRef = useRef<HTMLDivElement>(null)
   const [formData, setFormData] = useState({
     firstName: '',
@@ -1251,6 +1340,115 @@ function App() {
                 >
                   {status}
                 </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+
+      {/* ════════════════════════════════════════
+          FAQ — KYC & Compliance
+          ════════════════════════════════════════ */}
+      <section
+        id="faq"
+        className="pattern-crosshatch pattern-faint pattern-fade-edges pattern-full"
+        style={{
+          padding: '96px 0',
+          borderTop: '1px solid rgba(255,255,255,0.05)',
+        }}
+      >
+        <div className="max-w-4xl mx-auto px-6 lg:px-8">
+          <div className="text-center mb-16">
+            <h2
+              className="font-display mb-4"
+              style={{ fontSize: 'clamp(2rem,4vw,3rem)', fontWeight: 700, fontFamily: 'Syne, sans-serif' }}
+            >
+              Frequently asked questions
+            </h2>
+            <p style={{ color: '#64748b', maxWidth: '480px', margin: '0 auto', fontSize: '15px' }}>
+              Everything enterprises need to know about KYC verification, compliance, and integration.
+            </p>
+          </div>
+
+          <div className="space-y-10">
+            {FAQ_CATEGORIES.map(({ category, items }) => (
+              <div key={category}>
+                <h3
+                  className="uppercase tracking-widest font-semibold mb-4"
+                  style={{ color: '#22d3ee', fontSize: '11px', letterSpacing: '0.15em' }}
+                >
+                  {category}
+                </h3>
+                <div
+                  className="rounded-xl overflow-hidden"
+                  style={{ border: '1px solid rgba(255,255,255,0.06)' }}
+                >
+                  {items.map(({ q, a }, idx) => {
+                    const key = `${category}-${idx}`
+                    const isOpen = openFaq === key
+                    return (
+                      <div
+                        key={key}
+                        style={{
+                          borderTop: idx > 0 ? '1px solid rgba(255,255,255,0.06)' : undefined,
+                        }}
+                      >
+                        <button
+                          onClick={() => setOpenFaq(prev => prev === key ? null : key)}
+                          aria-expanded={isOpen}
+                          aria-controls={`faq-panel-${key}`}
+                          id={`faq-btn-${key}`}
+                          className="w-full flex items-center justify-between gap-4 text-left transition-colors duration-200"
+                          style={{
+                            padding: '16px 20px',
+                            background: isOpen ? 'rgba(255,255,255,0.03)' : 'transparent',
+                            color: isOpen ? '#f1f5f9' : '#94a3b8',
+                            fontSize: '14px',
+                            fontWeight: 500,
+                          }}
+                          onMouseEnter={e => {
+                            if (!isOpen) e.currentTarget.style.background = 'rgba(255,255,255,0.02)'
+                          }}
+                          onMouseLeave={e => {
+                            if (!isOpen) e.currentTarget.style.background = 'transparent'
+                          }}
+                        >
+                          {q}
+                          <ChevronDown
+                            className="w-4 h-4 flex-shrink-0 transition-transform duration-200"
+                            style={{
+                              transform: isOpen ? 'rotate(180deg)' : 'rotate(0deg)',
+                              color: isOpen ? '#22d3ee' : '#475569',
+                            }}
+                          />
+                        </button>
+                        <div
+                          id={`faq-panel-${key}`}
+                          role="region"
+                          aria-labelledby={`faq-btn-${key}`}
+                          className="grid transition-all duration-200"
+                          style={{
+                            gridTemplateRows: isOpen ? '1fr' : '0fr',
+                            opacity: isOpen ? 1 : 0,
+                          }}
+                        >
+                          <div className="overflow-hidden">
+                            <p
+                              style={{
+                                padding: '0 20px 16px',
+                                color: '#64748b',
+                                fontSize: '13px',
+                                lineHeight: '1.7',
+                              }}
+                            >
+                              {a}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )
+                  })}
+                </div>
               </div>
             ))}
           </div>
