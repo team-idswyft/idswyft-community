@@ -336,9 +336,7 @@ export const DocsPage: React.FC = () => {
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
           <a
-            href={`${apiUrl}/api/docs/markdown`}
-            target="_blank"
-            rel="noopener noreferrer"
+            href="/docs/markdown"
             style={{
               fontFamily: C.mono, fontSize: '0.72rem', fontWeight: 500,
               color: C.muted, textDecoration: 'none',
