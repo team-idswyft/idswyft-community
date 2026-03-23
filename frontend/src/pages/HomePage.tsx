@@ -258,11 +258,9 @@ export function HomePage() {
         </div>
         <div className="landing-cards-row" style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
           {[
-            { value: '99.8%', label: 'Accuracy' },
-            { value: '<200ms', label: 'Response' },
-            { value: '200+', label: 'Doc Types' },
-            { value: '19+', label: 'Countries' },
-            { value: '6', label: 'Languages' },
+            { value: '>90%', label: 'Accuracy Target' },
+            { value: '60+', label: 'Doc Types' },
+            { value: '20', label: 'Countries' },
             { value: 'MIT', label: 'License' },
           ].map(({ value, label }) => (
             <div className="landing-card" key={label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 20px', fontFamily: C.mono, fontSize: 13 }}>
@@ -355,7 +353,7 @@ export function HomePage() {
             <div style={{ display: 'flex', gap: 32 }}>
               {[
                 { value: '<3 min', label: 'Verification time' },
-                { value: '99.8%', label: 'Accuracy rate' },
+                { value: '>90%', label: 'Accuracy target' },
                 { value: '5 steps', label: 'Guided flow' },
               ].map(({ value, label }) => (
                 <div key={label}>
@@ -402,7 +400,7 @@ export function HomePage() {
         </div>
         <div className="landing-cards-grid" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
           {[
-            { title: 'OCR Extraction',       desc: 'Name, DOB, document number, expiry — extracted from passports, driver\'s licenses, and national IDs across 19+ countries.', tags: [] as string[] },
+            { title: 'OCR Extraction',       desc: 'Name, DOB, document number, expiry — extracted from passports, driver\'s licenses, and national IDs across 20 countries.', tags: [] as string[] },
             { title: 'Back-of-ID / Barcode', desc: 'PDF417 barcodes (US), MRZ zones (international), and QR codes — all cross-validated against front-side data.', tags: [] as string[] },
             { title: 'Liveness Detection',   desc: 'Anti-spoof scoring with live capture to confirm a real person is present. Detects printed photos, screen replays, and 3D masks.', tags: [] as string[] },
             { title: 'Face Matching',         desc: 'Live capture matched against document photo with a configurable confidence threshold.', tags: [] as string[] },
@@ -486,7 +484,7 @@ export function HomePage() {
           Ready to integrate?
         </h2>
         <p style={{ color: C.muted, fontSize: 16, marginBottom: 36 }}>
-          Free tier includes 1,000 verifications per month.
+          Self-host for free. No per-verification fees.
         </p>
         <Link to="/developer" style={{ background: C.cyan, color: C.bg, padding: '14px 36px', borderRadius: 8, fontWeight: 600, fontSize: 16, textDecoration: 'none', display: 'inline-block', marginBottom: 40 }}>
           Get Free API Key →
@@ -494,7 +492,7 @@ export function HomePage() {
         <div style={{ display: 'flex', gap: 32, justifyContent: 'center', flexWrap: 'wrap' }}>
           {[
             { value: '5 min', label: 'to first verification' },
-            { value: '1,000', label: 'free / month' },
+            { value: '$0',    label: 'self-hosted' },
             { value: 'MIT',   label: 'open source' },
           ].map(({ value, label }) => (
             <div key={label} style={{ textAlign: 'center' }}>
