@@ -4,7 +4,8 @@ import {
   ShieldCheckIcon,
   CodeBracketIcon,
   DocumentTextIcon,
-  BuildingOfficeIcon
+  BuildingOfficeIcon,
+  CurrencyDollarIcon
 } from '@heroicons/react/24/outline'
 import { clsx } from 'clsx'
 import { isCommunity } from '../../config/edition'
@@ -28,6 +29,7 @@ const cloudNavigation = [
   { name: 'Developer', href: '/developer', icon: CodeBracketIcon },
   { name: 'Demo', href: '/demo', icon: DocumentTextIcon },
   { name: 'Docs', href: '/docs', icon: DocumentTextIcon },
+  { name: 'Pricing', href: '/pricing', icon: CurrencyDollarIcon },
   { name: 'Enterprise', href: getEnterpriseUrl(), icon: BuildingOfficeIcon, external: true },
 ]
 
@@ -44,6 +46,7 @@ export function Layout({ children }: LayoutProps) {
     location.pathname.startsWith('/docs') ||
     location.pathname.startsWith('/developer') ||
     location.pathname.startsWith('/demo') ||
+    location.pathname.startsWith('/pricing') ||
     location.pathname.startsWith('/status') ||
     location.pathname.startsWith('/legal')
 

@@ -12,6 +12,7 @@ import { DocsPage } from './pages/DocsPage'
 import { MarkdownDocsPage } from './pages/MarkdownDocsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { LegalPage } from './pages/LegalPage'
+import { PricingPage } from './pages/PricingPage'
 import { Status } from './pages/Status'
 import { PatternShowcase } from './components/PatternShowcase'
 import { isCommunity, isCloud } from './config/edition'
@@ -31,6 +32,7 @@ function App() {
         <Route path="/verify" element={<Navigate to="/demo" replace />} />
 
         {/* Cloud-only marketing routes — redirect to portal in community */}
+        <Route path="/pricing" element={isCloud ? <PricingPage /> : <Navigate to="/" replace />} />
         <Route path="/patterns" element={isCloud ? <PatternShowcase /> : <Navigate to="/" replace />} />
 
         {/* Shared routes — both editions */}

@@ -486,9 +486,14 @@ export function HomePage() {
         <p style={{ color: C.muted, fontSize: 16, marginBottom: 36 }}>
           Self-host for free. No per-verification fees.
         </p>
-        <Link to="/developer" style={{ background: C.cyan, color: C.bg, padding: '14px 36px', borderRadius: 8, fontWeight: 600, fontSize: 16, textDecoration: 'none', display: 'inline-block', marginBottom: 40 }}>
-          Get Free API Key →
-        </Link>
+        <div style={{ display: 'flex', gap: 16, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 40 }}>
+          <Link to="/developer" style={{ background: C.cyan, color: C.bg, padding: '14px 36px', borderRadius: 8, fontWeight: 600, fontSize: 16, textDecoration: 'none' }}>
+            Get Free API Key →
+          </Link>
+          <Link to="/pricing" style={{ border: `1px solid ${C.border}`, color: C.text, padding: '14px 28px', borderRadius: 8, fontWeight: 600, fontSize: 16, textDecoration: 'none' }}>
+            View Pricing
+          </Link>
+        </div>
         <div style={{ display: 'flex', gap: 32, justifyContent: 'center', flexWrap: 'wrap' }}>
           {[
             { value: '5 min', label: 'to first verification' },
