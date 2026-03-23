@@ -134,7 +134,7 @@ function InviteActionDropdown({ onResend, onRevoke }: {
       {open && (
         <div className="absolute right-0 top-full mt-1 z-50 w-36 bg-slate-900/95 backdrop-blur-sm border border-white/10 rounded-xl shadow-xl py-1 animate-scale-in">
           <button onClick={() => { onResend(); setOpen(false); }} className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm text-cyan-300 hover:bg-slate-800/80 rounded-lg mx-1" style={{ width: 'calc(100% - 0.5rem)' }}>
-            <Send className="h-3.5 w-3.5" /> Resend
+            <RefreshCw className="h-3.5 w-3.5" /> Resend
           </button>
           <button onClick={() => { onRevoke(); setOpen(false); }} className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm text-rose-300 hover:bg-slate-800/80 rounded-lg mx-1" style={{ width: 'calc(100% - 0.5rem)' }}>
             <X className="h-3.5 w-3.5" /> Revoke
