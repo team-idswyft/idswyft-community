@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '../contexts/AuthContext';
 import apiClient from '../services/api';
 import Modal, { ConfirmationModal } from '../components/ui/Modal';
@@ -37,6 +38,45 @@ import { sectionLabel, monoXs, monoSm, statusPill, cardSurface, statusAccent, ta
 
 const ITEMS_PER_PAGE = 20;
 
+// ─── Portal dropdown hook ───────────────────────────────────────────────────
+function usePortalDropdown() {
+  const [open, setOpen] = useState(false);
+  const btnRef = useRef<HTMLButtonElement>(null);
+  const menuRef = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState({ top: 0, left: 0 });
+
+  const toggle = useCallback(() => {
+    if (!open && btnRef.current) {
+      const rect = btnRef.current.getBoundingClientRect();
+      setPos({
+        top: rect.bottom + 4,
+        left: Math.max(8, rect.right - 176), // 176px = w-44
+      });
+    }
+    setOpen(prev => !prev);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const close = (e: MouseEvent) => {
+      const t = e.target as Node;
+      if (btnRef.current?.contains(t) || menuRef.current?.contains(t)) return;
+      setOpen(false);
+    };
+    const dismiss = () => setOpen(false);
+    document.addEventListener('mousedown', close);
+    window.addEventListener('scroll', dismiss, true);
+    window.addEventListener('resize', dismiss);
+    return () => {
+      document.removeEventListener('mousedown', close);
+      window.removeEventListener('scroll', dismiss, true);
+      window.removeEventListener('resize', dismiss);
+    };
+  }, [open]);
+
+  return { open, setOpen, toggle, btnRef, menuRef, pos };
+}
+
 // ─── ActionDropdown component ───────────────────────────────────────────────
 function ActionDropdown({ user, canModify, onView, onEdit, onSuspend, onActivate, onUnlock, onDelete, actionLoading }: {
   user: AdminUser;
@@ -49,28 +89,23 @@ function ActionDropdown({ user, canModify, onView, onEdit, onSuspend, onActivate
   onDelete: () => void;
   actionLoading: boolean;
 }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
+  const { open, setOpen, toggle, btnRef, menuRef, pos } = usePortalDropdown();
 
   return (
-    <div className="relative" ref={ref}>
+    <>
       <button
-        onClick={() => setOpen(!open)}
+        ref={btnRef}
+        onClick={toggle}
         className="p-1.5 rounded-lg hover:bg-slate-800/80 transition-colors text-slate-400 hover:text-slate-200"
       >
         <MoreHorizontal className="h-4 w-4" />
       </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 w-44 bg-slate-900/95 backdrop-blur-sm border border-white/10 rounded-xl shadow-xl py-1 animate-scale-in">
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          className="fixed z-[9999] w-44 bg-slate-900/95 backdrop-blur-sm border border-white/10 rounded-xl shadow-xl py-1 animate-scale-in"
+          style={{ top: pos.top, left: pos.left }}
+        >
           <button onClick={() => { onView(); setOpen(false); }} className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm text-slate-200 hover:bg-slate-800/80 rounded-lg mx-1" style={{ width: 'calc(100% - 0.5rem)' }}>
             <Eye className="h-3.5 w-3.5" /> View Details
           </button>
@@ -100,9 +135,10 @@ function ActionDropdown({ user, canModify, onView, onEdit, onSuspend, onActivate
               </button>
             </>
           )}
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 }
 
@@ -111,37 +147,33 @@ function InviteActionDropdown({ onResend, onRevoke }: {
   onResend: () => void;
   onRevoke: () => void;
 }) {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    if (!open) return;
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, [open]);
+  const { open, setOpen, toggle, btnRef, menuRef, pos } = usePortalDropdown();
 
   return (
-    <div className="relative" ref={ref}>
+    <>
       <button
-        onClick={() => setOpen(!open)}
+        ref={btnRef}
+        onClick={toggle}
         className="p-1.5 rounded-lg hover:bg-slate-800/80 transition-colors text-slate-400 hover:text-slate-200"
       >
         <MoreHorizontal className="h-4 w-4" />
       </button>
-      {open && (
-        <div className="absolute right-0 top-full mt-1 z-50 w-36 bg-slate-900/95 backdrop-blur-sm border border-white/10 rounded-xl shadow-xl py-1 animate-scale-in">
+      {open && createPortal(
+        <div
+          ref={menuRef}
+          className="fixed z-[9999] w-36 bg-slate-900/95 backdrop-blur-sm border border-white/10 rounded-xl shadow-xl py-1 animate-scale-in"
+          style={{ top: pos.top, left: Math.max(8, pos.left + 32) }}
+        >
           <button onClick={() => { onResend(); setOpen(false); }} className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm text-cyan-300 hover:bg-slate-800/80 rounded-lg mx-1" style={{ width: 'calc(100% - 0.5rem)' }}>
             <RefreshCw className="h-3.5 w-3.5" /> Resend
           </button>
           <button onClick={() => { onRevoke(); setOpen(false); }} className="w-full text-left flex items-center gap-2 px-3 py-2 text-sm text-rose-300 hover:bg-slate-800/80 rounded-lg mx-1" style={{ width: 'calc(100% - 0.5rem)' }}>
             <X className="h-3.5 w-3.5" /> Revoke
           </button>
-        </div>
+        </div>,
+        document.body
       )}
-    </div>
+    </>
   );
 }
 
@@ -539,7 +571,8 @@ export default function AdminUserManagement() {
 
       {/* ══════ TABLE (members + invites) ══════ */}
       {(users.length > 0 || pendingInvites.length > 0) && (
-        <div className={`${cardSurface}`}>
+        <div className={`${cardSurface} overflow-hidden`}>
+          <div className="overflow-x-auto">
             <table className="min-w-full divide-y divide-white/10">
               <thead className="bg-slate-900/60 backdrop-blur-sm">
                 <tr>
@@ -636,6 +669,7 @@ export default function AdminUserManagement() {
                 ))}
               </tbody>
             </table>
+          </div>
         </div>
       )}
 
