@@ -4,7 +4,7 @@ import {
   Code2, Building2, Activity, ChevronRight, ExternalLink,
   GitBranch, Fingerprint, FileCheck, Layers, Globe,
   BarChart2, Terminal, User, Mail, Briefcase, ArrowLeft,
-  Sparkles, Rocket, Crown
+  Sparkles, Rocket, Crown, Clock
 } from 'lucide-react'
 import { Player } from '@remotion/player'
 import { VaaSMarketing } from './remotion/VaaSMarketing'
@@ -86,32 +86,32 @@ const FEATURES = [
   {
     icon: FileCheck,
     title: 'Document OCR',
-    desc: 'AI-powered extraction from passports, driver\'s licenses, and national IDs. 200+ document types across 19+ countries with MRZ and localized field parsing.',
-    tags: ['PaddleOCR', 'MRZ Parsing', '19+ Countries'],
+    desc: 'AI-powered extraction from passports, driver\'s licenses, and national IDs. 30+ document formats across 20+ countries with MRZ and localized field parsing.',
+    tags: ['PaddleOCR', 'MRZ Parsing', '20+ Countries'],
   },
   {
     icon: Fingerprint,
     title: 'Biometric Matching',
-    desc: 'Liveness detection + face comparison against document photos. Anti-spoofing with 99.2% match accuracy.',
+    desc: 'Real-time liveness detection and anti-spoofing verification with face comparison against document photos.',
     tags: ['Liveness', 'Face Match', 'Anti-Spoof'],
   },
   {
     icon: Shield,
     title: 'Fraud Detection',
-    desc: 'Barcode cross-validation, MRZ parsing, tamper detection, and **OFAC/EU/UN sanctions screening** with fuzzy name matching.',
+    desc: 'Barcode cross-validation, MRZ parsing, tamper detection, and OFAC/EU/UN sanctions screening with fuzzy name matching.',
     tags: ['PDF417', 'MRZ', 'AML/Sanctions'],
   },
   {
     icon: Activity,
     title: 'Real-Time Webhooks',
-    desc: 'Instant event delivery via WebSocket or webhook. Built-in retry logic with exponential backoff. **Real-time push updates** — no polling needed.',
-    tags: ['WebSocket', 'Webhooks', 'Real-Time'],
+    desc: 'Instant event delivery via webhook with HMAC-signed payloads. Built-in retry logic with exponential backoff. Real-time push updates — no polling needed.',
+    tags: ['Webhooks', 'HMAC Signed', 'Real-Time'],
   },
   {
     icon: Layers,
     title: 'White-Label UI',
-    desc: 'Fully customizable verification flow with your brand colors, logo, and custom domain. Zero Idswyft branding.',
-    tags: ['Custom Domain', 'Theming', 'Embeddable'],
+    desc: 'Fully customizable verification flow with your brand colors and logo. Zero Idswyft branding.',
+    tags: ['Theming', 'Embeddable'],
   },
   {
     icon: BarChart2,
@@ -139,7 +139,7 @@ const INDUSTRIES = [
     icon: Building2,
     title: 'Fintech & Banking',
     accent: 'cyan',
-    items: ['KYC/AML with sanctions screening', 'CIP requirements', 'BSA compliance', 'Full audit trails'],
+    items: ['KYC/AML with sanctions screening', 'CIP requirements', 'BSA-ready audit trails', 'Transaction monitoring'],
   },
   {
     icon: Globe,
@@ -151,7 +151,7 @@ const INDUSTRIES = [
     icon: Shield,
     title: 'Healthcare',
     accent: 'emerald',
-    items: ['HIPAA-compliant', 'Patient verification', 'Address verification', 'Provider credentialing'],
+    items: ['Encryption & access controls for healthcare', 'Patient verification', 'Address verification', 'Provider credentialing'],
   },
   {
     icon: Users,
@@ -332,7 +332,7 @@ function HeroIllustration() {
           animationDelay: '-3s',
         }}
       >
-        <span style={{ fontSize: 10, fontWeight: 600, color: '#22d3ee', fontFamily: "'IBM Plex Mono', monospace" }}>99.8% match</span>
+        <span style={{ fontSize: 10, fontWeight: 600, color: '#22d3ee', fontFamily: "'IBM Plex Mono', monospace" }}>Match: PASS</span>
       </div>
 
       <div
@@ -649,7 +649,7 @@ function App() {
                   onMouseEnter={e => (e.currentTarget.style.background = '#67e8f9')}
                   onMouseLeave={e => (e.currentTarget.style.background = '#22d3ee')}
                 >
-                  Start Free Trial
+                  Get Started Free
                   <ArrowRight className="w-4 h-4" />
                 </button>
                 <a
@@ -678,8 +678,8 @@ function App() {
               <div className="flex flex-wrap gap-10">
                 {[
                   { value: '< 30 min', label: 'Integration time' },
-                  { value: '99.9%', label: 'API uptime SLA' },
-                  { value: '200+', label: 'Document types' },
+                  { value: '20+', label: 'Countries supported' },
+                  { value: '6', label: 'Languages' },
                 ].map(stat => (
                   <div key={stat.label}>
                     <div
@@ -825,7 +825,7 @@ function App() {
                 num: '02',
                 icon: Code2,
                 title: 'Embed the SDK',
-                desc: 'Drop in our JavaScript verification component, or call the REST API headless. Works with React, Vue, plain HTML, iOS, Android.',
+                desc: 'Drop in our JavaScript verification component, or call the REST API headless. Works with React, Next.js, or any web framework.',
                 tag: 'Framework-agnostic',
               },
               {
@@ -1011,17 +1011,17 @@ function App() {
                 trusted by compliance.
               </h2>
               <p style={{ color: '#64748b', lineHeight: '1.7', marginBottom: '28px' }}>
-                RESTful API with predictable JSON responses. SDK clients for JavaScript,
-                Python, and Go. Full OpenAPI schema, idempotency keys, signed webhooks,
-                and sub-200ms response times — everything you expect from a modern API.
+                RESTful API with predictable JSON responses. SDK clients for JavaScript
+                and Python. Idempotency keys, signed webhooks,
+                and low-latency API responses — everything you expect from a modern API.
               </p>
               <ul className="space-y-3">
                 {[
-                  'OpenAPI 3.0 schema included',
+                  'Comprehensive API documentation',
                   'Sandbox with realistic test identities',
                   'Idempotent retry support',
                   'Comprehensive audit logging',
-                  'Sub-200ms API response times',
+                  'Low-latency API responses',
                   'Rate limit headers on every response',
                 ].map(item => (
                   <li key={item} className="flex items-center gap-3 text-sm" style={{ color: '#94a3b8' }}>
@@ -1119,8 +1119,8 @@ function App() {
               Built for regulated industries
             </h2>
             <p style={{ color: '#64748b', maxWidth: '480px', margin: '0 auto' }}>
-              Deep compliance coverage across KYC, AML, HIPAA, and
-              trust & safety requirements.
+              Built for KYC, AML, and trust & safety requirements
+              across regulated industries.
             </p>
           </div>
 
@@ -1162,7 +1162,7 @@ function App() {
       </section>
 
       {/* ════════════════════════════════════════
-          COMPLIANCE BADGES
+          COMPLIANCE BADGES — Two-tier: Achieved + Roadmap
           ════════════════════════════════════════ */}
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-6 lg:px-8">
@@ -1171,41 +1171,88 @@ function App() {
               className="font-display mb-3"
               style={{ fontSize: '1.75rem', fontWeight: 700, fontFamily: 'Syne, sans-serif' }}
             >
-              Compliance without the headache
+              Security-first by design
             </h2>
             <p style={{ color: '#475569', fontSize: '14px' }}>
-              Certifications maintained by our team, not yours.
+              Built with enterprise security controls from day one.
             </p>
           </div>
+
+          {/* Achieved badges */}
+          <div className="flex flex-wrap justify-center gap-3 mb-6">
+            {[
+              'GDPR Ready',
+              'CCPA Ready',
+              'AML/OFAC Screening',
+              'AES-256 Encryption',
+              'RBAC & Audit Logs',
+            ].map(label => (
+              <div
+                key={label}
+                className="flex items-center gap-2 transition-all duration-200 cursor-default"
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(16,185,129,0.15)',
+                  background: 'rgba(16,185,129,0.04)',
+                  color: '#64748b',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.borderColor = 'rgba(16,185,129,0.3)'
+                  e.currentTarget.style.color = '#10b981'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.borderColor = 'rgba(16,185,129,0.15)'
+                  e.currentTarget.style.color = '#64748b'
+                }}
+              >
+                <CheckCircle className="w-4 h-4" style={{ color: '#10b981' }} />
+                {label}
+              </div>
+            ))}
+          </div>
+
+          {/* Roadmap badges */}
           <div className="flex flex-wrap justify-center gap-3">
-            {['SOC 2 Type II', 'GDPR Ready', 'CCPA Compliant', 'HIPAA Controls', 'PCI DSS', 'ISO 27001', 'AML/OFAC'].map(
-              cert => (
-                <div
-                  key={cert}
-                  className="flex items-center gap-2 transition-all duration-200 cursor-default"
-                  style={{
-                    padding: '10px 18px',
-                    borderRadius: '10px',
-                    border: '1px solid rgba(255,255,255,0.07)',
-                    background: 'rgba(255,255,255,0.025)',
-                    color: '#64748b',
-                    fontSize: '13px',
-                    fontWeight: 500,
-                  }}
-                  onMouseEnter={e => {
-                    e.currentTarget.style.borderColor = 'rgba(16,185,129,0.25)'
-                    e.currentTarget.style.color = '#10b981'
-                  }}
-                  onMouseLeave={e => {
-                    e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'
-                    e.currentTarget.style.color = '#64748b'
-                  }}
+            {[
+              { label: 'SOC 2 Type II', status: 'Controls implemented — formal audit planned' },
+              { label: 'ISO 27001', status: 'Security framework in place — certification planned' },
+              { label: 'HIPAA', status: 'Encryption & access controls ready — BAA in development' },
+            ].map(({ label, status }) => (
+              <div
+                key={label}
+                className="flex items-center gap-2 transition-all duration-200 cursor-default group relative"
+                style={{
+                  padding: '10px 18px',
+                  borderRadius: '10px',
+                  border: '1px solid rgba(255,255,255,0.07)',
+                  background: 'rgba(255,255,255,0.02)',
+                  color: '#475569',
+                  fontSize: '13px',
+                  fontWeight: 500,
+                }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.borderColor = 'rgba(245,158,11,0.2)'
+                  e.currentTarget.style.color = '#f59e0b'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'
+                  e.currentTarget.style.color = '#475569'
+                }}
+              >
+                <Clock className="w-4 h-4" style={{ color: '#f59e0b' }} />
+                {label}
+                {/* Tooltip */}
+                <span
+                  className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 px-3 py-1.5 rounded-lg text-xs whitespace-nowrap opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+                  style={{ background: '#1e293b', color: '#94a3b8', border: '1px solid rgba(255,255,255,0.1)' }}
                 >
-                  <CheckCircle className="w-4 h-4" style={{ color: '#10b981' }} />
-                  {cert}
-                </div>
-              )
-            )}
+                  {status}
+                </span>
+              </div>
+            ))}
           </div>
         </div>
       </section>
@@ -1236,9 +1283,9 @@ function App() {
             </p>
           </div>
 
-          <div className="grid lg:grid-cols-3 gap-5 max-w-5xl mx-auto items-start">
+          <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-5 max-w-6xl mx-auto items-start">
 
-            {/* Starter */}
+            {/* Free */}
             <div
               className="rounded-2xl p-7 transition-all duration-300"
               style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}
@@ -1246,17 +1293,16 @@ function App() {
               onMouseLeave={e => (e.currentTarget.style.border = '1px solid rgba(255,255,255,0.07)')}
             >
               <p className="uppercase tracking-widest font-semibold mb-4" style={{ color: '#475569', fontSize: '11px', letterSpacing: '0.15em' }}>
-                Starter
+                Free
               </p>
               <div className="flex items-end gap-1.5 mb-1">
-                <span className="font-display font-bold" style={{ fontSize: '40px', fontFamily: 'Syne, sans-serif' }}>$299</span>
-                <span style={{ color: '#475569', fontSize: '14px', marginBottom: '6px' }}>/mo</span>
+                <span className="font-display font-bold" style={{ fontSize: '40px', fontFamily: 'Syne, sans-serif' }}>$0</span>
               </div>
               <p style={{ color: '#334155', fontSize: '12px', marginBottom: '24px' }}>
-                + $2.00 per verification &middot; up to 500/mo
+                100 verifications/mo &middot; sandbox + production
               </p>
               <ul className="space-y-3 mb-8">
-                {['Document verification', 'Biometric face matching', 'Webhook events', 'Address verification', 'Sandbox environment', 'Email support'].map(f => (
+                {['Document verification', 'Face matching', 'Webhook events', 'Sandbox environment', 'Community support'].map(f => (
                   <li key={f} className="flex items-center gap-2.5 text-sm" style={{ color: '#64748b' }}>
                     <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#10b981' }} />
                     {f}
@@ -1276,7 +1322,48 @@ function App() {
                   e.currentTarget.style.color = '#94a3b8'
                 }}
               >
-                Start Free Trial
+                Get Started Free
+              </button>
+            </div>
+
+            {/* Growth */}
+            <div
+              className="rounded-2xl p-7 transition-all duration-300"
+              style={{ background: 'rgba(255,255,255,0.025)', border: '1px solid rgba(255,255,255,0.07)' }}
+              onMouseEnter={e => (e.currentTarget.style.border = '1px solid rgba(255,255,255,0.14)')}
+              onMouseLeave={e => (e.currentTarget.style.border = '1px solid rgba(255,255,255,0.07)')}
+            >
+              <p className="uppercase tracking-widest font-semibold mb-4" style={{ color: '#475569', fontSize: '11px', letterSpacing: '0.15em' }}>
+                Growth
+              </p>
+              <div className="flex items-end gap-1.5 mb-1">
+                <span className="font-display font-bold" style={{ fontSize: '40px', fontFamily: 'Syne, sans-serif' }}>$0</span>
+              </div>
+              <p style={{ color: '#334155', fontSize: '12px', marginBottom: '24px' }}>
+                $2.00 per verification &middot; pay as you go
+              </p>
+              <ul className="space-y-3 mb-8">
+                {['Everything in Free', 'AML screening', 'Address verification', 'No volume cap', 'Priority email support'].map(f => (
+                  <li key={f} className="flex items-center gap-2.5 text-sm" style={{ color: '#64748b' }}>
+                    <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#10b981' }} />
+                    {f}
+                  </li>
+                ))}
+              </ul>
+              <button
+                onClick={openSignup}
+                className="w-full py-3 rounded-xl text-sm font-semibold transition-all duration-200"
+                style={{ border: '1px solid rgba(255,255,255,0.1)', color: '#94a3b8', background: 'transparent' }}
+                onMouseEnter={e => {
+                  e.currentTarget.style.borderColor = 'rgba(34,211,238,0.3)'
+                  e.currentTarget.style.color = '#f1f5f9'
+                }}
+                onMouseLeave={e => {
+                  e.currentTarget.style.borderColor = 'rgba(255,255,255,0.1)'
+                  e.currentTarget.style.color = '#94a3b8'
+                }}
+              >
+                Start Building
               </button>
             </div>
 
@@ -1311,14 +1398,14 @@ function App() {
                 Professional
               </p>
               <div className="flex items-end gap-1.5 mb-1">
-                <span className="font-display font-bold" style={{ fontSize: '40px', fontFamily: 'Syne, sans-serif' }}>$799</span>
+                <span className="font-display font-bold" style={{ fontSize: '40px', fontFamily: 'Syne, sans-serif' }}>$499</span>
                 <span style={{ color: '#64748b', fontSize: '14px', marginBottom: '6px' }}>/mo</span>
               </div>
               <p style={{ color: '#334155', fontSize: '12px', marginBottom: '24px' }}>
-                + $1.50 per verification &middot; up to 2,000/mo
+                500 included, then $1.00 per verification
               </p>
               <ul className="space-y-3 mb-8">
-                {['Everything in Starter', 'Fraud detection + barcode scan', 'AML/sanctions screening', 'White-label UI', 'Priority support (4hr SLA)', 'Risk scoring & analytics'].map(f => (
+                {['Everything in Growth', 'White-label UI', 'Batch API', 'Risk scoring', 'Priority support (< 4hr SLA)'].map(f => (
                   <li key={f} className="flex items-center gap-2.5 text-sm" style={{ color: '#94a3b8' }}>
                     <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#22d3ee' }} />
                     {f}
@@ -1332,7 +1419,7 @@ function App() {
                 onMouseEnter={e => (e.currentTarget.style.background = '#67e8f9')}
                 onMouseLeave={e => (e.currentTarget.style.background = '#22d3ee')}
               >
-                Start Free Trial
+                Upgrade
               </button>
             </div>
 
@@ -1347,14 +1434,13 @@ function App() {
                 Enterprise
               </p>
               <div className="flex items-end gap-1.5 mb-1">
-                <span className="font-display font-bold" style={{ fontSize: '40px', fontFamily: 'Syne, sans-serif' }}>$2,499</span>
-                <span style={{ color: '#475569', fontSize: '14px', marginBottom: '6px' }}>/mo</span>
+                <span className="font-display font-bold" style={{ fontSize: '40px', fontFamily: 'Syne, sans-serif' }}>Custom</span>
               </div>
               <p style={{ color: '#334155', fontSize: '12px', marginBottom: '24px' }}>
-                + $1.00 per verification &middot; unlimited volume
+                Custom pricing &middot; dedicated support
               </p>
               <ul className="space-y-3 mb-8">
-                {['Everything in Professional', 'Dedicated account manager', '99.9% uptime SLA', 'SSO/SAML authentication', 'Batch verification API', 'Ongoing monitoring & alerts', 'On-prem deployment option'].map(f => (
+                {['Everything in Professional', 'SSO/SAML authentication', 'Dedicated support', 'Custom SLA available', 'Self-hosted option (open-source core)'].map(f => (
                   <li key={f} className="flex items-center gap-2.5 text-sm" style={{ color: '#64748b' }}>
                     <CheckCircle className="w-4 h-4 flex-shrink-0" style={{ color: '#10b981' }} />
                     {f}
@@ -1419,8 +1505,8 @@ function App() {
             <span style={{ color: '#22d3ee' }}>identities today.</span>
           </h2>
           <p style={{ color: '#64748b', fontSize: '17px', maxWidth: '420px', margin: '0 auto 48px', lineHeight: '1.65' }}>
-            Free trial includes 1,000 verifications.
-            No credit card required. Cancel any time.
+            Free forever — 100 verifications per month.
+            No credit card required.
           </p>
           <div className="flex flex-col sm:flex-row justify-center gap-4">
             <button
@@ -1430,7 +1516,7 @@ function App() {
               onMouseEnter={e => (e.currentTarget.style.background = '#67e8f9')}
               onMouseLeave={e => (e.currentTarget.style.background = '#22d3ee')}
             >
-              Start Free Trial
+              Get Started Free
               <ArrowRight className="w-4 h-4" />
             </button>
             <a
@@ -1705,7 +1791,7 @@ function App() {
                   <div className="flex items-center gap-4 pt-1" style={{ color: '#334155', fontSize: '11px' }}>
                     <span className="flex items-center gap-1.5">
                       <Shield className="w-3.5 h-3.5" style={{ color: '#22d3ee' }} />
-                      SOC 2 Compliant
+                      AES-256 Encrypted
                     </span>
                     <span className="flex items-center gap-1.5">
                       <CheckCircle className="w-3.5 h-3.5" style={{ color: '#10b981' }} />
@@ -1906,15 +1992,15 @@ function App() {
                     style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)' }}
                   >
                     <p className="font-semibold mb-3" style={{ color: '#64748b', fontSize: '11px', textTransform: 'uppercase', letterSpacing: '0.1em' }}>
-                      Your trial includes
+                      Your free plan includes
                     </p>
                     <ul className="space-y-2.5">
                       {[
-                        '1,000 free verifications',
+                        '100 free verifications per month',
                         'Full API access with sandbox mode',
                         'Admin dashboard & analytics',
                         'Webhook integrations',
-                        'Dedicated onboarding support',
+                        'Documentation & getting started guides',
                       ].map(item => (
                         <li key={item} className="flex items-center gap-2.5" style={{ color: '#94a3b8', fontSize: '13px' }}>
                           <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" style={{ color: '#10b981' }} />
@@ -1946,7 +2032,7 @@ function App() {
                       </span>
                     ) : (
                       <span className="flex items-center justify-center gap-2">
-                        Start Free Trial
+                        Get Started Free
                         <ArrowRight className="w-4 h-4" />
                       </span>
                     )}
@@ -1996,7 +2082,7 @@ function App() {
                         { text: 'Check your email for login credentials', highlight: true },
                         { text: 'Access the admin dashboard to configure settings', highlight: false },
                         { text: 'Generate API keys and start integrating', highlight: false },
-                        { text: '1,000 free verifications ready to use', highlight: false },
+                        { text: '100 free verifications per month', highlight: false },
                       ].map(({ text, highlight }) => (
                         <li key={text} className="flex items-start gap-2.5" style={{ color: highlight ? '#f1f5f9' : '#64748b', fontSize: '13px' }}>
                           <CheckCircle className="w-3.5 h-3.5 flex-shrink-0 mt-0.5" style={{ color: '#10b981' }} />
