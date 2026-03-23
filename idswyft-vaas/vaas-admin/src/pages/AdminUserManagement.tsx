@@ -30,12 +30,10 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
-  X,
-  Send,
-  Clock
+  X
 } from 'lucide-react';
 
-import { sectionLabel, monoXs, monoSm, statusPill, cardSurface, statusAccent } from '../styles/tokens';
+import { sectionLabel, monoXs, monoSm, statusPill, cardSurface, statusAccent, tableHeaderClass } from '../styles/tokens';
 
 const ITEMS_PER_PAGE = 20;
 
@@ -413,18 +411,19 @@ export default function AdminUserManagement() {
           </div>
           {/* Search skeleton */}
           <div className="h-10 bg-slate-700/50 rounded-xl" />
-          {/* Grid cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
+          {/* Table skeleton */}
+          <div className={`${cardSurface} overflow-hidden`}>
+            <div className="h-10 bg-slate-900/60 border-b border-white/10" />
             {[1, 2, 3, 4, 5, 6].map(i => (
-              <div key={i} className={`${cardSurface} border-l-[3px] border-l-slate-700/50 p-5`}>
-                <div className="flex items-center gap-3 mb-3">
-                  <div className="h-9 w-9 rounded-full bg-slate-700/50" />
-                  <div className="flex-1">
-                    <div className="h-4 bg-slate-700/50 rounded w-28 mb-2" />
-                    <div className="h-3 bg-slate-700/50 rounded w-36" />
-                  </div>
+              <div key={i} className="flex items-center gap-4 px-5 py-3.5 border-b border-white/5">
+                <div className="h-8 w-8 rounded-full bg-slate-700/50 shrink-0" />
+                <div className="flex-1 space-y-2">
+                  <div className="h-4 bg-slate-700/50 rounded w-32" />
+                  <div className="h-3 bg-slate-700/50 rounded w-44" />
                 </div>
-                <div className="h-3 bg-slate-700/50 rounded w-20" />
+                <div className="h-3 bg-slate-700/50 rounded w-16 hidden md:block" />
+                <div className="h-5 bg-slate-700/50 rounded-full w-14" />
+                <div className="h-3 bg-slate-700/50 rounded w-12 hidden md:block" />
               </div>
             ))}
           </div>
@@ -538,107 +537,107 @@ export default function AdminUserManagement() {
         </div>
       )}
 
-      {/* ══════ UNIFIED GRID (members + invites) ══════ */}
+      {/* ══════ TABLE (members + invites) ══════ */}
       {(users.length > 0 || pendingInvites.length > 0) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-          {/* ── Member cards ── */}
-          {users.map(user => {
-            const accent = statusAccent[user.status] || statusAccent.inactive;
-            const canModify = admin?.id !== user.id;
-            return (
-              <div
-                key={user.id}
-                className={`${cardSurface} border-l-[3px] ${accent.border} p-4 hover:bg-slate-800/40 transition-colors`}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <div className="h-9 w-9 shrink-0 rounded-full bg-cyan-500/15 border border-cyan-400/30 flex items-center justify-center">
-                      <span className="text-cyan-300 font-medium text-xs font-mono">
-                        {getInitials(user)}
-                      </span>
-                    </div>
-                    <div className="min-w-0">
-                      <p className="text-sm font-semibold text-slate-100 truncate">
-                        {user.first_name} {user.last_name}
-                      </p>
-                      <p className={`${monoXs} text-slate-500 truncate`}>{user.email}</p>
-                    </div>
-                  </div>
-                  <ActionDropdown
-                    user={user}
-                    canModify={canModify}
-                    onView={() => openViewModal(user)}
-                    onEdit={() => openEditModal(user)}
-                    onSuspend={() => handleSuspendUser(user)}
-                    onActivate={() => handleActivateUser(user)}
-                    onUnlock={() => handleUnlockUser(user)}
-                    onDelete={() => openDeleteModal(user)}
-                    actionLoading={!!actionLoading[user.id]}
-                  />
-                </div>
+        <div className={`${cardSurface} overflow-hidden`}>
+          <div className="overflow-x-auto">
+            <table className="min-w-full divide-y divide-white/10">
+              <thead className="bg-slate-900/60 backdrop-blur-sm">
+                <tr>
+                  <th className={tableHeaderClass}>Member</th>
+                  <th className={tableHeaderClass}>Role</th>
+                  <th className={tableHeaderClass}>Status</th>
+                  <th className={`${tableHeaderClass} hidden md:table-cell`}>Last Login</th>
+                  <th className={`${tableHeaderClass} w-12`}>
+                    <span className="sr-only">Actions</span>
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-white/10">
+                {/* ── Member rows ── */}
+                {users.map(user => {
+                  const accent = statusAccent[user.status] || statusAccent.inactive;
+                  const canModify = admin?.id !== user.id;
+                  return (
+                    <tr key={user.id} className="hover:bg-slate-800/40 transition-colors">
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-3">
+                          <div className="h-8 w-8 shrink-0 rounded-full bg-cyan-500/15 border border-cyan-400/30 flex items-center justify-center">
+                            <span className="text-cyan-300 font-medium text-xs font-mono">{getInitials(user)}</span>
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-sm font-medium text-slate-100 truncate">{user.first_name} {user.last_name}</p>
+                            <p className={`${monoXs} text-slate-500 truncate`}>{user.email}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <span className={`${monoXs} text-slate-300`}>{user.role.display_name}</span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <div className="flex items-center gap-2">
+                          <span className={`${statusPill} ${accent.pill}`}>{user.status}</span>
+                          {user.two_factor_enabled && (
+                            <span className="font-mono text-[0.65rem] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">2FA</span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-5 py-3.5 hidden md:table-cell">
+                        <span className={`${monoXs} text-slate-500`}>
+                          {user.last_login_at ? getRelativeTime(user.last_login_at) : 'Never'}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3.5">
+                        <ActionDropdown
+                          user={user}
+                          canModify={canModify}
+                          onView={() => openViewModal(user)}
+                          onEdit={() => openEditModal(user)}
+                          onSuspend={() => handleSuspendUser(user)}
+                          onActivate={() => handleActivateUser(user)}
+                          onUnlock={() => handleUnlockUser(user)}
+                          onDelete={() => openDeleteModal(user)}
+                          actionLoading={!!actionLoading[user.id]}
+                        />
+                      </td>
+                    </tr>
+                  );
+                })}
 
-                <div className="flex items-center gap-2 mt-3">
-                  <span className={`${statusPill} ${accent.pill}`}>
-                    {user.status}
-                  </span>
-                  {user.two_factor_enabled && (
-                    <span className="font-mono text-[0.65rem] px-1.5 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 border border-emerald-500/30">
-                      2FA
-                    </span>
-                  )}
-                  <span className={`${monoXs} text-slate-600 ml-auto`}>
-                    {user.role.display_name}
-                  </span>
-                </div>
-
-                <p className={`${monoXs} text-slate-600 mt-2`}>
-                  {user.last_login_at ? `Last login: ${getRelativeTime(user.last_login_at)}` : 'Never logged in'}
-                </p>
-              </div>
-            );
-          })}
-
-          {/* ── Invite cards (amber accent) ── */}
-          {pendingInvites.map(invite => (
-            <div
-              key={`invite-${invite.id}`}
-              className={`${cardSurface} border-l-[3px] border-l-amber-400 p-4 hover:bg-slate-800/40 transition-colors`}
-            >
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3 min-w-0">
-                  <div className="h-9 w-9 shrink-0 rounded-full bg-amber-500/15 border border-amber-400/30 flex items-center justify-center">
-                    <Send className="h-4 w-4 text-amber-300" />
-                  </div>
-                  <div className="min-w-0">
-                    <p className="text-sm font-semibold text-slate-100 truncate">
-                      {invite.email}
-                    </p>
-                    <p className={`${monoXs} text-slate-500`}>
-                      Invited by {invite.invited_by_name}
-                    </p>
-                  </div>
-                </div>
-                <InviteActionDropdown
-                  onResend={() => handleResendInvite(invite)}
-                  onRevoke={() => handleRevokeInvite(invite)}
-                />
-              </div>
-
-              <div className="flex items-center gap-2 mt-3">
-                <span className={`${statusPill} bg-amber-500/15 text-amber-300 border-amber-500/30`}>
-                  Invited
-                </span>
-                <span className={`${monoXs} text-slate-600 ml-auto`}>
-                  {invite.role?.display_name ?? 'Unknown'}
-                </span>
-              </div>
-
-              <p className={`${monoXs} text-slate-600 mt-2 flex items-center gap-1`}>
-                <Clock className="h-3 w-3" />
-                Expires {formatTimestamp(invite.expires_at)}
-              </p>
-            </div>
-          ))}
+                {/* ── Invite rows (amber) ── */}
+                {pendingInvites.map(invite => (
+                  <tr key={`invite-${invite.id}`} className="hover:bg-slate-800/40 transition-colors bg-amber-500/[0.03]">
+                    <td className="px-5 py-3.5">
+                      <div className="flex items-center gap-3">
+                        <div className="h-8 w-8 shrink-0 rounded-full bg-amber-500/15 border border-amber-400/30 flex items-center justify-center">
+                          <UserPlus className="h-3.5 w-3.5 text-amber-300" />
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium text-slate-100 truncate">{invite.email}</p>
+                          <p className={`${monoXs} text-slate-500`}>Invited by {invite.invited_by_name}</p>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <span className={`${monoXs} text-slate-300`}>{invite.role?.display_name ?? 'Unknown'}</span>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <span className={`${statusPill} bg-amber-500/15 text-amber-300 border-amber-500/30`}>Invited</span>
+                    </td>
+                    <td className="px-5 py-3.5 hidden md:table-cell">
+                      <span className={`${monoXs} text-slate-500`}>Expires {formatTimestamp(invite.expires_at)}</span>
+                    </td>
+                    <td className="px-5 py-3.5">
+                      <InviteActionDropdown
+                        onResend={() => handleResendInvite(invite)}
+                        onRevoke={() => handleRevokeInvite(invite)}
+                      />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
