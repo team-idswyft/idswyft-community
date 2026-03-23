@@ -79,16 +79,16 @@ export const SolutionScene: React.FC = () => {
           delay={30}
         />
         <AnimatedStatBar
-          label="Infrastructure cost"
-          value="$0"
-          targetWidth={5}
+          label="Starting cost"
+          value="Free tier"
+          targetWidth={10}
           color="#22d3ee"
           delay={45}
         />
         <AnimatedStatBar
-          label="Compliance"
-          value="Built-in"
-          targetWidth={95}
+          label="Compliance controls"
+          value="GDPR & CCPA ready"
+          targetWidth={85}
           color="#22d3ee"
           delay={60}
         />

@@ -9,8 +9,8 @@ const { fontFamily: dmSans } = loadDMSans();
 const { fontFamily: ibmPlexMono } = loadIBMPlexMono();
 
 const subStats = [
-  { value: '<200ms', label: 'Response time' },
-  { value: 'SOC 2', label: 'Certified' },
+  { value: '< 3 min', label: 'End-to-end verification' },
+  { value: 'GDPR', label: 'Compliance ready' },
   { value: 'White-label', label: 'Fully branded' },
 ];
 
@@ -57,9 +57,9 @@ export const ResultsScene: React.FC = () => {
       {/* Large counter */}
       <div style={{ marginBottom: 16 }}>
         <CounterAnimation
-          targetValue={99.8}
-          suffix="%"
-          decimals={1}
+          targetValue={90}
+          suffix="%+"
+          decimals={0}
           delay={0}
           fontSize={128}
           color="#f1f5f9"
@@ -79,7 +79,7 @@ export const ResultsScene: React.FC = () => {
           letterSpacing: '0.05em',
         }}
       >
-        Document verification accuracy
+        Document validation accuracy target
       </p>
 
       {/* Sub-stat cards */}
