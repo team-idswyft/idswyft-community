@@ -12,11 +12,17 @@ set -euo pipefail
 
 REPO_URL="https://github.com/team-idswyft/idswyft.git"
 BOLD="\033[1m"
+DIM="\033[2m"
 CYAN="\033[36m"
 GREEN="\033[32m"
 YELLOW="\033[33m"
 RED="\033[31m"
 RESET="\033[0m"
+SPINNER_CHARS='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+SPINNER_PID=""
+STEP_CURRENT=0
+STEP_TOTAL=5
+START_TIME=$(date +%s)
 
 banner() {
   echo ""
@@ -27,42 +33,78 @@ banner() {
   echo ""
 }
 
-info()  { echo -e "${CYAN}[INFO]${RESET}  $1"; }
-ok()    { echo -e "${GREEN}[OK]${RESET}    $1"; }
-warn()  { echo -e "${YELLOW}[WARN]${RESET}  $1"; }
-fail()  { echo -e "${RED}[ERROR]${RESET} $1"; exit 1; }
+elapsed() {
+  local now=$(date +%s)
+  local diff=$((now - START_TIME))
+  local mins=$((diff / 60))
+  local secs=$((diff % 60))
+  printf "%dm %02ds" "$mins" "$secs"
+}
+
+step()  { STEP_CURRENT=$((STEP_CURRENT + 1)); echo -e "\n${CYAN}${BOLD}[${STEP_CURRENT}/${STEP_TOTAL}]${RESET} ${BOLD}$1${RESET}"; }
+info()  { echo -e "  ${DIM}>${RESET}  $1"; }
+ok()    { echo -e "  ${GREEN}✓${RESET}  $1"; }
+warn()  { echo -e "  ${YELLOW}!${RESET}  $1"; }
+fail()  { echo -e "  ${RED}✗${RESET}  $1"; exit 1; }
+
+# Spinner — runs in background, call stop_spinner to end
+start_spinner() {
+  local msg="$1"
+  (
+    local i=0
+    while true; do
+      local char="${SPINNER_CHARS:$i:1}"
+      printf "\r  ${CYAN}%s${RESET}  %s ${DIM}(%s)${RESET}  " "$char" "$msg" "$(elapsed)"
+      i=$(( (i + 1) % ${#SPINNER_CHARS} ))
+      sleep 0.1
+    done
+  ) &
+  SPINNER_PID=$!
+}
+
+stop_spinner() {
+  if [ -n "$SPINNER_PID" ] && kill -0 "$SPINNER_PID" 2>/dev/null; then
+    kill "$SPINNER_PID" 2>/dev/null
+    wait "$SPINNER_PID" 2>/dev/null || true
+    printf "\r\033[K"  # clear spinner line
+  fi
+  SPINNER_PID=""
+}
 
 # ─────────────────────────────────────────
 # Pre-flight checks
 # ─────────────────────────────────────────
 check_dependencies() {
-  info "Checking dependencies..."
+  step "Checking dependencies"
 
   if ! command -v docker &>/dev/null; then
     fail "Docker is not installed. Install it from https://docs.docker.com/get-docker/"
   fi
+  ok "Docker found"
 
   if ! docker compose version &>/dev/null; then
     fail "Docker Compose V2 is required. Update Docker or install the compose plugin."
   fi
+  ok "Docker Compose found"
 
   if ! docker info &>/dev/null 2>&1; then
-    fail "Docker daemon is not running. Start Docker and try again."
+    fail "Docker daemon is not running. Start Docker Desktop and try again."
   fi
-
-  ok "Docker and Docker Compose found"
+  ok "Docker daemon running"
 }
 
 # ─────────────────────────────────────────
 # Clone repo if running via curl pipe
 # ─────────────────────────────────────────
 ensure_repo() {
+  step "Getting source code"
+
   if [ ! -f "docker-compose.yml" ]; then
-    info "Cloning Idswyft repository..."
     if ! command -v git &>/dev/null; then
       fail "Git is not installed. Install it from https://git-scm.com/"
     fi
-    git clone "$REPO_URL" idswyft
+    info "Cloning repository..."
+    git clone --depth 1 "$REPO_URL" idswyft
     cd idswyft
     ok "Repository cloned"
   else
@@ -86,9 +128,11 @@ generate_secret() {
 # Create .env file
 # ─────────────────────────────────────────
 setup_env() {
+  step "Configuring environment"
+
   if [ -f ".env" ]; then
     warn ".env file already exists"
-    read -rp "  Overwrite? (y/N): " overwrite
+    read -rp "    Overwrite? (y/N): " overwrite
     if [[ ! "$overwrite" =~ ^[Yy]$ ]]; then
       ok "Keeping existing .env"
       return
@@ -138,14 +182,41 @@ EOF
 # Build and start
 # ─────────────────────────────────────────
 start_services() {
-  info "Building containers (this may take a few minutes on first run)..."
-  docker compose build --quiet
+  step "Building containers"
+  info "This takes 5-15 minutes on first run (downloading images + compiling)"
+  echo ""
 
-  info "Starting services..."
+  # Show Docker build output so the user sees progress
+  # Use a temp file to capture exit code through pipe
+  local build_log
+  build_log=$(mktemp)
+
+  set +e
+  docker compose build 2>&1 | tee "$build_log" | while IFS= read -r line; do
+    case "$line" in
+      *"Pulling"*|*"pulling"*|*"Downloaded"*|*"Step"*|*"STEP"*|*"--->"*|*"Running"*|*"COPY"*|*"RUN"*|*"Successfully"*|*"DONE"*|*"Built"*|*"#"*|*"npm"*|*"error"*|*"Error"*)
+        echo -e "  ${DIM}${line}${RESET}"
+        ;;
+    esac
+  done
+  local build_exit=${PIPESTATUS[0]}
+  set -e
+
+  if [ "$build_exit" -ne 0 ]; then
+    echo ""
+    fail "Docker build failed. Full log at: $build_log"
+  fi
+  rm -f "$build_log"
+
+  echo ""
+  ok "Containers built successfully ($(elapsed))"
+
+  step "Starting services"
   docker compose up -d
+  ok "Containers started"
 
-  # Wait for health check
-  info "Waiting for API to be ready..."
+  # Wait for health check with spinner
+  start_spinner "Waiting for API to be ready"
   local retries=0
   local max_retries=30
   while [ $retries -lt $max_retries ]; do
@@ -155,9 +226,11 @@ start_services() {
     retries=$((retries + 1))
     sleep 2
   done
+  stop_spinner
 
   if [ $retries -eq $max_retries ]; then
-    warn "API health check timed out. Check logs with: docker compose logs api"
+    warn "API health check timed out — it may still be starting up"
+    info "Check logs with: docker compose logs api"
   else
     ok "API is healthy"
   fi
@@ -171,9 +244,9 @@ print_success() {
   port=$(grep -E "^PORT=" .env 2>/dev/null | cut -d= -f2 || echo "80")
 
   echo ""
-  echo -e "${GREEN}${BOLD}  ══════════════════════════════════════════${RESET}"
-  echo -e "${GREEN}${BOLD}   Idswyft is running!${RESET}"
-  echo -e "${GREEN}${BOLD}  ══════════════════════════════════════════${RESET}"
+  echo -e "${GREEN}${BOLD}  ╔══════════════════════════════════════════╗${RESET}"
+  echo -e "${GREEN}${BOLD}  ║  Idswyft is running!  ($(elapsed))       ║${RESET}"
+  echo -e "${GREEN}${BOLD}  ╚══════════════════════════════════════════╝${RESET}"
   echo ""
   echo -e "  ${BOLD}Dev Portal:${RESET}  http://localhost:${port}"
   echo -e "  ${BOLD}API:${RESET}         http://localhost:${port}/api"
@@ -195,6 +268,9 @@ print_success() {
 # ─────────────────────────────────────────
 # Main
 # ─────────────────────────────────────────
+cleanup() { stop_spinner; }
+trap cleanup EXIT
+
 main() {
   banner
   check_dependencies
