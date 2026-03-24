@@ -26,28 +26,11 @@ RUN node download-models.js
 COPY . .
 RUN npm run build
 
-# ── Stage 2: Production dependencies ──────────────────
-# Fresh install of production-only deps (avoids slow npm prune
-# which hangs on Windows Docker Desktop with native modules)
-FROM node:20-slim AS deps
-WORKDIR /app
+# Remove .bin symlinks — they break Docker Desktop on Windows
+# (containerd snapshotter can't extract symlinks during layer export)
+RUN rm -rf node_modules/.bin
 
-RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 \
-    make \
-    g++ \
-    libcairo2-dev \
-    libjpeg-dev \
-    libpango1.0-dev \
-    libgif-dev \
-    librsvg2-dev \
-    pkg-config \
-    && rm -rf /var/lib/apt/lists/*
-
-COPY package*.json ./
-RUN npm install --omit=dev --include=optional && rm -rf node_modules/.bin
-
-# ── Stage 3: Runtime ──────────────────────────────────
+# ── Stage 2: Runtime ──────────────────────────────────
 FROM node:20-slim
 WORKDIR /app
 
@@ -62,10 +45,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Compiled output + models from build stage, clean prod deps from deps stage
+# Copy compiled output, models, and node_modules (includes dev deps
+# but avoids npm prune which hangs with native modules on Windows)
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/models ./models
-COPY --from=deps /app/node_modules ./node_modules
+COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/package.json ./package.json
 
 EXPOSE 3001
