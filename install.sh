@@ -11,52 +11,95 @@ set -euo pipefail
 # ─────────────────────────────────────────────────
 
 REPO_URL="https://github.com/team-idswyft/idswyft.git"
+
+# ── Colors & formatting ──────────────────────────
 BOLD="\033[1m"
 DIM="\033[2m"
+ITALIC="\033[3m"
 CYAN="\033[36m"
 GREEN="\033[32m"
 YELLOW="\033[33m"
 RED="\033[31m"
+BLUE="\033[34m"
+MAGENTA="\033[35m"
+WHITE="\033[97m"
+GRAY="\033[90m"
 RESET="\033[0m"
-SPINNER_CHARS='⠋⠙⠹⠸⠼⠴⠦⠧⠇⠏'
+BG_CYAN="\033[46m"
+BG_GREEN="\033[42m"
+BG_RED="\033[41m"
+
+SPINNER_CHARS='⣾⣽⣻⢿⡿⣟⣯⣷'
 SPINNER_PID=""
 STEP_CURRENT=0
 STEP_TOTAL=5
 START_TIME=$(date +%s)
 
+# ── Banner ────────────────────────────────────────
 banner() {
   echo ""
-  echo -e "${CYAN}${BOLD}  ╔══════════════════════════════════════════╗${RESET}"
-  echo -e "${CYAN}${BOLD}  ║     Idswyft Community Edition            ║${RESET}"
-  echo -e "${CYAN}${BOLD}  ║     Identity Verification Platform       ║${RESET}"
-  echo -e "${CYAN}${BOLD}  ╚══════════════════════════════════════════╝${RESET}"
-  echo ""
+  echo -e "${CYAN}${BOLD}"
+  echo "    ╭──────────────────────────────────────────╮"
+  echo "    │                                          │"
+  echo "    │    ◆  Idswyft Community Edition          │"
+  echo "    │       Identity Verification Platform     │"
+  echo "    │                                          │"
+  echo "    ╰──────────────────────────────────────────╯"
+  echo -e "${RESET}"
 }
 
+# ── Formatting helpers ────────────────────────────
 elapsed() {
-  local now=$(date +%s)
-  local diff=$((now - START_TIME))
-  local mins=$((diff / 60))
-  local secs=$((diff % 60))
-  printf "%dm %02ds" "$mins" "$secs"
+  local now diff mins secs
+  now=$(date +%s)
+  diff=$((now - START_TIME))
+  mins=$((diff / 60))
+  secs=$((diff % 60))
+  if [ "$mins" -gt 0 ]; then
+    printf "%dm %02ds" "$mins" "$secs"
+  else
+    printf "%ds" "$secs"
+  fi
 }
 
-step()  { STEP_CURRENT=$((STEP_CURRENT + 1)); echo -e "\n${CYAN}${BOLD}[${STEP_CURRENT}/${STEP_TOTAL}]${RESET} ${BOLD}$1${RESET}"; }
-info()  { echo -e "  ${DIM}>${RESET}  $1"; }
-ok()    { echo -e "  ${GREEN}✓${RESET}  $1"; }
-warn()  { echo -e "  ${YELLOW}!${RESET}  $1"; }
-fail()  { echo -e "  ${RED}✗${RESET}  $1"; exit 1; }
+step() {
+  STEP_CURRENT=$((STEP_CURRENT + 1))
+  echo ""
+  echo -e "  ${CYAN}${BOLD}━━━ Step ${STEP_CURRENT}/${STEP_TOTAL}: $1 ━━━${RESET}"
+}
 
-# Spinner — runs in background, call stop_spinner to end
+info()    { echo -e "  ${GRAY}│${RESET}  ${DIM}$1${RESET}"; }
+ok()      { echo -e "  ${GREEN}│${RESET}  ${GREEN}✓${RESET}  $1"; }
+warn()    { echo -e "  ${YELLOW}│${RESET}  ${YELLOW}⚠${RESET}  $1"; }
+fail()    { echo -e "  ${RED}│${RESET}  ${RED}✗  $1${RESET}"; exit 1; }
+detail()  { echo -e "  ${GRAY}│${RESET}     ${GRAY}$1${RESET}"; }
+
+# ── Progress bar ──────────────────────────────────
+# Usage: progress_bar "message" current total
+progress_bar() {
+  local msg="$1" current="$2" total="$3"
+  local width=30
+  local pct=$((current * 100 / total))
+  local filled=$((current * width / total))
+  local empty=$((width - filled))
+  local bar=""
+
+  for ((i=0; i<filled; i++)); do bar+="█"; done
+  for ((i=0; i<empty; i++)); do bar+="░"; done
+
+  printf "\r  ${GRAY}│${RESET}  ${CYAN}%s${RESET} ${GRAY}%3d%%${RESET} ${DIM}%s${RESET}  " "$bar" "$pct" "$msg"
+}
+
+# ── Spinner ───────────────────────────────────────
 start_spinner() {
   local msg="$1"
   (
     local i=0
     while true; do
       local char="${SPINNER_CHARS:$i:1}"
-      printf "\r  ${CYAN}%s${RESET}  %s ${DIM}(%s)${RESET}  " "$char" "$msg" "$(elapsed)"
+      printf "\r  ${GRAY}│${RESET}  ${CYAN}${BOLD}%s${RESET}  %s ${GRAY}(%s)${RESET}  " "$char" "$msg" "$(elapsed)"
       i=$(( (i + 1) % ${#SPINNER_CHARS} ))
-      sleep 0.1
+      sleep 0.08
     done
   ) &
   SPINNER_PID=$!
@@ -66,57 +109,76 @@ stop_spinner() {
   if [ -n "$SPINNER_PID" ] && kill -0 "$SPINNER_PID" 2>/dev/null; then
     kill "$SPINNER_PID" 2>/dev/null
     wait "$SPINNER_PID" 2>/dev/null || true
-    printf "\r\033[K"  # clear spinner line
+    printf "\r\033[K"
   fi
   SPINNER_PID=""
 }
 
-# ─────────────────────────────────────────
-# Pre-flight checks
-# ─────────────────────────────────────────
-check_dependencies() {
-  step "Checking dependencies"
-
-  if ! command -v docker &>/dev/null; then
-    fail "Docker is not installed. Install it from https://docs.docker.com/get-docker/"
-  fi
-  ok "Docker found"
-
-  if ! docker compose version &>/dev/null; then
-    fail "Docker Compose V2 is required. Update Docker or install the compose plugin."
-  fi
-  ok "Docker Compose found"
-
-  if ! docker info &>/dev/null 2>&1; then
-    fail "Docker daemon is not running. Start Docker Desktop and try again."
-  fi
-  ok "Docker daemon running"
+# ── Section separator ─────────────────────────────
+divider() {
+  echo -e "  ${GRAY}│${RESET}"
 }
 
 # ─────────────────────────────────────────
-# Clone repo if running via curl pipe
+# Step 1: Pre-flight checks
+# ─────────────────────────────────────────
+check_dependencies() {
+  step "Checking dependencies"
+  divider
+
+  local docker_ver compose_ver
+
+  if ! command -v docker &>/dev/null; then
+    fail "Docker is not installed"
+    detail "Install from: https://docs.docker.com/get-docker/"
+  fi
+  docker_ver=$(docker --version 2>/dev/null | head -1)
+  ok "Docker found"
+  detail "$docker_ver"
+
+  if ! docker compose version &>/dev/null; then
+    fail "Docker Compose V2 is required"
+    detail "Update Docker or install the compose plugin"
+  fi
+  compose_ver=$(docker compose version 2>/dev/null | head -1)
+  ok "Docker Compose found"
+  detail "$compose_ver"
+
+  if ! docker info &>/dev/null 2>&1; then
+    fail "Docker daemon is not running"
+    detail "Start Docker Desktop and try again"
+  fi
+  ok "Docker daemon running"
+  divider
+}
+
+# ─────────────────────────────────────────
+# Step 2: Clone repo if running via curl pipe
 # ─────────────────────────────────────────
 ensure_repo() {
   step "Getting source code"
+  divider
 
   if [ ! -f "docker-compose.yml" ]; then
     if ! command -v git &>/dev/null; then
-      fail "Git is not installed. Install it from https://git-scm.com/"
+      fail "Git is not installed. Install from https://git-scm.com/"
     fi
-    info "Cloning repository..."
-    git clone --depth 1 "$REPO_URL" idswyft
+    start_spinner "Cloning repository"
+    git clone --depth 1 "$REPO_URL" idswyft 2>/dev/null
+    stop_spinner
     cd idswyft
     ok "Repository cloned"
+    detail "github.com/team-idswyft/idswyft"
   else
     ok "Already in Idswyft directory"
   fi
+  divider
 }
 
 # ─────────────────────────────────────────
 # Generate secrets
 # ─────────────────────────────────────────
 generate_secret() {
-  # Generate a random 32-character hex string
   if command -v openssl &>/dev/null; then
     openssl rand -hex 16
   else
@@ -125,28 +187,25 @@ generate_secret() {
 }
 
 # ─────────────────────────────────────────
-# Create .env file
+# Step 3: Create .env file
 # ─────────────────────────────────────────
 setup_env() {
   step "Configuring environment"
+  divider
 
   if [ -f ".env" ]; then
     warn ".env file already exists"
-    read -rp "    Overwrite? (y/N): " overwrite
+    read -rp "       Overwrite? (y/N): " overwrite
     if [[ ! "$overwrite" =~ ^[Yy]$ ]]; then
       ok "Keeping existing .env"
+      divider
       return
     fi
   fi
 
   info "Generating secure secrets..."
 
-  local db_password
-  local jwt_secret
-  local api_key_secret
-  local encryption_key
-  local service_token
-
+  local db_password jwt_secret api_key_secret encryption_key service_token
   db_password=$(generate_secret)
   jwt_secret=$(generate_secret)
   api_key_secret=$(generate_secret)
@@ -176,26 +235,58 @@ SANDBOX_MODE=false
 EOF
 
   ok "Created .env with secure secrets"
+  detail "DB_PASSWORD, JWT_SECRET, API_KEY_SECRET, ENCRYPTION_KEY, SERVICE_TOKEN"
+  divider
 }
 
 # ─────────────────────────────────────────
-# Build and start
+# Step 4: Build and start
 # ─────────────────────────────────────────
 start_services() {
   step "Building containers"
-  info "This takes 5-15 minutes on first run (downloading images + compiling)"
-  echo ""
+  divider
+  info "First run downloads base images + compiles the app"
+  info "Subsequent builds use cache and are much faster"
+  echo -e "  ${GRAY}│${RESET}"
 
-  # Show Docker build output so the user sees progress
-  # Use a temp file to capture exit code through pipe
-  local build_log
+  local build_log line_count
   build_log=$(mktemp)
+  line_count=0
 
   set +e
   docker compose build 2>&1 | tee "$build_log" | while IFS= read -r line; do
+    line_count=$((line_count + 1))
+
     case "$line" in
-      *"Pulling"*|*"pulling"*|*"Downloaded"*|*"Step"*|*"STEP"*|*"--->"*|*"Running"*|*"COPY"*|*"RUN"*|*"Successfully"*|*"DONE"*|*"Built"*|*"#"*|*"npm"*|*"error"*|*"Error"*)
-        echo -e "  ${DIM}${line}${RESET}"
+      *"Pulling"*|*"pulling"*)
+        echo -e "  ${GRAY}│${RESET}  ${BLUE}⬇${RESET}  ${line}"
+        ;;
+      *"Downloaded"*|*"Pull complete"*|*"Already exists"*)
+        echo -e "  ${GRAY}│${RESET}  ${GREEN}⬇${RESET}  ${DIM}${line}${RESET}"
+        ;;
+      *"STEP"*|*"Step"*)
+        echo -e "  ${GRAY}│${RESET}  ${MAGENTA}▸${RESET}  ${WHITE}${line}${RESET}"
+        ;;
+      *"CACHED"*)
+        echo -e "  ${GRAY}│${RESET}  ${GREEN}◆${RESET}  ${DIM}${line}${RESET}"
+        ;;
+      *"DONE"*)
+        echo -e "  ${GRAY}│${RESET}  ${GREEN}●${RESET}  ${GREEN}${line}${RESET}"
+        ;;
+      *"RUN"*|*"COPY"*|*"FROM"*|*"WORKDIR"*|*"ARG"*|*"EXPOSE"*|*"CMD"*)
+        echo -e "  ${GRAY}│${RESET}  ${CYAN}▸${RESET}  ${DIM}${line}${RESET}"
+        ;;
+      *"npm"*install*|*"npm"*build*|*"npm"*prune*)
+        echo -e "  ${GRAY}│${RESET}  ${YELLOW}▸${RESET}  ${line}"
+        ;;
+      *"error"*|*"Error"*|*"ERROR"*|*"failed"*)
+        echo -e "  ${GRAY}│${RESET}  ${RED}✗${RESET}  ${RED}${line}${RESET}"
+        ;;
+      *"exporting"*|*"writing"*|*"naming"*)
+        echo -e "  ${GRAY}│${RESET}  ${CYAN}◇${RESET}  ${DIM}${line}${RESET}"
+        ;;
+      *"#"[0-9]*)
+        echo -e "  ${GRAY}│${RESET}     ${GRAY}${line}${RESET}"
         ;;
     esac
   done
@@ -204,19 +295,41 @@ start_services() {
 
   if [ "$build_exit" -ne 0 ]; then
     echo ""
-    fail "Docker build failed. Full log at: $build_log"
+    echo -e "  ${RED}│${RESET}"
+    echo -e "  ${RED}│${RESET}  Build failed. Full log: ${BOLD}$build_log${RESET}"
+    echo -e "  ${RED}│${RESET}  Last 10 lines:"
+    tail -10 "$build_log" | while IFS= read -r errline; do
+      echo -e "  ${RED}│${RESET}    ${DIM}${errline}${RESET}"
+    done
+    fail "Docker build failed — see above for details"
   fi
   rm -f "$build_log"
 
-  echo ""
-  ok "Containers built successfully ($(elapsed))"
+  echo -e "  ${GRAY}│${RESET}"
+  ok "Containers built ${GREEN}${BOLD}$(elapsed)${RESET}"
 
   step "Starting services"
-  docker compose up -d
+  divider
+
+  docker compose up -d 2>&1 | while IFS= read -r line; do
+    case "$line" in
+      *"Created"*|*"Started"*)
+        echo -e "  ${GRAY}│${RESET}  ${GREEN}▸${RESET}  ${line}"
+        ;;
+      *"Running"*)
+        echo -e "  ${GRAY}│${RESET}  ${CYAN}▸${RESET}  ${DIM}${line}${RESET}"
+        ;;
+      *)
+        echo -e "  ${GRAY}│${RESET}     ${DIM}${line}${RESET}"
+        ;;
+    esac
+  done
   ok "Containers started"
 
+  echo -e "  ${GRAY}│${RESET}"
+
   # Wait for health check with spinner
-  start_spinner "Waiting for API to be ready"
+  start_spinner "Waiting for API health check"
   local retries=0
   local max_retries=30
   while [ $retries -lt $max_retries ]; do
@@ -230,38 +343,46 @@ start_services() {
 
   if [ $retries -eq $max_retries ]; then
     warn "API health check timed out — it may still be starting up"
-    info "Check logs with: docker compose logs api"
+    detail "Check logs: docker compose logs api"
   else
     ok "API is healthy"
   fi
+  divider
 }
 
 # ─────────────────────────────────────────
-# Print success
+# Success screen
 # ─────────────────────────────────────────
 print_success() {
   local port
   port=$(grep -E "^PORT=" .env 2>/dev/null | cut -d= -f2 || echo "80")
 
   echo ""
-  echo -e "${GREEN}${BOLD}  ╔══════════════════════════════════════════╗${RESET}"
-  echo -e "${GREEN}${BOLD}  ║  Idswyft is running!  ($(elapsed))       ║${RESET}"
-  echo -e "${GREEN}${BOLD}  ╚══════════════════════════════════════════╝${RESET}"
+  echo -e "${GREEN}${BOLD}"
+  echo "    ╭──────────────────────────────────────────╮"
+  echo "    │                                          │"
+  echo "    │    ✓  Idswyft is running!                │"
+  echo "    │       Installed in $(elapsed)                │"
+  echo "    │                                          │"
+  echo "    ╰──────────────────────────────────────────╯"
+  echo -e "${RESET}"
+  echo -e "    ${CYAN}${BOLD}URLs${RESET}"
+  echo -e "    ${GRAY}────────────────────────────────────${RESET}"
+  echo -e "    ${BOLD}Dev Portal${RESET}   ${CYAN}http://localhost:${port}${RESET}"
+  echo -e "    ${BOLD}API${RESET}          ${CYAN}http://localhost:${port}/api${RESET}"
+  echo -e "    ${BOLD}Docs${RESET}         ${CYAN}http://localhost:${port}/docs${RESET}"
+  echo -e "    ${BOLD}Demo${RESET}         ${CYAN}http://localhost:${port}/demo${RESET}"
   echo ""
-  echo -e "  ${BOLD}Dev Portal:${RESET}  http://localhost:${port}"
-  echo -e "  ${BOLD}API:${RESET}         http://localhost:${port}/api"
-  echo -e "  ${BOLD}API Docs:${RESET}    http://localhost:${port}/docs"
-  echo -e "  ${BOLD}Demo:${RESET}        http://localhost:${port}/demo"
+  echo -e "    ${CYAN}${BOLD}Commands${RESET}"
+  echo -e "    ${GRAY}────────────────────────────────────${RESET}"
+  echo -e "    ${DIM}docker compose logs -f${RESET}        ${GRAY}# View logs${RESET}"
+  echo -e "    ${DIM}docker compose stop${RESET}          ${GRAY}# Stop${RESET}"
+  echo -e "    ${DIM}docker compose up -d${RESET}         ${GRAY}# Start${RESET}"
+  echo -e "    ${DIM}docker compose down${RESET}          ${GRAY}# Remove${RESET}"
+  echo -e "    ${DIM}docker compose down -v${RESET}       ${GRAY}# Remove + delete data${RESET}"
   echo ""
-  echo -e "  ${BOLD}Useful commands:${RESET}"
-  echo "    docker compose logs -f        # View logs"
-  echo "    docker compose stop           # Stop services"
-  echo "    docker compose up -d          # Start services"
-  echo "    docker compose down           # Stop and remove containers"
-  echo "    docker compose down -v        # Stop, remove containers and data"
-  echo ""
-  echo -e "  ${BOLD}Documentation:${RESET} https://idswyft.app/docs"
-  echo -e "  ${BOLD}GitHub:${RESET}        https://github.com/team-idswyft/idswyft"
+  echo -e "    ${GRAY}Documentation:${RESET} ${CYAN}https://idswyft.app/docs${RESET}"
+  echo -e "    ${GRAY}GitHub:${RESET}        ${CYAN}https://github.com/team-idswyft/idswyft${RESET}"
   echo ""
 }
 
