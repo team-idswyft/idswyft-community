@@ -1,15 +1,12 @@
 # ── Idswyft API — Single-stage build ──────────────────
 # Single stage avoids the expensive cross-stage COPY of node_modules
 # (~1-2GB) which is the main bottleneck on Windows Docker Desktop.
-# BuildKit cache mounts persist npm/apt caches between builds.
 FROM node:20-slim
 WORKDIR /app
 
 # Native build + runtime dependencies
 # Using slim (Debian) instead of Alpine because onnxruntime-node requires full glibc
-RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked \
-    apt-get update && apt-get install -y --no-install-recommends \
+RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     make \
     g++ \
@@ -19,12 +16,12 @@ RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
     libgif-dev \
     librsvg2-dev \
     pkg-config \
-    wget
+    wget \
+    && rm -rf /var/lib/apt/lists/*
 
-# Install dependencies (cache mount keeps downloaded packages between builds)
+# Install dependencies
 COPY package*.json ./
-RUN --mount=type=cache,id=npm-cache,target=/root/.npm \
-    npm install --include=optional
+RUN npm install --include=optional
 
 # Download face detection model weights
 COPY download-models.js ./
