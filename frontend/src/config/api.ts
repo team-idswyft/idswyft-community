@@ -1,8 +1,9 @@
 // API Configuration
-// When accessed via a LAN IP (e.g. phone scanning a QR code), route API calls
-// through the same Vite dev server instead of hitting the backend port directly.
-// Vite's /api proxy forwards to localhost:3001 server-side, so the phone only
-// ever needs to reach port 5173 — no firewall or CORS issues.
+// Determines the base URL for all API calls. The resolution order:
+//   1. Explicit VITE_API_URL override (custom deployments)
+//   2. Production build → '' (same-origin; nginx proxies /api/ to backend)
+//   3. Dev server on LAN IP → same origin (Vite proxy)
+//   4. Dev server on localhost → hit backend directly at :3001
 const _getApiBaseUrl = (): string => {
   // Explicit override — custom deployments can point the frontend at any API origin
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
