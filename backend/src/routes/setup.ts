@@ -16,8 +16,18 @@ const setupRateLimit = rateLimit({
   legacyHeaders: false,
 });
 
+// In-memory cache: once setup is complete (needs_setup === false), the result
+// is permanent — no need to hit the database on every poll. Resets to null on
+// POST /initialize so the next GET reflects the new state.
+let setupCompleteCache: boolean | null = null;
+
 // GET /api/setup/status — check if first-run setup is needed (no auth)
 router.get('/status', catchAsync(async (_req: Request, res: Response) => {
+  // If we already know setup is done, skip the DB query
+  if (setupCompleteCache === true) {
+    return res.json({ needs_setup: false });
+  }
+
   const { count, error } = await supabase
     .from('developers')
     .select('*', { count: 'exact', head: true });
@@ -27,9 +37,10 @@ router.get('/status', catchAsync(async (_req: Request, res: Response) => {
     throw new Error('Failed to check setup status');
   }
 
-  res.json({
-    needs_setup: (count ?? 0) === 0,
-  });
+  const needsSetup = (count ?? 0) === 0;
+  if (!needsSetup) setupCompleteCache = true;
+
+  res.json({ needs_setup: needsSetup });
 }));
 
 // POST /api/setup/initialize — create first developer account (no auth, first-run only)
@@ -100,6 +111,9 @@ router.post('/initialize',
 
     // Generate session token
     const token = generateDeveloperToken(developer);
+
+    // Mark setup as complete so GET /status skips the DB from now on
+    setupCompleteCache = true;
 
     logger.info('First developer created via setup wizard', {
       developerId: developer.id,

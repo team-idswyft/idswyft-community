@@ -126,7 +126,7 @@ export function SetupPage() {
             Make sure the backend is running and try again.
           </div>
           <button
-            onClick={() => { setState('loading'); window.location.reload() }}
+            onClick={() => window.location.reload()}
             style={{ background: C.cyan, color: C.bg, border: 'none', borderRadius: 6, padding: '10px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer', fontFamily: C.sans }}
           >
             Retry
