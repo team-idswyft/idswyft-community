@@ -16,7 +16,7 @@ Self-hostable identity verification platform for developers. Document OCR, barco
 git clone https://github.com/team-idswyft/idswyft.git && cd idswyft && docker compose up -d
 ```
 
-That's it. Visit `http://localhost` to access the developer portal.
+That's it — pre-built images are pulled from GitHub Container Registry in ~2 minutes. Visit `http://localhost` to access the developer portal.
 
 The Community Edition is **free forever** — unlimited verifications, full source code, MIT license. Your data stays on your servers.
 
@@ -31,9 +31,24 @@ cd idswyft
 ```
 
 The install script will:
+- Pull pre-built Docker images from `ghcr.io/team-idswyft/`
 - Generate secure random values for `JWT_SECRET`, `API_KEY_SECRET`, `ENCRYPTION_KEY`
 - Create a `.env` file with your configuration
 - Start the stack via Docker Compose
+
+### Build from Source
+
+If you prefer to build images locally (e.g., for auditing, custom modifications, or ARM64 hosts):
+
+```bash
+# Via install script
+./install.sh --build
+
+# Or manually
+docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+```
+
+> **Note:** Pre-built images are x86_64 (amd64) only. On ARM64 hosts (Apple Silicon, AWS Graviton), use `--build` to compile from source.
 
 ### What Gets Deployed
 
@@ -187,7 +202,10 @@ install.sh         Interactive setup script
 
 | Variable | Description | Default |
 |----------|-------------|---------|
-| `DATABASE_URL` | PostgreSQL connection string | required |
+| `DB_NAME` | PostgreSQL database name | `idswyft` |
+| `DB_USER` | PostgreSQL username | `idswyft` |
+| `DB_PASSWORD` | PostgreSQL password | required |
+| `DATABASE_URL` | PostgreSQL connection string (auto-built in Docker) | required |
 | `JWT_SECRET` | Secret for auth tokens | required |
 | `API_KEY_SECRET` | Secret for API key generation | required |
 | `ENCRYPTION_KEY` | 32-char key for file encryption at rest | required |

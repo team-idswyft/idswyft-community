@@ -1,0 +1,25 @@
+# ─────────────────────────────────────────────────
+# Build-from-source override
+# ─────────────────────────────────────────────────
+# Use this to build images locally instead of pulling pre-built ones:
+#
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+#
+# The build: directives here override the image: directives in
+# docker-compose.yml, telling Compose to build from source and tag
+# the result with the ghcr.io image name.
+# ─────────────────────────────────────────────────
+
+services:
+  api:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        VITE_EDITION: community
+        VITE_API_URL: /api

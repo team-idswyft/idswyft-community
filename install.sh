@@ -8,9 +8,20 @@ set -euo pipefail
 #   curl -fsSL https://raw.githubusercontent.com/team-idswyft/idswyft/main/install.sh | bash
 #   or:
 #   git clone https://github.com/team-idswyft/idswyft.git && cd idswyft && ./install.sh
+#
+# Options:
+#   --build    Build images from source instead of pulling pre-built images
 # ─────────────────────────────────────────────────
 
 REPO_URL="https://github.com/team-idswyft/idswyft.git"
+BUILD_FROM_SOURCE=false
+
+# Parse arguments
+for arg in "$@"; do
+  case "$arg" in
+    --build) BUILD_FROM_SOURCE=true ;;
+  esac
+done
 
 # ── Colors & formatting ──────────────────────────
 BOLD="\033[1m"
@@ -219,6 +230,8 @@ setup_env() {
 # ─────────────────────────────────────────
 
 # Database
+DB_NAME=idswyft
+DB_USER=idswyft
 DB_PASSWORD=${db_password}
 
 # Authentication secrets (auto-generated, keep private)
@@ -240,88 +253,120 @@ EOF
 }
 
 # ─────────────────────────────────────────
-# Step 4: Build and start
+# Step 4: Pull images (or build from source)
 # ─────────────────────────────────────────
 start_services() {
-  step "Building containers"
-  divider
-  info "First run downloads base images + compiles the app"
-  info "Subsequent builds use cache and are much faster"
-  echo -e "  ${GRAY}│${RESET}"
+  if [ "$BUILD_FROM_SOURCE" = true ]; then
+    step "Building containers from source"
+    divider
+    info "Building locally — this may take 15-30 minutes on first run"
+    info "Tip: next time, omit --build to pull pre-built images (~2 min)"
+    echo -e "  ${GRAY}│${RESET}"
 
-  local build_log line_count
-  build_log=$(mktemp)
-  line_count=0
+    local build_log
+    build_log=$(mktemp)
 
-  set +e
-  docker compose build 2>&1 | tee "$build_log" | while IFS= read -r line; do
-    line_count=$((line_count + 1))
-
-    case "$line" in
-      *"Pulling"*|*"pulling"*)
-        echo -e "  ${GRAY}│${RESET}  ${BLUE}⬇${RESET}  ${line}"
-        ;;
-      *"Downloaded"*|*"Pull complete"*|*"Already exists"*)
-        echo -e "  ${GRAY}│${RESET}  ${GREEN}⬇${RESET}  ${DIM}${line}${RESET}"
-        ;;
-      *"STEP"*|*"Step"*)
-        echo -e "  ${GRAY}│${RESET}  ${MAGENTA}▸${RESET}  ${WHITE}${line}${RESET}"
-        ;;
-      *"CACHED"*)
-        echo -e "  ${GRAY}│${RESET}  ${GREEN}◆${RESET}  ${DIM}${line}${RESET}"
-        ;;
-      *"DONE"*)
-        echo -e "  ${GRAY}│${RESET}  ${GREEN}●${RESET}  ${GREEN}${line}${RESET}"
-        ;;
-      *"RUN"*|*"COPY"*|*"FROM"*|*"WORKDIR"*|*"ARG"*|*"EXPOSE"*|*"CMD"*)
-        echo -e "  ${GRAY}│${RESET}  ${CYAN}▸${RESET}  ${DIM}${line}${RESET}"
-        ;;
-      *"npm"*install*|*"npm"*build*|*"npm"*prune*)
-        echo -e "  ${GRAY}│${RESET}  ${YELLOW}▸${RESET}  ${line}"
-        ;;
-      *"error"*|*"Error"*|*"ERROR"*|*"failed"*)
-        echo -e "  ${GRAY}│${RESET}  ${RED}✗${RESET}  ${RED}${line}${RESET}"
-        ;;
-      *"exporting"*|*"writing"*|*"naming"*)
-        echo -e "  ${GRAY}│${RESET}  ${CYAN}◇${RESET}  ${DIM}${line}${RESET}"
-        ;;
-      *"#"[0-9]*)
-        echo -e "  ${GRAY}│${RESET}     ${GRAY}${line}${RESET}"
-        ;;
-    esac
-  done
-  local build_exit=${PIPESTATUS[0]}
-  set -e
-
-  if [ "$build_exit" -ne 0 ]; then
-    echo ""
-    echo -e "  ${RED}│${RESET}"
-    echo -e "  ${RED}│${RESET}  Build failed. Full log: ${BOLD}$build_log${RESET}"
-    echo -e "  ${RED}│${RESET}  Last 10 lines:"
-    tail -10 "$build_log" | while IFS= read -r errline; do
-      echo -e "  ${RED}│${RESET}    ${DIM}${errline}${RESET}"
+    set +e
+    docker compose -f docker-compose.yml -f docker-compose.build.yml build 2>&1 | tee "$build_log" | while IFS= read -r line; do
+      case "$line" in
+        *"STEP"*|*"Step"*)
+          echo -e "  ${GRAY}│${RESET}  ${MAGENTA}▸${RESET}  ${WHITE}${line}${RESET}" ;;
+        *"CACHED"*)
+          echo -e "  ${GRAY}│${RESET}  ${GREEN}◆${RESET}  ${DIM}${line}${RESET}" ;;
+        *"DONE"*)
+          echo -e "  ${GRAY}│${RESET}  ${GREEN}●${RESET}  ${GREEN}${line}${RESET}" ;;
+        *"error"*|*"Error"*|*"ERROR"*|*"failed"*)
+          echo -e "  ${GRAY}│${RESET}  ${RED}✗${RESET}  ${RED}${line}${RESET}" ;;
+        *"#"[0-9]*)
+          echo -e "  ${GRAY}│${RESET}     ${GRAY}${line}${RESET}" ;;
+      esac
     done
-    fail "Docker build failed — see above for details"
-  fi
-  rm -f "$build_log"
+    local build_exit=${PIPESTATUS[0]}
+    set -e
 
-  echo -e "  ${GRAY}│${RESET}"
-  ok "Containers built ${GREEN}${BOLD}$(elapsed)${RESET}"
+    if [ "$build_exit" -ne 0 ]; then
+      echo ""
+      echo -e "  ${RED}│${RESET}"
+      echo -e "  ${RED}│${RESET}  Build failed. Full log: ${BOLD}$build_log${RESET}"
+      echo -e "  ${RED}│${RESET}  Last 10 lines:"
+      tail -10 "$build_log" | while IFS= read -r errline; do
+        echo -e "  ${RED}│${RESET}    ${DIM}${errline}${RESET}"
+      done
+      fail "Docker build failed — see above for details"
+    fi
+    rm -f "$build_log"
+
+    echo -e "  ${GRAY}│${RESET}"
+    ok "Containers built ${GREEN}${BOLD}$(elapsed)${RESET}"
+  else
+    step "Pulling pre-built images"
+    divider
+    info "Downloading from GitHub Container Registry"
+    echo -e "  ${GRAY}│${RESET}"
+
+    set +e
+    docker compose pull 2>&1 | while IFS= read -r line; do
+      case "$line" in
+        *"Pulling"*|*"pulling"*)
+          echo -e "  ${GRAY}│${RESET}  ${BLUE}⬇${RESET}  ${line}" ;;
+        *"Downloaded"*|*"Pull complete"*|*"Already exists"*)
+          echo -e "  ${GRAY}│${RESET}  ${GREEN}⬇${RESET}  ${DIM}${line}${RESET}" ;;
+        *"done"*|*"Downloaded newer"*|*"up to date"*)
+          echo -e "  ${GRAY}│${RESET}  ${GREEN}●${RESET}  ${GREEN}${line}${RESET}" ;;
+        *"error"*|*"Error"*|*"ERROR"*)
+          echo -e "  ${GRAY}│${RESET}  ${RED}✗${RESET}  ${RED}${line}${RESET}" ;;
+        *)
+          echo -e "  ${GRAY}│${RESET}     ${DIM}${line}${RESET}" ;;
+      esac
+    done
+    local pull_exit=${PIPESTATUS[0]}
+    set -e
+
+    if [ "$pull_exit" -ne 0 ]; then
+      echo ""
+      warn "Failed to pull pre-built images — falling back to building from source"
+      info "This will take longer on first run (~15-30 minutes)"
+      echo -e "  ${GRAY}│${RESET}"
+
+      set +e
+      docker compose -f docker-compose.yml -f docker-compose.build.yml build 2>&1 | while IFS= read -r line; do
+        case "$line" in
+          *"DONE"*) echo -e "  ${GRAY}│${RESET}  ${GREEN}●${RESET}  ${GREEN}${line}${RESET}" ;;
+          *"error"*|*"Error"*|*"ERROR"*) echo -e "  ${GRAY}│${RESET}  ${RED}✗${RESET}  ${RED}${line}${RESET}" ;;
+          *"#"[0-9]*) echo -e "  ${GRAY}│${RESET}     ${GRAY}${line}${RESET}" ;;
+        esac
+      done
+      local fallback_exit=${PIPESTATUS[0]}
+      set -e
+
+      if [ "$fallback_exit" -ne 0 ]; then
+        fail "Docker build failed — check the output above for details"
+      fi
+      ok "Containers built from source ${GREEN}${BOLD}$(elapsed)${RESET}"
+      # Mark that we need to use build override for up -d
+      BUILD_FROM_SOURCE=true
+    else
+      echo -e "  ${GRAY}│${RESET}"
+      ok "Images pulled ${GREEN}${BOLD}$(elapsed)${RESET}"
+    fi
+  fi
 
   step "Starting services"
   divider
 
-  docker compose up -d 2>&1 | while IFS= read -r line; do
+  local compose_cmd="docker compose"
+  if [ "$BUILD_FROM_SOURCE" = true ]; then
+    compose_cmd="docker compose -f docker-compose.yml -f docker-compose.build.yml"
+  fi
+
+  $compose_cmd up -d 2>&1 | while IFS= read -r line; do
     case "$line" in
       *"Created"*|*"Started"*)
-        echo -e "  ${GRAY}│${RESET}  ${GREEN}▸${RESET}  ${line}"
-        ;;
+        echo -e "  ${GRAY}│${RESET}  ${GREEN}▸${RESET}  ${line}" ;;
       *"Running"*)
-        echo -e "  ${GRAY}│${RESET}  ${CYAN}▸${RESET}  ${DIM}${line}${RESET}"
-        ;;
+        echo -e "  ${GRAY}│${RESET}  ${CYAN}▸${RESET}  ${DIM}${line}${RESET}" ;;
       *)
-        echo -e "  ${GRAY}│${RESET}     ${DIM}${line}${RESET}"
-        ;;
+        echo -e "  ${GRAY}│${RESET}     ${DIM}${line}${RESET}" ;;
     esac
   done
   ok "Containers started"

@@ -1,11 +1,17 @@
-# ── Idswyft API — Single-stage build ──────────────────
-# Single stage avoids the expensive cross-stage COPY of node_modules
-# (~1-2GB) which is the main bottleneck on Windows Docker Desktop.
-FROM node:20-slim
+# ── Idswyft API — Multi-stage build ──────────────────
+# Stage 1: install deps, download models, compile TypeScript
+# Stage 2: slim runtime with only what's needed to run
+#
+# This Dockerfile is optimized for CI (GitHub Actions) and pre-built
+# image pulls. For local builds, use:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+# ─────────────────────────────────────────────────────
+
+# ── Stage 1: Build ──────────────────────────────────
+FROM node:20-slim AS build
 WORKDIR /app
 
-# Native build + runtime dependencies
-# Using slim (Debian) instead of Alpine because onnxruntime-node requires full glibc
+# Native build dependencies (needed to compile canvas, sharp, onnxruntime)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     make \
@@ -19,7 +25,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Install dependencies
+# Install all dependencies (including devDependencies for build)
 COPY package*.json ./
 RUN npm install --include=optional
 
@@ -27,13 +33,35 @@ RUN npm install --include=optional
 COPY download-models.js ./
 RUN node download-models.js
 
-# Build the TypeScript source
+# Copy source and compile TypeScript
+# Note: using tsc directly instead of `npm run build` because the build
+# script also runs download-models.js, which we already ran above
 COPY . .
-RUN npm run build
+RUN npx tsc && npx tsc-alias
 
-# Remove .bin symlinks — they break Docker Desktop on Windows
-# (containerd snapshotter can't extract symlinks during layer export)
-RUN rm -rf node_modules/.bin
+# ── Stage 2: Runtime ────────────────────────────────
+FROM node:20-slim
+WORKDIR /app
+
+# Runtime-only native libraries (no compilers)
+# - libcairo2, libpango, libjpeg, libgif, librsvg: for canvas
+# - libstdc++6: for onnxruntime-node (already in node:20-slim)
+# - wget: for health checks
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libcairo2 \
+    libjpeg62-turbo \
+    libpango-1.0-0 \
+    libpangocairo-1.0-0 \
+    libgif7 \
+    librsvg2-2 \
+    wget \
+    && rm -rf /var/lib/apt/lists/*
+
+# Copy compiled output + node_modules + models from build stage
+COPY --from=build /app/dist ./dist
+COPY --from=build /app/node_modules ./node_modules
+COPY --from=build /app/models ./models
+COPY --from=build /app/package.json ./package.json
 
 EXPOSE 3001
 

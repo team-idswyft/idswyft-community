@@ -1,10 +1,13 @@
 # ─────────────────────────────────────────────────
 # Idswyft Community Edition — Self-Hosted Install
 # ─────────────────────────────────────────────────
-# Quick start:
+# Quick start (pulls pre-built images, ~2 minutes):
 #   ./install.sh        (interactive setup)
 #   docker compose up -d
 #   Visit http://localhost
+#
+# Build from source instead:
+#   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 # ─────────────────────────────────────────────────
 
 services:
@@ -17,11 +20,11 @@ services:
     volumes:
       - pgdata:/var/lib/postgresql/data
     environment:
-      POSTGRES_DB: idswyft
-      POSTGRES_USER: idswyft
+      POSTGRES_DB: ${DB_NAME:-idswyft}
+      POSTGRES_USER: ${DB_USER:-idswyft}
       POSTGRES_PASSWORD: ${DB_PASSWORD:-changeme-in-production}
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U idswyft"]
+      test: ["CMD-SHELL", "pg_isready -U ${DB_USER:-idswyft}"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -30,9 +33,7 @@ services:
   # Core identity verification API
   # ─────────────────────────────────────────
   api:
-    build:
-      context: ./backend
-      dockerfile: Dockerfile
+    image: ghcr.io/team-idswyft/idswyft-api:latest
     restart: unless-stopped
     depends_on:
       postgres:
@@ -40,7 +41,7 @@ services:
     environment:
       NODE_ENV: production
       PORT: "3001"
-      DATABASE_URL: postgresql://idswyft:${DB_PASSWORD:-changeme-in-production}@postgres:5432/idswyft
+      DATABASE_URL: postgresql://${DB_USER:-idswyft}:${DB_PASSWORD:-changeme-in-production}@postgres:5432/${DB_NAME:-idswyft}
       JWT_SECRET: ${JWT_SECRET:-change-this-jwt-secret}
       API_KEY_SECRET: ${API_KEY_SECRET:-change-this-api-key-secret}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change-this-32-char-encrypt-key!}
@@ -61,12 +62,7 @@ services:
   # Dev Portal frontend (community edition)
   # ─────────────────────────────────────────
   frontend:
-    build:
-      context: ./frontend
-      dockerfile: Dockerfile
-      args:
-        VITE_EDITION: community
-        VITE_API_URL: /api
+    image: ghcr.io/team-idswyft/idswyft-frontend:latest
     restart: unless-stopped
     depends_on:
       - api
