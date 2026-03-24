@@ -39,6 +39,9 @@ RUN node download-models.js
 COPY . .
 RUN npx tsc && npx tsc-alias
 
+# Strip devDependencies — only production deps go to runtime stage
+RUN npm prune --omit=dev
+
 # ── Stage 2: Runtime ────────────────────────────────
 FROM node:20-slim
 WORKDIR /app
