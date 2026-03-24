@@ -5,6 +5,13 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.0] - 2026-03-24
+
+### Added
+- Community edition first-run setup wizard — `GET /api/setup/status` and `POST /api/setup/initialize`
+- Auto-detects zero-developer state, creates first account + API key without OTP
+- Rate-limited setup endpoint (5 req/15min) with input sanitization
+
 ## [1.2.0] - 2026-03-20
 
 ### Changed
