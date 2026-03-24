@@ -478,7 +478,153 @@ export function HomePage() {
         </div>
       </section>
 
-      {/* 7. CTA */}
+      {/* 7. PRICING PREVIEW */}
+      <section className="scroll-reveal" style={{ padding: '80px 24px', maxWidth: 1100, margin: '0 auto' }}>
+        <div style={{ textAlign: 'center', marginBottom: 48 }}>
+          <div style={{ fontFamily: C.mono, fontSize: 11, color: C.muted, letterSpacing: '0.1em', textTransform: 'uppercase', marginBottom: 12 }}>
+            Pricing
+          </div>
+          <h2 style={{ fontFamily: C.mono, fontSize: 28, fontWeight: 600, color: C.text, marginBottom: 8 }}>
+            Start free. Scale when ready.
+          </h2>
+          <p style={{ color: C.muted, fontSize: 15 }}>
+            Self-host the full engine or let us run it for you.
+          </p>
+        </div>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 20 }}>
+          {/* Community — prominent */}
+          <div style={{
+            background: C.panel,
+            border: `2px solid ${C.cyan}`,
+            borderRadius: 14,
+            padding: 28,
+            position: 'relative',
+          }}>
+            <div style={{
+              position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)',
+              background: C.cyan, color: C.bg,
+              fontFamily: C.mono, fontSize: 11, fontWeight: 600,
+              padding: '4px 14px', borderRadius: 20, letterSpacing: '0.04em',
+            }}>
+              Open Source
+            </div>
+            <div style={{ fontFamily: C.mono, fontSize: 13, fontWeight: 600, color: C.cyan, marginBottom: 12 }}>
+              Community Edition
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <span style={{ fontFamily: C.mono, fontSize: 40, fontWeight: 700, color: C.text }}>Free</span>
+              <span style={{ fontFamily: C.mono, fontSize: 14, color: C.dim, marginLeft: 6 }}>forever</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+              {['Unlimited verifications', 'Full source code (MIT)', 'Your infrastructure, your data', 'Community support'].map(item => (
+                <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.text }}>
+                  <div style={{ width: 5, height: 5, borderRadius: '50%', background: C.cyan, flexShrink: 0 }} />
+                  {item}
+                </div>
+              ))}
+            </div>
+            <a
+              href="https://github.com/team-idswyft/idswyft"
+              target="_blank"
+              rel="noopener noreferrer"
+              style={{
+                display: 'block', textAlign: 'center', padding: '10px 20px', borderRadius: 8,
+                fontWeight: 600, fontSize: 13, textDecoration: 'none',
+                background: C.cyan, color: C.bg,
+              }}
+            >
+              View on GitHub
+            </a>
+          </div>
+
+          {/* Cloud Starter */}
+          <div style={{
+            background: C.panel,
+            border: `1px solid ${C.border}`,
+            borderRadius: 14,
+            padding: 28,
+          }}>
+            <div style={{ fontFamily: C.mono, fontSize: 13, fontWeight: 600, color: C.muted, marginBottom: 12 }}>
+              Cloud Starter
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <span style={{ fontFamily: C.mono, fontSize: 40, fontWeight: 700, color: C.text }}>$0</span>
+              <span style={{ fontFamily: C.mono, fontSize: 14, color: C.dim, marginLeft: 6 }}>/mo</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+              {['50 verifications / month', 'Managed hosting', 'Email support', '99.5% uptime SLA'].map(item => (
+                <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.text }}>
+                  <div style={{ width: 5, height: 5, borderRadius: '50%', background: C.green, flexShrink: 0 }} />
+                  {item}
+                </div>
+              ))}
+            </div>
+            <Link
+              to="/developer"
+              style={{
+                display: 'block', textAlign: 'center', padding: '10px 20px', borderRadius: 8,
+                fontWeight: 600, fontSize: 13, textDecoration: 'none',
+                border: `1px solid ${C.border}`, color: C.text,
+              }}
+            >
+              Get Started
+            </Link>
+          </div>
+
+          {/* Cloud Pro */}
+          <div style={{
+            background: C.panel,
+            border: `1px solid ${C.border}`,
+            borderRadius: 14,
+            padding: 28,
+            position: 'relative',
+          }}>
+            <div style={{
+              position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)',
+              background: C.surface, color: C.muted,
+              fontFamily: C.mono, fontSize: 11, fontWeight: 600,
+              padding: '4px 14px', borderRadius: 20, letterSpacing: '0.04em',
+              border: `1px solid ${C.border}`,
+            }}>
+              Most Popular
+            </div>
+            <div style={{ fontFamily: C.mono, fontSize: 13, fontWeight: 600, color: C.muted, marginBottom: 12 }}>
+              Cloud Pro
+            </div>
+            <div style={{ marginBottom: 16 }}>
+              <span style={{ fontFamily: C.mono, fontSize: 40, fontWeight: 700, color: C.text }}>$49</span>
+              <span style={{ fontFamily: C.mono, fontSize: 14, color: C.dim, marginLeft: 6 }}>/mo</span>
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
+              {['2,000 verifications / month', 'Priority support + monitoring', 'Audit logs & daily backups', '99.9% uptime SLA'].map(item => (
+                <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.text }}>
+                  <div style={{ width: 5, height: 5, borderRadius: '50%', background: C.green, flexShrink: 0 }} />
+                  {item}
+                </div>
+              ))}
+            </div>
+            <Link
+              to="/developer"
+              style={{
+                display: 'block', textAlign: 'center', padding: '10px 20px', borderRadius: 8,
+                fontWeight: 600, fontSize: 13, textDecoration: 'none',
+                border: `1px solid ${C.border}`, color: C.text,
+              }}
+            >
+              Get Started
+            </Link>
+          </div>
+        </div>
+
+        <div style={{ textAlign: 'center', marginTop: 28 }}>
+          <Link to="/pricing" style={{ color: C.cyan, fontSize: 14, fontFamily: C.mono, textDecoration: 'none' }}>
+            Compare all features →
+          </Link>
+        </div>
+      </section>
+
+      {/* 8. CTA */}
       <section className="scroll-reveal pattern-guilloche pattern-subtle pattern-animate-slow pattern-full" style={{ padding: '80px 24px', textAlign: 'center', background: C.panel, borderTop: `1px solid ${C.border}`, position: 'relative', overflow: 'hidden' }}>
         <h2 style={{ fontFamily: C.mono, fontSize: 28, fontWeight: 600, color: C.text, marginBottom: 16 }}>
           Ready to integrate?
