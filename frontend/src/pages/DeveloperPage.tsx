@@ -1,7 +1,8 @@
 ﻿import React, { useState, useEffect } from 'react'
 import toast from 'react-hot-toast'
-import { Link } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { API_BASE_URL } from '../config/api'
+import { isCommunity } from '../config/edition'
 import { C, injectFonts } from '../theme'
 import '../styles/patterns.css'
 import { AnalyticsCharts } from '../components/developer/AnalyticsCharts'
@@ -616,9 +617,23 @@ function CreateKeyModal({ onClose, onCreated, token }: {
 // â"€â"€â"€ Main portal â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
 export function DeveloperPage() {
+  const navigate = useNavigate()
   useEffect(() => { injectFonts() }, [])
 
   const [token, setToken] = useState<string | null>(localStorage.getItem('developer_token'))
+  const [setupNeeded, setSetupNeeded] = useState<boolean | null>(null)
+
+  // Community edition: redirect to /setup if no developers exist yet
+  useEffect(() => {
+    if (token || !isCommunity) { setSetupNeeded(false); return }
+    fetch(`${API_BASE_URL}/api/setup/status`)
+      .then(r => r.json())
+      .then(data => {
+        if (data.needs_setup) navigate('/setup', { replace: true })
+        else setSetupNeeded(false)
+      })
+      .catch(() => setSetupNeeded(false))
+  }, [token, navigate])
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([])
   const [stats, setStats] = useState<DeveloperStats | null>(null)
   const [showCreate, setShowCreate] = useState(false)
@@ -1249,6 +1264,14 @@ export function DeveloperPage() {
   }
 
   if (!token) {
+    // Community edition: show spinner while checking if setup is needed
+    if (isCommunity && setupNeeded === null) {
+      return (
+        <div style={{ background: C.bg, fontFamily: C.sans, color: C.text, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          <div style={{ color: C.muted, fontSize: 14 }}>Loading...</div>
+        </div>
+      )
+    }
     return (
       <div style={{ background: C.bg, fontFamily: C.sans, color: C.text, minHeight: '100vh' }}>
         <AuthGate onAuth={handleAuth} />

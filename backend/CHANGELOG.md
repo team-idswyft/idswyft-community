@@ -5,6 +5,36 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.4.0] - 2026-03-24
+
+### Added
+- Community edition first-run setup wizard — `GET /api/setup/status` and `POST /api/setup/initialize`
+- Auto-detects zero-developer state, creates first account + API key without OTP
+- Rate-limited setup endpoint (5 req/15min) with input sanitization
+- Docker auto-migration on boot via entrypoint script
+- Migration runner: configurable directory (`MIGRATIONS_DIR`), conditional SSL, lenient mode
+
+### Removed
+- VaaS-specific migrations (06, 08, 10) that don't belong in community edition
+
+### Fixed
+- Docker frontend double `/api/api/` URL prefix — production builds now use same-origin (empty base URL)
+
+## [1.3.0] - 2026-03-24 (superseded by 1.4.0)
+
+_Initial setup wizard implementation, replaced by the clean rewrite in 1.4.0._
+
+### Added
+- Setup wizard endpoints (initial version)
+- Version bump and changelog entry
+
+## [1.3.1] - 2026-03-24 (superseded by 1.4.0)
+
+_Docker integration fixes for 1.3.0, folded into 1.4.0._
+
+### Fixed
+- API URL prefix, auto-migration entrypoint, removed VaaS migrations
+
 ## [1.2.0] - 2026-03-20
 
 ### Changed

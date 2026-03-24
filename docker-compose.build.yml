@@ -22,4 +22,3 @@ services:
       dockerfile: Dockerfile
       args:
         VITE_EDITION: community
-        VITE_API_URL: /api
