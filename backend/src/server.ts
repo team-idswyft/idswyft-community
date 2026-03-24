@@ -28,6 +28,7 @@ import batchRoutes from './routes/batch.js';
 import addressVerificationRoutes from './routes/addressVerification.js';
 import monitoringRoutes from './routes/monitoring.js';
 import statusRoutes from './routes/status.js';
+import setupRoutes from './routes/setup.js';
 import { API_DOCS_MARKDOWN } from './api-docs/apiDocsMarkdown.js';
 
 const app = express();
@@ -110,6 +111,7 @@ app.use('/api/v2/batch', batchRoutes);
 app.use('/api/v2/verify', addressVerificationRoutes);
 app.use('/api/v2/monitoring', monitoringRoutes);
 app.use('/api/status', statusRoutes);
+app.use('/api/setup', setupRoutes);
 
 // Local file serving — authenticated with API key, path traversal blocked in serveLocalFile
 if (config.storage.provider === 'local') {

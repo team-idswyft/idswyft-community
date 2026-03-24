@@ -14,6 +14,7 @@ import { NotFoundPage } from './pages/NotFoundPage'
 import { LegalPage } from './pages/LegalPage'
 import { PricingPage } from './pages/PricingPage'
 import { Status } from './pages/Status'
+import { SetupPage } from './pages/SetupPage'
 import { PatternShowcase } from './components/PatternShowcase'
 import { isCommunity, isCloud } from './config/edition'
 
@@ -41,6 +42,8 @@ function App() {
         <Route path="/verify/mobile" element={<MobileVerificationPage />} />
         <Route path="/docs/markdown" element={<MarkdownDocsPage />} />
         <Route path="/docs" element={<DocsPage />} />
+        {/* Community-only setup wizard — redirect to portal in cloud */}
+        <Route path="/setup" element={isCommunity ? <SetupPage /> : <Navigate to="/" replace />} />
         <Route path="/status" element={<Status />} />
         <Route path="/legal" element={<LegalPage />} />
         <Route path="/admin/login" element={<AdminLogin />} />
