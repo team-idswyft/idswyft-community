@@ -5,6 +5,14 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.3.1] - 2026-03-24
+
+### Fixed
+- Docker frontend double `/api/api/` URL prefix — setup wizard and all API calls now work correctly in Docker
+- Auto-run database migrations on Docker boot via entrypoint script
+- Migration runner: conditional SSL (skip for Docker postgres), configurable migrations dir, lenient mode
+- Removed 3 VaaS-specific migrations (06, 08, 10) that broke community Docker postgres
+
 ## [1.3.0] - 2026-03-24
 
 ### Added

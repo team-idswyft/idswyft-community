@@ -6,7 +6,8 @@ RUN npm ci
 
 # Edition flag — defaults to community for self-hosted
 ARG VITE_EDITION=community
-ARG VITE_API_URL=/api
+# Optional: override API base URL (leave empty for same-origin via nginx proxy)
+ARG VITE_API_URL
 
 COPY . .
 RUN npm run build

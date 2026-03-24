@@ -4,12 +4,19 @@
 // Vite's /api proxy forwards to localhost:3001 server-side, so the phone only
 // ever needs to reach port 5173 — no firewall or CORS issues.
 const _getApiBaseUrl = (): string => {
+  // Explicit override — custom deployments can point the frontend at any API origin
   if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+
+  // Production build (Docker/nginx) — same-origin; nginx proxies /api/ to backend
+  if (!import.meta.env.DEV) return '';
+
+  // Vite dev server on a LAN IP (e.g. phone testing) — proxy through Vite
   const h = window.location.hostname;
   if (h !== 'localhost' && h !== '127.0.0.1') {
-    // Network IP: proxy API through Vite (same host:port as the frontend)
     return `${window.location.protocol}//${window.location.host}`;
   }
+
+  // Vite dev server on localhost — hit backend directly
   return 'http://localhost:3001';
 };
 export const API_BASE_URL = _getApiBaseUrl();

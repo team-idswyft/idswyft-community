@@ -63,6 +63,14 @@ COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/models ./models
 COPY --from=build /app/package.json ./package.json
 
+# Entrypoint: auto-migrate then start server
+# sed converts Windows CRLF → LF (git on Windows may check out with \r\n)
+COPY --from=build /app/docker-entrypoint.sh ./docker-entrypoint.sh
+RUN sed -i 's/\r$//' ./docker-entrypoint.sh && chmod +x ./docker-entrypoint.sh
+
+# Migrations are bind-mounted from supabase/migrations/ at runtime
+ENV MIGRATIONS_DIR=/app/migrations
+
 EXPOSE 3001
 
-CMD ["node", "dist/server.js"]
+CMD ["sh", "./docker-entrypoint.sh"]

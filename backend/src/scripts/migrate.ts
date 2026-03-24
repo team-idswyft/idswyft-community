@@ -28,8 +28,7 @@ const __dirname = dirname(__filename);
 dotenv.config({ path: join(__dirname, '../../.env') });
 
 // ── Config ──────────────────────────────────────────────────────────────────
-const DATABASE_URL = process.env.DATABASE_URL;
-if (!DATABASE_URL) {
+if (!process.env.DATABASE_URL) {
   console.error(
     '❌ DATABASE_URL is not set.\n' +
     '\n' +
@@ -44,14 +43,17 @@ if (!DATABASE_URL) {
   );
   process.exit(1);
 }
+const DATABASE_URL: string = process.env.DATABASE_URL;
 
-const MIGRATIONS_DIR = join(__dirname, '../../../supabase/migrations');
+const MIGRATIONS_DIR = process.env.MIGRATIONS_DIR || join(__dirname, '../../../supabase/migrations');
 
 // ── Main ────────────────────────────────────────────────────────────────────
 async function main() {
+  // Only use SSL for cloud-hosted Postgres (e.g. Supabase)
+  const useSSL = DATABASE_URL.includes('supabase.co') || process.env.DB_SSL === 'true';
   const client = new pg.Client({
     connectionString: DATABASE_URL,
-    ssl: { rejectUnauthorized: false },
+    ...(useSSL ? { ssl: { rejectUnauthorized: false } } : {}),
   });
 
   try {
@@ -75,8 +77,13 @@ async function main() {
       .filter(f => f.endsWith('.sql'))
       .sort();
 
+    // In Docker (community edition), skip migrations that fail due to missing
+    // prerequisites rather than blocking the server from starting.
+    const lenient = process.env.MIGRATIONS_LENIENT === 'true';
+
     // Run pending migrations
     let ranCount = 0;
+    let skippedCount = 0;
     for (const file of files) {
       if (appliedSet.has(file)) {
         console.log(`  ⏭️  ${file} (already applied)`);
@@ -95,15 +102,20 @@ async function main() {
         ranCount++;
       } catch (err: any) {
         await client.query('ROLLBACK');
-        console.error(`  ❌ ${file} FAILED: ${err.message}`);
-        process.exit(1);
+        if (lenient) {
+          console.warn(`  ⚠️  ${file} skipped: ${err.message}`);
+          skippedCount++;
+        } else {
+          console.error(`  ❌ ${file} FAILED: ${err.message}`);
+          process.exit(1);
+        }
       }
     }
 
-    if (ranCount === 0) {
+    if (ranCount === 0 && skippedCount === 0) {
       console.log('\n✅ Database is up to date — no pending migrations');
     } else {
-      console.log(`\n✅ Applied ${ranCount} migration(s) successfully`);
+      console.log(`\n✅ Applied ${ranCount} migration(s)${skippedCount > 0 ? `, skipped ${skippedCount}` : ''}`);
     }
   } finally {
     await client.end();
