@@ -7,8 +7,8 @@ WORKDIR /app
 
 # Native build + runtime dependencies
 # Using slim (Debian) instead of Alpine because onnxruntime-node requires full glibc
-RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
-    --mount=type=cache,target=/var/lib/apt,sharing=locked \
+RUN --mount=type=cache,id=apt-cache,target=/var/cache/apt,sharing=locked \
+    --mount=type=cache,id=apt-lib,target=/var/lib/apt,sharing=locked \
     apt-get update && apt-get install -y --no-install-recommends \
     python3 \
     make \
@@ -23,7 +23,7 @@ RUN --mount=type=cache,target=/var/cache/apt,sharing=locked \
 
 # Install dependencies (cache mount keeps downloaded packages between builds)
 COPY package*.json ./
-RUN --mount=type=cache,target=/root/.npm \
+RUN --mount=type=cache,id=npm-cache,target=/root/.npm \
     npm install --include=optional
 
 # Download face detection model weights
