@@ -1473,8 +1473,14 @@ const DemoPage: React.FC = () => {
                     userId={userId}
                     source="demo"
                     onComplete={(result) => {
-                      setMobileResult(result);
-                      setMobileHandoffDone(true);
+                      if (result.verification_id) {
+                        setVerificationId(result.verification_id);
+                        loadVerificationResults(result.verification_id);
+                        setCurrentStep(5);
+                      } else {
+                        setMobileResult(result);
+                        setMobileHandoffDone(true);
+                      }
                     }}
                   />
                 </div>

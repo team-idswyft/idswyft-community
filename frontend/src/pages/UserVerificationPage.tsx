@@ -12,7 +12,7 @@ import { API_BASE_URL, shouldUseSandbox } from '../config/api';
 // 'desktop'    → EndUserVerification with dark theme
 // 'address'    → optional address verification (when address_verif=true)
 // ────────────────────────────────────────────────────────────────────
-type Phase = 'choice' | 'mobile-qr' | 'desktop' | 'address';
+type Phase = 'choice' | 'mobile-qr' | 'desktop' | 'address' | 'completed';
 
 const UserVerificationPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -80,9 +80,12 @@ const UserVerificationPage: React.FC = () => {
 
     if (window.parent !== window) {
       window.parent.postMessage({ type: 'VERIFICATION_COMPLETE', result }, '*');
-    }
-    if (redirectUrl) {
+    } else if (redirectUrl) {
       setTimeout(() => { window.location.href = buildRedirectUrl(redirectUrl, result); }, 1500);
+    } else {
+      // Not in iframe, no redirect — show completion screen
+      setVerificationResult(result);
+      setPhase('completed');
     }
   };
 
@@ -253,6 +256,69 @@ const UserVerificationPage: React.FC = () => {
           onRedirect={handleRedirect}
           allowedDocumentTypes={['passport', 'drivers_license', 'national_id']}
         />
+      </div>
+    );
+  }
+
+  // ── Phase: completed — terminal state when no redirect/iframe ───────
+  if (!viewOnly && phase === 'completed') {
+    const statusLabel = verificationResult?.status === 'verified' || verificationResult?.status === 'completed'
+      ? 'Verified' : verificationResult?.status === 'failed' ? 'Failed' : 'Under Review';
+    const isSuccess = statusLabel === 'Verified';
+    const isFailed = statusLabel === 'Failed';
+    return (
+      <div style={{ background: C.bg, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+        <div style={{ maxWidth: 440, width: '100%', textAlign: 'center' }}>
+          <img src="/idswyft-logo.png" alt="Idswyft" style={{ height: 36, margin: '0 auto 32px' }} />
+          <div style={{
+            width: 56, height: 56, borderRadius: '50%', margin: '0 auto 16px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24,
+            background: isSuccess ? C.greenDim : isFailed ? C.redDim : C.amberDim,
+            border: `1px solid ${isSuccess ? C.green : isFailed ? C.red : C.amber}`,
+            color: isSuccess ? C.green : isFailed ? C.red : C.amber,
+          }}>
+            {isSuccess ? '✓' : isFailed ? '✗' : '⏳'}
+          </div>
+          <h1 style={{ fontFamily: C.sans, fontSize: '1.4rem', fontWeight: 600, color: C.text, margin: '0 0 8px' }}>
+            Verification {statusLabel}
+          </h1>
+          <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, margin: '0 0 24px' }}>
+            {isSuccess
+              ? 'Your identity has been successfully verified.'
+              : statusLabel === 'Failed'
+                ? 'Verification could not be completed. Please try again.'
+                : 'Your verification is being reviewed. You will be notified of the result.'}
+          </p>
+          {verificationResult && (
+            <div style={{
+              background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14,
+              padding: '16px 20px', textAlign: 'left', fontSize: '0.82rem',
+              display: 'flex', flexDirection: 'column', gap: 8,
+            }}>
+              {verificationResult.confidence_score != null && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: C.muted }}>Confidence</span>
+                  <span style={{ color: C.text, fontWeight: 600 }}>{Math.round(verificationResult.confidence_score * 100)}%</span>
+                </div>
+              )}
+              {verificationResult.face_match_score != null && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: C.muted }}>Face Match</span>
+                  <span style={{ color: C.text, fontWeight: 600 }}>{Math.round(verificationResult.face_match_score * 100)}%</span>
+                </div>
+              )}
+              {verificationResult.liveness_score != null && (
+                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                  <span style={{ color: C.muted }}>Liveness</span>
+                  <span style={{ color: C.text, fontWeight: 600 }}>{Math.round(verificationResult.liveness_score * 100)}%</span>
+                </div>
+              )}
+            </div>
+          )}
+          <p style={{ fontFamily: C.sans, fontSize: '0.75rem', color: C.dim, marginTop: 24 }}>
+            You can close this window.
+          </p>
+        </div>
       </div>
     );
   }
