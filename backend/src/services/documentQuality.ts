@@ -1,4 +1,5 @@
-import Jimp from 'jimp';
+// Dynamic import — jimp is only available in dev mode or the Engine Worker
+let Jimp: any;
 import { statSync, readFileSync } from 'fs';
 import sizeOf from 'image-size';
 import { SharpTamperDetector } from '@/providers/tampering/SharpTamperDetector.js';
@@ -47,7 +48,8 @@ export class DocumentQualityService {
       // Get image dimensions using image-size (faster than loading full image)
       const dimensions = sizeOf(filePath);
 
-      // Load image with Jimp for analysis
+      // Load image with Jimp for analysis (dynamic import — optional dep)
+      if (!Jimp) Jimp = (await import('jimp')).default;
       const image = await Jimp.read(filePath);
 
       // Calculate basic image statistics
@@ -157,7 +159,7 @@ export class DocumentQualityService {
     }
   }
 
-  private static calculateImageStats(image: Jimp): { brightness: number; contrast: number } {
+  private static calculateImageStats(image: any): { brightness: number; contrast: number } {
     const width = image.getWidth();
     const height = image.getHeight();
 
@@ -190,7 +192,7 @@ export class DocumentQualityService {
     };
   }
 
-  private static calculateBlurScore(image: Jimp): number {
+  private static calculateBlurScore(image: any): number {
     try {
       // Simple edge detection for blur measurement
       const width = image.getWidth();

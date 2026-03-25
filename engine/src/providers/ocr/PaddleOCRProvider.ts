@@ -1,8 +1,8 @@
-// Dynamic import — ppu-paddle-ocr is only available in dev mode or the Engine Worker.
-// In production Docker, the engine handles OCR via HTTP (ENGINE_URL).
-let PaddleOcrService: any;
-type PaddleOcrResult = any;
-type RecognitionResult = any;
+import {
+  PaddleOcrService,
+  type PaddleOcrResult,
+  type RecognitionResult,
+} from 'ppu-paddle-ocr';
 import { OCRProvider } from '../types.js';
 import { OCRData } from '../../types/index.js';
 import { logger } from '@/utils/logger.js';
@@ -263,18 +263,14 @@ function nameScore(text: string): number {
 export class PaddleOCRProvider implements OCRProvider {
   readonly name = 'paddle';
 
-  private service:     any = null;
-  private initPromise: Promise<void> | null = null;
+  private service:     PaddleOcrService | null = null;
+  private initPromise: Promise<void>     | null = null;
 
-  private async ensureInitialized(): Promise<any> {
+  private async ensureInitialized(): Promise<PaddleOcrService> {
     if (this.service) return this.service;
     if (!this.initPromise) {
       this.initPromise = (async () => {
         logger.info('PaddleOCRProvider: initializing ONNX models…');
-        if (!PaddleOcrService) {
-          const mod = await import('ppu-paddle-ocr');
-          PaddleOcrService = mod.PaddleOcrService;
-        }
         const svc = new PaddleOcrService({ debugging: { verbose: false } });
         await svc.initialize();
         this.service = svc;

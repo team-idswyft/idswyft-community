@@ -1,9 +1,11 @@
 # ── Idswyft API — Multi-stage build ──────────────────
-# Stage 1: install deps, download models, compile TypeScript
+# Stage 1: install deps, compile TypeScript
 # Stage 2: slim runtime with only what's needed to run
 #
-# This Dockerfile is optimized for CI (GitHub Actions) and pre-built
-# image pulls. For local builds, use:
+# ML dependencies (TensorFlow, ONNX, PaddleOCR, canvas) have been moved
+# to the Engine Worker container. This image is now lightweight (~250MB).
+#
+# For local builds:
 #   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 # ─────────────────────────────────────────────────────
 
@@ -11,17 +13,8 @@
 FROM node:20-slim AS build
 WORKDIR /app
 
-# Native build dependencies (needed to compile canvas, sharp, onnxruntime)
+# Minimal build dependencies (sharp uses pre-built binaries, no native build needed)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    python3 \
-    make \
-    g++ \
-    libcairo2-dev \
-    libjpeg-dev \
-    libpango1.0-dev \
-    libgif-dev \
-    librsvg2-dev \
-    pkg-config \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
@@ -29,13 +22,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 COPY package*.json ./
 RUN npm install --include=optional
 
-# Download face detection model weights
-COPY download-models.js ./
-RUN node download-models.js
-
 # Copy source and compile TypeScript
-# Note: using tsc directly instead of `npm run build` because the build
-# script also runs download-models.js, which we already ran above
 COPY . .
 RUN npx tsc && npx tsc-alias
 
@@ -46,24 +33,14 @@ RUN npm prune --omit=dev
 FROM node:20-slim
 WORKDIR /app
 
-# Runtime-only native libraries (no compilers)
-# - libcairo2, libpango, libjpeg, libgif, librsvg: for canvas
-# - libstdc++6: for onnxruntime-node (already in node:20-slim)
-# - wget: for health checks
+# Runtime: only wget for health checks (sharp pre-built binaries are self-contained)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libcairo2 \
-    libjpeg62-turbo \
-    libpango-1.0-0 \
-    libpangocairo-1.0-0 \
-    libgif7 \
-    librsvg2-2 \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Copy compiled output + node_modules + models from build stage
+# Copy compiled output + node_modules from build stage
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
-COPY --from=build /app/models ./models
 COPY --from=build /app/package.json ./package.json
 
 # Entrypoint: auto-migrate then start server

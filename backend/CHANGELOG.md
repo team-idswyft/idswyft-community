@@ -5,6 +5,23 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.0] - 2026-03-24
+
+### Changed
+- **Extracted ML verification engine into separate microservice** (`engine/`)
+  - Core API image reduced from ~2GB to ~250MB — no longer bundles TensorFlow, ONNX, PaddleOCR, or canvas
+  - Engine Worker runs as a standalone container (~1.5GB) handling OCR, face detection, liveness, and deepfake analysis
+  - API calls engine via HTTP (`ENGINE_URL` env var) during verifications; falls back to local extraction when unset
+- Docker Compose architecture: postgres + engine + api + frontend (4 containers)
+- Backend `package.json` stripped of `@tensorflow/tfjs`, `@vladmandic/face-api`, `onnxruntime-node`, `ppu-paddle-ocr`, `canvas`, `jimp`, `tesseract.js`, `@zxing/*`
+- Backend Dockerfile no longer needs native build tools (python3, make, g++, libcairo2-dev, etc.)
+- CI workflow builds 3 images in parallel: api, engine, frontend
+
+### Added
+- `engine/` directory with its own `package.json`, `tsconfig.json`, `Dockerfile`, and Express server
+- `backend/src/services/engineClient.ts` — HTTP client for the engine worker using native `fetch` + `FormData`
+- `ENGINE_URL` environment variable for engine service discovery
+
 ## [1.4.0] - 2026-03-24
 
 ### Added

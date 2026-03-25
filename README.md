@@ -52,11 +52,12 @@ docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 
 ### What Gets Deployed
 
-| Service    | Description                        | Port  |
-|------------|------------------------------------|-------|
-| `api`      | Verification engine (Node.js)      | 3001  |
-| `frontend` | Developer portal (React)           | 80    |
-| `postgres` | PostgreSQL 16 database             | 5432  |
+| Service    | Description                              | Port  | Image Size |
+|------------|------------------------------------------|-------|------------|
+| `postgres` | PostgreSQL 16 database                   | 5432  | ~80MB      |
+| `engine`   | ML verification engine (OCR, face, liveness) | 3002 | ~1.5GB    |
+| `api`      | Core API (lightweight orchestrator)      | 3001  | ~250MB     |
+| `frontend` | Developer portal (React)                 | 80    | ~100MB     |
 
 ---
 
@@ -182,17 +183,24 @@ print(result["status"])  # 'verified' | 'failed' | 'manual_review'
 
 ```
 frontend/          React + Vite developer portal
-backend/           Node.js + TypeScript verification engine
+backend/           Node.js + TypeScript core API (lightweight orchestrator)
   src/
-    verification/  OCR, barcode, MRZ, cross-validation, face matching
     routes/        API endpoints (v2)
-    services/      Webhook delivery, API key management
+    services/      Webhook delivery, API key management, engine client
+    verification/  Session state machine, cross-validation, face matching
     config/        Dynamic thresholds, verification config
-docker-compose.yml One-command self-hosted deployment
+engine/            ML verification engine (separate microservice)
+  src/
+    routes/        Extraction endpoints (front, back, live)
+    services/      OCR, barcode, face recognition
+    providers/     PaddleOCR, liveness, tampering, deepfake detection
+docker-compose.yml One-command self-hosted deployment (4 containers)
 install.sh         Interactive setup script
 ```
 
-**Tech stack:** Node.js, TypeScript, Express, React, Vite, PostgreSQL, PaddleOCR, TensorFlow (face detection), Tailwind CSS
+The core API (~250MB) handles routing, sessions, webhooks, and API key management. Heavy ML operations (OCR, face detection, liveness, deepfake analysis) run in a separate Engine Worker container (~1.5GB), called via HTTP only during verifications.
+
+**Tech stack:** Node.js, TypeScript, Express, React, Vite, PostgreSQL, PaddleOCR, TensorFlow (face detection), ONNX Runtime, Tailwind CSS
 
 ---
 
@@ -213,6 +221,7 @@ install.sh         Interactive setup script
 | `NODE_ENV` | `development` or `production` | `development` |
 | `STORAGE_PROVIDER` | `local` or `supabase` | `local` |
 | `SANDBOX_MODE` | Enable sandbox for testing | `false` |
+| `ENGINE_URL` | Engine worker URL (auto-set in Docker) | `http://engine:3002` |
 
 ### Database Migrations
 

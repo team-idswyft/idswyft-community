@@ -11,6 +11,11 @@
 # ─────────────────────────────────────────────────
 
 services:
+  engine:
+    build:
+      context: ./engine
+      dockerfile: Dockerfile
+
   api:
     build:
       context: ./backend
