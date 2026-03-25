@@ -181,7 +181,7 @@ describe('PaddleOCRProvider', () => {
       const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
 
       expect(data.document_number).toBe('000055667788');
-      expect(data.name).toBe('ELENA MARTINEZ');
+      expect(data.name).toBe('MARTINEZ ELENA');
       expect(data.date_of_birth).toBe('1979-09-29');
       expect(data.expiration_date).toBe('2033-09-29');
     });
@@ -257,7 +257,7 @@ describe('PaddleOCRProvider', () => {
       expect(data.document_number).not.toMatch(/carolina/i);
       // The actual data should still be extracted
       expect(data.document_number).toBe('000055667788');
-      expect(data.name).toBe('ELENA MARTINEZ');
+      expect(data.name).toBe('MARTINEZ ELENA');
       expect(data.date_of_birth).toBe('1979-09-29');
     });
 
@@ -438,7 +438,7 @@ describe('PaddleOCRProvider', () => {
 
       // Should have used DL extraction despite being called as national_id
       expect(data.document_number).toBe('000012345678');
-      expect(data.name).toBe('JOHN SMITH');
+      expect(data.name).toBe('SMITH JOHN');
       expect(data.date_of_birth).toBe('1990-01-15');
       expect(data.expiration_date).toBe('2035-06-01');
     });
@@ -511,7 +511,7 @@ describe('PaddleOCRProvider', () => {
         ]),
       );
       const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
-      expect(data.name).toBe('OBED LORISSON');
+      expect(data.name).toBe('LORISSON OBED');
     });
 
     it('removes eye/hair color codes from name', async () => {
@@ -524,7 +524,7 @@ describe('PaddleOCRProvider', () => {
         ]),
       );
       const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
-      expect(data.name).toBe('JANE SMITH');
+      expect(data.name).toBe('SMITH JANE');
     });
 
     it('removes SEX field token from name', async () => {
@@ -537,7 +537,7 @@ describe('PaddleOCRProvider', () => {
         ]),
       );
       const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
-      expect(data.name).toBe('JOHN DOE');
+      expect(data.name).toBe('DOE JOHN');
     });
 
     it('keeps valid name unchanged when no noise present', async () => {
@@ -550,7 +550,7 @@ describe('PaddleOCRProvider', () => {
         ]),
       );
       const data = await provider.processDocument(Buffer.from('img'), 'drivers_license');
-      expect(data.name).toBe('ELENA ROSA MARTINEZ');
+      expect(data.name).toBe('MARTINEZ ELENA ROSA');
     });
   });
 
