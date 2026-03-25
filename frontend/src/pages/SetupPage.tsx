@@ -50,7 +50,10 @@ export function SetupPage() {
   // Check if setup is needed
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/setup/status`)
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
       .then(data => {
         if (data.needs_setup) {
           setState('form')
