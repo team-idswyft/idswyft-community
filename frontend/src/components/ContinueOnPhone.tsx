@@ -96,7 +96,7 @@ export const ContinueOnPhone: React.FC<ContinueOnPhoneProps> = ({
       else setTimeLeft(left);
     }, 1000);
 
-    // Status poll every 3 seconds
+    // Status poll every 3 seconds — with fallback verification polling
     pollRef.current = setInterval(async () => {
       try {
         const res = await fetch(`${API_BASE_URL}/api/verify/handoff/${tok}/status`);
@@ -106,11 +106,36 @@ export const ContinueOnPhone: React.FC<ContinueOnPhoneProps> = ({
         const data = await res.json();
         if (!mountedRef.current) return;
         if (data.status !== 'pending') {
+          // Handoff explicitly completed — use this result
           clearTimers();
           setResult(data.result ?? { status: data.status });
           setState('done');
-          // Fix 2: use ref so we always call the latest onComplete prop
           onCompleteRef.current(data.result ?? { status: data.status });
+        } else if (data.verification_id) {
+          // Handoff still pending but we have a verification_id — check directly
+          try {
+            const vRes = await fetch(
+              `${API_BASE_URL}/api/v2/verify/${data.verification_id}/status`,
+              { headers: { 'X-API-Key': apiKey } },
+            );
+            if (!mountedRef.current) return;
+            if (vRes.ok) {
+              const vData = await vRes.json();
+              if (vData.final_result !== null && vData.final_result !== undefined) {
+                clearTimers();
+                const fallbackResult: VerificationResult = {
+                  verification_id: data.verification_id,
+                  status: vData.final_result,
+                  confidence_score: vData.confidence_score,
+                  face_match_score: vData.face_match_results?.similarity_score,
+                  liveness_score: vData.liveness_results?.liveness_score,
+                };
+                setResult(fallbackResult);
+                setState('done');
+                onCompleteRef.current(fallbackResult);
+              }
+            }
+          } catch { /* fallback poll failed — continue normal polling */ }
         }
       } catch { /* network hiccup — retry next tick */ }
     }, 3000);

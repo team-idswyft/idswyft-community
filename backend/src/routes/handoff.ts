@@ -16,7 +16,7 @@ router.post('/create', catchAsync(async (req: Request, res: Response) => {
 
   const validSource = ['api', 'vaas', 'demo'].includes(source) ? source : 'api';
   const token = crypto.randomBytes(32).toString('hex');
-  const expiresAt = new Date(Date.now() + 10 * 60 * 1000); // 10 minutes
+  const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
 
   const { error } = await supabase
     .from('mobile_handoff_sessions')
@@ -69,6 +69,42 @@ router.get('/:token/session', catchAsync(async (req: Request, res: Response) => 
   }
 
   res.json({ api_key: data.api_key, user_id: data.user_id, source: data.source || 'api' });
+}));
+
+// PATCH /api/verify/handoff/:token/link — mobile links verification_id to session
+router.patch('/:token/link', catchAsync(async (req: Request, res: Response) => {
+  const { token } = req.params;
+  const { verification_id } = req.body;
+
+  if (!/^[0-9a-f]{64}$/.test(token)) {
+    return res.status(404).json({ error: 'Session not found' });
+  }
+
+  if (!verification_id || typeof verification_id !== 'string') {
+    throw new ValidationError('verification_id is required', 'verification_id', verification_id);
+  }
+
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(verification_id)) {
+    throw new ValidationError('Invalid verification_id format', 'verification_id', verification_id);
+  }
+
+  const { data: updated, error } = await supabase
+    .from('mobile_handoff_sessions')
+    .update({ verification_id })
+    .eq('token', token)
+    .eq('status', 'pending')
+    .select('id');
+
+  if (error) {
+    logger.error('Failed to link verification_id to handoff session', error);
+    throw new Error('Failed to link verification_id');
+  }
+
+  if (!updated || updated.length === 0) {
+    return res.status(404).json({ error: 'Session not found or already completed' });
+  }
+
+  res.json({ success: true });
 }));
 
 // PATCH /api/verify/handoff/:token/complete — mobile reports completion
@@ -140,7 +176,7 @@ router.get('/:token/status', catchAsync(async (req: Request, res: Response) => {
 
   const { data, error } = await supabase
     .from('mobile_handoff_sessions')
-    .select('status, result, expires_at')
+    .select('status, result, expires_at, verification_id')
     .eq('token', token)
     .single();
 
@@ -161,6 +197,7 @@ router.get('/:token/status', catchAsync(async (req: Request, res: Response) => {
 
   res.json({
     status: data.status,
+    ...(data.verification_id && { verification_id: data.verification_id }),
     ...(data.status !== 'pending' && { result: data.result }),
   });
 }));

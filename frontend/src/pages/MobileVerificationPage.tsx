@@ -485,6 +485,14 @@ const MobileVerificationPage: React.FC = () => {
       const data = await res.json();
       if (!mountedRef.current) return;
       setVerificationId(data.verification_id);
+      // Link verification_id to handoff session (fire-and-forget)
+      if (token) {
+        fetch(`${API_BASE_URL}/api/verify/handoff/${token}/link`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ verification_id: data.verification_id }),
+        }).catch(() => {});
+      }
       setLoading(false);
     } catch (err: any) {
       if (mountedRef.current) {
@@ -789,6 +797,24 @@ const MobileVerificationPage: React.FC = () => {
     }
   };
 
+  // ── Retry helper with exponential backoff ────────────────────────────────
+  const patchWithRetry = async (url: string, body: object, maxRetries = 3): Promise<boolean> => {
+    for (let i = 0; i < maxRetries; i++) {
+      try {
+        const res = await fetch(url, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(body),
+          keepalive: true,
+        });
+        if (res.ok || res.status === 409) return true;  // 409 = already completed
+        if (res.status === 410) return false;            // expired — no point retrying
+      } catch { /* network error — retry */ }
+      if (i < maxRetries - 1) await new Promise(r => setTimeout(r, 1000 * Math.pow(2, i)));
+    }
+    return false;
+  };
+
   // ── Show final result & notify desktop ─────────────────────────────────
   const showFinalResult = async (data: any) => {
     if (!mountedRef.current) return;
@@ -796,27 +822,22 @@ const MobileVerificationPage: React.FC = () => {
     setScreenIdx(4);
     // Notify desktop
     if (!token) return;
-    try {
-      const status = data.final_result ?? data.status;
-      const res = await fetch(`${API_BASE_URL}/api/verify/handoff/${token}/complete`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          status: status === 'failed' ? 'failed' : 'completed',
-          result: {
-            verification_id: data.verification_id,
-            status,
-            user_id: data.user_id,
-            confidence_score: data.confidence_score,
-            face_match_score: data.face_match_results?.score ?? data.face_match_score,
-            liveness_score: data.liveness_results?.liveness_score ?? data.liveness_score,
-          },
-        }),
-      });
-      if (!res.ok) setPatchFailed(true);
-    } catch {
-      setPatchFailed(true);
-    }
+    const status = data.final_result ?? data.status;
+    const ok = await patchWithRetry(
+      `${API_BASE_URL}/api/verify/handoff/${token}/complete`,
+      {
+        status: status === 'failed' ? 'failed' : 'completed',
+        result: {
+          verification_id: data.verification_id,
+          status,
+          user_id: data.user_id,
+          confidence_score: data.confidence_score,
+          face_match_score: data.face_match_results?.similarity_score ?? data.face_match_score,
+          liveness_score: data.liveness_results?.liveness_score ?? data.liveness_score,
+        },
+      },
+    );
+    if (!ok && mountedRef.current) setPatchFailed(true);
   };
 
   // ─── Shared styles ────────────────────────────────────────────────────
