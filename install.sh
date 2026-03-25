@@ -359,25 +359,66 @@ start_services() {
     compose_cmd="docker compose -f docker-compose.yml -f docker-compose.build.yml"
   fi
 
-  $compose_cmd up -d 2>&1 | while IFS= read -r line; do
-    case "$line" in
-      *"Created"*|*"Started"*)
-        echo -e "  ${GRAY}│${RESET}  ${GREEN}▸${RESET}  ${line}" ;;
-      *"Running"*)
-        echo -e "  ${GRAY}│${RESET}  ${CYAN}▸${RESET}  ${DIM}${line}${RESET}" ;;
-      *)
-        echo -e "  ${GRAY}│${RESET}     ${DIM}${line}${RESET}" ;;
-    esac
-  done
-  ok "Containers started"
+  # Start containers in background (--no-deps avoids blocking on health checks)
+  info "Creating containers..."
+  $compose_cmd up -d --no-deps postgres 2>/dev/null
+  ok "postgres"
+
+  $compose_cmd up -d --no-deps engine 2>/dev/null
+  ok "engine"
+
+  $compose_cmd up -d --no-deps frontend 2>/dev/null
+  ok "frontend"
 
   echo -e "  ${GRAY}│${RESET}"
 
-  # Wait for health check with spinner
-  start_spinner "Waiting for API health check"
+  # Wait for postgres health
+  start_spinner "Waiting for database"
   local retries=0
-  local max_retries=30
-  while [ $retries -lt $max_retries ]; do
+  while [ $retries -lt 30 ]; do
+    if docker compose exec -T postgres pg_isready -U "${DB_USER:-idswyft}" &>/dev/null 2>&1; then
+      break
+    fi
+    retries=$((retries + 1))
+    sleep 2
+  done
+  stop_spinner
+  if [ $retries -ge 30 ]; then
+    warn "Database health check timed out"
+    detail "Check logs: docker compose logs postgres"
+  else
+    ok "Database ready"
+  fi
+
+  # Wait for engine health (ML models take time to load)
+  start_spinner "Waiting for engine (loading ML models — may take 1-2 minutes)"
+  retries=0
+  local max_engine_retries=60
+  while [ $retries -lt $max_engine_retries ]; do
+    if docker compose exec -T engine wget -qO- http://localhost:3002/health &>/dev/null 2>&1; then
+      break
+    fi
+    retries=$((retries + 1))
+    sleep 3
+  done
+  stop_spinner
+  if [ $retries -ge $max_engine_retries ]; then
+    warn "Engine health check timed out — it may still be loading"
+    detail "Check logs: docker compose logs engine"
+  else
+    ok "Engine ready"
+  fi
+
+  # Now start API (depends on postgres + engine)
+  $compose_cmd up -d --no-deps api 2>/dev/null
+  ok "api"
+
+  echo -e "  ${GRAY}│${RESET}"
+
+  # Wait for API health
+  start_spinner "Waiting for API"
+  retries=0
+  while [ $retries -lt 30 ]; do
     if docker compose exec -T api wget -qO- http://localhost:3001/health &>/dev/null 2>&1; then
       break
     fi
@@ -386,7 +427,7 @@ start_services() {
   done
   stop_spinner
 
-  if [ $retries -eq $max_retries ]; then
+  if [ $retries -ge 30 ]; then
     warn "API health check timed out — it may still be starting up"
     detail "Check logs: docker compose logs api"
   else
