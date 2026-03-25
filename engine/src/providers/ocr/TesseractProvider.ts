@@ -1,20 +1,13 @@
-// Dynamic imports — tesseract.js and jimp are only available in dev mode or the Engine Worker
-let Tesseract: any;
-let Jimp: any;
+import Tesseract from 'tesseract.js';
+import Jimp from 'jimp';
 import { OCRProvider } from '../types.js';
 import { OCRData } from '../../types/index.js';
 import { logger } from '@/utils/logger.js';
-
-async function ensureTesseractDeps() {
-  if (!Tesseract) Tesseract = (await import('tesseract.js')).default;
-  if (!Jimp) Jimp = (await import('jimp')).default;
-}
 
 export class TesseractProvider implements OCRProvider {
   readonly name = 'tesseract';
 
   async processDocument(buffer: Buffer, documentType: string, _issuingCountry?: string): Promise<OCRData> {
-    await ensureTesseractDeps();
     const preprocessed = await this.preprocessImage(buffer);
 
     const worker = await Tesseract.createWorker('eng', 1, {});

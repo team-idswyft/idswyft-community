@@ -1,12 +1,12 @@
 {
   "name": "idswyft-backend",
-  "version": "1.4.0",
+  "version": "1.5.0",
   "description": "Backend API for Idswyft identity verification platform",
   "type": "module",
   "main": "dist/server.js",
   "scripts": {
     "dev": "tsx watch --clear-screen=false src/server.ts",
-    "build": "node download-models.js && tsc && tsc-alias",
+    "build": "tsc && tsc-alias",
     "start": "node dist/server.js",
     "test": "vitest",
     "lint": "eslint src --ext .ts,.js",
@@ -20,11 +20,6 @@
     "@aws-sdk/client-s3": "^3.750.0",
     "@aws-sdk/s3-request-presigner": "^3.750.0",
     "@supabase/supabase-js": "^2.39.0",
-    "@tensorflow/tfjs": "^4.22.0",
-    "@tensorflow/tfjs-backend-wasm": "^4.22.0",
-    "@vladmandic/face-api": "^1.7.14",
-    "@zxing/browser": "^0.1.5",
-    "@zxing/library": "^0.21.3",
     "axios": "^1.6.2",
     "bcryptjs": "^2.4.3",
     "compression": "^1.7.4",
@@ -43,23 +38,16 @@
     "mrz": "^5.0.2",
     "multer": "^1.4.5-lts.1",
     "node-cron": "^3.0.3",
-    "onnxruntime-node": "^1.24.3",
     "otplib": "^12.0.1",
     "parse-usdl": "^3.2.0",
     "pg": "^8.20.0",
     "pixelmatch": "^4.0.2",
-    "ppu-paddle-ocr": "^4.1.1",
     "qrcode": "^1.5.4",
     "uuid": "^9.0.1",
     "validator": "^13.11.0",
     "winston": "^3.11.0",
-    "zod": "^3.22.4"
-  },
-  "optionalDependencies": {
-    "canvas": "^3.1.0",
-    "jimp": "^0.22.10",
     "sharp": "^0.33.5",
-    "tesseract.js": "^5.0.4"
+    "zod": "^3.22.4"
   },
   "devDependencies": {
     "@types/bcryptjs": "^2.4.6",

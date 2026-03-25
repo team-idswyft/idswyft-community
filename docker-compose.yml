@@ -30,6 +30,23 @@ services:
       retries: 5
 
   # ─────────────────────────────────────────
+  # ML verification engine (OCR, face detection, liveness)
+  # ─────────────────────────────────────────
+  engine:
+    image: ghcr.io/team-idswyft/idswyft-engine:latest
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: "3002"
+      LOG_LEVEL: info
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  # ─────────────────────────────────────────
   # Core identity verification API
   # ─────────────────────────────────────────
   api:
@@ -37,6 +54,8 @@ services:
     restart: unless-stopped
     depends_on:
       postgres:
+        condition: service_healthy
+      engine:
         condition: service_healthy
     environment:
       NODE_ENV: production
@@ -49,6 +68,7 @@ services:
       STORAGE_PROVIDER: local
       SANDBOX_MODE: ${SANDBOX_MODE:-false}
       MIGRATIONS_LENIENT: "true"
+      ENGINE_URL: http://engine:3002
     volumes:
       - uploads:/app/uploads
       - temp:/app/temp

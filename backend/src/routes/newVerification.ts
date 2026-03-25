@@ -37,6 +37,7 @@ import sharp from 'sharp';
 import { SharpTamperDetector } from '@/providers/tampering/SharpTamperDetector.js';
 import { DocumentZoneValidator } from '@/providers/tampering/DocumentZoneValidator.js';
 import { createDeepfakeDetector } from '@/providers/deepfake/index.js';
+import engineClient from '@/services/engineClient.js';
 
 const router = express.Router();
 
@@ -767,8 +768,16 @@ router.post('/:verification_id/front-document',
     const developerId = (req as any).developer.id;
     const llmConfig = await getDeveloperLLMConfig(developerId);
 
-    // Run front extraction (downloadFile resolves bucket from encoded path)
-    const frontResult = await extractFrontDocument(documentPath, document.id, document_type, resolvedCountry, verification_id, llmConfig, req.file.buffer);
+    // Run front extraction — engine worker if available, local fallback otherwise
+    const frontResult = engineClient.isEnabled()
+      ? await engineClient.extractFront(req.file.buffer, {
+          documentId: document.id,
+          documentType: document_type,
+          issuingCountry: resolvedCountry,
+          verificationId: verification_id,
+          llmConfig,
+        })
+      : await extractFrontDocument(documentPath, document.id, document_type, resolvedCountry, verification_id, llmConfig, req.file.buffer);
 
     // Ephemeral cleanup: demo files are deleted immediately after extraction
     if (source === 'demo') {
@@ -885,7 +894,9 @@ router.post('/:verification_id/back-document',
     });
 
     // Run back extraction (country context flows to Gate 2 via session state)
-    const backResult = await extractBackDocument(documentPath);
+    const backResult = engineClient.isEnabled()
+      ? await engineClient.extractBack(req.file.buffer)
+      : await extractBackDocument(documentPath);
 
     // Ephemeral cleanup: demo files are deleted immediately after extraction
     if (source === 'demo') {
@@ -1082,7 +1093,9 @@ router.post('/:verification_id/live-capture',
     }
 
     // Run live capture extraction with real liveness detection
-    const liveResult = await extractLiveCapture(selfiePath, null, req.file.buffer, isSandbox, headTurnMetadata);
+    const liveResult = engineClient.isEnabled()
+      ? await engineClient.extractLive(req.file.buffer, { isSandbox, headTurnMetadata })
+      : await extractLiveCapture(selfiePath, null, req.file.buffer, isSandbox, headTurnMetadata);
 
     // Ephemeral cleanup: demo selfie files are deleted immediately after extraction
     if (source === 'demo') {

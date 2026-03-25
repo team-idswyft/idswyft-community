@@ -9,11 +9,9 @@
  * returns no face so gate evaluation handles it.
  */
 
-// Use the WASM-backed bundle — the default entry (face-api.node.js) requires
-// @tensorflow/tfjs-node which needs native C++ compilation and fails on Railway.
-// The node-wasm bundle uses @tensorflow/tfjs + @tensorflow/tfjs-backend-wasm instead.
-// @ts-ignore — TypeScript can't resolve .js subpath types but runtime works fine
-import faceapi from '@vladmandic/face-api/dist/face-api.node-wasm.js';
+// Dynamic import — @vladmandic/face-api is only available in dev mode or the Engine Worker.
+// In production Docker, the engine handles face detection via HTTP (ENGINE_URL).
+let faceapi: any;
 import { StorageService } from './storage.js';
 import { logger } from '@/utils/logger.js';
 import path from 'path';
@@ -24,29 +22,34 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 const MODELS_DIR = path.resolve(__dirname, '../../models');
 
-// ─── Optional image-decoding backends ────────────────────────────
-
+// ─── Optional image-decoding backends (loaded lazily in initialize()) ────
 let canvasModule: any = null;
 let sharpModule: any = null;
+let imageBackendsLoaded = false;
 
-try {
-  canvasModule = await import('canvas');
-} catch {
-  // canvas not available (e.g. Windows dev without Cairo)
-}
+async function loadImageBackends() {
+  if (imageBackendsLoaded) return;
+  imageBackendsLoaded = true;
 
-if (!canvasModule) {
   try {
-    sharpModule = (await import('sharp')).default;
+    canvasModule = await import('canvas');
   } catch {
-    // sharp not available either
+    // canvas not available (e.g. Windows dev without Cairo, or production Docker)
+  }
+
+  if (!canvasModule) {
+    try {
+      sharpModule = (await import('sharp')).default;
+    } catch {
+      // sharp not available either
+    }
   }
 }
 
 // ─── Helpers ─────────────────────────────────────────────────────
 
 /** Decode an image Buffer into a tensor3d [H, W, 3]. */
-async function bufferToTensor(buffer: Buffer): Promise<faceapi.tf.Tensor3D> {
+async function bufferToTensor(buffer: Buffer): Promise<any> {
   // Prefer canvas — vladmandic/face-api works best with it
   if (canvasModule) {
     const img = await canvasModule.loadImage(buffer);
@@ -109,6 +112,13 @@ export class FaceRecognitionService {
 
     this.initPromise = (async () => {
       try {
+        // ── Step 0: Load optional image backends + face-api ──
+        await loadImageBackends();
+        if (!faceapi) {
+          const mod = await import('@vladmandic/face-api/dist/face-api.node-wasm.js');
+          faceapi = mod.default || mod;
+        }
+
         // ── Step 1: Initialize TF.js backend (WASM preferred, CPU fallback) ──
         await this.initTfBackend();
 
@@ -213,7 +223,7 @@ export class FaceRecognitionService {
           return { confidence: 0, embedding: null };
         }
 
-        const embedding = Array.from(result.descriptor); // Float32Array → number[]
+        const embedding = Array.from(result.descriptor) as number[]; // Float32Array → number[]
         const confidence = result.detection.score;
 
         logger.info('Face detected', {

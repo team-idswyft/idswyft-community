@@ -1,5 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import type { PaddleOcrResult, RecognitionResult } from 'ppu-paddle-ocr';
+// Types inlined — ppu-paddle-ocr is an optional dep (only in engine container)
+type PaddleOcrResult = any;
+type RecognitionResult = any;
 
 // Mock ppu-paddle-ocr so tests don't need real ONNX models.
 // Use a class so `new PaddleOcrService()` works.
