@@ -36,6 +36,15 @@ This is an MVP project with the following key components:
 - Search and filter functionality by verification status
 - Export capabilities for compliance reporting
 
+## Architectural Invariant: Deterministic Decisions
+
+**All comparison and decision logic must be deterministic and fully auditable.** No LLM or probabilistic model may be used for any verification decision — only for OCR text extraction, which is isolated behind a provider interface.
+
+- Gates use checksums, exact string matching, Levenshtein distance, cosine similarity with fixed thresholds
+- Same inputs must always produce the same verification result
+- LLMs may only read text from images (extraction) — never decide pass/fail/review
+- The LLM provider interface is isolated in `providers/ocr/LLMFieldExtractor.ts` — it must never be imported or called from gate logic, cross-validation, liveness scoring, or face matching
+
 ## Key Requirements
 
 Based on the project specifications, when implementing features ensure:
