@@ -5,6 +5,23 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.1] - 2026-03-24
+
+### Fixed
+- **Mobile handoff desktop notification** — desktop no longer stays stuck on "Waiting for phone..." when mobile PATCH fails
+  - Added exponential backoff retry (3 attempts: 1s/2s/4s) with `keepalive` on mobile completion PATCH
+  - Extended handoff session timeout from 10 to 30 minutes for complex verifications
+  - New `verification_id` linkage: mobile links verification to handoff session early, desktop dual-polls both handoff status and verification API as fallback
+  - DemoPage transitions to full results view on handoff completion
+  - UserVerificationPage gets dark-themed completion screen with distinct verified/failed/review states
+- Fixed `face_match_results.score` → `.similarity_score` in mobile handoff result payload
+- Added UUID format validation on `/link` endpoint
+
+### Added
+- `PATCH /api/verify/handoff/:token/link` — links a verification_id to a handoff session
+- `verification_id` column on `mobile_handoff_sessions` table (migration 32)
+- `verification_id` returned in handoff status poll response for desktop fallback
+
 ## [1.5.0] - 2026-03-24
 
 ### Changed
