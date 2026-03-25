@@ -304,9 +304,23 @@ export const DocsPage: React.FC = () => {
   const [tab, setTab] = useState<CodeTabType>('curl');
   const [active, setActive] = useState('quick-start');
 
+  // Responsive layout
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth < 768
+  );
+
   // Inject fonts
   useEffect(() => {
     injectFonts();
+  }, []);
+
+  // Track viewport width for responsive grids
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    setIsMobile(mq.matches);
+    return () => mq.removeEventListener('change', handler);
   }, []);
 
   // Scroll spy
@@ -675,7 +689,7 @@ data = res.json()`} />
 
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
               <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>What cross-validation checks</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '6px 24px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '6px 24px' }}>
                 {['PDF417 / QR barcode decoding', 'ID number consistency (front OCR ↔ barcode)', 'Expiry date matching', 'Issuing authority matching', 'Photo consistency score', 'Security feature detection'].map(s => (
                   <div key={s} style={{ fontFamily: C.sans, fontSize: '0.8rem', color: C.muted, display: 'flex', gap: 8, alignItems: 'center' }}>
                     <span style={{ color: C.green, fontSize: '0.7rem' }}>✓</span> {s}
@@ -759,7 +773,7 @@ data = res.json()`} />
             </p>
 
             {/* Two-column mode comparison */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 24 }}>
               {[
                 {
                   title: 'Passive', color: C.amber, label: 'Basic',
@@ -804,7 +818,7 @@ data = res.json()`} />
             {/* Client-side requirements */}
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
               <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>Client-side requirements</div>
-              <div style={{ display: 'grid', gridTemplateColumns: '100px 1fr 1fr', gap: '8px 16px' }}>
+              <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '100px 1fr 1fr', gap: '8px 16px' }}>
                 {[
                   ['Passive', 'None — just upload the image file', 'None'],
                   ['Head turn', 'getUserMedia() + canvas.toDataURL()', 'None — all face analysis runs server-side'],
@@ -1122,7 +1136,7 @@ data = res.json()`} />
             </code>
           </div>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 16, marginBottom: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 16, marginBottom: 24 }}>
             {[
               {
                 emoji: '🔗', title: 'Redirect',
@@ -1571,7 +1585,7 @@ while True:
           </p>
 
           <h4 style={{ fontFamily: C.mono, fontSize: '0.85rem', fontWeight: 600, color: C.text, margin: '24px 0 12px' }}>Polling Strategies</h4>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12, marginBottom: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 12, marginBottom: 24 }}>
             {[
               { title: 'Fixed Interval', color: C.amber, pros: 'Simple to implement', cons: 'Wastes requests if processing is slow', code: 'setInterval(() => poll(), 2000)' },
               { title: 'Exponential Backoff', color: C.green, pros: 'Efficient — reduces load over time', cons: 'Slightly slower on fast responses', code: 'delay = min(delay * 1.5, 10s)' },
@@ -1686,7 +1700,7 @@ const sdk = new IdswyftSDK({
                 { method: 'uploadAddressDocument()', returns: 'AddressResult', desc: 'Upload proof-of-address document' },
                 { method: 'createMonitoringSchedule()', returns: 'Schedule', desc: 'Schedule re-verification' },
               ].map(row => (
-                <div key={row.method} style={{ display: 'grid', gridTemplateColumns: '220px 140px 1fr', gap: 12, padding: '10px 0', borderTop: `1px solid ${C.border}`, alignItems: 'baseline' }}>
+                <div key={row.method} style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '220px 140px 1fr', gap: 12, padding: '10px 0', borderTop: `1px solid ${C.border}`, alignItems: 'baseline' }}>
                   <code style={{ fontFamily: C.mono, fontSize: '0.78rem', color: C.cyan, whiteSpace: 'nowrap' }}>{row.method}</code>
                   <code style={{ fontFamily: C.mono, fontSize: '0.72rem', color: C.muted, whiteSpace: 'nowrap' }}>→ {row.returns}</code>
                   <span style={{ fontFamily: C.sans, fontSize: '0.83rem', color: C.text, lineHeight: 1.6 }}>{row.desc}</span>
@@ -1764,7 +1778,7 @@ watcher.destroy();`} />
             pointing to the hosted verification page and communicates results via <code style={{ fontFamily: C.mono, color: C.cyan, fontSize: '0.82rem' }}>postMessage</code>.
           </Lead>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 24 }}>
             {[
               {
                 title: 'Modal Mode',
@@ -2125,7 +2139,7 @@ const status = await sdk.getAddressStatus(verificationId);`} />
 
           <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
             <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>Risk levels & outcomes</div>
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 12 }}>
               {[
                 { level: 'clear', score: '< 0.5', outcome: 'Verification proceeds normally', color: C.green },
                 { level: 'potential_match', score: '0.5 – 0.84', outcome: 'Routed to manual_review', color: C.amber },
@@ -2303,7 +2317,7 @@ await sdk.cancelMonitoringSchedule(schedule.schedule.id);`} />
           <SectionAnchor id="rate-limits" />
           <H2>Rate Limits & Status Codes</H2>
 
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 24 }}>
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '20px 24px' }}>
               <div style={{ fontFamily: C.mono, fontSize: '0.7rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 14 }}>Rate Limits</div>
               {[

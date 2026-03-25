@@ -173,6 +173,11 @@ const DemoPage: React.FC = () => {
   const [mobileResult, setMobileResult] = useState<any>(null);
   const [retryProcessing, setRetryProcessing] = useState(false);
 
+  // Responsive layout
+  const [isMobile, setIsMobile] = useState(() =>
+    typeof window !== 'undefined' && window.innerWidth < 768
+  );
+
   // Address verification state
   const [addressFile, setAddressFile] = useState<File | null>(null);
   const [addressPreview, setAddressPreview] = useState<string | null>(null);
@@ -201,6 +206,15 @@ const DemoPage: React.FC = () => {
 
   // Inject brand fonts
   useEffect(() => { injectFonts(); }, []);
+
+  // Track viewport width for responsive grids
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 767px)');
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    setIsMobile(mq.matches);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   // Load OpenCV script when needed
   useEffect(() => {
@@ -1456,7 +1470,7 @@ const DemoPage: React.FC = () => {
                   </div>
                 </div>
 
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, maxWidth: 600, margin: '0 auto' }}>
+                <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, maxWidth: 600, margin: '0 auto' }}>
                   <div style={{ background: '#0b0f19', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 10 }}>
                     <div style={{ fontSize: 13, color: '#dde2ec', fontWeight: 600 }}>Start Here</div>
                     <p style={{ fontSize: 12, color: '#8896aa', lineHeight: 1.5 }}>Upload documents and use webcam on this device.</p>
@@ -1772,7 +1786,7 @@ const DemoPage: React.FC = () => {
             </div>
 
             {/* Result Cards Grid */}
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 12 }}>
+            <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 12 }}>
               {/* Cross-Validation */}
               <div style={cardStyle}>
                 <div style={cardTitle}>Cross-Validation</div>
