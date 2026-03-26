@@ -259,7 +259,7 @@ export function HomePage() {
         <div className="landing-cards-row" style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
           {[
             { value: '>90%', label: 'Accuracy Target' },
-            { value: '60+', label: 'Doc Types' },
+            { value: '<5s', label: 'OCR Latency (p95)' },
             { value: '20', label: 'Countries' },
             { value: 'MIT', label: 'License' },
           ].map(({ value, label }) => (
@@ -353,7 +353,7 @@ export function HomePage() {
             <div style={{ display: 'flex', gap: 32 }}>
               {[
                 { value: '<3 min', label: 'Verification time' },
-                { value: '>90%', label: 'Accuracy target' },
+                { value: '<5s', label: 'OCR p95 latency' },
                 { value: '5 steps', label: 'Guided flow' },
               ].map(({ value, label }) => (
                 <div key={label}>
@@ -517,7 +517,7 @@ export function HomePage() {
               <span style={{ fontFamily: C.mono, fontSize: 14, color: C.dim, marginLeft: 6 }}>forever</span>
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 20 }}>
-              {['Unlimited verifications', 'Full source code (MIT)', 'Your infrastructure, your data', 'Community support'].map(item => (
+              {['Unlimited verifications', 'Full source code (MIT)', 'Your infrastructure, your data', 'No rate limits', 'Community support'].map(item => (
                 <div key={item} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: C.text }}>
                   <div style={{ width: 5, height: 5, borderRadius: '50%', background: C.cyan, flexShrink: 0 }} />
                   {item}

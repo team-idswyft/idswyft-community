@@ -449,7 +449,7 @@ export function PricingPage() {
             { title: 'MIT License', desc: 'Use it commercially, modify it, distribute it — no restrictions.' },
             { title: 'Full source code', desc: 'Every line of the verification engine is open and auditable.' },
             { title: 'Your data, your servers', desc: 'Documents and personal data never leave your infrastructure.' },
-            { title: 'Community support', desc: 'Active GitHub issues, discussions, and contributor community.' },
+            { title: 'Runs on minimal hardware', desc: '2 vCPU / 4 GB RAM minimum. Handles ~1-2 verifications/sec with <5s OCR latency at p95.' },
           ].map(({ title, desc }) => (
             <div key={title} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
               <div style={{ width: 6, height: 6, borderRadius: '50%', background: C.cyan, marginTop: 7, flexShrink: 0 }} />

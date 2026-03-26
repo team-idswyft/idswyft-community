@@ -2321,8 +2321,9 @@ await sdk.cancelMonitoringSchedule(schedule.schedule.id);`} />
             <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '20px 24px' }}>
               <div style={{ fontFamily: C.mono, fontSize: '0.7rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 14 }}>Rate Limits</div>
               {[
-                { label: 'Per developer key', value: '1,000 req / hour', note: 'sandbox + production combined' },
-                { label: 'Per user', value: '5 verifications / hour', note: 'across all developer keys' },
+                { label: 'Per developer key', value: '1,000 req / hour', note: 'cloud edition — sandbox + production combined' },
+                { label: 'Per user', value: '5 verifications / hour', note: 'cloud edition — across all developer keys' },
+                { label: 'Self-hosted', value: 'None', note: 'rate limiting disabled by default' },
                 { label: 'Enterprise', value: 'Custom', note: 'contact sales' },
               ].map(r => (
                 <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0', borderTop: `1px solid ${C.border}` }}>
