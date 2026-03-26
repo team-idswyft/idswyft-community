@@ -5,6 +5,14 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.4] - 2026-03-26
+
+### Fixed
+- **CSRF token endpoint 503** — `/api/auth/csrf-token` returned 503 because `cookie-parser` was not installed. The `csrf-csrf` library requires `req.cookies` to be populated. Added `cookie-parser` middleware and wrapped the route in `catchAsync` for proper error handling.
+
+### Added
+- `cookie-parser` dependency for CSRF double-submit cookie support
+
 ## [1.5.3] - 2026-03-26
 
 ### Fixed
