@@ -1,5 +1,6 @@
 import 'dotenv/config';
 import express from 'express';
+import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import { buildCorsOptions } from './middleware/cors.js';
 import { csrfProtection } from './middleware/csrf.js';
@@ -81,6 +82,7 @@ app.use(compression());
 app.use(morgan('combined'));
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(cookieParser());
 
 // Rate limiting
 const limiter = rateLimit({
