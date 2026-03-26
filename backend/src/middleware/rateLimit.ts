@@ -19,6 +19,8 @@ export const basicRateLimit = rateLimit({
 
 // Advanced rate limiting with database tracking
 export const rateLimitMiddleware = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
+  if (!config.rateLimiting.enabled) return next();
+
   const windowMs = config.rateLimiting.windowMs;
   const now = new Date();
   const windowStart = new Date(now.getTime() - windowMs);
@@ -193,6 +195,8 @@ export const cleanupRateLimitRecords = async () => {
 
 // Verification-specific rate limiting
 export const verificationRateLimit = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
+  if (!config.rateLimiting.enabled) return next();
+
   if (!req.user) {
     return next();
   }
