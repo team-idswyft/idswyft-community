@@ -624,15 +624,21 @@ export function DeveloperPage() {
   const [setupNeeded, setSetupNeeded] = useState<boolean | null>(null)
 
   // Community edition: redirect to /setup if no developers exist yet
+  // On API error (e.g. backend not ready during Docker startup), redirect
+  // to /setup which has a retry UI, rather than showing the login form
+  // for an account that doesn't exist yet.
   useEffect(() => {
     if (token || !isCommunity) { setSetupNeeded(false); return }
     fetch(`${API_BASE_URL}/api/setup/status`)
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
       .then(data => {
         if (data.needs_setup) navigate('/setup', { replace: true })
         else setSetupNeeded(false)
       })
-      .catch(() => setSetupNeeded(false))
+      .catch(() => navigate('/setup', { replace: true }))
   }, [token, navigate])
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([])
   const [stats, setStats] = useState<DeveloperStats | null>(null)

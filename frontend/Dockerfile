@@ -10,6 +10,8 @@ ARG VITE_EDITION=community
 ARG VITE_API_URL
 
 COPY . .
+# Remove cloud .env.production so Docker builds use same-origin API (nginx proxy)
+RUN rm -f .env.production
 RUN npm run build
 
 # Serve with nginx

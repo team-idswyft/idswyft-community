@@ -50,7 +50,10 @@ export function SetupPage() {
   // Check if setup is needed
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/setup/status`)
-      .then(r => r.json())
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`)
+        return r.json()
+      })
       .then(data => {
         if (data.needs_setup) {
           setState('form')
@@ -224,12 +227,12 @@ export function SetupPage() {
 
   // Form state — welcome + create account
   return (
-    <div className="pattern-shield pattern-faint pattern-full" style={{ background: C.bg, minHeight: '100vh', fontFamily: C.sans, color: C.text }}>
+    <div className="pattern-shield pattern-faint pattern-full" style={{ background: C.bg, minHeight: '100vh', fontFamily: C.sans, color: C.text, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
       <Toaster position="top-right" />
-      <div style={{ maxWidth: 440, margin: '0 auto', padding: '80px 24px' }}>
+      <div style={{ maxWidth: 440, width: '100%', padding: '24px' }}>
 
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
-          <img src="/idswyft-logo.png" alt="Idswyft" style={{ height: 36, marginBottom: 20 }} />
+          <img src="/idswyft-logo.png" alt="Idswyft" style={{ height: 36, marginBottom: 20, display: 'block', marginLeft: 'auto', marginRight: 'auto' }} />
           <h1 style={{ fontFamily: C.mono, fontSize: 22, fontWeight: 600, marginBottom: 8 }}>Welcome to Idswyft</h1>
           <p style={{ color: C.muted, fontSize: 14, margin: 0, lineHeight: 1.6 }}>
             Create your admin developer account to get started.
