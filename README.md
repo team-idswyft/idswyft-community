@@ -347,11 +347,13 @@ For large features, open an issue first to discuss the approach.
 
 ---
 
-## License
+## License & Trademarks
 
-MIT License. See [LICENSE](./LICENSE) for details.
+**Code:** MIT License. See [LICENSE](./LICENSE). Use it commercially, modify it, distribute it.
 
-Use it commercially, modify it, distribute it — no restrictions.
+**Brand:** The Idswyft name and logo are trademarks. Self-hosted deployments of the default UI must retain the "Powered by Idswyft" footer. See [TRADEMARK.md](./TRADEMARK.md) for the full policy.
+
+**White-label:** Want to remove Idswyft branding? [Enterprise licenses](https://enterprise.idswyft.app) are available.
 
 ---
 
