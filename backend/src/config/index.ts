@@ -55,6 +55,7 @@ export const config: AppConfig = {
   },
   
   rateLimiting: {
+    enabled: process.env.RATE_LIMIT_ENABLED !== 'false', // default true; set false for self-hosted
     windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS || '3600000'), // 1 hour
     maxRequestsPerUser: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS_PER_USER || '5'),
     maxRequestsPerDev: parseInt(process.env.RATE_LIMIT_MAX_REQUESTS_PER_DEV || '1000')

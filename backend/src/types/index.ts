@@ -287,6 +287,7 @@ export interface AppConfig {
     };
   };
   rateLimiting: {
+    enabled: boolean;
     windowMs: number;
     maxRequestsPerUser: number;
     maxRequestsPerDev: number;

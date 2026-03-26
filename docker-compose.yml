@@ -70,6 +70,7 @@ services:
       SERVICE_TOKEN: ${SERVICE_TOKEN:-change-this-service-token}
       CORS_ORIGINS: "http://localhost,${CORS_ORIGINS:-}"
       STORAGE_PROVIDER: local
+      RATE_LIMIT_ENABLED: "false"
       SANDBOX_MODE: ${SANDBOX_MODE:-false}
       MIGRATIONS_LENIENT: "true"
       ENGINE_URL: http://engine:3002
