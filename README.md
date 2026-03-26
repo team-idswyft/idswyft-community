@@ -58,6 +58,55 @@ docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
 | `engine`   | ML verification engine (OCR, face, liveness) | 3002 | ~1.5GB    |
 | `api`      | Core API (lightweight orchestrator)      | 3001  | ~250MB     |
 | `frontend` | Developer portal (React)                 | 80    | ~100MB     |
+| `caddy`    | HTTPS reverse proxy (optional)           | 80/443 | ~50MB     |
+
+### Server Requirements
+
+The ML engine is the most resource-intensive component. Minimum and recommended specs:
+
+| | Minimum | Recommended | High Volume |
+|---|---|---|---|
+| **CPU** | 2 vCPUs | 4 vCPUs | 8+ vCPUs |
+| **RAM** | 4 GB | 8 GB | 16 GB |
+| **Disk** | 20 GB | 50 GB | 100+ GB |
+| **Throughput** | ~10 req/s | ~30 req/s | ~80+ req/s |
+| **Use case** | Dev/testing, low traffic | Small-to-medium production | High-traffic production |
+
+**Minimum (2 vCPU / 4GB)** — Handles ~10 concurrent verifications/sec with comfortable headroom. The engine uses ~1.5GB RAM at idle and spikes during ML inference. Suitable for startups processing up to a few hundred verifications per day.
+
+**Recommended (4 vCPU / 8GB)** — Comfortable for production workloads. Extra cores significantly improve OCR and face detection throughput since these operations parallelize well.
+
+**Storage note:** Disk usage grows with verification volume. Each verification stores uploaded documents (~2-5MB per session). Configure `RETENTION_DAYS` to auto-delete expired data.
+
+> **Tested on:** 2 vCPU / 4GB RAM (AMD EPYC, Hetzner CX22) — sustained 15 req/s with p95 < 400ms, rate limiter engaged at higher loads, clean recovery under stress.
+
+### HTTPS (Optional)
+
+For public-facing deployments, enable automatic TLS via the built-in Caddy reverse proxy:
+
+```bash
+./install.sh    # Select "Enable HTTPS" when prompted, enter your domain
+```
+
+Or configure manually:
+
+```bash
+# 1. Copy the Caddyfile template
+cp caddy/Caddyfile.acme caddy/Caddyfile    # Let's Encrypt (automatic)
+# or
+cp caddy/Caddyfile.manual caddy/Caddyfile  # Your own certificate
+
+# 2. Set environment variables in .env
+ENABLE_HTTPS=true
+DOMAIN=verify.example.com
+IDSWYFT_PORT=127.0.0.1:8080
+CORS_ORIGINS=https://verify.example.com
+
+# 3. Start with the HTTPS profile
+docker compose --profile https up -d
+```
+
+Caddy automatically obtains and renews Let's Encrypt certificates. Requirements: ports 80 + 443 open, DNS A record pointing to your server.
 
 ---
 
