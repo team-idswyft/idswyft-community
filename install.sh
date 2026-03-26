@@ -15,6 +15,7 @@ set -euo pipefail
 
 REPO_URL="https://github.com/team-idswyft/idswyft.git"
 BUILD_FROM_SOURCE=false
+ENABLE_HTTPS=false
 
 # Parse arguments
 for arg in "$@"; do
@@ -43,7 +44,7 @@ BG_RED="\033[41m"
 SPINNER_CHARS='⣾⣽⣻⢿⡿⣟⣯⣷'
 SPINNER_PID=""
 STEP_CURRENT=0
-STEP_TOTAL=5
+STEP_TOTAL=6
 START_TIME=$(date +%s)
 
 # ── Banner ────────────────────────────────────────
@@ -241,10 +242,16 @@ ENCRYPTION_KEY=${encryption_key}
 SERVICE_TOKEN=${service_token}
 
 # Port to expose the frontend (default: 80)
-PORT=80
+# In HTTPS mode this is set to 127.0.0.1:8080 so only Caddy serves external traffic
+IDSWYFT_PORT=80
 
 # Set to true to enable sandbox/mock verification mode
 SANDBOX_MODE=false
+
+# HTTPS / TLS (configured by install.sh — leave empty to disable)
+ENABLE_HTTPS=false
+DOMAIN=
+CORS_ORIGINS=
 EOF
 
   ok "Created .env with secure secrets"
@@ -253,7 +260,82 @@ EOF
 }
 
 # ─────────────────────────────────────────
-# Step 4: Pull images (or build from source)
+# Step 4: Configure HTTPS (optional)
+# ─────────────────────────────────────────
+setup_https() {
+  step "HTTPS / TLS configuration"
+  divider
+
+  echo -e "  ${GRAY}│${RESET}"
+  echo -e "  ${GRAY}│${RESET}  ${BOLD}Enable automatic HTTPS with TLS certificates?${RESET}"
+  echo -e "  ${GRAY}│${RESET}  ${DIM}Required for public-facing deployments. Skippable for localhost/LAN.${RESET}"
+  echo -e "  ${GRAY}│${RESET}"
+  read -rp "       Enable HTTPS? (y/N): " want_https
+
+  if [[ ! "$want_https" =~ ^[Yy]$ ]]; then
+    ok "Skipping HTTPS — HTTP-only mode"
+    detail "You can re-run install.sh later to enable HTTPS"
+    divider
+    return
+  fi
+
+  ENABLE_HTTPS=true
+
+  # Collect domain
+  echo -e "  ${GRAY}│${RESET}"
+  read -rp "       Enter your domain (e.g. verify.example.com): " user_domain
+  if [ -z "$user_domain" ]; then
+    warn "No domain entered — disabling HTTPS"
+    ENABLE_HTTPS=false
+    divider
+    return
+  fi
+
+  # Choose certificate mode
+  echo -e "  ${GRAY}│${RESET}"
+  echo -e "  ${GRAY}│${RESET}  ${BOLD}Certificate mode:${RESET}"
+  echo -e "  ${GRAY}│${RESET}  ${CYAN}1)${RESET} Let's Encrypt (automatic — recommended)"
+  echo -e "  ${GRAY}│${RESET}  ${CYAN}2)${RESET} Manual certificate (provide your own cert + key)"
+  echo -e "  ${GRAY}│${RESET}"
+  read -rp "       Choose [1/2] (default: 1): " cert_mode
+  cert_mode="${cert_mode:-1}"
+
+  # Copy appropriate Caddyfile template
+  if [ "$cert_mode" = "2" ]; then
+    cp caddy/Caddyfile.manual caddy/Caddyfile
+    ok "Using manual certificate mode"
+    detail "Place your files at: caddy/certs/cert.pem and caddy/certs/key.pem"
+  else
+    cp caddy/Caddyfile.acme caddy/Caddyfile
+    ok "Using Let's Encrypt (automatic TLS)"
+    detail "Ensure ports 80 + 443 are open and DNS points to this server"
+  fi
+
+  # Update .env with HTTPS settings (sed for existing keys, append if missing)
+  sed -i "s|^ENABLE_HTTPS=.*|ENABLE_HTTPS=true|" .env
+  sed -i "s|^DOMAIN=.*|DOMAIN=${user_domain}|" .env
+  sed -i "s|^CORS_ORIGINS=.*|CORS_ORIGINS=https://${user_domain}|" .env
+
+  # Handle IDSWYFT_PORT — also covers legacy .env files that used PORT= instead
+  if grep -q "^IDSWYFT_PORT=" .env; then
+    sed -i "s|^IDSWYFT_PORT=.*|IDSWYFT_PORT=127.0.0.1:8080|" .env
+  elif grep -q "^PORT=" .env; then
+    sed -i "s|^PORT=.*|IDSWYFT_PORT=127.0.0.1:8080|" .env
+  else
+    echo "IDSWYFT_PORT=127.0.0.1:8080" >> .env
+  fi
+
+  # Ensure all HTTPS vars exist (may be missing from older .env files)
+  grep -q "^ENABLE_HTTPS=" .env || echo "ENABLE_HTTPS=true" >> .env
+  grep -q "^DOMAIN=" .env || echo "DOMAIN=${user_domain}" >> .env
+  grep -q "^CORS_ORIGINS=" .env || echo "CORS_ORIGINS=https://${user_domain}" >> .env
+
+  ok "HTTPS configured for ${CYAN}${user_domain}${RESET}"
+  divider
+}
+
+# ─────────────────────────────────────────
+# Step 5: Pull images (or build from source)
 # ─────────────────────────────────────────
 start_services() {
   if [ "$BUILD_FROM_SOURCE" = true ]; then
@@ -359,6 +441,11 @@ start_services() {
     compose_cmd="docker compose -f docker-compose.yml -f docker-compose.build.yml"
   fi
 
+  # Add HTTPS profile if enabled
+  if [ "$ENABLE_HTTPS" = true ]; then
+    compose_cmd="$compose_cmd --profile https"
+  fi
+
   # Start containers in background (--no-deps avoids blocking on health checks)
   info "Creating containers..."
   $compose_cmd up -d --no-deps postgres 2>/dev/null
@@ -433,6 +520,31 @@ start_services() {
   else
     ok "API is healthy"
   fi
+
+  # Start Caddy if HTTPS is enabled
+  if [ "$ENABLE_HTTPS" = true ]; then
+    echo -e "  ${GRAY}│${RESET}"
+    $compose_cmd up -d --no-deps caddy 2>/dev/null
+    ok "caddy (HTTPS reverse proxy)"
+
+    start_spinner "Waiting for Caddy to start serving HTTPS"
+    retries=0
+    while [ $retries -lt 30 ]; do
+      if $compose_cmd exec -T caddy wget -qO /dev/null --no-check-certificate "https://localhost/" &>/dev/null 2>&1; then
+        break
+      fi
+      retries=$((retries + 1))
+      sleep 2
+    done
+    stop_spinner
+
+    if [ $retries -ge 30 ]; then
+      warn "Caddy may still be provisioning the TLS certificate"
+      detail "Check logs: $compose_cmd logs caddy"
+    else
+      ok "Caddy is running"
+    fi
+  fi
   divider
 }
 
@@ -440,8 +552,22 @@ start_services() {
 # Success screen
 # ─────────────────────────────────────────
 print_success() {
-  local port
-  port=$(grep -E "^PORT=" .env 2>/dev/null | cut -d= -f2 || echo "80")
+  local domain base_url compose_profile_flag
+  domain=$(grep -E "^DOMAIN=" .env 2>/dev/null | cut -d= -f2 || echo "")
+
+  if [ "$ENABLE_HTTPS" = true ] && [ -n "$domain" ]; then
+    base_url="https://${domain}"
+    compose_profile_flag=" --profile https"
+  else
+    local port
+    port=$(grep -E "^IDSWYFT_PORT=" .env 2>/dev/null | cut -d= -f2 || echo "80")
+    if [ "$port" = "80" ]; then
+      base_url="http://localhost"
+    else
+      base_url="http://localhost:${port}"
+    fi
+    compose_profile_flag=""
+  fi
 
   echo ""
   echo -e "${GREEN}${BOLD}"
@@ -454,16 +580,16 @@ print_success() {
   echo -e "${RESET}"
   echo -e "    ${CYAN}${BOLD}Getting Started${RESET}"
   echo -e "    ${GRAY}────────────────────────────────────${RESET}"
-  echo -e "    1. Open ${CYAN}http://localhost:${port}${RESET}"
+  echo -e "    1. Open ${CYAN}${base_url}${RESET}"
   echo -e "    2. Complete the first-time setup wizard"
   echo -e "    3. Save your API key and start integrating"
   echo ""
   echo -e "    ${CYAN}${BOLD}URLs${RESET}"
   echo -e "    ${GRAY}────────────────────────────────────${RESET}"
-  echo -e "    ${BOLD}Dev Portal${RESET}   ${CYAN}http://localhost:${port}${RESET}"
-  echo -e "    ${BOLD}API${RESET}          ${CYAN}http://localhost:${port}/api${RESET}"
-  echo -e "    ${BOLD}Docs${RESET}         ${CYAN}http://localhost:${port}/docs${RESET}"
-  echo -e "    ${BOLD}Demo${RESET}         ${CYAN}http://localhost:${port}/demo${RESET}"
+  echo -e "    ${BOLD}Dev Portal${RESET}   ${CYAN}${base_url}${RESET}"
+  echo -e "    ${BOLD}API${RESET}          ${CYAN}${base_url}/api${RESET}"
+  echo -e "    ${BOLD}Docs${RESET}         ${CYAN}${base_url}/docs${RESET}"
+  echo -e "    ${BOLD}Demo${RESET}         ${CYAN}${base_url}/demo${RESET}"
   echo ""
   echo -e "    ${CYAN}${BOLD}Services${RESET}"
   echo -e "    ${GRAY}────────────────────────────────────${RESET}"
@@ -471,15 +597,18 @@ print_success() {
   echo -e "    ${BOLD}engine${RESET}       ${GRAY}ML verification engine (OCR, face detection)${RESET}"
   echo -e "    ${BOLD}api${RESET}          ${GRAY}Core API (lightweight orchestrator)${RESET}"
   echo -e "    ${BOLD}frontend${RESET}     ${GRAY}Dev Portal UI${RESET}"
+  if [ "$ENABLE_HTTPS" = true ]; then
+    echo -e "    ${BOLD}caddy${RESET}        ${GRAY}HTTPS reverse proxy (TLS termination)${RESET}"
+  fi
   echo ""
   echo -e "    ${CYAN}${BOLD}Commands${RESET}"
   echo -e "    ${GRAY}────────────────────────────────────${RESET}"
-  echo -e "    ${DIM}docker compose logs -f${RESET}        ${GRAY}# View logs${RESET}"
-  echo -e "    ${DIM}docker compose logs engine${RESET}    ${GRAY}# Engine logs${RESET}"
-  echo -e "    ${DIM}docker compose stop${RESET}          ${GRAY}# Stop${RESET}"
-  echo -e "    ${DIM}docker compose up -d${RESET}         ${GRAY}# Start${RESET}"
-  echo -e "    ${DIM}docker compose down${RESET}          ${GRAY}# Remove${RESET}"
-  echo -e "    ${DIM}docker compose down -v${RESET}       ${GRAY}# Remove + delete data${RESET}"
+  echo -e "    ${DIM}docker compose${compose_profile_flag} logs -f${RESET}        ${GRAY}# View logs${RESET}"
+  echo -e "    ${DIM}docker compose${compose_profile_flag} logs engine${RESET}    ${GRAY}# Engine logs${RESET}"
+  echo -e "    ${DIM}docker compose${compose_profile_flag} stop${RESET}          ${GRAY}# Stop${RESET}"
+  echo -e "    ${DIM}docker compose${compose_profile_flag} up -d${RESET}         ${GRAY}# Start${RESET}"
+  echo -e "    ${DIM}docker compose${compose_profile_flag} down${RESET}          ${GRAY}# Remove${RESET}"
+  echo -e "    ${DIM}docker compose${compose_profile_flag} down -v${RESET}       ${GRAY}# Remove + delete data${RESET}"
   echo ""
   echo -e "    ${GRAY}Documentation:${RESET} ${CYAN}https://idswyft.app/docs${RESET}"
   echo -e "    ${GRAY}GitHub:${RESET}        ${CYAN}https://github.com/team-idswyft/idswyft${RESET}"
@@ -497,6 +626,7 @@ main() {
   check_dependencies
   ensure_repo
   setup_env
+  setup_https
   start_services
   print_success
 }

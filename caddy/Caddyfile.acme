@@ -1,0 +1,23 @@
+# ─────────────────────────────────────────────────
+# Caddy reverse proxy — Let's Encrypt auto-cert
+# ─────────────────────────────────────────────────
+# Caddy automatically obtains and renews TLS certificates
+# from Let's Encrypt when a valid domain is configured.
+#
+# Requirements:
+#   - Port 80 and 443 must be reachable from the internet
+#   - DNS for {$DOMAIN} must point to this server
+#   - The DOMAIN env var must be set (e.g. verify.example.com)
+# ─────────────────────────────────────────────────
+
+{$DOMAIN} {
+    log {
+        output stdout
+    }
+
+    reverse_proxy frontend:80 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}
