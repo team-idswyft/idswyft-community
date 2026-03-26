@@ -5,6 +5,11 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.3] - 2026-03-26
+
+### Fixed
+- **CORS blocks Docker setup wizard** — `http://localhost` (port 80) was missing from the CORS allowlist, causing the setup form POST to fail with 500. Added `http://localhost` as a hardcoded origin in config and prepended it to `CORS_ORIGINS` in docker-compose.yml.
+
 ## [1.5.2] - 2026-03-26
 
 ### Fixed
