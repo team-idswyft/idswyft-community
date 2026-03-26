@@ -71,10 +71,11 @@ export function Layout({ children }: LayoutProps) {
         <footer style={{ background: '#0b0f19', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
           <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
             <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-              <div className="flex items-center gap-3">
+              <a href="https://idswyft.app" target="_blank" rel="noopener noreferrer"
+                className="flex items-center gap-3 hover:opacity-80 transition-opacity" style={{ textDecoration: 'none' }}>
                 <img src="/idswyft-logo.png" alt="Idswyft" className="h-6 w-auto" />
-                <span style={{ color: '#4a5568', fontSize: 13 }}>Community Edition</span>
-              </div>
+                <span style={{ color: '#4a5568', fontSize: 13 }}>Powered by Idswyft</span>
+              </a>
               <div className="flex items-center gap-6">
                 <Link to="/docs" style={{ color: '#8896aa', fontSize: 13 }}
                   className="hover:text-white transition-colors">Docs</Link>
