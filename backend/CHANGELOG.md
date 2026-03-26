@@ -5,6 +5,20 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.5.2] - 2026-03-26
+
+### Fixed
+- **Docker setup wizard not loading** — `.env.production` had `VITE_API_URL=https://api.idswyft.app` baked in, causing Docker builds to route API calls to the cloud instead of the local nginx proxy. Dockerfile now removes `.env.production` before `vite build`.
+- **Port collision in docker-compose** — renamed `${PORT}` to `${IDSWYFT_PORT}` so dev `.env` (`PORT=3001`) no longer hijacks the frontend container port mapping
+- **Setup redirect on API error** — DeveloperPage now redirects to `/setup` when API is unreachable (common during Docker startup) instead of silently showing the login form
+- **Setup wizard layout** — vertically centered form, block-centered logo
+- **Mobile responsive grids** — DemoPage and DocsPage grids now stack to single column on viewports < 768px
+- **Step indicator overflow** — shrunk step circles/labels on mobile to prevent horizontal overflow on DemoPage
+
+### Changed
+- **OCR modular architecture** — refactored `PaddleOCRProvider.ts` (2,141 → 120 lines) into 12 focused modules using facade + strategy pattern. Zero behavior change, same benchmark accuracy (63.6%)
+- **US DL name extraction** — improved name scoring, sanitization, and multi-line parsing
+
 ## [1.5.1] - 2026-03-24
 
 ### Fixed
