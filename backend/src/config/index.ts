@@ -6,7 +6,8 @@ export const config: AppConfig = {
   corsOrigins: [
     ...new Set([
       ...(process.env.CORS_ORIGINS?.split(',').map(s => s.trim()) || ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176', 'http://localhost:3000']),
-      // Always allow both bare and www production origins
+      // Always allow production + Docker self-hosted origins
+      'http://localhost',
       'https://idswyft.app',
       'https://www.idswyft.app',
     ]),
