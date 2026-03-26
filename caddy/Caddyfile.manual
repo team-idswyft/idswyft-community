@@ -1,0 +1,22 @@
+# ─────────────────────────────────────────────────
+# Caddy reverse proxy — manual TLS certificate
+# ─────────────────────────────────────────────────
+# Use your own certificate files instead of Let's Encrypt.
+# Place your cert and key in caddy/certs/:
+#   caddy/certs/cert.pem   (full chain)
+#   caddy/certs/key.pem    (private key)
+# ─────────────────────────────────────────────────
+
+{$DOMAIN} {
+    tls /etc/caddy/certs/cert.pem /etc/caddy/certs/key.pem
+
+    log {
+        output stdout
+    }
+
+    reverse_proxy frontend:80 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+        header_up X-Forwarded-Proto {scheme}
+    }
+}

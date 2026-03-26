@@ -133,6 +133,12 @@ backend/temp/
 # OCR benchmark scripts and specimens (internal tooling, not committed)
 backend/scripts/
 
+# Caddy — generated Caddyfile and user-provided TLS certificates
+caddy/Caddyfile
+caddy/certs/*.pem
+caddy/certs/*.key
+caddy/certs/*.crt
+
 # Internal docs — all markdown (except README.md / CLAUDE.md) lives in docs/
 docs/
 .vercel

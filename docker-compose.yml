@@ -8,6 +8,9 @@
 #
 # Build from source instead:
 #   docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
+#
+# Enable HTTPS (optional — run install.sh with HTTPS setup first):
+#   docker compose --profile https up -d
 # ─────────────────────────────────────────────────
 
 services:
@@ -92,7 +95,39 @@ services:
     ports:
       - "${IDSWYFT_PORT:-80}:80"
 
+  # ─────────────────────────────────────────
+  # Caddy reverse proxy (optional HTTPS)
+  # Only starts with: docker compose --profile https up -d
+  # IMPORTANT: Set IDSWYFT_PORT=127.0.0.1:8080 in .env to avoid port 80 conflict
+  # ─────────────────────────────────────────
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    profiles:
+      - https
+    depends_on:
+      - frontend
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    environment:
+      DOMAIN: ${DOMAIN:-localhost}
+    volumes:
+      - ./caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./caddy/certs:/etc/caddy/certs:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    healthcheck:
+      test: ["CMD", "wget", "-qO", "/dev/null", "--no-check-certificate", "https://localhost/"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
 volumes:
   pgdata:
   uploads:
   temp:
+  caddy_data:
+  caddy_config:
