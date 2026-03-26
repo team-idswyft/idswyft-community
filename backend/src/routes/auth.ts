@@ -130,9 +130,13 @@ router.post('/developer/otp/send',
     const { email } = req.body;
 
     // Always return success to prevent email enumeration
-    await createAndSendOtp(email);
+    const result = await createAndSendOtp(email);
 
-    res.json({ message: 'If this email is valid, a verification code has been sent.' });
+    // Self-hosted: include the code in response when no email transport is configured
+    res.json({
+      message: 'If this email is valid, a verification code has been sent.',
+      ...(result.code && { code: result.code, self_hosted: true }),
+    });
   })
 );
 

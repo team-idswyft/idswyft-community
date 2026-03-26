@@ -277,9 +277,19 @@ function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) => void
       const data = await res.json()
       if (!res.ok) throw new Error(data.message || 'Failed to send code')
       setStep('verify_otp')
-      setOtpDigits(['', '', '', '', '', ''])
       setResendCooldown(30)
-      toast.success('Verification code sent')
+
+      if (data.code && data.self_hosted) {
+        // Self-hosted mode: auto-fill and auto-submit the OTP
+        const digits = data.code.split('')
+        setOtpDigits(digits)
+        toast.success('Self-hosted mode — code auto-filled')
+        // Small delay to let state update, then auto-verify
+        setTimeout(() => verifyOtp(data.code), 300)
+      } else {
+        setOtpDigits(['', '', '', '', '', ''])
+        toast.success('Verification code sent')
+      }
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Failed to send code')
     } finally {

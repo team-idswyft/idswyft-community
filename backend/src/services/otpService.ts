@@ -45,8 +45,10 @@ async function checkRateLimit(email: string): Promise<boolean> {
 /**
  * Create an OTP for the given email, store its hash, and send the email.
  * Returns { success: true } or { success: false, reason: string }.
+ * When email is not configured (self-hosted), also returns the plaintext code
+ * so the frontend can display it directly.
  */
-export async function createAndSendOtp(email: string): Promise<{ success: boolean; reason?: string }> {
+export async function createAndSendOtp(email: string): Promise<{ success: boolean; reason?: string; code?: string }> {
   // Rate limit check
   const allowed = await checkRateLimit(email);
   if (!allowed) {
@@ -87,6 +89,12 @@ export async function createAndSendOtp(email: string): Promise<{ success: boolea
   }
 
   logger.info('OTP created and sent', { email });
+
+  // Self-hosted: return plaintext code when no email transport is configured
+  if (!emailService.isConfigured) {
+    return { success: true, code };
+  }
+
   return { success: true };
 }
 
