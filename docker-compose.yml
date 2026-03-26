@@ -89,7 +89,7 @@ services:
     depends_on:
       - api
     ports:
-      - "${PORT:-80}:80"
+      - "${IDSWYFT_PORT:-80}:80"
 
 volumes:
   pgdata:
