@@ -33,14 +33,17 @@ interface SendEmailOptions {
 class EmailService {
   private resendApiKey: string;
   private fromAddress: string;
-  private isConfigured: boolean;
+  private _isConfigured: boolean;
+
+  /** Whether a real email transport (Resend) is configured */
+  get isConfigured(): boolean { return this._isConfigured; }
 
   constructor() {
     this.resendApiKey = config.email.resendApiKey;
     this.fromAddress = config.email.fromAddress;
-    this.isConfigured = !!this.resendApiKey;
+    this._isConfigured = !!this.resendApiKey;
 
-    if (this.isConfigured) {
+    if (this._isConfigured) {
       logger.info(`Email service configured (from: ${this.fromAddress})`);
     } else {
       logger.warn('Resend not configured — OTP codes will be logged to console');
@@ -48,7 +51,7 @@ class EmailService {
   }
 
   private async sendEmail(options: SendEmailOptions): Promise<boolean> {
-    if (!this.isConfigured) {
+    if (!this._isConfigured) {
       logger.info(`[DEV] Email to ${options.to}: ${options.subject}`);
       logger.info(`[DEV] Text body:\n${options.text}`);
       return true;
