@@ -192,9 +192,9 @@ ensure_repo() {
 # ─────────────────────────────────────────
 generate_secret() {
   if command -v openssl &>/dev/null; then
-    openssl rand -hex 16
+    openssl rand -hex 32
   else
-    head -c 16 /dev/urandom | xxd -p 2>/dev/null || cat /dev/urandom | tr -dc 'a-f0-9' | head -c 32
+    head -c 32 /dev/urandom | xxd -p 2>/dev/null || cat /dev/urandom | tr -dc 'a-f0-9' | head -c 64
   fi
 }
 

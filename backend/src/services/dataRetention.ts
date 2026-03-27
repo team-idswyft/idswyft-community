@@ -35,7 +35,7 @@ export class DataRetentionService {
 
     const verificationIds = (verifications ?? []).map((v: any) => v.id);
 
-    // 3. Delete document and selfie DB records
+    // 3. Delete document and selfie DB records + related data
     if (verificationIds.length > 0) {
       await supabase.from('documents')
         .delete()
@@ -43,6 +43,21 @@ export class DataRetentionService {
 
       await supabase.from('selfies')
         .delete()
+        .in('verification_request_id', verificationIds);
+
+      // Delete verification contexts (session state with potential biometric data)
+      await supabase.from('verification_contexts')
+        .delete()
+        .in('verification_id', verificationIds);
+
+      // Delete risk scores
+      await supabase.from('verification_risk_scores')
+        .delete()
+        .in('verification_request_id', verificationIds);
+
+      // Nullify webhook delivery payloads (preserve delivery audit trail, remove PII)
+      await supabase.from('webhook_deliveries')
+        .update({ payload: null })
         .in('verification_request_id', verificationIds);
     }
 

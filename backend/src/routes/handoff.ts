@@ -1,17 +1,41 @@
 import express, { Request, Response } from 'express';
 import crypto from 'crypto';
 import { catchAsync, ValidationError } from '@/middleware/errorHandler.js';
+import { AuthenticationError } from '@/middleware/errorHandler.js';
 import { supabase } from '@/config/database.js';
 import { logger } from '@/utils/logger.js';
+import config from '@/config/index.js';
+import { basicRateLimit } from '@/middleware/rateLimit.js';
 
 const router = express.Router();
 
 // POST /api/verify/handoff/create — desktop creates a session, returns token
-router.post('/create', catchAsync(async (req: Request, res: Response) => {
+router.post('/create', basicRateLimit, catchAsync(async (req: Request, res: Response) => {
   const { api_key, user_id, source } = req.body;
 
   if (!api_key || !user_id) {
     throw new ValidationError('api_key and user_id are required', 'body', req.body);
+  }
+
+  // Validate the API key exists and is active
+  const keyHash = crypto
+    .createHmac('sha256', config.apiKeySecret)
+    .update(api_key)
+    .digest('hex');
+
+  const { data: apiKeyRecord, error: keyError } = await supabase
+    .from('api_keys')
+    .select('id, developer_id, is_active, expires_at')
+    .eq('key_hash', keyHash)
+    .eq('is_active', true)
+    .single();
+
+  if (keyError || !apiKeyRecord) {
+    throw new AuthenticationError('Invalid API key');
+  }
+
+  if (apiKeyRecord.expires_at && new Date(apiKeyRecord.expires_at) < new Date()) {
+    throw new AuthenticationError('API key has expired');
   }
 
   const validSource = ['api', 'vaas', 'demo'].includes(source) ? source : 'api';

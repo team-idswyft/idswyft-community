@@ -219,7 +219,7 @@ function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) => void
 
   // Check if GitHub OAuth is configured
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/auth/developer/github/url?state=check`)
+    fetch(`${API_BASE_URL}/api/auth/developer/github/url?state=check`, { credentials: 'include' })
       .then(r => r.json())
       .then(d => setGithubConfigured(d.configured === true))
       .catch(() => {})
@@ -245,14 +245,14 @@ function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) => void
     fetch(`${API_BASE_URL}/api/auth/developer/github/callback`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
       body: JSON.stringify({ code }),
     })
       .then(r => r.json().then(data => ({ ok: r.ok, data })))
       .then(({ ok, data }) => {
         window.history.replaceState({}, '', window.location.pathname)
         if (!ok) throw new Error(data.message || 'GitHub login failed')
-        localStorage.setItem('developer_token', data.token)
-        onAuth(data.token, data.api_key?.key)
+        onAuth('session', data.api_key?.key)
       })
       .catch((err: unknown) => {
         window.history.replaceState({}, '', window.location.pathname)
@@ -274,6 +274,7 @@ function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) => void
       const res = await fetch(`${API_BASE_URL}/api/auth/developer/otp/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email }),
       })
       const data = await res.json()
@@ -344,6 +345,7 @@ function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) => void
       const res = await fetch(`${API_BASE_URL}/api/auth/developer/otp/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, code }),
       })
       const data = await res.json()
@@ -354,8 +356,7 @@ function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) => void
         setRegistrationToken(data.registration_token)
         setStep('complete_registration')
       } else {
-        // Existing user — login complete
-        localStorage.setItem('developer_token', data.token)
+        // Existing user — login complete (cookie set by server)
         onAuth(data.token)
       }
     } catch (err: unknown) {
@@ -374,11 +375,12 @@ function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) => void
       const res = await fetch(`${API_BASE_URL}/api/auth/developer/otp/complete-registration`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ registration_token: registrationToken, name, company }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.message || 'Registration failed')
-      localStorage.setItem('developer_token', data.token)
+      // Cookie set by server
       onAuth(data.token, data.api_key?.key)
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Registration failed')
@@ -392,7 +394,7 @@ function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) => void
     try {
       const state = crypto.randomUUID()
       sessionStorage.setItem('github_oauth_state', state)
-      const res = await fetch(`${API_BASE_URL}/api/auth/developer/github/url?state=${encodeURIComponent(state)}`)
+      const res = await fetch(`${API_BASE_URL}/api/auth/developer/github/url?state=${encodeURIComponent(state)}`, { credentials: 'include' })
       const data = await res.json()
       if (!data.url) throw new Error('GitHub OAuth not configured')
       window.location.href = data.url
@@ -538,10 +540,9 @@ function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) => void
 
 // â"€â"€â"€ Create key modal â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
 
-function CreateKeyModal({ onClose, onCreated, token }: {
+function CreateKeyModal({ onClose, onCreated }: {
   onClose: () => void
   onCreated: (key: ApiKey, fullKey: string) => void
-  token: string
 }) {
   const [name, setName] = useState('')
   const [isSandbox, setIsSandbox] = useState(false)
@@ -553,7 +554,7 @@ function CreateKeyModal({ onClose, onCreated, token }: {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/api-key`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}` },
+        headers: { 'Content-Type': 'application/json' }, credentials: 'include' as RequestCredentials,
         body: JSON.stringify({ name, is_sandbox: isSandbox }),
       })
       const data = await res.json()
@@ -632,8 +633,15 @@ export function DeveloperPage() {
   const navigate = useNavigate()
   useEffect(() => { injectFonts() }, [])
 
-  const [token, setToken] = useState<string | null>(localStorage.getItem('developer_token'))
+  const [token, setToken] = useState<string | null>(null)
   const [setupNeeded, setSetupNeeded] = useState<boolean | null>(null)
+
+  // On mount, check if an auth cookie exists by probing a protected endpoint
+  useEffect(() => {
+    fetch(`${API_BASE_URL}/api/developer/profile`, { credentials: 'include' })
+      .then(res => { if (res.ok) setToken('session') })
+      .catch(() => {})
+  }, [])
 
   // Community edition: redirect to /setup if no developers exist yet
   // On API error (e.g. backend not ready during Docker startup), redirect
@@ -712,29 +720,29 @@ export function DeveloperPage() {
   const [reviewerName, setReviewerName] = useState('')
   const [reviewerInviting, setReviewerInviting] = useState(false)
 
-  const fetchKeys = async (t: string) => {
+  const fetchKeys = async (_t?: string) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/api-keys`, {
-        headers: { Authorization: `Bearer ${t}` },
+        credentials: 'include' as RequestCredentials,
       })
-      if (res.status === 401) { localStorage.removeItem('developer_token'); setToken(null); return }
+      if (res.status === 401) { setToken(null); return }
       if (res.ok) setApiKeys((await res.json()).api_keys ?? [])
     } catch { /* network error - backend offline, show empty state */ }
   }
 
-  const fetchStats = async (t: string) => {
+  const fetchStats = async (_t?: string) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/stats`, {
-        headers: { Authorization: `Bearer ${t}` },
+        credentials: 'include' as RequestCredentials,
       })
       if (res.ok) setStats(await res.json())
     } catch { /* network error */ }
   }
 
-  const fetchWebhooks = async (t: string) => {
+  const fetchWebhooks = async (_t?: string) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/webhooks`, {
-        headers: { Authorization: `Bearer ${t}` },
+        credentials: 'include' as RequestCredentials,
       })
       if (res.ok) {
         const data = await res.json()
@@ -743,11 +751,11 @@ export function DeveloperPage() {
     } catch { /* network error */ }
   }
 
-  const fetchLLMSettings = async (t: string) => {
+  const fetchLLMSettings = async (_t?: string) => {
     setLlmLoading(true)
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/settings/llm`, {
-        headers: { Authorization: `Bearer ${t}` },
+        credentials: 'include' as RequestCredentials,
       })
       if (res.ok) {
         const data = await res.json()
@@ -771,7 +779,7 @@ export function DeveloperPage() {
       if (llmProvider === 'custom') body.endpoint_url = llmEndpointUrl || null
       const res = await fetch(`${API_BASE_URL}/api/developer/settings/llm`, {
         method: 'PUT',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' }, credentials: 'include' as RequestCredentials,
         body: JSON.stringify(body),
       })
       if (res.ok) {
@@ -791,7 +799,7 @@ export function DeveloperPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/settings/llm`, {
         method: 'PUT',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' }, credentials: 'include' as RequestCredentials,
         body: JSON.stringify({ provider: null }),
       })
       if (res.ok) {
@@ -806,11 +814,11 @@ export function DeveloperPage() {
     setLlmSaving(false)
   }
 
-  const fetchProfile = async (t: string) => {
+  const fetchProfile = async (_t?: string) => {
     setProfileLoading(true)
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/profile`, {
-        headers: { Authorization: `Bearer ${t}` },
+        credentials: 'include' as RequestCredentials,
       })
       if (res.ok) {
         const { data } = await res.json()
@@ -829,7 +837,7 @@ export function DeveloperPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/profile`, {
         method: 'PUT',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' }, credentials: 'include' as RequestCredentials,
         body: JSON.stringify({ name: profileName, company: profileCompany || null }),
       })
       if (res.ok) {
@@ -849,7 +857,7 @@ export function DeveloperPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/avatar`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include' as RequestCredentials,
         body: formData,
       })
       if (res.ok) {
@@ -863,10 +871,10 @@ export function DeveloperPage() {
     } catch { toast.error('Network error') }
   }
 
-  const fetchReviewers = async (t: string) => {
+  const fetchReviewers = async (_t?: string) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/reviewers`, {
-        headers: { Authorization: `Bearer ${t}` },
+        credentials: 'include' as RequestCredentials,
       })
       if (res.ok) {
         const data = await res.json()
@@ -881,7 +889,7 @@ export function DeveloperPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/reviewers/invite`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' }, credentials: 'include' as RequestCredentials,
         body: JSON.stringify({ email: reviewerEmail, name: reviewerName || undefined }),
       })
       const data = await res.json()
@@ -902,7 +910,7 @@ export function DeveloperPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/reviewers/${id}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include' as RequestCredentials,
       })
       if (res.ok) {
         setReviewers(prev => prev.map(r => r.id === id ? { ...r, status: 'revoked' } : r))
@@ -941,7 +949,7 @@ export function DeveloperPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/api-key/${id}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include' as RequestCredentials,
       })
       if (!res.ok) throw new Error('Delete failed')
       setApiKeys(prev => prev.filter(k => k.id !== id))
@@ -954,7 +962,7 @@ export function DeveloperPage() {
   }
 
   const handleLogout = () => {
-    localStorage.removeItem('developer_token')
+    fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {})
     setToken(null)
     setApiKeys([])
     setStats(null)
@@ -971,7 +979,7 @@ export function DeveloperPage() {
     setLogsLoadingForKey(keyId)
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/activity?api_key_id=${encodeURIComponent(keyId)}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include' as RequestCredentials,
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.message || 'Failed to load logs')
@@ -1094,7 +1102,7 @@ export function DeveloperPage() {
     setVerificationDetailError(null)
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/verifications/${verificationId}`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include' as RequestCredentials,
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.message || 'Failed to load verification details')
@@ -1124,10 +1132,8 @@ export function DeveloperPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/webhooks`, {
         method: 'POST',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include' as RequestCredentials,
         body: JSON.stringify({ url, events: selectedWebhookEvents, api_key_id: webhookApiKeyId }),
       })
       const data = await res.json()
@@ -1153,7 +1159,7 @@ export function DeveloperPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/webhooks/${id}`, {
         method: 'DELETE',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include' as RequestCredentials,
       })
       if (!res.ok) throw new Error('Failed to remove webhook')
       setWebhooks(prev => prev.filter(w => w.id !== id))
@@ -1172,7 +1178,7 @@ export function DeveloperPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/webhooks/${id}/test`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include' as RequestCredentials,
         signal: controller.signal,
       })
       clearTimeout(timer)
@@ -1199,7 +1205,7 @@ export function DeveloperPage() {
     if (!token) return
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/webhooks/${id}/secret`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include' as RequestCredentials,
       })
       const data = await res.json()
       if (res.ok && data.secret_key) {
@@ -1223,7 +1229,7 @@ export function DeveloperPage() {
     setDeliveriesLoading(webhookId)
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/webhooks/${webhookId}/deliveries`, {
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include' as RequestCredentials,
       })
       if (res.ok) {
         const data = await res.json()
@@ -1239,13 +1245,13 @@ export function DeveloperPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/webhooks/${webhookId}/deliveries/${deliveryId}/resend`, {
         method: 'POST',
-        headers: { Authorization: `Bearer ${token}` },
+        credentials: 'include' as RequestCredentials,
       })
       if (res.ok) {
         toast.success('Webhook resent')
         // Refresh deliveries for this webhook
         const listRes = await fetch(`${API_BASE_URL}/api/developer/webhooks/${webhookId}/deliveries`, {
-          headers: { Authorization: `Bearer ${token}` },
+          credentials: 'include' as RequestCredentials,
         })
         if (listRes.ok) {
           const data = await listRes.json()
@@ -1320,15 +1326,13 @@ export function DeveloperPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/account`, {
         method: 'DELETE',
-        headers: {
-          Authorization: `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include' as RequestCredentials,
         body: JSON.stringify({ confirm_email: deleteAccountEmail }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.message || 'Failed to delete account')
-      localStorage.removeItem('developer_token')
+      fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {})
       setToken(null)
       toast.success('Account deleted')
     } catch (err: unknown) {
@@ -2066,7 +2070,6 @@ if (expected !== req.headers['x-idswyft-signature']) {
       {/* Create key modal */}
       {showCreate && token && (
         <CreateKeyModal
-          token={token}
           onClose={() => setShowCreate(false)}
           onCreated={handleCreated}
         />

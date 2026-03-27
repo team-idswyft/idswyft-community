@@ -6,6 +6,7 @@ import { WebhookService } from '@/services/webhook.js';
 import { WEBHOOK_EVENT_NAMES } from '@/constants/webhookEvents.js';
 import { logger } from '@/utils/logger.js';
 import { WebhookPayload } from '@/types/index.js';
+import { validateWebhookUrl } from '@/utils/validateUrl.js';
 
 const router = express.Router();
 const webhookService = new WebhookService();
@@ -34,7 +35,14 @@ router.post('/register',
     
     const { url, is_sandbox = false, secret_token } = req.body;
     const developerId = req.developer!.id;
-    
+
+    // SSRF protection: block private/reserved network URLs
+    try {
+      validateWebhookUrl(url);
+    } catch (err: any) {
+      throw new ValidationError(err.message, 'url', url);
+    }
+
     // Check if webhook already exists for this developer and URL
     const existingWebhook = await webhookService.getWebhookByUrl(developerId, url, is_sandbox);
     if (existingWebhook) {
@@ -121,7 +129,12 @@ router.put('/:webhookId',
     if (!webhook || webhook.developer_id !== developerId) {
       throw new NotFoundError('Webhook');
     }
-    
+
+    // SSRF validation on URL updates
+    if (updates.url) {
+      validateWebhookUrl(updates.url);
+    }
+
     // Update webhook
     const updatedWebhook = await webhookService.updateWebhook(webhookId, updates);
     

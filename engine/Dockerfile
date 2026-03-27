@@ -57,11 +57,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
+# Create non-root user
+RUN groupadd -r nodeuser && useradd -r -g nodeuser -s /bin/false nodeuser
+
 # Copy compiled output + node_modules + models from build stage
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
 COPY --from=build /app/models ./models
 COPY --from=build /app/package.json ./package.json
+
+RUN chown -R nodeuser:nodeuser /app
+USER nodeuser
 
 EXPOSE 3002
 

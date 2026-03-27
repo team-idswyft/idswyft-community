@@ -38,6 +38,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
+# Create non-root user
+RUN groupadd -r nodeuser && useradd -r -g nodeuser -s /bin/false nodeuser
+
 # Copy compiled output + node_modules from build stage
 COPY --from=build /app/dist ./dist
 COPY --from=build /app/node_modules ./node_modules
@@ -50,6 +53,9 @@ RUN sed -i 's/\r$//' ./docker-entrypoint.sh && chmod +x ./docker-entrypoint.sh
 
 # Migrations are bind-mounted from supabase/migrations/ at runtime
 ENV MIGRATIONS_DIR=/app/migrations
+
+RUN chown -R nodeuser:nodeuser /app
+USER nodeuser
 
 EXPOSE 3001
 

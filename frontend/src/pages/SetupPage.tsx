@@ -75,6 +75,7 @@ export function SetupPage() {
       const res = await fetch(`${API_BASE_URL}/api/setup/initialize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ name: name.trim(), email: email.trim(), company: company.trim() || undefined }),
       })
 
@@ -85,8 +86,7 @@ export function SetupPage() {
 
       const data = await res.json()
 
-      // Store the session token
-      localStorage.setItem('developer_token', data.token)
+      // Auth cookie set by server (httpOnly)
       setResult(data)
       setState('success')
       toast.success('Account created!')

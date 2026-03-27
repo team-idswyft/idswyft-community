@@ -32,6 +32,7 @@ import { VerificationStatus } from '@/verification/models/types.js';
 import type { FrontExtractionResult, BackExtractionResult, SessionState } from '@/verification/models/types.js';
 import { computeFaceMatch } from '@/verification/face/faceMatchService.js';
 import { getFaceMatchingThresholdSync } from '@/config/verificationThresholds.js';
+import { validateDownloadUrl } from '@/utils/validateUrl.js';
 
 const router = express.Router();
 const storageService = new StorageService();
@@ -41,28 +42,6 @@ const verificationService = new VerificationService();
 
 const DOWNLOAD_TIMEOUT = 30_000; // 30 seconds
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
-
-/** Block SSRF: only allow HTTPS and reject private/reserved network targets. */
-function validateDownloadUrl(raw: string): void {
-  const parsed = new URL(raw);
-  if (parsed.protocol !== 'https:') {
-    throw new Error('Only HTTPS URLs are allowed for document downloads');
-  }
-  const h = parsed.hostname;
-  if (
-    h === 'localhost' ||
-    h.startsWith('127.') ||
-    h.startsWith('10.') ||
-    h.startsWith('192.168.') ||
-    /^172\.(1[6-9]|2\d|3[01])\./.test(h) ||
-    h.startsWith('169.254.') ||
-    h === '0.0.0.0' ||
-    h === '::1' ||
-    h === '::'
-  ) {
-    throw new Error('URLs pointing to private/reserved networks are not allowed');
-  }
-}
 
 /** Download a file from a URL and return its buffer. */
 async function downloadFile(url: string): Promise<Buffer> {
@@ -84,9 +63,14 @@ async function downloadFile(url: string): Promise<Buffer> {
 
 /** Save session state to verification_contexts table. */
 async function saveSessionState(verificationId: string, state: Readonly<SessionState>): Promise<void> {
+  // Strip biometric data (GDPR Article 9) — embeddings only needed in-memory for face match
+  const sanitized: any = JSON.parse(JSON.stringify(state));
+  if (sanitized.front_extraction) sanitized.front_extraction.face_embedding = null;
+  if (sanitized.live_capture) sanitized.live_capture.face_embedding = null;
+
   await supabase.from('verification_contexts').upsert({
     verification_id: verificationId,
-    context: JSON.stringify(state),
+    context: JSON.stringify(sanitized),
     updated_at: new Date().toISOString(),
   }, { onConflict: 'verification_id' });
 }

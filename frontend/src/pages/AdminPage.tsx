@@ -26,31 +26,26 @@ export const AdminPage: React.FC = () => {
   const [deletingData, setDeletingData] = useState<string | null>(null);
 
   useEffect(() => {
-    // Check if user is authenticated
-    const token = localStorage.getItem('adminToken');
-    if (!token) {
-      window.location.href = '/admin/login';
-      return;
-    }
-
-    fetchVerifications();
-    fetchStats();
+    // Check auth via cookie — try a protected endpoint
+    fetch(`${API_BASE_URL}/api/admin/dashboard`, { credentials: 'include' })
+      .then(res => {
+        if (!res.ok) { window.location.href = '/admin/login'; return; }
+        fetchVerifications();
+        fetchStats();
+      })
+      .catch(() => { window.location.href = '/admin/login'; });
   }, []);
 
   const fetchVerifications = async () => {
     try {
-      const token = localStorage.getItem('adminToken');
       const response = await fetch(`${API_BASE_URL}/api/admin/verifications`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        credentials: 'include',
       });
 
       if (response.ok) {
         const data = await response.json();
         setVerifications(data.verifications || []);
       } else if (response.status === 401) {
-        localStorage.removeItem('adminToken');
         window.location.href = '/admin/login';
       } else {
         // Mock data for demo
@@ -83,11 +78,8 @@ export const AdminPage: React.FC = () => {
 
   const fetchStats = async () => {
     try {
-      const token = localStorage.getItem('adminToken');
       const response = await fetch(`${API_BASE_URL}/api/admin/stats`, {
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
+        credentials: 'include',
       });
 
       if (response.ok) {
@@ -110,13 +102,10 @@ export const AdminPage: React.FC = () => {
 
   const handleStatusUpdate = async (verificationId: string, newStatus: string) => {
     try {
-      const token = localStorage.getItem('adminToken');
       const response = await fetch(`${API_BASE_URL}/api/admin/verification/${verificationId}/review`, {
         method: 'PUT',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ status: newStatus }),
       });
 
@@ -132,7 +121,7 @@ export const AdminPage: React.FC = () => {
   };
 
   const handleLogout = () => {
-    localStorage.removeItem('adminToken');
+    fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {});
     window.location.href = '/admin/login';
   };
 

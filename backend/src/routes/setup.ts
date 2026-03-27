@@ -111,6 +111,10 @@ router.post('/initialize',
 
     // Generate session token
     const token = generateDeveloperToken(developer);
+    res.cookie('idswyft_token', token, {
+      httpOnly: true, secure: process.env.NODE_ENV === 'production',
+      sameSite: 'strict', maxAge: 7 * 24 * 60 * 60 * 1000, path: '/',
+    });
 
     // Mark setup as complete so GET /status skips the DB from now on
     setupCompleteCache = true;

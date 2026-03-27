@@ -61,9 +61,14 @@ const upload = multer({
 
 /** Save session state to verification_contexts table */
 async function saveSessionState(verificationId: string, state: Readonly<SessionState>): Promise<void> {
+  // Strip biometric data (GDPR Article 9) — embeddings only needed in-memory for face match
+  const sanitized: any = JSON.parse(JSON.stringify(state));
+  if (sanitized.front_extraction) sanitized.front_extraction.face_embedding = null;
+  if (sanitized.live_capture) sanitized.live_capture.face_embedding = null;
+
   const context = {
     verification_id: verificationId,
-    context: JSON.stringify(state),
+    context: JSON.stringify(sanitized),
     updated_at: new Date().toISOString(),
   };
 
@@ -815,7 +820,6 @@ router.post('/:verification_id/front-document',
       status: mapped.status,
       current_step: mapped.current_step,
       document_id: document.id,
-      document_path: documentPath,
       ocr_data: state.front_extraction?.ocr ?? null,
       rejection_reason: state.rejection_reason,
       rejection_detail: state.rejection_detail,
@@ -950,7 +954,6 @@ router.post('/:verification_id/back-document',
       status: mapped.status,
       current_step: mapped.current_step,
       document_id: document.id,
-      document_path: documentPath,
       barcode_data: state.back_extraction?.qr_payload ?? null,
       barcode_extraction_failed: !state.back_extraction?.qr_payload,
       documents_match: state.cross_validation ? !state.cross_validation.has_critical_failure : null,
@@ -1180,7 +1183,6 @@ router.post('/:verification_id/live-capture',
       status: mapped.status,
       current_step: mapped.current_step,
       selfie_id: selfie.id,
-      selfie_path: selfiePath,
       face_match_results: state.face_match ?? null,
       liveness_results: {
         liveness_passed: liveResult.liveness_passed,

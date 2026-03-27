@@ -28,11 +28,18 @@ export class PgClient {
   public pool: pg.Pool;
 
   constructor(connectionString: string) {
+    const isLocalConnection = connectionString.includes('localhost') ||
+      connectionString.includes('127.0.0.1') ||
+      connectionString.includes('@postgres:');
+
     this.pool = new Pool({
       connectionString,
       max: 20,
       idleTimeoutMillis: 30000,
       connectionTimeoutMillis: 10000,
+      ...(process.env.DATABASE_SSL !== 'false' && !isLocalConnection
+        ? { ssl: { rejectUnauthorized: process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false' } }
+        : {}),
     });
   }
 

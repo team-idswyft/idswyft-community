@@ -124,8 +124,8 @@ export const authenticateAPIKey = catchAsync(async (req: Request, res: Response,
 
 // JWT authentication for admin users
 export const authenticateJWT = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  
+  const token = req.headers.authorization?.replace('Bearer ', '') || req.cookies?.idswyft_token;
+
   if (!token) {
     throw new AuthenticationError('Access token is required');
   }
@@ -330,8 +330,8 @@ export const generateDeveloperToken = (developer: Developer): string => {
 
 // JWT authentication for developers
 export const authenticateDeveloperJWT = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
-  const token = req.headers.authorization?.replace('Bearer ', '');
-  
+  const token = req.headers.authorization?.replace('Bearer ', '') || req.cookies?.idswyft_token;
+
   if (!token) {
     throw new AuthenticationError('Access token is required');
   }
@@ -429,7 +429,7 @@ export const generateReviewerToken = (reviewer: { id: string; email: string; dev
 
 // JWT authentication for reviewers
 export const authenticateReviewerJWT = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
-  const token = req.headers.authorization?.replace('Bearer ', '');
+  const token = req.headers.authorization?.replace('Bearer ', '') || req.cookies?.idswyft_token;
 
   if (!token) {
     throw new AuthenticationError('Access token is required');
@@ -474,7 +474,7 @@ export const authenticateReviewerJWT = catchAsync(async (req: Request, res: Resp
 // Flexible middleware: accepts admin JWT OR reviewer JWT
 // Sets req.user (admin) or req.reviewer (reviewer with developer_id scope)
 export const authenticateAdminOrReviewer = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
-  const token = req.headers.authorization?.replace('Bearer ', '');
+  const token = req.headers.authorization?.replace('Bearer ', '') || req.cookies?.idswyft_token;
 
   if (!token) {
     throw new AuthenticationError('Access token is required');

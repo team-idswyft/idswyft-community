@@ -15,6 +15,8 @@ import { WebhookService, createWebhookSignature } from '@/services/webhook.js';
 import axios from 'axios';
 import { config } from '@/config/index.js';
 import { encryptSecret, decryptSecret, maskApiKey } from '@/utils/encryption.js';
+import { validateWebhookUrl } from '@/utils/validateUrl.js';
+import { createAndSendOtp } from '@/services/otpService.js';
 import { emailService } from '@/services/emailService.js';
 import {
   getConversionFunnel,
@@ -99,7 +101,7 @@ router.post('/register',
       throw new ValidationError('Developer with this email already exists', 'email', email);
     }
     
-    // Create developer
+    // Create developer (unverified — must complete OTP to activate)
     const { data: developer, error } = await supabase
       .from('developers')
       .insert({
@@ -107,78 +109,31 @@ router.post('/register',
         name,
         company,
         webhook_url,
-        is_verified: true // Auto-verify for MVP
+        is_verified: false
       })
       .select('*')
       .single();
-    
+
     if (error) {
-      console.error('🚨 Developer creation failed:', error);
       logger.error('Database error:', error);
-      
+
       // Handle specific duplicate email error
       if (error.code === '23505' && error.details?.includes('email')) {
         throw new ValidationError('Developer with this email already exists', 'email', email);
       }
-      
+
       throw new Error('Failed to create developer account');
     }
-    
-    console.log('✅ Developer created successfully:', developer.id);
-    console.log('📋 Developer object:', developer);
-    
-    // Create initial API key
-    console.log('🔑 About to generate API key...');
-    console.log('🔑 Generating API key for developer:', developer.id);
-    const { key, hash, prefix } = generateAPIKey();
-    console.log('🔑 Generated API key parts:', { keyLength: key.length, prefix, hashLength: hash.length });
-    
-    // Set appropriate sandbox mode based on environment
-    const isProductionEnv = process.env.NODE_ENV === 'production';
-    const defaultIsSandbox = !isProductionEnv; // Sandbox in dev, production in prod
-    
-    console.log('🔑 Inserting API key into database...');
-    const { data: apiKey, error: keyError } = await supabase
-      .from('api_keys')
-      .insert({
-        developer_id: developer.id,
-        key_hash: hash,
-        key_prefix: prefix,
-        name: 'Default API Key',
-        is_sandbox: defaultIsSandbox
-      })
-      .select('id, name, is_sandbox, created_at')
-      .single();
-    
-    console.log('🔑 API key insertion result:', { data: !!apiKey, error: keyError });
-    
-    if (keyError) {
-      console.error('🚨 API key creation failed:', keyError);
-      logger.error('Failed to create API key:', keyError);
-      // Still return developer info even if API key creation fails
-      return res.status(201).json({
-        developer: {
-          id: developer.id,
-          email: developer.email,
-          name: developer.name,
-          company: developer.company,
-          is_verified: developer.is_verified,
-          created_at: developer.created_at
-        },
-        message: 'Developer account created successfully, but API key creation failed. Please create one manually.',
-        error: 'API key creation failed'
-      });
-    }
-    
-    console.log('✅ API key created successfully:', apiKey);
-    
-    logger.info('New developer registered', {
+
+    // Send OTP for email verification (API key generated post-OTP-verify login)
+    const result = await createAndSendOtp(email);
+
+    logger.info('New developer registered (pending OTP verification)', {
       developerId: developer.id,
       email: developer.email,
       company: developer.company,
-      apiKeyId: apiKey.id
     });
-    
+
     res.status(201).json({
       developer: {
         id: developer.id,
@@ -188,14 +143,8 @@ router.post('/register',
         is_verified: developer.is_verified,
         created_at: developer.created_at
       },
-      api_key: {
-        key, // Only returned once
-        id: apiKey.id,
-        name: apiKey.name,
-        is_sandbox: apiKey.is_sandbox,
-        created_at: apiKey.created_at
-      },
-      message: 'Developer account created successfully. Store your API key securely - it will not be shown again.'
+      message: 'Verification email sent. Complete email verification to activate your account.',
+      ...(result.code && { code: result.code }),
     });
   })
 );
@@ -618,6 +567,13 @@ router.post('/webhooks',
     }
 
     const { url, is_sandbox = false, events, secret, api_key_id } = req.body;
+
+    // SSRF protection: block private/reserved network URLs
+    try {
+      validateWebhookUrl(url);
+    } catch (err: any) {
+      throw new ValidationError(err.message, 'url', url);
+    }
 
     // If api_key_id is provided, validate it belongs to this developer
     if (api_key_id) {
@@ -1120,7 +1076,7 @@ router.post('/api-key/:id/rotate',
   authenticateDeveloperJWT,
   catchAsync(async (req: Request, res: Response) => {
     const { id } = req.params;
-    const { gracePeriodHours = 168 } = req.body; // default: 7 days
+    const hours = Math.max(1, Math.min(168, Number(req.body.gracePeriodHours) || 168));
 
     // Verify the key belongs to this developer and is currently active
     const { data: oldKey, error } = await supabase
@@ -1150,7 +1106,7 @@ router.post('/api-key/:id/rotate',
       .single();
 
     // Mark the old key to expire after the grace period (still usable until then)
-    const expiresAt = new Date(Date.now() + gracePeriodHours * 60 * 60 * 1000);
+    const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000);
     await supabase
       .from('api_keys')
       .update({ expires_at: expiresAt.toISOString() })
@@ -1160,14 +1116,14 @@ router.post('/api-key/:id/rotate',
       developerId: (req as any).developer!.id,
       oldKeyId: id,
       newKeyId: newKey?.id,
-      gracePeriodHours,
+      gracePeriodHours: hours,
     });
 
     res.status(201).json({
       new_key: key,                              // shown once — store securely
       new_key_id: newKey?.id,
       old_key_expires_at: expiresAt.toISOString(),
-      grace_period_hours: gracePeriodHours,
+      grace_period_hours: hours,
       message: `Old key will remain active until ${expiresAt.toISOString()}. Update your integration before then.`,
     });
   })

@@ -17,17 +17,19 @@ export const AdminLogin: React.FC = () => {
 
   useEffect(() => { injectFonts(); }, []);
 
-  // If already authenticated, skip straight to verifications
+  // Try escalating developer session or check existing cookie auth
   useEffect(() => {
-    if (localStorage.getItem('adminToken') || localStorage.getItem('reviewerToken')) {
-      navigate('/admin/verifications');
-      return;
-    }
-    if (!localStorage.getItem('developer_token')) return;
-
     setEscalating(true);
-    tryEscalateDeveloperToken()
-      .then(ok => ok ? navigate('/admin/verifications') : setEscalating(false))
+    // Try to access a protected endpoint — if the cookie is valid, skip login
+    fetch(`${API_BASE_URL}/api/admin/dashboard`, { credentials: 'include' })
+      .then(res => {
+        if (res.ok) { navigate('/admin/verifications'); return; }
+        // No valid admin/reviewer cookie — try developer escalation
+        return tryEscalateDeveloperToken().then(ok => {
+          if (ok) navigate('/admin/verifications');
+          else setEscalating(false);
+        });
+      })
       .catch(() => setEscalating(false));
   }, [navigate]);
 
@@ -46,6 +48,7 @@ export const AdminLogin: React.FC = () => {
       const res = await fetch(`${API_BASE_URL}/api/auth/reviewer/otp/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email }),
       });
       const data = await res.json();
@@ -77,6 +80,7 @@ export const AdminLogin: React.FC = () => {
       const res = await fetch(`${API_BASE_URL}/api/auth/reviewer/otp/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
         body: JSON.stringify({ email, code: otpCode }),
       });
       const data = await res.json();
@@ -91,7 +95,7 @@ export const AdminLogin: React.FC = () => {
         return;
       }
 
-      localStorage.setItem('reviewerToken', data.token);
+      // Token is now set as httpOnly cookie by the server
       navigate('/admin/verifications');
     } catch (err: any) {
       setError(err.message ?? 'Could not reach the server');

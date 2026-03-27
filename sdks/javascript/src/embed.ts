@@ -275,6 +275,10 @@ export class IdswyftEmbed {
   // ── PostMessage Handler ───────────────────────────────
 
   private handleMessage(event: MessageEvent): void {
+    // Validate origin to prevent cross-origin message spoofing
+    const expectedOrigin = new URL(this.options.verificationUrl).origin;
+    if (event.origin !== expectedOrigin) return;
+
     const data = event.data as EmbedMessage;
 
     // Only process messages from our iframe

@@ -5,29 +5,21 @@ export const adminApi = createApiClient(`${API_BASE_URL}/api/v1`, {
   sandbox: shouldUseSandbox(),
 });
 
-adminApi.interceptors.request.use((config) => {
-  const token = localStorage.getItem('adminToken');
-  if (token) {
-    config.headers.Authorization = `Bearer ${token}`;
-  }
-  return config;
-});
+// Auth is handled via httpOnly cookie (set by server, sent automatically via withCredentials)
 
 /**
  * Try to exchange a developer JWT for an admin JWT.
- * Returns true if successful (adminToken is stored in localStorage).
+ * Returns true if successful (admin cookie set by server via httpOnly).
  */
 export async function tryEscalateDeveloperToken(): Promise<boolean> {
-  const devToken = localStorage.getItem('developer_token');
-  if (!devToken) return false;
   try {
     const res = await fetch(`${API_BASE_URL}/api/auth/admin/escalate`, {
       method: 'POST',
-      headers: { 'Authorization': `Bearer ${devToken}`, 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json' },
+      credentials: 'include',
     });
     if (!res.ok) return false;
-    const data = await res.json();
-    localStorage.setItem('adminToken', data.token);
+    // Admin cookie is set by the server via httpOnly cookie
     return true;
   } catch {
     return false;

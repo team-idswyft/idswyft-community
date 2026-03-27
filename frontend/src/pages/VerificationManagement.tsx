@@ -101,10 +101,8 @@ const formatTime = (iso: string) => {
   return d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' })
 }
 
-const authHeaders = () => {
-  const token = localStorage.getItem('adminToken') || localStorage.getItem('reviewerToken')
-  return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
-}
+const authFetchOpts = (): RequestInit => ({ credentials: 'include' })
+const authFetchOptsJson = (): RequestInit => ({ credentials: 'include', headers: { 'Content-Type': 'application/json' } })
 
 // ─── Component ──────────────────────────────────────────────
 
@@ -130,23 +128,19 @@ export function VerificationManagement() {
   const [actionReason, setActionReason] = useState('')
   const [overrideStatus, setOverrideStatus] = useState('verified')
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
-  const [authReady, setAuthReady] = useState(
-    !!(localStorage.getItem('adminToken') || localStorage.getItem('reviewerToken'))
-  )
+  const [authReady, setAuthReady] = useState(false)
 
   const LIMIT = 25
 
-  // ── Auth guard (try developer token escalation before redirecting) ──
+  // ── Auth guard (check cookie auth, then try developer escalation) ──
   useEffect(() => {
-    if (localStorage.getItem('adminToken') || localStorage.getItem('reviewerToken')) {
-      setAuthReady(true)
-      return
-    }
-
-    tryEscalateDeveloperToken()
-      .then(ok => {
-        if (ok) setAuthReady(true)
-        else navigate('/admin/login')
+    fetch(`${API_BASE_URL}/api/admin/dashboard`, { credentials: 'include' })
+      .then(res => {
+        if (res.ok) { setAuthReady(true); return }
+        return tryEscalateDeveloperToken().then(ok => {
+          if (ok) setAuthReady(true)
+          else navigate('/admin/login')
+        })
       })
       .catch(() => navigate('/admin/login'))
   }, [navigate])
@@ -166,10 +160,8 @@ export function VerificationManagement() {
       const params = new URLSearchParams({ page: String(page), limit: String(LIMIT) })
       if (statusFilter !== 'all') params.set('status', statusFilter)
 
-      const res = await fetch(`${API_BASE_URL}/api/admin/verifications?${params}`, { headers: authHeaders() })
+      const res = await fetch(`${API_BASE_URL}/api/admin/verifications?${params}`, authFetchOpts())
       if (res.status === 401) {
-        localStorage.removeItem('adminToken')
-        localStorage.removeItem('reviewerToken')
         navigate('/admin/login')
         return
       }
@@ -188,7 +180,7 @@ export function VerificationManagement() {
   // ── Fetch stats ──
   const fetchStats = useCallback(async () => {
     try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/dashboard`, { headers: authHeaders() })
+      const res = await fetch(`${API_BASE_URL}/api/admin/dashboard`, authFetchOpts())
       if (!res.ok) return
       const data = await res.json()
       if (data.stats) setStats(data.stats)
@@ -205,7 +197,7 @@ export function VerificationManagement() {
     setDetail(null)
     setDetailLoading(true)
     try {
-      const res = await fetch(`${API_BASE_URL}/api/admin/verification/${id}`, { headers: authHeaders() })
+      const res = await fetch(`${API_BASE_URL}/api/admin/verification/${id}`, authFetchOpts())
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       setDetail(data.verification)
@@ -223,7 +215,7 @@ export function VerificationManagement() {
       if (actionReason.trim()) body.reason = actionReason.trim()
 
       const res = await fetch(`${API_BASE_URL}/api/admin/verification/${confirmAction.verificationId}/review`, {
-        method: 'PUT', headers: authHeaders(), body: JSON.stringify(body),
+        method: 'PUT', ...authFetchOptsJson(), body: JSON.stringify(body),
       })
       if (!res.ok) { const d = await res.json().catch(() => ({})); throw new Error(d.message || `HTTP ${res.status}`) }
 
@@ -298,8 +290,7 @@ export function VerificationManagement() {
             </button>
             <button
               onClick={() => {
-                localStorage.removeItem('adminToken')
-                localStorage.removeItem('reviewerToken')
+                fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {})
                 navigate('/admin/login')
               }}
               style={{

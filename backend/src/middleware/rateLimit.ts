@@ -197,11 +197,11 @@ export const cleanupRateLimitRecords = async () => {
 export const verificationRateLimit = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
   if (!config.rateLimiting.enabled) return next();
 
-  if (!req.user) {
+  // Fall back to developer scope when req.user is not set (API-key authenticated requests)
+  const userId = req.user?.id || (req as any).apiKey?.developer_id;
+  if (!userId) {
     return next();
   }
-  
-  const userId = req.user.id;
   const now = new Date();
   const oneDayAgo = new Date(now.getTime() - 24 * 60 * 60 * 1000);
   

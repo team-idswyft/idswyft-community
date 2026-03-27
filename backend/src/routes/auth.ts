@@ -35,6 +35,23 @@ const otpSendLimiter = rateLimit({
 
 const router = express.Router();
 
+// Set httpOnly auth cookie alongside JSON token response (H3 security fix)
+function setAuthCookie(res: Response, token: string, maxAge = 7 * 24 * 60 * 60 * 1000): void {
+  res.cookie('idswyft_token', token, {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === 'production',
+    sameSite: 'strict',
+    maxAge,
+    path: '/',
+  });
+}
+
+// POST /api/auth/logout — clear httpOnly auth cookie
+router.post('/logout', (_req: Request, res: Response) => {
+  res.clearCookie('idswyft_token', { path: '/' });
+  res.json({ message: 'Logged out' });
+});
+
 // GET /api/auth/csrf-token — frontend calls this before any admin mutation
 router.get('/csrf-token', catchAsync(async (req: Request, res: Response) => {
   const token = generateToken(req, res);
@@ -100,6 +117,7 @@ router.post('/admin/login',
 
     // Generate token
     const token = generateAdminToken(adminUser);
+    setAuthCookie(res, token, 24 * 60 * 60 * 1000);
 
     logger.info('Admin user logged in', {
       adminId: adminUser.id,
@@ -170,6 +188,7 @@ router.post('/admin/escalate',
     }
 
     const token = generateAdminToken(adminUser);
+    setAuthCookie(res, token, 24 * 60 * 60 * 1000);
     logger.info('Developer escalated to admin session', {
       developerId: developer.id,
       adminId: adminUser.id,
@@ -254,6 +273,7 @@ router.post('/developer/otp/verify',
     if (developer) {
       // Existing developer — issue a session token
       const token = generateDeveloperToken(developer);
+      setAuthCookie(res, token);
       logger.info('Developer logged in via OTP', { developerId: developer.id, email });
 
       return res.json({
@@ -348,6 +368,7 @@ router.post('/developer/otp/complete-registration',
 
     // Generate session token
     const token = generateDeveloperToken(developer);
+    setAuthCookie(res, token);
 
     logger.info('New developer registered via OTP', {
       developerId: developer.id,
@@ -464,6 +485,7 @@ router.post('/reviewer/otp/verify',
       email: reviewer.email,
       developer_id: reviewer.developer_id,
     });
+    setAuthCookie(res, token, 24 * 60 * 60 * 1000);
 
     logger.info('Reviewer logged in via OTP', { reviewerId: reviewer.id, email });
 
@@ -481,10 +503,24 @@ router.post('/reviewer/otp/verify',
 
 // ─── GitHub OAuth ──────────────────────────────────────────────────────────────
 
+// Server-side OAuth state map (CSRF protection)
+const oauthStateMap = new Map<string, { createdAt: number }>();
+const OAUTH_STATE_TTL = 10 * 60 * 1000; // 10 minutes
+
+function cleanExpiredOAuthStates(): void {
+  const now = Date.now();
+  for (const [key, val] of oauthStateMap) {
+    if (now - val.createdAt > OAUTH_STATE_TTL) {
+      oauthStateMap.delete(key);
+    }
+  }
+}
+
 // POST /api/auth/developer/github/callback — exchange GitHub code for session
 router.post('/developer/github/callback',
   [
     body('code').isString().matches(/^[a-f0-9]{10,40}$/).withMessage('Invalid GitHub authorization code'),
+    body('state').isString().notEmpty().withMessage('OAuth state parameter is required'),
   ],
   catchAsync(async (req: Request, res: Response) => {
     const errors = validationResult(req);
@@ -496,7 +532,13 @@ router.post('/developer/github/callback',
       throw new AuthenticationError('GitHub authentication is not configured');
     }
 
-    const { code } = req.body;
+    // Validate OAuth state (CSRF protection — mandatory)
+    const { code, state } = req.body;
+    cleanExpiredOAuthStates();
+    if (!oauthStateMap.has(state)) {
+      throw new AuthenticationError('Invalid or expired OAuth state');
+    }
+    oauthStateMap.delete(state);
 
     // Exchange code for access token
     const accessToken = await githubOAuth.exchangeCodeForToken(code);
@@ -607,6 +649,7 @@ router.post('/developer/github/callback',
           });
 
           const token = generateDeveloperToken(developer);
+          setAuthCookie(res, token);
           return res.status(201).json({
             token,
             developer: {
@@ -630,6 +673,7 @@ router.post('/developer/github/callback',
       throw new Error('Failed to resolve developer account');
     }
     const token = generateDeveloperToken(developer);
+    setAuthCookie(res, token);
     logger.info('Developer logged in via GitHub', { developerId: developer.id, githubId: ghUser.id });
 
     res.json({
@@ -655,9 +699,13 @@ router.get('/developer/github/url',
       return res.json({ url: null, configured: false });
     }
 
-    const state = req.query.state as string || '';
+    // Generate server-side state for CSRF protection
+    cleanExpiredOAuthStates();
+    const state = crypto.randomBytes(16).toString('hex');
+    oauthStateMap.set(state, { createdAt: Date.now() });
+
     const url = githubOAuth.getAuthorizationUrl(state);
-    res.json({ url, configured: true });
+    res.json({ url, state, configured: true });
   })
 );
 

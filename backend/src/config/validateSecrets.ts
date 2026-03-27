@@ -3,6 +3,10 @@ const PLACEHOLDER_SECRETS = [
   'your-api-key-encryption-secret',
   'your-32-character-encryption-key',
   'your-service-to-service-token',
+  'change-this-jwt-secret',
+  'change-this-api-key-secret',
+  'change-this-32-char-encrypt-key!',
+  'change-this-service-token',
 ];
 
 interface Secrets {
@@ -37,7 +41,15 @@ export function validateSecrets(secrets: Secrets): void {
     );
   }
 
+  if (secrets.apiKeySecret.length < 32) {
+    throw new Error('API_KEY_SECRET must be at least 32 characters long.');
+  }
+
   if (PLACEHOLDER_SECRETS.includes(secrets.serviceToken)) {
     throw new Error('SERVICE_TOKEN must be changed from the default value.');
+  }
+
+  if (secrets.serviceToken.length < 32) {
+    throw new Error('SERVICE_TOKEN must be at least 32 characters long.');
   }
 }
