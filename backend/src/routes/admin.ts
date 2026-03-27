@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { body, query, param, validationResult } from 'express-validator';
-import { authenticateJWT, requireAdminRole } from '@/middleware/auth.js';
-import { catchAsync, ValidationError, NotFoundError } from '@/middleware/errorHandler.js';
+import { authenticateJWT, requireAdminRole, authenticateAdminOrReviewer } from '@/middleware/auth.js';
+import { catchAsync, ValidationError, NotFoundError, AuthorizationError } from '@/middleware/errorHandler.js';
 import { VerificationService } from '@/services/verification.js';
 import { WebhookService } from '@/services/webhook.js';
 import { StorageService } from '@/services/storage.js';
@@ -24,21 +24,23 @@ const storageService = new StorageService();
 
 // Get dashboard overview
 router.get('/dashboard',
-  authenticateJWT,
-  requireAdminRole(['admin', 'reviewer']),
+  authenticateAdminOrReviewer,
   catchAsync(async (req: Request, res: Response) => {
+    // Scope to developer's data when a reviewer
+    const developerId = req.reviewer?.developer_id;
+
     const [
       verificationStats,
       recentVerifications,
       developerCount,
       systemHealth
     ] = await Promise.all([
-      verificationService.getVerificationStats(),
-      verificationService.getVerificationRequestsForAdmin({ limit: 10 }),
-      getDeveloperCount(),
-      getSystemHealth()
+      verificationService.getVerificationStats(developerId),
+      verificationService.getVerificationRequestsForAdmin({ limit: 10, developerId }),
+      developerId ? Promise.resolve(1) : getDeveloperCount(),
+      developerId ? Promise.resolve({ overall_status: 'healthy' }) : getSystemHealth()
     ]);
-    
+
     res.json({
       stats: verificationStats,
       recent_verifications: recentVerifications.verifications.slice(0, 10),
@@ -50,8 +52,7 @@ router.get('/dashboard',
 
 // Get verification requests with filtering
 router.get('/verifications',
-  authenticateJWT,
-  requireAdminRole(['admin', 'reviewer']),
+  authenticateAdminOrReviewer,
   [
     query('status')
       .optional()
@@ -75,16 +76,21 @@ router.get('/verifications',
     if (!errors.isEmpty()) {
       throw new ValidationError('Validation failed', 'multiple', errors.array());
     }
-    
+
+    // Reviewer: always scoped to their developer — never trust query param
+    const scopedDeveloperId = req.reviewer
+      ? req.reviewer.developer_id
+      : (req.query.developer_id as string | undefined);
+
     const filters = {
       status: req.query.status as any,
-      developerId: req.query.developer_id as string,
+      developerId: scopedDeveloperId,
       page: parseInt(req.query.page as string) || 1,
       limit: parseInt(req.query.limit as string) || 50
     };
-    
+
     const result = await verificationService.getVerificationRequestsForAdmin(filters);
-    
+
     res.json({
       verifications: result.verifications,
       pagination: {
@@ -99,8 +105,7 @@ router.get('/verifications',
 
 // Get specific verification request details
 router.get('/verification/:id',
-  authenticateJWT,
-  requireAdminRole(['admin', 'reviewer']),
+  authenticateAdminOrReviewer,
   [
     param('id')
       .isUUID()
@@ -111,11 +116,11 @@ router.get('/verification/:id',
     if (!errors.isEmpty()) {
       throw new ValidationError('Validation failed', 'multiple', errors.array());
     }
-    
+
     const { id } = req.params;
-    
+
     // Get verification with related data
-    const { data: verification, error } = await supabase
+    let verificationQuery = supabase
       .from('verification_requests')
       .select(`
         *,
@@ -124,8 +129,14 @@ router.get('/verification/:id',
         document:documents(*),
         selfie:selfies(*)
       `)
-      .eq('id', id)
-      .single();
+      .eq('id', id);
+
+    // Scope to developer when reviewer
+    if (req.reviewer) {
+      verificationQuery = verificationQuery.eq('developer_id', req.reviewer.developer_id);
+    }
+
+    const { data: verification, error } = await verificationQuery.single();
     
     if (error || !verification) {
       throw new NotFoundError('Verification request');
@@ -170,8 +181,7 @@ router.get('/verification/:id',
 // Manual review decision (approve/reject/override)
 // Fires webhooks to the developer's downstream systems after status change.
 router.put('/verification/:id/review',
-  authenticateJWT,
-  requireAdminRole(['admin', 'reviewer']),
+  authenticateAdminOrReviewer,
   [
     param('id')
       .isUUID()
@@ -197,7 +207,23 @@ router.put('/verification/:id/review',
 
     const { id } = req.params;
     const { decision, reason, new_status } = req.body;
-    const adminUserId = req.user!.id;
+    const adminUserId = req.user?.id || req.reviewer?.id || '';
+
+    // If reviewer, verify the verification belongs to their developer
+    if (req.reviewer) {
+      const { data: check } = await supabase
+        .from('verification_requests')
+        .select('id')
+        .eq('id', id)
+        .eq('developer_id', req.reviewer.developer_id)
+        .single();
+      if (!check) throw new NotFoundError('Verification request');
+    }
+
+    // Override is admin-only — reviewers can only approve/reject
+    if (decision === 'override' && req.reviewer) {
+      throw new AuthorizationError('Reviewers cannot override verification status');
+    }
 
     // Override requires new_status
     if (decision === 'override' && !new_status) {

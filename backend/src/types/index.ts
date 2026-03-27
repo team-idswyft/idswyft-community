@@ -343,12 +343,23 @@ export interface AuthenticatedRequest extends Express.Request {
   user?: User;
 }
 
+export interface Reviewer {
+  id: string;
+  developer_id: string;
+  email: string;
+  name?: string;
+  status: 'invited' | 'active' | 'revoked';
+  invited_at: string;
+  last_login_at?: string;
+}
+
 declare global {
   namespace Express {
     interface Request {
       developer?: Developer;
       apiKey?: APIKey;
       user?: User;
+      reviewer?: Reviewer;
     }
   }
 }

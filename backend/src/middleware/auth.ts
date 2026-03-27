@@ -5,7 +5,7 @@ import { supabase } from '@/config/database.js';
 import config from '@/config/index.js';
 import { AuthenticationError, AuthorizationError, catchAsync } from './errorHandler.js';
 import { logger } from '@/utils/logger.js';
-import { APIKey, Developer, User, AdminUser } from '@/types/index.js';
+import { APIKey, Developer, User, AdminUser, Reviewer } from '@/types/index.js';
 
 // Service token authentication for service-to-service communication
 export const authenticateServiceToken = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
@@ -409,6 +409,131 @@ export const verifyRegistrationToken = (token: string): string => {
   return decoded.email;
 };
 
+// Generate JWT token for reviewers (24h, scoped to developer)
+export const generateReviewerToken = (reviewer: { id: string; email: string; developer_id: string }): string => {
+  return jwt.sign(
+    {
+      id: reviewer.id,
+      email: reviewer.email,
+      developer_id: reviewer.developer_id,
+      type: 'reviewer',
+    },
+    config.jwtSecret,
+    {
+      expiresIn: '24h',
+      issuer: 'idswyft-api',
+      audience: 'idswyft-reviewer',
+    }
+  );
+};
+
+// JWT authentication for reviewers
+export const authenticateReviewerJWT = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+
+  if (!token) {
+    throw new AuthenticationError('Access token is required');
+  }
+
+  try {
+    const decoded = jwt.verify(token, config.jwtSecret, {
+      issuer: 'idswyft-api',
+      audience: 'idswyft-reviewer',
+    }) as any;
+
+    if (decoded.type !== 'reviewer') {
+      throw new AuthenticationError('Invalid reviewer token');
+    }
+
+    // Look up reviewer in DB — must not be revoked, must match developer_id from JWT
+    const { data: reviewer, error } = await supabase
+      .from('verification_reviewers')
+      .select('*')
+      .eq('id', decoded.id)
+      .eq('developer_id', decoded.developer_id)
+      .neq('status', 'revoked')
+      .single();
+
+    if (error || !reviewer) {
+      throw new AuthenticationError('Reviewer account not found or revoked');
+    }
+
+    req.reviewer = reviewer as Reviewer;
+    next();
+  } catch (error) {
+    if (error instanceof jwt.JsonWebTokenError) {
+      throw new AuthenticationError('Invalid token');
+    }
+    if (error instanceof jwt.TokenExpiredError) {
+      throw new AuthenticationError('Token has expired');
+    }
+    throw error;
+  }
+});
+
+// Flexible middleware: accepts admin JWT OR reviewer JWT
+// Sets req.user (admin) or req.reviewer (reviewer with developer_id scope)
+export const authenticateAdminOrReviewer = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
+  const token = req.headers.authorization?.replace('Bearer ', '');
+
+  if (!token) {
+    throw new AuthenticationError('Access token is required');
+  }
+
+  // Try admin token first (audience: idswyft-admin)
+  try {
+    const decoded = jwt.verify(token, config.jwtSecret, {
+      issuer: 'idswyft-api',
+      audience: 'idswyft-admin',
+    }) as any;
+
+    const { data: adminUser, error } = await supabase
+      .from('admin_users')
+      .select('*')
+      .eq('id', decoded.id)
+      .single();
+
+    if (!error && adminUser) {
+      req.user = {
+        ...adminUser,
+        updated_at: adminUser.updated_at || adminUser.created_at,
+      } as AdminUser;
+      return next();
+    }
+  } catch {
+    // Not a valid admin token — try reviewer next
+  }
+
+  // Try reviewer token (audience: idswyft-reviewer)
+  try {
+    const decoded = jwt.verify(token, config.jwtSecret, {
+      issuer: 'idswyft-api',
+      audience: 'idswyft-reviewer',
+    }) as any;
+
+    if (decoded.type !== 'reviewer') {
+      throw new AuthenticationError('Invalid token');
+    }
+
+    const { data: reviewer, error } = await supabase
+      .from('verification_reviewers')
+      .select('*')
+      .eq('id', decoded.id)
+      .eq('developer_id', decoded.developer_id)
+      .neq('status', 'revoked')
+      .single();
+
+    if (!error && reviewer) {
+      req.reviewer = reviewer as Reviewer;
+      return next();
+    }
+  } catch {
+    // Not a valid reviewer token either
+  }
+
+  throw new AuthenticationError('Invalid or expired token');
+});
+
 // Middleware to log authentication events
 export const logAuthEvent = (event: string) => {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -438,12 +563,15 @@ export default {
   authenticateAPIKey,
   authenticateJWT,
   authenticateDeveloperJWT,
+  authenticateReviewerJWT,
+  authenticateAdminOrReviewer,
   authenticateUser,
   requireAdminRole,
   checkSandboxMode,
   checkPremiumAccess,
   generateAdminToken,
   generateDeveloperToken,
+  generateReviewerToken,
   generateRegistrationToken,
   verifyRegistrationToken,
   generateAPIKey,

@@ -18,6 +18,8 @@ import {
   ExclamationTriangleIcon,
   Cog6ToothIcon,
   UserCircleIcon,
+  UsersIcon,
+  XMarkIcon,
 } from '@heroicons/react/24/outline'
 
 // â"€â"€â"€ Types â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€â"€
@@ -704,6 +706,12 @@ export function DeveloperPage() {
   const [profileLoading, setProfileLoading] = useState(false)
   const [profileSaving, setProfileSaving] = useState(false)
 
+  // Reviewer management
+  const [reviewers, setReviewers] = useState<Array<{ id: string; email: string; name?: string; status: string; invited_at: string; last_login_at?: string }>>([])
+  const [reviewerEmail, setReviewerEmail] = useState('')
+  const [reviewerName, setReviewerName] = useState('')
+  const [reviewerInviting, setReviewerInviting] = useState(false)
+
   const fetchKeys = async (t: string) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/api-keys`, {
@@ -855,6 +863,57 @@ export function DeveloperPage() {
     } catch { toast.error('Network error') }
   }
 
+  const fetchReviewers = async (t: string) => {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/reviewers`, {
+        headers: { Authorization: `Bearer ${t}` },
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setReviewers(data.reviewers ?? [])
+      }
+    } catch { /* network error */ }
+  }
+
+  const inviteReviewer = async () => {
+    if (!token || !reviewerEmail) return
+    setReviewerInviting(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/reviewers/invite`, {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: reviewerEmail, name: reviewerName || undefined }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        setReviewers(prev => [data.reviewer, ...prev])
+        setReviewerEmail('')
+        setReviewerName('')
+        toast.success('Reviewer invited')
+      } else {
+        toast.error(data.message || 'Failed to invite reviewer')
+      }
+    } catch { toast.error('Network error') }
+    setReviewerInviting(false)
+  }
+
+  const revokeReviewer = async (id: string) => {
+    if (!token) return
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/reviewers/${id}`, {
+        method: 'DELETE',
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      if (res.ok) {
+        setReviewers(prev => prev.map(r => r.id === id ? { ...r, status: 'revoked' } : r))
+        toast.success('Reviewer access revoked')
+      } else {
+        const data = await res.json().catch(() => ({}))
+        toast.error(data.message || 'Failed to revoke reviewer')
+      }
+    } catch { toast.error('Network error') }
+  }
+
   useEffect(() => {
     if (token) {
       fetchKeys(token)
@@ -862,6 +921,7 @@ export function DeveloperPage() {
       fetchWebhooks(token)
       fetchLLMSettings(token)
       fetchProfile(token)
+      fetchReviewers(token)
     }
   }, [token])
 
@@ -899,6 +959,7 @@ export function DeveloperPage() {
     setApiKeys([])
     setStats(null)
     setWebhooks([])
+    setReviewers([])
     setRevealedSecrets({})
     setExpandedKeyId(null)
     setKeyLogs({})
@@ -2213,6 +2274,113 @@ if (expected !== req.headers['x-idswyft-signature']) {
                       </button>
                     </>
                   )}
+                </div>
+
+                {/* Verification Reviewers */}
+                <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 20, marginBottom: 24 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <UsersIcon style={{ width: 16, height: 16, color: C.cyan }} />
+                    <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>Verification Reviewers</div>
+                  </div>
+                  <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
+                    Invite people to review and manage your verifications. They sign in via email code — no passwords needed.
+                  </div>
+
+                  {/* Invite form */}
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+                    <input
+                      type="email"
+                      value={reviewerEmail}
+                      onChange={e => setReviewerEmail(e.target.value)}
+                      placeholder="reviewer@company.com"
+                      style={{ ...inputStyle, flex: '1 1 160px', marginBottom: 0 }}
+                    />
+                    <input
+                      type="text"
+                      value={reviewerName}
+                      onChange={e => setReviewerName(e.target.value)}
+                      placeholder="Name (optional)"
+                      style={{ ...inputStyle, flex: '0 1 120px', marginBottom: 0 }}
+                    />
+                    <button
+                      onClick={inviteReviewer}
+                      disabled={reviewerInviting || !reviewerEmail.includes('@')}
+                      style={{
+                        background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
+                        padding: '8px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                        opacity: (reviewerInviting || !reviewerEmail.includes('@')) ? 0.5 : 1,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {reviewerInviting ? 'Inviting...' : 'Invite'}
+                    </button>
+                  </div>
+
+                  {/* Reviewers list */}
+                  {reviewers.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {reviewers.map(r => (
+                        <div key={r.id} style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          background: C.surface, border: `1px solid ${C.border}`, borderRadius: 6, padding: '8px 12px',
+                          opacity: r.status === 'revoked' ? 0.45 : 1,
+                        }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {r.email}
+                              {r.name && <span style={{ color: C.dim, marginLeft: 6 }}>({r.name})</span>}
+                            </div>
+                            <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>
+                              {r.status === 'invited' && 'Invited'}
+                              {r.status === 'active' && `Active${r.last_login_at ? ` · Last login ${new Date(r.last_login_at).toLocaleDateString()}` : ''}`}
+                              {r.status === 'revoked' && 'Revoked'}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: 8 }}>
+                            <span style={{
+                              fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em',
+                              padding: '2px 6px', borderRadius: 4,
+                              background: r.status === 'active' ? 'rgba(34,197,94,0.12)' : r.status === 'invited' ? 'rgba(34,211,238,0.1)' : 'rgba(248,113,113,0.1)',
+                              color: r.status === 'active' ? '#22c55e' : r.status === 'invited' ? C.cyan : C.red,
+                            }}>
+                              {r.status}
+                            </span>
+                            {r.status !== 'revoked' && (
+                              <button
+                                onClick={() => revokeReviewer(r.id)}
+                                title="Revoke access"
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: C.dim, display: 'flex' }}
+                                onMouseEnter={e => (e.currentTarget.style.color = C.red)}
+                                onMouseLeave={e => (e.currentTarget.style.color = C.dim)}
+                              >
+                                <XMarkIcon style={{ width: 14, height: 14 }} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {reviewers.length === 0 && (
+                    <div style={{ color: C.dim, fontSize: 12, textAlign: 'center', padding: '8px 0' }}>
+                      No reviewers invited yet
+                    </div>
+                  )}
+
+                  {/* Copy login link */}
+                  <button
+                    onClick={() => {
+                      const url = `${window.location.origin}/admin/login`
+                      navigator.clipboard.writeText(url).then(() => toast.success('Login link copied'))
+                    }}
+                    style={{
+                      marginTop: 12, background: 'none', border: `1px solid ${C.border}`,
+                      color: C.muted, borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontSize: 12,
+                    }}
+                  >
+                    Copy reviewer login link
+                  </button>
                 </div>
 
                 {/* Danger Zone */}

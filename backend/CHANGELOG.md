@@ -5,6 +5,32 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.0] - 2026-03-27
+
+### Added
+- **Reviewer invitation system** — developers can invite external reviewers to access the Verification Management page, scoped to that developer's data only
+- **Passwordless reviewer auth** — reviewers authenticate via email OTP (same flow as developer portal), no passwords or admin accounts needed
+- `POST /api/developer/reviewers/invite` — invite a reviewer by email
+- `GET /api/developer/reviewers` — list all reviewers for the authenticated developer
+- `DELETE /api/developer/reviewers/:id` — revoke a reviewer's access
+- `POST /api/auth/reviewer/otp/send` — send OTP to reviewer email
+- `POST /api/auth/reviewer/otp/verify` — verify OTP and issue scoped reviewer JWT (24h, developer-scoped)
+- `authenticateAdminOrReviewer` middleware — admin routes accept either admin JWT or reviewer JWT
+- Reviewer management UI in developer portal Settings modal (invite, list, revoke, copy login link)
+- `verification_reviewers` database table with global email uniqueness
+
+### Changed
+- Admin verification endpoints now scope queries by `developer_id` when accessed with a reviewer token
+- `AdminLogin.tsx` rewritten as passwordless OTP flow (replaces legacy password form)
+- `VerificationManagement.tsx` accepts both `adminToken` and `reviewerToken`, with Sign Out button
+- Reviewers cannot use the `override` decision on verification reviews (admin-only)
+- Rate limiting on reviewer OTP send endpoint (5 per 15 min per IP)
+
+### Security
+- HTML escaping in reviewer invitation emails to prevent injection
+- JWT `developer_id` cross-checked against database in both reviewer auth middlewares
+- Timing-safe token comparison inherited from existing OTP infrastructure
+
 ## [1.6.0] - 2026-03-26
 
 ### Added

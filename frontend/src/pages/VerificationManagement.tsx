@@ -100,7 +100,7 @@ const formatTime = (iso: string) => {
 }
 
 const authHeaders = () => {
-  const token = localStorage.getItem('adminToken')
+  const token = localStorage.getItem('adminToken') || localStorage.getItem('reviewerToken')
   return { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' }
 }
 
@@ -128,13 +128,18 @@ export function VerificationManagement() {
   const [actionReason, setActionReason] = useState('')
   const [overrideStatus, setOverrideStatus] = useState('verified')
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
-  const [authReady, setAuthReady] = useState(!!localStorage.getItem('adminToken'))
+  const [authReady, setAuthReady] = useState(
+    !!(localStorage.getItem('adminToken') || localStorage.getItem('reviewerToken'))
+  )
 
   const LIMIT = 25
 
   // ── Auth guard (try developer token escalation before redirecting) ──
   useEffect(() => {
-    if (localStorage.getItem('adminToken')) { setAuthReady(true); return }
+    if (localStorage.getItem('adminToken') || localStorage.getItem('reviewerToken')) {
+      setAuthReady(true)
+      return
+    }
 
     tryEscalateDeveloperToken()
       .then(ok => {
@@ -160,7 +165,12 @@ export function VerificationManagement() {
       if (statusFilter !== 'all') params.set('status', statusFilter)
 
       const res = await fetch(`${API_BASE_URL}/api/admin/verifications?${params}`, { headers: authHeaders() })
-      if (res.status === 401) { navigate('/admin/login'); return }
+      if (res.status === 401) {
+        localStorage.removeItem('adminToken')
+        localStorage.removeItem('reviewerToken')
+        navigate('/admin/login')
+        return
+      }
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
 
       const data = await res.json()
@@ -270,19 +280,37 @@ export function VerificationManagement() {
               </p>
             </div>
           </div>
-          <button
-            onClick={() => { fetchVerifications(); fetchStats() }}
-            style={{
-              background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8,
-              color: C.muted, padding: '8px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-              fontFamily: C.sans, fontSize: 13, transition: 'all 0.15s',
-            }}
-            onMouseEnter={e => { e.currentTarget.style.borderColor = C.cyanBorder; e.currentTarget.style.color = C.cyan }}
-            onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.muted }}
-          >
-            <ArrowPathIcon style={{ width: 14, height: 14 }} />
-            Refresh
-          </button>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              onClick={() => { fetchVerifications(); fetchStats() }}
+              style={{
+                background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8,
+                color: C.muted, padding: '8px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                fontFamily: C.sans, fontSize: 13, transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = C.cyanBorder; e.currentTarget.style.color = C.cyan }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.muted }}
+            >
+              <ArrowPathIcon style={{ width: 14, height: 14 }} />
+              Refresh
+            </button>
+            <button
+              onClick={() => {
+                localStorage.removeItem('adminToken')
+                localStorage.removeItem('reviewerToken')
+                navigate('/admin/login')
+              }}
+              style={{
+                background: 'none', border: `1px solid ${C.border}`, borderRadius: 8,
+                color: C.muted, padding: '8px 16px', cursor: 'pointer',
+                fontFamily: C.sans, fontSize: 13, transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = C.red; e.currentTarget.style.color = C.red }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.muted }}
+            >
+              Sign Out
+            </button>
+          </div>
         </div>
 
         {/* ── Stats Cards ── */}

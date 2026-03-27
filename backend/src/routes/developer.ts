@@ -15,6 +15,7 @@ import { WebhookService, createWebhookSignature } from '@/services/webhook.js';
 import axios from 'axios';
 import { config } from '@/config/index.js';
 import { encryptSecret, decryptSecret, maskApiKey } from '@/utils/encryption.js';
+import { emailService } from '@/services/emailService.js';
 import {
   getConversionFunnel,
   getGateRejectionBreakdown,
@@ -1580,6 +1581,131 @@ router.post('/avatar',
     logger.info('Developer avatar updated', { developerId: developer.id });
 
     res.json({ success: true, data: { avatar_url: avatarUrl } });
+  })
+);
+
+// ─── Reviewer Management ────────────────────────────────────────────────────
+
+// POST /api/developer/reviewers/invite — invite a reviewer
+router.post('/reviewers/invite',
+  authenticateDeveloperJWT,
+  [
+    body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
+    body('name').optional().trim().escape().isLength({ max: 100 }).withMessage('Name must be less than 100 characters'),
+  ],
+  catchAsync(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw new ValidationError('Validation failed', 'multiple', errors.array());
+    }
+
+    const developer = req.developer;
+    if (!developer) throw new AuthenticationError('Developer authentication required');
+
+    const { email, name } = req.body;
+
+    // Check if reviewer already exists for this developer
+    const { data: existing } = await supabase
+      .from('verification_reviewers')
+      .select('id, status')
+      .eq('developer_id', developer.id)
+      .eq('email', email)
+      .single();
+
+    let reviewer;
+
+    if (existing) {
+      if (existing.status === 'revoked') {
+        // Reactivate revoked reviewer
+        const { data, error } = await supabase
+          .from('verification_reviewers')
+          .update({ status: 'invited', name: name || undefined, invited_at: new Date().toISOString() })
+          .eq('id', existing.id)
+          .select('*')
+          .single();
+        if (error) throw new Error('Failed to reactivate reviewer');
+        reviewer = data;
+      } else {
+        throw new ValidationError('Reviewer with this email already exists', 'email', email);
+      }
+    } else {
+      const { data, error } = await supabase
+        .from('verification_reviewers')
+        .insert({ developer_id: developer.id, email, name: name || null })
+        .select('*')
+        .single();
+      if (error) throw new Error('Failed to invite reviewer');
+      reviewer = data;
+    }
+
+    // Send invitation email (best-effort)
+    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const loginUrl = `${process.env.FRONTEND_URL || 'https://idswyft.app'}/admin/login`;
+    const safeName = name ? esc(name) : '';
+    const safeDevName = esc(developer.name || developer.email);
+    const subject = `You've been invited to review verifications on Idswyft`;
+    const html = `<p>Hi${safeName ? ` ${safeName}` : ''},</p>
+<p><strong>${safeDevName}</strong> has invited you to review identity verifications on Idswyft.</p>
+<p>To get started, visit: <a href="${loginUrl}">${loginUrl}</a></p>
+<p>Enter your email address and use the one-time code sent to you to sign in.</p>
+<p>&mdash; Idswyft</p>`;
+    const text = `Hi${name ? ` ${name}` : ''},\n\n${developer.name || developer.email} has invited you to review verifications on Idswyft.\n\nVisit ${loginUrl} to sign in with your email.\n\n— Idswyft`;
+
+    emailService.sendEmail({ to: email, subject, html, text }).catch(err => {
+      logger.error('Failed to send reviewer invitation email', { email, error: err });
+    });
+
+    logger.info('Reviewer invited', { developerId: developer.id, reviewerEmail: email });
+
+    res.status(201).json({ reviewer });
+  })
+);
+
+// GET /api/developer/reviewers — list all reviewers for this developer
+router.get('/reviewers',
+  authenticateDeveloperJWT,
+  catchAsync(async (req: Request, res: Response) => {
+    const developer = req.developer;
+    if (!developer) throw new AuthenticationError('Developer authentication required');
+
+    const { data: reviewers, error } = await supabase
+      .from('verification_reviewers')
+      .select('*')
+      .eq('developer_id', developer.id)
+      .order('invited_at', { ascending: false });
+
+    if (error) throw new Error('Failed to list reviewers');
+
+    res.json({ reviewers: reviewers || [] });
+  })
+);
+
+// DELETE /api/developer/reviewers/:id — revoke a reviewer
+router.delete('/reviewers/:id',
+  authenticateDeveloperJWT,
+  [param('id').isUUID().withMessage('Invalid reviewer ID format')],
+  catchAsync(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw new ValidationError('Validation failed', 'multiple', errors.array());
+    }
+
+    const developer = req.developer;
+    if (!developer) throw new AuthenticationError('Developer authentication required');
+
+    const { data: reviewer, error } = await supabase
+      .from('verification_reviewers')
+      .update({ status: 'revoked' })
+      .eq('id', req.params.id)
+      .eq('developer_id', developer.id)
+      .select('id, email')
+      .single();
+
+    if (error || !reviewer) throw new NotFoundError('Reviewer not found');
+
+    logger.info('Reviewer revoked', { developerId: developer.id, reviewerId: reviewer.id });
+
+    res.json({ message: 'Reviewer access revoked', reviewer });
   })
 );
 

@@ -50,7 +50,7 @@ class EmailService {
     }
   }
 
-  private async sendEmail(options: SendEmailOptions): Promise<boolean> {
+  async sendEmail(options: SendEmailOptions): Promise<boolean> {
     if (!this._isConfigured) {
       logger.info(`[DEV] Email to ${options.to}: ${options.subject}`);
       logger.info(`[DEV] Text body:\n${options.text}`);

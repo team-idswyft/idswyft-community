@@ -6,7 +6,7 @@ import { body, validationResult } from 'express-validator';
 import validator from 'validator';
 import { supabase } from '@/config/database.js';
 import config from '@/config/index.js';
-import { generateAdminToken, generateDeveloperToken, generateRegistrationToken, verifyRegistrationToken, generateAPIKey, authenticateJWT, authenticateDeveloperJWT } from '@/middleware/auth.js';
+import { generateAdminToken, generateDeveloperToken, generateRegistrationToken, verifyRegistrationToken, generateReviewerToken, generateAPIKey, authenticateJWT, authenticateDeveloperJWT } from '@/middleware/auth.js';
 import { catchAsync, ValidationError, AuthenticationError } from '@/middleware/errorHandler.js';
 import { TotpService } from '@/services/totpService.js';
 import { createAndSendOtp, verifyOtp } from '@/services/otpService.js';
@@ -20,6 +20,15 @@ const otpVerifyLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 10,
   message: { message: 'Too many verification attempts. Please try again later.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
+// Rate limiter for OTP send: 5 sends per 15 minutes per IP
+const otpSendLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  message: { message: 'Too many code requests. Please try again later.' },
   standardHeaders: true,
   legacyHeaders: false,
 });
@@ -364,6 +373,108 @@ router.post('/developer/otp/complete-registration',
         created_at: apiKey.created_at,
       } : undefined,
       is_new: true,
+    });
+  })
+);
+
+// ─── Reviewer OTP Flow ────────────────────────────────────────────────────────
+
+// POST /api/auth/reviewer/otp/send — send OTP to a reviewer's email
+router.post('/reviewer/otp/send',
+  otpSendLimiter,
+  emailValidation,
+  catchAsync(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw new ValidationError('Validation failed', 'multiple', errors.array());
+    }
+
+    const { email } = req.body;
+
+    // Check email exists in verification_reviewers and is not revoked
+    const { data: reviewer } = await supabase
+      .from('verification_reviewers')
+      .select('id')
+      .eq('email', email)
+      .neq('status', 'revoked')
+      .limit(1)
+      .single();
+
+    // Always return success to prevent email enumeration
+    if (!reviewer) {
+      return res.json({
+        message: 'If this email is registered as a reviewer, a verification code has been sent.',
+      });
+    }
+
+    const result = await createAndSendOtp(email);
+
+    res.json({
+      message: 'If this email is registered as a reviewer, a verification code has been sent.',
+      ...(result.code && { code: result.code, self_hosted: true }),
+    });
+  })
+);
+
+// POST /api/auth/reviewer/otp/verify — verify OTP and issue reviewer JWT
+router.post('/reviewer/otp/verify',
+  otpVerifyLimiter,
+  [
+    ...emailValidation,
+    body('code')
+      .isString()
+      .isLength({ min: 6, max: 6 })
+      .isNumeric()
+      .withMessage('6-digit numeric code is required'),
+  ],
+  catchAsync(async (req: Request, res: Response) => {
+    const errors = validationResult(req);
+    if (!errors.isEmpty()) {
+      throw new ValidationError('Validation failed', 'multiple', errors.array());
+    }
+
+    const { email, code } = req.body;
+    const result = await verifyOtp(email, code);
+
+    if (!result.valid) {
+      throw new AuthenticationError(result.reason || 'Invalid code');
+    }
+
+    // Look up reviewer — must not be revoked
+    const { data: reviewer, error } = await supabase
+      .from('verification_reviewers')
+      .select('*')
+      .eq('email', email)
+      .neq('status', 'revoked')
+      .limit(1)
+      .single();
+
+    if (error || !reviewer) {
+      throw new AuthenticationError('No active reviewer account found for this email');
+    }
+
+    // Update status to active + last_login_at
+    await supabase
+      .from('verification_reviewers')
+      .update({ status: 'active', last_login_at: new Date().toISOString() })
+      .eq('id', reviewer.id);
+
+    const token = generateReviewerToken({
+      id: reviewer.id,
+      email: reviewer.email,
+      developer_id: reviewer.developer_id,
+    });
+
+    logger.info('Reviewer logged in via OTP', { reviewerId: reviewer.id, email });
+
+    res.json({
+      token,
+      reviewer: {
+        id: reviewer.id,
+        email: reviewer.email,
+        name: reviewer.name,
+        developer_id: reviewer.developer_id,
+      },
     });
   })
 );
