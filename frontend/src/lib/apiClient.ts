@@ -26,12 +26,15 @@ export function createApiClient(
   const instance = axios.create({ baseURL, withCredentials: true });
 
   // ── Request: CSRF + sandbox ──────────────────────────────────────
+  // Derive the auth-level base (e.g. /api) from the versioned baseURL (e.g. /api/v1)
+  const csrfUrl = baseURL.replace(/\/v\d+$/, '') + '/auth/csrf-token';
+
   instance.interceptors.request.use(async (config) => {
     if (MUTATING.has(config.method?.toLowerCase() ?? '')) {
       if (!csrfFetch) {
         csrfFetch = axios
-          .get(`${baseURL}/auth/csrf`, { withCredentials: true })
-          .then((r) => r.data.token as string)
+          .get(csrfUrl, { withCredentials: true })
+          .then((r) => r.data.csrfToken as string)
           .catch((err) => {
             csrfFetch = null;
             return Promise.reject(err);

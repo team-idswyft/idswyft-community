@@ -1,5 +1,6 @@
 import { createApiClient } from './apiClient';
 import { API_BASE_URL, shouldUseSandbox } from '../config/api';
+import { fetchCsrfToken, csrfHeader } from './csrf';
 
 export const adminApi = createApiClient(`${API_BASE_URL}/api/v1`, {
   sandbox: shouldUseSandbox(),
@@ -13,9 +14,12 @@ export const adminApi = createApiClient(`${API_BASE_URL}/api/v1`, {
  */
 export async function tryEscalateDeveloperToken(): Promise<boolean> {
   try {
+    // Fetch CSRF token first — the developer already has an auth cookie,
+    // so the POST will be CSRF-validated by conditionalCsrf middleware.
+    await fetchCsrfToken();
     const res = await fetch(`${API_BASE_URL}/api/auth/admin/escalate`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...csrfHeader() },
       credentials: 'include',
     });
     if (!res.ok) return false;

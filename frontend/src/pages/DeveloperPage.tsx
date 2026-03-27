@@ -3,6 +3,7 @@ import toast from 'react-hot-toast'
 import { Link, useNavigate } from 'react-router-dom'
 import { API_BASE_URL } from '../config/api'
 import { isCommunity } from '../config/edition'
+import { fetchCsrfToken, csrfHeader, clearCsrfToken } from '../lib/csrf'
 import { C, injectFonts } from '../theme'
 import '../styles/patterns.css'
 import { AnalyticsCharts } from '../components/developer/AnalyticsCharts'
@@ -244,7 +245,7 @@ function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) => void
     setLoading(true)
     fetch(`${API_BASE_URL}/api/auth/developer/github/callback`, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: { 'Content-Type': 'application/json', ...csrfHeader() },
       credentials: 'include',
       body: JSON.stringify({ code }),
     })
@@ -273,7 +274,7 @@ function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) => void
     try {
       const res = await fetch(`${API_BASE_URL}/api/auth/developer/otp/send`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...csrfHeader() },
         credentials: 'include',
         body: JSON.stringify({ email }),
       })
@@ -344,7 +345,7 @@ function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) => void
     try {
       const res = await fetch(`${API_BASE_URL}/api/auth/developer/otp/verify`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...csrfHeader() },
         credentials: 'include',
         body: JSON.stringify({ email, code }),
       })
@@ -374,7 +375,7 @@ function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) => void
     try {
       const res = await fetch(`${API_BASE_URL}/api/auth/developer/otp/complete-registration`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...csrfHeader() },
         credentials: 'include',
         body: JSON.stringify({ registration_token: registrationToken, name, company }),
       })
@@ -554,7 +555,7 @@ function CreateKeyModal({ onClose, onCreated }: {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/api-key`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }, credentials: 'include' as RequestCredentials,
+        headers: { 'Content-Type': 'application/json', ...csrfHeader() }, credentials: 'include' as RequestCredentials,
         body: JSON.stringify({ name, is_sandbox: isSandbox }),
       })
       const data = await res.json()
@@ -639,7 +640,7 @@ export function DeveloperPage() {
   // On mount, check if an auth cookie exists by probing a protected endpoint
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/developer/profile`, { credentials: 'include' })
-      .then(res => { if (res.ok) setToken('session') })
+      .then(res => { if (res.ok) { setToken('session'); fetchCsrfToken(); } })
       .catch(() => {})
   }, [])
 
@@ -779,7 +780,7 @@ export function DeveloperPage() {
       if (llmProvider === 'custom') body.endpoint_url = llmEndpointUrl || null
       const res = await fetch(`${API_BASE_URL}/api/developer/settings/llm`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' }, credentials: 'include' as RequestCredentials,
+        headers: { 'Content-Type': 'application/json', ...csrfHeader() }, credentials: 'include' as RequestCredentials,
         body: JSON.stringify(body),
       })
       if (res.ok) {
@@ -799,7 +800,7 @@ export function DeveloperPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/settings/llm`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' }, credentials: 'include' as RequestCredentials,
+        headers: { 'Content-Type': 'application/json', ...csrfHeader() }, credentials: 'include' as RequestCredentials,
         body: JSON.stringify({ provider: null }),
       })
       if (res.ok) {
@@ -837,7 +838,7 @@ export function DeveloperPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/profile`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' }, credentials: 'include' as RequestCredentials,
+        headers: { 'Content-Type': 'application/json', ...csrfHeader() }, credentials: 'include' as RequestCredentials,
         body: JSON.stringify({ name: profileName, company: profileCompany || null }),
       })
       if (res.ok) {
@@ -857,6 +858,7 @@ export function DeveloperPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/avatar`, {
         method: 'POST',
+        headers: csrfHeader(),
         credentials: 'include' as RequestCredentials,
         body: formData,
       })
@@ -889,7 +891,7 @@ export function DeveloperPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/reviewers/invite`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' }, credentials: 'include' as RequestCredentials,
+        headers: { 'Content-Type': 'application/json', ...csrfHeader() }, credentials: 'include' as RequestCredentials,
         body: JSON.stringify({ email: reviewerEmail, name: reviewerName || undefined }),
       })
       const data = await res.json()
@@ -910,6 +912,7 @@ export function DeveloperPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/reviewers/${id}`, {
         method: 'DELETE',
+        headers: csrfHeader(),
         credentials: 'include' as RequestCredentials,
       })
       if (res.ok) {
@@ -935,6 +938,7 @@ export function DeveloperPage() {
 
   const handleAuth = (t: string, apiKey?: string) => {
     setToken(t)
+    fetchCsrfToken()
     if (apiKey) setNewFullKey(apiKey)
   }
 
@@ -949,6 +953,7 @@ export function DeveloperPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/api-key/${id}`, {
         method: 'DELETE',
+        headers: csrfHeader(),
         credentials: 'include' as RequestCredentials,
       })
       if (!res.ok) throw new Error('Delete failed')
@@ -962,7 +967,8 @@ export function DeveloperPage() {
   }
 
   const handleLogout = () => {
-    fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {})
+    fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include', headers: csrfHeader() }).catch(() => {})
+    clearCsrfToken()
     setToken(null)
     setApiKeys([])
     setStats(null)
@@ -1132,7 +1138,7 @@ export function DeveloperPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/webhooks`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...csrfHeader() },
         credentials: 'include' as RequestCredentials,
         body: JSON.stringify({ url, events: selectedWebhookEvents, api_key_id: webhookApiKeyId }),
       })
@@ -1159,6 +1165,7 @@ export function DeveloperPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/webhooks/${id}`, {
         method: 'DELETE',
+        headers: csrfHeader(),
         credentials: 'include' as RequestCredentials,
       })
       if (!res.ok) throw new Error('Failed to remove webhook')
@@ -1178,6 +1185,7 @@ export function DeveloperPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/webhooks/${id}/test`, {
         method: 'POST',
+        headers: csrfHeader(),
         credentials: 'include' as RequestCredentials,
         signal: controller.signal,
       })
@@ -1245,6 +1253,7 @@ export function DeveloperPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/webhooks/${webhookId}/deliveries/${deliveryId}/resend`, {
         method: 'POST',
+        headers: csrfHeader(),
         credentials: 'include' as RequestCredentials,
       })
       if (res.ok) {
@@ -1326,13 +1335,14 @@ export function DeveloperPage() {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/account`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...csrfHeader() },
         credentials: 'include' as RequestCredentials,
         body: JSON.stringify({ confirm_email: deleteAccountEmail }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.message || 'Failed to delete account')
-      fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {})
+      fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include', headers: csrfHeader() }).catch(() => {})
+      clearCsrfToken()
       setToken(null)
       toast.success('Account deleted')
     } catch (err: unknown) {

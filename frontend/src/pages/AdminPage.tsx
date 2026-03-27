@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { API_BASE_URL } from '../config/api';
 import { exportUserData, deleteUserData } from '../lib/adminApiInstance';
+import { fetchCsrfToken, csrfHeader, clearCsrfToken } from '../lib/csrf';
 
 interface VerificationRequest {
   id: string;
@@ -30,6 +31,7 @@ export const AdminPage: React.FC = () => {
     fetch(`${API_BASE_URL}/api/admin/dashboard`, { credentials: 'include' })
       .then(res => {
         if (!res.ok) { window.location.href = '/admin/login'; return; }
+        fetchCsrfToken();
         fetchVerifications();
         fetchStats();
       })
@@ -104,7 +106,7 @@ export const AdminPage: React.FC = () => {
     try {
       const response = await fetch(`${API_BASE_URL}/api/admin/verification/${verificationId}/review`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...csrfHeader() },
         credentials: 'include',
         body: JSON.stringify({ status: newStatus }),
       });
@@ -121,7 +123,8 @@ export const AdminPage: React.FC = () => {
   };
 
   const handleLogout = () => {
-    fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {});
+    fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include', headers: csrfHeader() }).catch(() => {});
+    clearCsrfToken();
     window.location.href = '/admin/login';
   };
 

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { API_BASE_URL } from '../config/api'
 import { tryEscalateDeveloperToken } from '../lib/adminApiInstance'
+import { fetchCsrfToken, csrfHeader, clearCsrfToken } from '../lib/csrf'
 import { C, injectFonts } from '../theme'
 import {
   ShieldCheckIcon,
@@ -102,7 +103,7 @@ const formatTime = (iso: string) => {
 }
 
 const authFetchOpts = (): RequestInit => ({ credentials: 'include' })
-const authFetchOptsJson = (): RequestInit => ({ credentials: 'include', headers: { 'Content-Type': 'application/json' } })
+const authFetchOptsJson = (): RequestInit => ({ credentials: 'include', headers: { 'Content-Type': 'application/json', ...csrfHeader() } })
 
 // ─── Component ──────────────────────────────────────────────
 
@@ -136,9 +137,9 @@ export function VerificationManagement() {
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/admin/dashboard`, { credentials: 'include' })
       .then(res => {
-        if (res.ok) { setAuthReady(true); return }
+        if (res.ok) { setAuthReady(true); fetchCsrfToken(); return }
         return tryEscalateDeveloperToken().then(ok => {
-          if (ok) setAuthReady(true)
+          if (ok) { setAuthReady(true); fetchCsrfToken(); }
           else navigate('/admin/login')
         })
       })
@@ -290,7 +291,8 @@ export function VerificationManagement() {
             </button>
             <button
               onClick={() => {
-                fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include' }).catch(() => {})
+                fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include', headers: csrfHeader() }).catch(() => {})
+                clearCsrfToken()
                 navigate('/admin/login')
               }}
               style={{

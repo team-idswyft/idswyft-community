@@ -11,7 +11,7 @@ describe('createApiClient', () => {
 
   it('retries CSRF fetch and injects X-CSRF-Token on POST requests', async () => {
     // Spy on axios.get to return a fake CSRF token
-    const getSpy = vi.spyOn(axios, 'get').mockResolvedValue({ data: { token: 'test-csrf-token' } });
+    const getSpy = vi.spyOn(axios, 'get').mockResolvedValue({ data: { csrfToken: 'test-csrf-token' } });
 
     const client = createApiClient('http://localhost:3001/api/v1');
 
@@ -26,7 +26,7 @@ describe('createApiClient', () => {
 
     // Should have fetched CSRF
     expect(getSpy).toHaveBeenCalledWith(
-      'http://localhost:3001/api/v1/auth/csrf',
+      'http://localhost:3001/api/auth/csrf-token',
       expect.objectContaining({ withCredentials: true })
     );
     // Should have injected the token
@@ -34,7 +34,7 @@ describe('createApiClient', () => {
   });
 
   it('reuses cached CSRF token on second mutating request (no duplicate fetch)', async () => {
-    const getSpy = vi.spyOn(axios, 'get').mockResolvedValue({ data: { token: 'cached-token' } });
+    const getSpy = vi.spyOn(axios, 'get').mockResolvedValue({ data: { csrfToken: 'cached-token' } });
 
     const client = createApiClient('http://localhost:3001/api/v1');
     // @ts-ignore
@@ -53,7 +53,7 @@ describe('createApiClient', () => {
   });
 
   it('does NOT inject X-CSRF-Token on GET requests', async () => {
-    const getSpy = vi.spyOn(axios, 'get').mockResolvedValue({ data: { token: 'test-csrf-token' } });
+    const getSpy = vi.spyOn(axios, 'get').mockResolvedValue({ data: { csrfToken: 'test-csrf-token' } });
     const client = createApiClient('http://localhost:3001/api/v1');
 
     // @ts-ignore
@@ -119,7 +119,7 @@ describe('createApiClient', () => {
   it('resets csrfFetch cache on CSRF fetch failure so next request retries', async () => {
     const getSpy = vi.spyOn(axios, 'get')
       .mockRejectedValueOnce(new Error('Network error'))
-      .mockResolvedValueOnce({ data: { token: 'retry-token' } });
+      .mockResolvedValueOnce({ data: { csrfToken: 'retry-token' } });
 
     const client = createApiClient('http://localhost:3001/api/v1');
     // @ts-ignore

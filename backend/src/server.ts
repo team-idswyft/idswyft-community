@@ -3,7 +3,7 @@ import express from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import { buildCorsOptions } from './middleware/cors.js';
-import { csrfProtection } from './middleware/csrf.js';
+import { conditionalCsrf } from './middleware/csrf.js';
 import { serveLocalFile } from './middleware/fileServing.js';
 import helmet from 'helmet';
 import compression from 'compression';
@@ -100,11 +100,11 @@ app.use('/api', apiActivityLogger);
 // Mount API routes
 app.use('/api/v2/verify', newVerificationRoutes);
 app.use('/api/verify/handoff', handoffRoutes);
-app.use('/api/developer', developerRoutes);
-// Admin routes use JWT Bearer tokens — CSRF not needed (no cookie auth)
-app.use('/api/admin', adminRoutes);
-app.use('/api/admin/thresholds', adminThresholdsRoutes);
-app.use('/api/auth', authRoutes);
+// Cookie-authenticated route groups — enforce CSRF on mutations when auth cookie present
+app.use('/api/developer', conditionalCsrf, developerRoutes);
+app.use('/api/admin', conditionalCsrf, adminRoutes);
+app.use('/api/admin/thresholds', conditionalCsrf, adminThresholdsRoutes);
+app.use('/api/auth', conditionalCsrf, authRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/vaas', vaasRoutes);
