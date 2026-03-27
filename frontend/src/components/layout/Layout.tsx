@@ -50,7 +50,7 @@ export function Layout({ children }: LayoutProps) {
     location.pathname.startsWith('/status') ||
     location.pathname.startsWith('/legal')
 
-  if (isAdminRoute && location.pathname !== '/admin/login') {
+  if (isAdminRoute) {
     return <>{children}</>
   }
 

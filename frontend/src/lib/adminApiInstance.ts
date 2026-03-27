@@ -21,7 +21,7 @@ export async function tryEscalateDeveloperToken(): Promise<boolean> {
   const devToken = localStorage.getItem('developer_token');
   if (!devToken) return false;
   try {
-    const res = await fetch(`${API_BASE_URL}/api/v1/auth/admin/escalate`, {
+    const res = await fetch(`${API_BASE_URL}/api/auth/admin/escalate`, {
       method: 'POST',
       headers: { 'Authorization': `Bearer ${devToken}`, 'Content-Type': 'application/json' },
     });

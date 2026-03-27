@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { adminApi, tryEscalateDeveloperToken } from '../lib/adminApiInstance';
-import type { ApiError } from '../lib/apiClient';
+import { tryEscalateDeveloperToken } from '../lib/adminApiInstance';
+import { API_BASE_URL } from '../config/api';
 import { TotpModal } from '../components/auth/TotpModal';
 import { C, injectFonts } from '../theme';
 
@@ -33,12 +33,19 @@ export const AdminLogin: React.FC = () => {
     setError('');
 
     try {
-      const { data } = await adminApi.post('/auth/admin/login', {
-        email: credentials.email,
-        password: credentials.password,
+      const res = await fetch(`${API_BASE_URL}/api/auth/admin/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: credentials.email, password: credentials.password }),
       });
+      const data = await res.json();
 
-      if (data.mfa_required) {
+      if (!res.ok) {
+        setError(data.message || data.error || 'Invalid credentials');
+        return;
+      }
+
+      if (data.requires_totp || data.mfa_required) {
         if (!data.temp_token || typeof data.temp_token !== 'string') {
           setError('Login failed: invalid MFA response from server');
           return;
@@ -54,16 +61,8 @@ export const AdminLogin: React.FC = () => {
       }
       localStorage.setItem('adminToken', data.token);
       navigate('/admin/verifications');
-    } catch (err) {
-      const apiError = err as ApiError;
-      if (apiError.fields?.length) {
-        setError(apiError.fields.map((f) => f.message).join(', '));
-      } else {
-        setError(apiError.message ?? 'Login failed');
-      }
-      if (apiError.correlationId) {
-        console.error('Error ID:', apiError.correlationId);
-      }
+    } catch (err: any) {
+      setError(err.message ?? 'Login failed — could not reach the server');
     } finally {
       setLoading(false);
     }
