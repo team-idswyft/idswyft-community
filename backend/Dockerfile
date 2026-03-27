@@ -19,8 +19,11 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install all dependencies (including devDependencies for build)
-COPY package.json package-lock.json ./
-RUN npm ci --include=optional
+# NOTE: Using `npm install` (not `npm ci`) because the lockfile may drift
+# on Windows dev machines with platform-specific optional deps (esbuild, rollup).
+# Regenerate lockfile with `npm install --package-lock-only` if switching to npm ci.
+COPY package*.json ./
+RUN npm install --include=optional
 
 # Copy source and compile TypeScript
 COPY . .
