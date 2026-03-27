@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { adminApi } from '../../lib/adminApiInstance';
 import type { ApiError } from '../../lib/apiClient';
 import { RetryAfterError } from '../../lib/apiClient';
+import { C } from '../../theme';
 
 interface Props {
   tempToken: string;
@@ -48,7 +49,7 @@ export function TotpModal({ tempToken, onSuccess, onCancel }: Props) {
       if (err instanceof RetryAfterError) {
         setRetryUntil(Date.now() + err.retryAfter * 1000);
         setCountdown(err.retryAfter);
-        setError(`Too many attempts. Please wait ${err.retryAfter} seconds before trying again.`);
+        setError(`Too many attempts. Wait ${err.retryAfter}s.`);
         return;
       }
       const apiError = err as ApiError;
@@ -58,14 +59,32 @@ export function TotpModal({ tempToken, onSuccess, onCancel }: Props) {
     }
   };
 
+  const disabled = code.length !== 6 || loading || Date.now() < (retryUntil ?? 0);
+
   return (
-    <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50">
-      <div className="bg-white rounded-xl p-8 w-full max-w-sm shadow-2xl">
-        <h2 className="text-xl font-semibold mb-2">Two-Factor Authentication</h2>
-        <p className="text-sm text-gray-500 mb-6">
+    <div style={{
+      position: 'fixed', inset: 0,
+      background: 'rgba(0,0,0,0.7)',
+      backdropFilter: 'blur(4px)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      zIndex: 50,
+      fontFamily: C.sans,
+    }}>
+      <div style={{
+        background: C.panel,
+        border: `1px solid ${C.border}`,
+        borderRadius: 12,
+        padding: 32,
+        width: '100%',
+        maxWidth: 380,
+      }}>
+        <h2 style={{ color: C.text, fontSize: 18, fontWeight: 600, margin: '0 0 6px' }}>
+          Two-Factor Authentication
+        </h2>
+        <p style={{ color: C.muted, fontSize: 13, margin: '0 0 24px' }}>
           Enter the 6-digit code from your authenticator app.
         </p>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <form onSubmit={handleSubmit}>
           <input
             type="text"
             inputMode="numeric"
@@ -73,24 +92,63 @@ export function TotpModal({ tempToken, onSuccess, onCancel }: Props) {
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
             placeholder="000000"
-            className="w-full border rounded-lg px-4 py-3 text-center text-2xl tracking-widest focus:outline-none focus:ring-2 focus:ring-blue-500"
             autoFocus
+            style={{
+              width: '100%',
+              background: C.surface,
+              border: `1px solid ${C.cyanBorder}`,
+              borderRadius: 8,
+              padding: '14px 16px',
+              color: C.text,
+              fontSize: 24,
+              fontFamily: C.mono,
+              textAlign: 'center',
+              letterSpacing: '0.3em',
+              outline: 'none',
+              boxSizing: 'border-box',
+            }}
           />
           {error && (
-            <p className="text-sm text-red-600">{error}</p>
+            <p style={{ color: C.red, fontSize: 13, margin: '12px 0 0' }}>{error}</p>
           )}
-          <div className="flex gap-3">
+          <div style={{ display: 'flex', gap: 12, marginTop: 20 }}>
             <button
               type="button"
               onClick={onCancel}
-              className="flex-1 py-2 border rounded-lg text-gray-600 hover:bg-gray-50 transition-colors"
+              style={{
+                flex: 1,
+                padding: '10px 16px',
+                background: 'transparent',
+                border: `1px solid ${C.border}`,
+                borderRadius: 8,
+                color: C.muted,
+                fontSize: 14,
+                fontFamily: C.sans,
+                cursor: 'pointer',
+                transition: 'border-color 0.2s',
+              }}
+              onMouseEnter={(e) => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.2)'}
+              onMouseLeave={(e) => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.07)'}
             >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={code.length !== 6 || loading || Date.now() < (retryUntil ?? 0)}
-              className="flex-1 py-2 bg-blue-600 text-white rounded-lg disabled:opacity-50 hover:bg-blue-700 transition-colors"
+              disabled={disabled}
+              style={{
+                flex: 1,
+                padding: '10px 16px',
+                background: disabled ? C.dim : C.cyan,
+                color: '#080c14',
+                border: 'none',
+                borderRadius: 8,
+                fontSize: 14,
+                fontWeight: 600,
+                fontFamily: C.sans,
+                cursor: disabled ? 'not-allowed' : 'pointer',
+                opacity: disabled ? 0.5 : 1,
+                transition: 'opacity 0.2s',
+              }}
             >
               {loading ? 'Verifying...' : countdown > 0 ? `Wait ${countdown}s` : 'Verify'}
             </button>

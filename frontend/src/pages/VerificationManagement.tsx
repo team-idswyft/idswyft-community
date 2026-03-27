@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { API_BASE_URL } from '../config/api'
+import { tryEscalateDeveloperToken } from '../lib/adminApiInstance'
 import { C, injectFonts } from '../theme'
 import {
   ShieldCheckIcon,
@@ -127,14 +128,20 @@ export function VerificationManagement() {
   const [actionReason, setActionReason] = useState('')
   const [overrideStatus, setOverrideStatus] = useState('verified')
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  const [authReady, setAuthReady] = useState(!!localStorage.getItem('adminToken'))
 
   const LIMIT = 25
 
-  // ── Auth guard ──
+  // ── Auth guard (try developer token escalation before redirecting) ──
   useEffect(() => {
-    if (!localStorage.getItem('adminToken')) {
-      navigate('/admin/login')
-    }
+    if (localStorage.getItem('adminToken')) { setAuthReady(true); return }
+
+    tryEscalateDeveloperToken()
+      .then(ok => {
+        if (ok) setAuthReady(true)
+        else navigate('/admin/login')
+      })
+      .catch(() => navigate('/admin/login'))
   }, [navigate])
 
   // ── Toast auto-dismiss ──
@@ -176,8 +183,8 @@ export function VerificationManagement() {
     } catch { /* non-critical */ }
   }, [])
 
-  useEffect(() => { fetchVerifications() }, [fetchVerifications])
-  useEffect(() => { fetchStats() }, [fetchStats])
+  useEffect(() => { if (authReady) fetchVerifications() }, [authReady, fetchVerifications])
+  useEffect(() => { if (authReady) fetchStats() }, [authReady, fetchStats])
 
   // ── Fetch detail when expanding a row ──
   const toggleExpand = async (id: string) => {

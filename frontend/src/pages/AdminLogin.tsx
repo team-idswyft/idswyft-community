@@ -1,19 +1,31 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { adminApi } from '../lib/adminApiInstance';
+import { adminApi, tryEscalateDeveloperToken } from '../lib/adminApiInstance';
 import type { ApiError } from '../lib/apiClient';
 import { TotpModal } from '../components/auth/TotpModal';
+import { C, injectFonts } from '../theme';
 
 export const AdminLogin: React.FC = () => {
   const navigate = useNavigate();
-  const [credentials, setCredentials] = useState({
-    email: '',
-    password: ''
-  });
+  const [credentials, setCredentials] = useState({ email: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [tempToken, setTempToken] = useState<string | null>(null);
   const [showTotpModal, setShowTotpModal] = useState(false);
+  const [escalating, setEscalating] = useState(false);
+
+  useEffect(() => { injectFonts(); }, []);
+
+  // If developer is already logged in, try token escalation
+  useEffect(() => {
+    if (localStorage.getItem('adminToken')) { navigate('/admin/verifications'); return; }
+    if (!localStorage.getItem('developer_token')) return;
+
+    setEscalating(true);
+    tryEscalateDeveloperToken()
+      .then(ok => ok ? navigate('/admin/verifications') : setEscalating(false))
+      .catch(() => setEscalating(false));
+  }, [navigate]);
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -41,7 +53,7 @@ export const AdminLogin: React.FC = () => {
         return;
       }
       localStorage.setItem('adminToken', data.token);
-      navigate('/admin');
+      navigate('/admin/verifications');
     } catch (err) {
       const apiError = err as ApiError;
       if (apiError.fields?.length) {
@@ -57,99 +69,221 @@ export const AdminLogin: React.FC = () => {
     }
   };
 
-  return (
-    <div className="min-h-screen flex items-center justify-center bg-gray-50">
-      <div className="max-w-md w-full space-y-8">
-        <div className="bg-white p-8 rounded-lg shadow-md">
-          <div className="text-center">
-            <div className="flex flex-col items-center mb-6">
-              <img 
-                src="/idswyft-logo.png" 
-                alt="Idswyft" 
-                className="h-8 w-auto mb-4"
-                onError={(e) => {
-                  // Fallback to icon and text if image fails to load
-                  e.currentTarget.style.display = 'none';
-                  const fallback = e.currentTarget.nextSibling as HTMLElement;
-                  if (fallback) fallback.style.display = 'flex';
-                }}
-              />
-              <div className="hidden items-center mb-4">
-                <img 
-                  src="/idswyft-logo.png"
-                  alt="Idswyft"
-                  className="h-8 w-auto"
-                />
-              </div>
-              <h2 className="text-3xl font-bold text-gray-900">Admin Login</h2>
-            </div>
-            <p className="text-gray-600">Access the Idswyft admin dashboard</p>
-          </div>
+  // Show a loading state while attempting token escalation
+  if (escalating) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        background: C.bg,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        fontFamily: C.sans,
+      }}>
+        <div style={{ textAlign: 'center' }}>
+          <div style={{
+            width: 40, height: 40, border: `3px solid ${C.border}`,
+            borderTopColor: C.cyan, borderRadius: '50%',
+            animation: 'spin 0.8s linear infinite',
+            margin: '0 auto 16px',
+          }} />
+          <p style={{ color: C.muted, fontSize: 14 }}>Authenticating...</p>
+          <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+        </div>
+      </div>
+    );
+  }
 
-          <form onSubmit={handleLogin} className="mt-8 space-y-6">
+  return (
+    <div style={{
+      minHeight: '100vh',
+      background: C.bg,
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      fontFamily: C.sans,
+      position: 'relative',
+      overflow: 'hidden',
+    }}>
+      {/* Subtle radial glow */}
+      <div style={{
+        position: 'absolute',
+        top: '30%', left: '50%',
+        transform: 'translate(-50%, -50%)',
+        width: 600, height: 600,
+        background: `radial-gradient(circle, ${C.cyanDim} 0%, transparent 70%)`,
+        pointerEvents: 'none',
+      }} />
+
+      <div style={{
+        width: '100%',
+        maxWidth: 420,
+        padding: '0 24px',
+        position: 'relative',
+        zIndex: 1,
+      }}>
+        {/* Logo + header */}
+        <div style={{ textAlign: 'center', marginBottom: 32 }}>
+          <img
+            src="/idswyft-logo.png"
+            alt="Idswyft"
+            style={{ height: 32, margin: '0 auto 24px' }}
+            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+          />
+          <h1 style={{
+            color: C.text,
+            fontSize: 24,
+            fontWeight: 600,
+            margin: '0 0 8px',
+            letterSpacing: '-0.02em',
+          }}>
+            Verification Management
+          </h1>
+          <p style={{ color: C.muted, fontSize: 14, margin: 0 }}>
+            Sign in to review and manage verifications
+          </p>
+        </div>
+
+        {/* Login card */}
+        <div style={{
+          background: C.panel,
+          border: `1px solid ${C.border}`,
+          borderRadius: 12,
+          padding: 32,
+          backdropFilter: 'blur(20px)',
+        }}>
+          <form onSubmit={handleLogin}>
             {error && (
-              <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded">
+              <div style={{
+                background: C.redDim,
+                border: `1px solid rgba(248,113,113,0.25)`,
+                borderRadius: 8,
+                padding: '12px 16px',
+                marginBottom: 20,
+                color: C.red,
+                fontSize: 13,
+              }}>
                 {error}
               </div>
             )}
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+            <div style={{ marginBottom: 20 }}>
+              <label style={{
+                display: 'block',
+                color: C.muted,
+                fontSize: 12,
+                fontWeight: 500,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                marginBottom: 8,
+              }}>
                 Email Address
               </label>
               <input
                 type="email"
                 value={credentials.email}
-                onChange={(e) => setCredentials({...credentials, email: e.target.value})}
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                placeholder="admin@idswyft.app"
+                onChange={(e) => setCredentials({ ...credentials, email: e.target.value })}
+                placeholder="reviewer@company.com"
                 required
+                style={{
+                  width: '100%',
+                  background: C.surface,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 8,
+                  padding: '12px 16px',
+                  color: C.text,
+                  fontSize: 14,
+                  fontFamily: C.sans,
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  transition: 'border-color 0.2s',
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = C.cyan}
+                onBlur={(e) => e.currentTarget.style.borderColor = C.border}
               />
             </div>
 
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">
+            <div style={{ marginBottom: 28 }}>
+              <label style={{
+                display: 'block',
+                color: C.muted,
+                fontSize: 12,
+                fontWeight: 500,
+                textTransform: 'uppercase',
+                letterSpacing: '0.05em',
+                marginBottom: 8,
+              }}>
                 Password
               </label>
               <input
                 type="password"
                 value={credentials.password}
-                onChange={(e) => setCredentials({...credentials, password: e.target.value})}
-                className="w-full p-3 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                onChange={(e) => setCredentials({ ...credentials, password: e.target.value })}
                 placeholder="••••••••"
                 required
+                style={{
+                  width: '100%',
+                  background: C.surface,
+                  border: `1px solid ${C.border}`,
+                  borderRadius: 8,
+                  padding: '12px 16px',
+                  color: C.text,
+                  fontSize: 14,
+                  fontFamily: C.sans,
+                  outline: 'none',
+                  boxSizing: 'border-box',
+                  transition: 'border-color 0.2s',
+                }}
+                onFocus={(e) => e.currentTarget.style.borderColor = C.cyan}
+                onBlur={(e) => e.currentTarget.style.borderColor = C.border}
               />
             </div>
 
             <button
               type="submit"
               disabled={loading}
-              className="w-full bg-blue-600 text-white py-3 px-4 rounded-md hover:bg-blue-700 disabled:bg-gray-400 transition duration-200"
+              style={{
+                width: '100%',
+                padding: '12px 24px',
+                background: loading ? C.dim : C.cyan,
+                color: '#080c14',
+                border: 'none',
+                borderRadius: 8,
+                fontSize: 14,
+                fontWeight: 600,
+                fontFamily: C.sans,
+                cursor: loading ? 'not-allowed' : 'pointer',
+                transition: 'opacity 0.2s, transform 0.1s',
+                opacity: loading ? 0.6 : 1,
+              }}
+              onMouseEnter={(e) => { if (!loading) e.currentTarget.style.opacity = '0.9'; }}
+              onMouseLeave={(e) => { if (!loading) e.currentTarget.style.opacity = '1'; }}
+              onMouseDown={(e) => { if (!loading) e.currentTarget.style.transform = 'scale(0.98)'; }}
+              onMouseUp={(e) => e.currentTarget.style.transform = 'scale(1)'}
             >
               {loading ? 'Signing in...' : 'Sign In'}
             </button>
           </form>
+        </div>
 
-          {import.meta.env.DEV && (
-            <div className="mt-6 p-4 bg-gray-50 rounded-md">
-              <h3 className="font-semibold text-gray-900 mb-2">Development Access</h3>
-              <p className="text-sm text-gray-600 mb-2">
-                For testing purposes, you can use:
-              </p>
-              <div className="text-sm text-gray-700">
-                <p><strong>Email:</strong> admin@idswyft.app</p>
-                <p><strong>Password:</strong> admin123</p>
-              </div>
-            </div>
-          )}
-
-          <div className="mt-6 text-center">
-            <a href="/" className="text-sm text-blue-600 hover:text-blue-800">
-              ← Back to Home
-            </a>
-          </div>
+        {/* Footer link */}
+        <div style={{ textAlign: 'center', marginTop: 24 }}>
+          <a
+            href="/"
+            style={{
+              color: C.muted,
+              fontSize: 13,
+              textDecoration: 'none',
+              transition: 'color 0.2s',
+            }}
+            onMouseEnter={(e) => e.currentTarget.style.color = C.cyan}
+            onMouseLeave={(e) => e.currentTarget.style.color = C.muted}
+          >
+            &larr; Back to Portal
+          </a>
         </div>
       </div>
+
       {showTotpModal && tempToken && (
         <TotpModal
           tempToken={tempToken}
@@ -157,7 +291,7 @@ export const AdminLogin: React.FC = () => {
             setTempToken(null);
             setShowTotpModal(false);
             localStorage.setItem('adminToken', token);
-            navigate('/admin');
+            navigate('/admin/verifications');
           }}
           onCancel={() => {
             setShowTotpModal(false);
