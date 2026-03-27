@@ -2151,11 +2151,11 @@ if (expected !== req.headers['x-idswyft-signature']) {
       {/* Settings modal */}
       {showSettings && (
         <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 80 }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: '80px 16px 24px' }}
           onClick={() => setShowSettings(false)}
         >
           <div
-            style={{ width: '100%', maxWidth: 820, background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 28, maxHeight: '90vh', overflowY: 'auto' }}
+            style={{ width: '100%', maxWidth: 1040, background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 28, maxHeight: '100%', overflowY: 'auto' }}
             onClick={e => e.stopPropagation()}
           >
             {/* Header */}
