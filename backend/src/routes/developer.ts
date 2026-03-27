@@ -80,8 +80,6 @@ router.post('/register',
       .withMessage('Webhook URL must be a valid HTTPS URL')
   ],
   catchAsync(async (req: Request, res: Response) => {
-    console.log('🎯 REGISTRATION ENDPOINT CALLED', req.body);
-    
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       throw new ValidationError('Validation failed', 'multiple', errors.array());
@@ -180,14 +178,6 @@ router.post('/api-key',
       throw new AuthenticationError('Developer authentication required');
     }
     
-    // Debug logging for API key creation
-    console.log('🔑 API Key Creation Debug:', {
-      originalRequest: { name, is_sandbox, expires_in_days },
-      environment: process.env.NODE_ENV,
-      developerEmail: developer.email,
-      requestBody: req.body
-    });
-    
     // Environment-based API key restrictions
     const isProductionEnv = process.env.NODE_ENV === 'production';
     
@@ -238,11 +228,9 @@ router.post('/api-key',
       );
     }
     
-    // Generate API key with enhanced security
-    console.log('🔑 Generating API key...');
+    // Generate API key
     const { key, hash, prefix } = generateAPIKey();
     const keyId = crypto.randomUUID();
-    console.log('🔑 API key generated:', { prefix, keyId });
     
     // Calculate expiration date
     let expiresAt = null;
@@ -251,8 +239,6 @@ router.post('/api-key',
       expiresAt.setDate(expiresAt.getDate() + expires_in_days);
     }
     
-    // Create API key record with enhanced security
-    console.log('🔑 Inserting API key into database...');
     const { data: apiKey, error: keyError } = await supabase
       .from('api_keys')
       .insert({
@@ -269,22 +255,9 @@ router.post('/api-key',
       .single();
     
     if (keyError) {
-      console.error('🚨 API Key Creation Error:', keyError);
       logger.error('Failed to create API key:', keyError);
       throw new Error(`Failed to create API key: ${keyError.message || keyError.code || 'Unknown database error'}`);
     }
-    
-    // Debug logging for created API key
-    console.log('🔑 API Key Created Successfully:', {
-      savedKey: { 
-        id: apiKey.id, 
-        name: apiKey.name, 
-        is_sandbox: apiKey.is_sandbox 
-      },
-      requestedSandbox: is_sandbox,
-      actualSandbox: apiKey.is_sandbox,
-      sandboxMismatch: is_sandbox !== apiKey.is_sandbox
-    });
     
     logger.info('API key created', {
       developerId: developer.id,
@@ -390,9 +363,6 @@ router.delete('/api-key/:keyId',
       throw new AuthenticationError('Developer authentication required');
     }
     
-    // Debug logging
-    console.log('🗑️ Deleting API key:', { keyId, developerId: developer.id });
-    
     // First, check if the key exists and belongs to the developer
     const { data: existingKey, error: checkError } = await supabase
       .from('api_keys')
@@ -401,10 +371,7 @@ router.delete('/api-key/:keyId',
       .eq('developer_id', developer.id)
       .single();
     
-    console.log('🗑️ Existing key check:', { existingKey, checkError });
-    
     if (checkError || !existingKey) {
-      console.log('🗑️ API key not found:', { keyId, developerId: developer.id, checkError });
       throw new NotFoundError('API key not found or does not belong to this developer');
     }
     
@@ -419,10 +386,8 @@ router.delete('/api-key/:keyId',
       .select('id, name, key_prefix')
       .single();
     
-    console.log('🗑️ Update result:', { apiKey, error });
-    
     if (error || !apiKey) {
-      console.log('🗑️ Failed to update API key:', error);
+      logger.error('Failed to deactivate API key', { keyId, error });
       throw new Error(`Failed to deactivate API key: ${error?.message || 'Unknown error'}`);
     }
     
@@ -988,16 +953,6 @@ router.get('/activity',
     // Get recent activities from memory (fast) and optionally filter by API key
     const recentActivities = getRecentActivities(developer.id)
       .filter(activity => !apiKeyIdParam || activity.api_key_id === apiKeyIdParam);
-    
-    // Debug logging for activities
-    console.log(`🔍 Developer ${developer.id} activity check:`, {
-      activitiesFound: recentActivities.length,
-      recentActivities: recentActivities.slice(0, 3).map(a => ({
-        method: a.method,
-        endpoint: a.endpoint,
-        timestamp: a.timestamp
-      }))
-    });
     
     // Get verification statistics from database
     const { data: verificationStats, error: statsError } = await supabase

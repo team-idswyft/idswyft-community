@@ -122,8 +122,14 @@ router.put('/:webhookId',
     
     const { webhookId } = req.params;
     const developerId = req.developer!.id;
-    const updates = req.body;
-    
+
+    // Allowlist — only permit fields the API is designed to update (M3 mass-assignment fix)
+    const { url, is_active, secret_token } = req.body;
+    const updates: Record<string, unknown> = {};
+    if (url !== undefined) updates.url = url;
+    if (is_active !== undefined) updates.is_active = is_active;
+    if (secret_token !== undefined) updates.secret_token = secret_token;
+
     // Verify webhook belongs to developer
     const webhook = await webhookService.getWebhookById(webhookId);
     if (!webhook || webhook.developer_id !== developerId) {
@@ -132,7 +138,7 @@ router.put('/:webhookId',
 
     // SSRF validation on URL updates
     if (updates.url) {
-      validateWebhookUrl(updates.url);
+      validateWebhookUrl(updates.url as string);
     }
 
     // Update webhook

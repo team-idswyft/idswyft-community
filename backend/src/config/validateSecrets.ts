@@ -35,9 +35,12 @@ export function validateSecrets(secrets: Secrets): void {
     );
   }
 
-  if (secrets.encryptionKey.length < 32) {
+  // AES-256 requires a 256-bit (32-byte) key. Hex-encoded = 64 chars, raw = 32 chars.
+  const keyBytes = Buffer.byteLength(secrets.encryptionKey, 'utf8');
+  if (keyBytes < 32) {
     throw new Error(
-      `ENCRYPTION_KEY must be at least 32 characters (got ${secrets.encryptionKey.length}).`
+      `ENCRYPTION_KEY must be at least 32 bytes (got ${keyBytes}). ` +
+      'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
     );
   }
 

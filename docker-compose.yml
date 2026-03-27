@@ -68,7 +68,7 @@ services:
       API_KEY_SECRET: ${API_KEY_SECRET:-change-this-api-key-secret}
       ENCRYPTION_KEY: ${ENCRYPTION_KEY:-change-this-32-char-encrypt-key!}
       SERVICE_TOKEN: ${SERVICE_TOKEN:-change-this-service-token}
-      CORS_ORIGINS: "http://localhost,${CORS_ORIGINS:-}"
+      CORS_ORIGINS: "${CORS_ORIGINS:-}"
       STORAGE_PROVIDER: local
       RATE_LIMIT_ENABLED: "${RATE_LIMIT_ENABLED:-true}"
       SANDBOX_MODE: ${SANDBOX_MODE:-false}
