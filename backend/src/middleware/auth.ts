@@ -337,8 +337,11 @@ export const authenticateDeveloperJWT = catchAsync(async (req: Request, res: Res
   }
   
   try {
-    const decoded = jwt.verify(token, config.jwtSecret) as any;
-    
+    const decoded = jwt.verify(token, config.jwtSecret, {
+      issuer: 'idswyft-api',
+      audience: 'idswyft-developer',
+    }) as any;
+
     // Verify it's a developer token
     if (decoded.type !== 'developer') {
       throw new AuthenticationError('Invalid developer token');

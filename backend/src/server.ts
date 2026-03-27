@@ -64,8 +64,8 @@ app.use(helmet({
       workerSrc: ["'self'", "blob:"],          // Web workers for TF.js
       ...(config.nodeEnv === 'production' ? { upgradeInsecureRequests: [] } : {}),
     },
-    // Report-only in staging so we can observe violations before enforcing
-    reportOnly: config.nodeEnv !== 'production',
+    // Report-only in local dev only; enforce in staging + production
+    reportOnly: config.nodeEnv === 'development',
   },
   hsts: {
     maxAge: 31536000,

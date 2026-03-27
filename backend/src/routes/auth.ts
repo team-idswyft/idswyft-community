@@ -218,6 +218,7 @@ const emailValidation = [
 
 // POST /api/auth/developer/otp/send — send a 6-digit code to the email
 router.post('/developer/otp/send',
+  otpSendLimiter,
   emailValidation,
   catchAsync(async (req: Request, res: Response) => {
     const errors = validationResult(req);
@@ -723,7 +724,7 @@ router.post('/totp/setup',
       .update({ totp_secret: secret, totp_enabled: false })
       .eq('id', user.id);
 
-    res.json({ qrCode, secret });
+    res.json({ qrCode });
   })
 );
 

@@ -5,23 +5,38 @@ import { Request, Response } from 'express';
 const UPLOADS_BASE = path.resolve(process.cwd(), 'uploads');
 
 /**
- * Returns true if the given relative path resolves within UPLOADS_BASE.
- * Rejects absolute paths and path traversal attempts (e.g., ../../etc/passwd).
+ * Decode a percent-encoded relative path and resolve it within UPLOADS_BASE.
+ * Returns the absolute path if safe, or null if the path is invalid/escapes the base.
  */
-export function isPathSafe(filePath: string): boolean {
+export function safeDecode(filePath: string): string | null {
   // Reject absolute paths immediately
-  if (path.isAbsolute(filePath)) return false;
+  if (path.isAbsolute(filePath)) return null;
 
-  // Decode percent-encoded characters before resolving
+  // Decode percent-encoded characters once
   let decoded: string;
   try {
     decoded = decodeURIComponent(filePath);
   } catch {
-    return false;
+    return null;
+  }
+
+  // Reject if a second decode would produce a different value (double-encoding attack)
+  try {
+    if (decodeURIComponent(decoded) !== decoded) return null;
+  } catch {
+    // decodeURIComponent threw — decoded contained an invalid sequence, which is fine
   }
 
   const resolved = path.resolve(UPLOADS_BASE, decoded);
-  return resolved.startsWith(UPLOADS_BASE + path.sep) || resolved === UPLOADS_BASE;
+  if (!resolved.startsWith(UPLOADS_BASE + path.sep) && resolved !== UPLOADS_BASE) {
+    return null;
+  }
+  return resolved;
+}
+
+// Keep the old name as an alias for any existing consumers
+export function isPathSafe(filePath: string): boolean {
+  return safeDecode(filePath) !== null;
 }
 
 /**
@@ -32,12 +47,12 @@ export function isPathSafe(filePath: string): boolean {
 export async function serveLocalFile(req: Request, res: Response): Promise<void> {
   const requestedPath = (req.params as any)[0]; // everything after /api/files/
 
-  if (!requestedPath || !isPathSafe(requestedPath)) {
+  // Decode + validate once — same resolved path used for serving
+  const absolutePath = requestedPath ? safeDecode(requestedPath) : null;
+  if (!absolutePath) {
     res.status(403).json({ error: 'Forbidden' });
     return;
   }
-
-  const absolutePath = path.join(UPLOADS_BASE, decodeURIComponent(requestedPath));
 
   try {
     await fs.access(absolutePath);

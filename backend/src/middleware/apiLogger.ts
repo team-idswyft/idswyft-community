@@ -16,7 +16,22 @@ interface ApiLogEntry {
 }
 
 // In-memory store for recent API activities (last 100 calls per developer)
+// Entries are evicted after ACTIVITY_TTL_MS to prevent unbounded memory growth
+// and avoid persisting IP addresses (PII) beyond their useful lifetime.
+const ACTIVITY_TTL_MS = 60 * 60 * 1000; // 1 hour
+const MAX_DEVELOPERS = 500; // hard cap on tracked developer IDs
 const recentActivities = new Map<string, ApiLogEntry[]>();
+const lastAccess = new Map<string, number>(); // developer_id → last access epoch
+
+function evictStaleEntries(): void {
+  const cutoff = Date.now() - ACTIVITY_TTL_MS;
+  for (const [devId, ts] of lastAccess) {
+    if (ts < cutoff) {
+      recentActivities.delete(devId);
+      lastAccess.delete(devId);
+    }
+  }
+}
 
 export const apiActivityLogger = (req: Request, res: Response, next: NextFunction) => {
   const startTime = Date.now();
@@ -49,21 +64,33 @@ export const apiActivityLogger = (req: Request, res: Response, next: NextFunctio
     if (developer?.id && apiKey?.id) { // Only log if there's an API key (external API usage)
       // Filter out developer dashboard internal calls
       const isDeveloperPortalCall = req.originalUrl.startsWith('/api/developer/');
-      
+
       if (!isDeveloperPortalCall) {
+        // Periodic eviction of stale entries (runs inline, cheap)
+        evictStaleEntries();
+
+        // Enforce hard cap — drop oldest developer entry if at limit
+        if (!recentActivities.has(developer.id) && recentActivities.size >= MAX_DEVELOPERS) {
+          const oldest = [...lastAccess.entries()].sort((a, b) => a[1] - b[1])[0];
+          if (oldest) {
+            recentActivities.delete(oldest[0]);
+            lastAccess.delete(oldest[0]);
+          }
+        }
+
         if (!recentActivities.has(developer.id)) {
           recentActivities.set(developer.id, []);
         }
-        
+
         const activities = recentActivities.get(developer.id)!;
         activities.unshift({ ...logEntry, timestamp: new Date() } as any);
-        
+
         // Keep only last 100 activities per developer
         if (activities.length > 100) {
           activities.splice(100);
         }
-        
-        recentActivities.set(developer.id, activities);
+
+        lastAccess.set(developer.id, Date.now());
       }
     }
     
