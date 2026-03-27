@@ -131,37 +131,44 @@ router.get('/verification/:id',
       throw new NotFoundError('Verification request');
     }
     
-    // Get file URLs if needed
-    let documentUrl = null;
+    // Fetch ALL documents for this verification (front + back for batch items)
+    const { data: allDocuments } = await supabase
+      .from('documents')
+      .select('*')
+      .eq('verification_request_id', id)
+      .order('created_at', { ascending: true });
+
+    // Resolve signed URLs for all documents and selfie
+    const documentUrls: Array<{ id: string; file_name: string; document_type: string; url: string | null }> = [];
+    for (const doc of (allDocuments || [])) {
+      let url = null;
+      if (doc.file_path) {
+        try { url = await storageService.getFileUrl(doc.file_path, 3600); } catch { /* skip */ }
+      }
+      documentUrls.push({ id: doc.id, file_name: doc.file_name, document_type: doc.document_type, url });
+    }
+
     let selfieUrl = null;
-    
-    if (verification.document?.file_path) {
-      try {
-        documentUrl = await storageService.getFileUrl(verification.document.file_path, 3600);
-      } catch (error) {
-        logger.warn('Failed to get document URL:', error);
-      }
-    }
-    
     if (verification.selfie?.file_path) {
-      try {
-        selfieUrl = await storageService.getFileUrl(verification.selfie.file_path, 3600);
-      } catch (error) {
-        logger.warn('Failed to get selfie URL:', error);
-      }
+      try { selfieUrl = await storageService.getFileUrl(verification.selfie.file_path, 3600); } catch { /* skip */ }
     }
-    
+
+    // Legacy single document_url for backward compat
+    const documentUrl = documentUrls.length > 0 ? documentUrls[0].url : null;
+
     res.json({
       verification: {
         ...verification,
         document_url: documentUrl,
-        selfie_url: selfieUrl
+        selfie_url: selfieUrl,
+        documents: documentUrls,
       }
     });
   })
 );
 
-// Manual review decision (approve/reject)
+// Manual review decision (approve/reject/override)
+// Fires webhooks to the developer's downstream systems after status change.
 router.put('/verification/:id/review',
   authenticateJWT,
   requireAdminRole(['admin', 'reviewer']),
@@ -170,37 +177,108 @@ router.put('/verification/:id/review',
       .isUUID()
       .withMessage('Verification ID must be a valid UUID'),
     body('decision')
-      .isIn(['approve', 'reject'])
-      .withMessage('Decision must be approve or reject'),
+      .isIn(['approve', 'reject', 'override'])
+      .withMessage('Decision must be approve, reject, or override'),
     body('reason')
       .optional()
       .trim()
       .isLength({ min: 1, max: 500 })
-      .withMessage('Reason must be between 1 and 500 characters')
+      .withMessage('Reason must be between 1 and 500 characters'),
+    body('new_status')
+      .optional()
+      .isIn(['verified', 'failed', 'manual_review', 'pending'])
+      .withMessage('new_status must be verified, failed, manual_review, or pending'),
   ],
   catchAsync(async (req: Request, res: Response) => {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       throw new ValidationError('Validation failed', 'multiple', errors.array());
     }
-    
+
     const { id } = req.params;
-    const { decision, reason } = req.body;
+    const { decision, reason, new_status } = req.body;
     const adminUserId = req.user!.id;
-    
+
+    // Override requires new_status
+    if (decision === 'override' && !new_status) {
+      throw new ValidationError('new_status is required for override decisions', 'new_status', '');
+    }
+
     let updatedVerification;
-    
+    let finalStatus: string;
+
     if (decision === 'approve') {
       updatedVerification = await verificationService.approveVerification(id, adminUserId);
-    } else {
+      finalStatus = 'verified';
+    } else if (decision === 'reject') {
       const reviewReason = reason || 'Rejected by admin review';
       updatedVerification = await verificationService.rejectVerification(id, adminUserId, reviewReason);
+      finalStatus = 'failed';
+    } else {
+      // Override — set any valid status directly
+      const { data, error } = await supabase
+        .from('verification_requests')
+        .update({
+          status: new_status,
+          reviewed_by: adminUserId,
+          reviewed_at: new Date().toISOString(),
+          failure_reason: new_status === 'failed' ? (reason || 'Status overridden by reviewer') : null,
+        })
+        .eq('id', id)
+        .select('*')
+        .single();
+
+      if (error || !data) throw new NotFoundError('Verification request');
+      updatedVerification = data;
+      finalStatus = new_status;
     }
-    
+
     res.json({
       verification: updatedVerification,
-      message: `Verification ${decision}d successfully`
+      message: `Verification ${decision === 'override' ? 'overridden to ' + new_status : decision + 'd'} successfully`,
     });
+
+    // ── Webhook forwarding (after response is sent) ──────────────
+    // Fire webhook using the developer's scoped API key so downstream
+    // systems are notified of the manual review decision.
+    try {
+      const developerId = updatedVerification.developer_id;
+      const userId = updatedVerification.user_id;
+      const isSandbox = updatedVerification.is_sandbox || false;
+
+      const eventType = finalStatus === 'verified' ? 'verification.completed'
+        : finalStatus === 'failed' ? 'verification.failed'
+        : finalStatus === 'manual_review' ? 'verification.manual_review'
+        : null;
+
+      if (eventType && developerId) {
+        const webhooks = await webhookService.getActiveWebhooksForDeveloper(developerId, isSandbox, eventType);
+        for (const webhook of webhooks) {
+          webhookService.sendWebhook(webhook, id, {
+            event: eventType,
+            user_id: userId,
+            verification_id: id,
+            status: finalStatus as any,
+            timestamp: new Date().toISOString(),
+            data: {
+              failure_reason: finalStatus === 'failed' ? (reason || 'Manual review decision') : undefined,
+              manual_review_reason: decision === 'override' ? `Status overridden to ${new_status} by reviewer` : undefined,
+            },
+          }).catch(err => {
+            logger.error('Admin review webhook delivery error:', {
+              webhookId: webhook.id,
+              verificationId: id,
+              error: err instanceof Error ? err.message : String(err),
+            });
+          });
+        }
+      }
+    } catch (err) {
+      logger.error('Admin review webhook forwarding failed:', {
+        verificationId: id,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
   })
 );
 

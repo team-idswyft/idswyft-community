@@ -3,6 +3,10 @@
  *
  * Enterprise API for processing multiple verifications at once.
  * All endpoints are API-key authenticated and scoped to the developer.
+ *
+ * Unlike single verifications, batch items cannot perform live capture
+ * (head-turn liveness challenge). Processed items therefore always end
+ * at `manual_review` status, requiring a human to approve or reject.
  */
 
 import express, { Request, Response } from 'express';
@@ -19,8 +23,191 @@ import {
   listBatches,
   type BatchItemInput,
 } from '@/services/batchVerification.js';
+import { supabase } from '@/config/database.js';
+import { StorageService } from '@/services/storage.js';
+import { VerificationService } from '@/services/verification.js';
+import engineClient from '@/services/engineClient.js';
+import { VerificationSession } from '@/verification/session/VerificationSession.js';
+import { VerificationStatus } from '@/verification/models/types.js';
+import type { FrontExtractionResult, BackExtractionResult, SessionState } from '@/verification/models/types.js';
+import { computeFaceMatch } from '@/verification/face/faceMatchService.js';
+import { getFaceMatchingThresholdSync } from '@/config/verificationThresholds.js';
 
 const router = express.Router();
+const storageService = new StorageService();
+const verificationService = new VerificationService();
+
+// ─── Batch item processing ──────────────────────────────────
+
+const DOWNLOAD_TIMEOUT = 30_000; // 30 seconds
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+
+/** Block SSRF: only allow HTTPS and reject private/reserved network targets. */
+function validateDownloadUrl(raw: string): void {
+  const parsed = new URL(raw);
+  if (parsed.protocol !== 'https:') {
+    throw new Error('Only HTTPS URLs are allowed for document downloads');
+  }
+  const h = parsed.hostname;
+  if (
+    h === 'localhost' ||
+    h.startsWith('127.') ||
+    h.startsWith('10.') ||
+    h.startsWith('192.168.') ||
+    /^172\.(1[6-9]|2\d|3[01])\./.test(h) ||
+    h.startsWith('169.254.') ||
+    h === '0.0.0.0' ||
+    h === '::1' ||
+    h === '::'
+  ) {
+    throw new Error('URLs pointing to private/reserved networks are not allowed');
+  }
+}
+
+/** Download a file from a URL and return its buffer. */
+async function downloadFile(url: string): Promise<Buffer> {
+  validateDownloadUrl(url);
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT);
+  try {
+    const response = await fetch(url, { signal: controller.signal });
+    if (!response.ok) throw new Error(`Download failed: HTTP ${response.status}`);
+    const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
+    if (contentLength > MAX_FILE_SIZE) throw new Error('File exceeds 10MB limit');
+    const ab = await response.arrayBuffer();
+    if (ab.byteLength > MAX_FILE_SIZE) throw new Error('File exceeds 10MB limit');
+    return Buffer.from(ab);
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+/** Save session state to verification_contexts table. */
+async function saveSessionState(verificationId: string, state: Readonly<SessionState>): Promise<void> {
+  await supabase.from('verification_contexts').upsert({
+    verification_id: verificationId,
+    context: JSON.stringify(state),
+    updated_at: new Date().toISOString(),
+  }, { onConflict: 'verification_id' });
+}
+
+/**
+ * Process a single batch item through the verification pipeline.
+ *
+ * Flow: create record → download docs → engine extraction → gates + cross-validation → manual_review
+ * If any gate hard-rejects, the item is marked as 'failed' (which is correct — bad documents fail).
+ */
+async function processBatchItem(
+  item: BatchItemInput,
+  developerId: string,
+  isSandbox: boolean,
+): Promise<string> {
+  // 1. Create verification record
+  const record = await verificationService.createVerificationRequest({
+    user_id: item.user_id,
+    developer_id: developerId,
+    is_sandbox: isSandbox,
+    source: 'api',
+  });
+  const vId = record.id;
+
+  try {
+    let frontResult: FrontExtractionResult | null = null;
+    let backResult: BackExtractionResult | null = null;
+
+    // 2. Download + process front document
+    if (item.front_document_url) {
+      const buffer = await downloadFile(item.front_document_url);
+      const docPath = await storageService.storeDocument(
+        buffer, 'front_document.jpg', 'image/jpeg', vId,
+      );
+      const doc = await verificationService.createDocument({
+        verification_request_id: vId,
+        file_path: docPath,
+        file_name: 'front_document.jpg',
+        file_size: buffer.length,
+        mime_type: 'image/jpeg',
+        document_type: item.document_type || 'drivers_license',
+      });
+      await supabase.from('verification_requests').update({ document_id: doc.id }).eq('id', vId);
+
+      if (engineClient.isEnabled()) {
+        frontResult = await engineClient.extractFront(buffer, {
+          documentId: doc.id,
+          documentType: item.document_type || 'drivers_license',
+          verificationId: vId,
+        });
+      }
+    }
+
+    // 3. Download + process back document
+    if (item.back_document_url) {
+      const buffer = await downloadFile(item.back_document_url);
+      const docPath = await storageService.storeDocument(
+        buffer, 'back_document.jpg', 'image/jpeg', vId,
+      );
+      await verificationService.createDocument({
+        verification_request_id: vId,
+        file_path: docPath,
+        file_name: 'back_document.jpg',
+        file_size: buffer.length,
+        mime_type: 'image/jpeg',
+        document_type: 'other',
+        is_back_of_id: true,
+      });
+
+      if (engineClient.isEnabled()) {
+        backResult = await engineClient.extractBack(buffer);
+      }
+    }
+
+    // 4. Run verification session (gates + cross-validation) if we have results
+    if (frontResult) {
+      const deps = {
+        extractFront: async () => frontResult!,
+        extractBack: async () => backResult!,
+        processLiveCapture: async () => { throw new Error('Not available in batch mode'); },
+        computeFaceMatch,
+        faceMatchThreshold: getFaceMatchingThresholdSync(isSandbox),
+      };
+      const session = new VerificationSession(deps, { session_id: vId });
+
+      // Submit front → Gate 1
+      await session.submitFront(Buffer.alloc(0));
+
+      // Submit back → Gate 2 + auto cross-validation → Gate 3
+      if (backResult) {
+        await session.submitBack(Buffer.alloc(0));
+      }
+
+      await saveSessionState(vId, session.getState());
+
+      // If gates hard-rejected, mark as failed and return
+      const state = session.getState();
+      if (state.current_step === VerificationStatus.HARD_REJECTED) {
+        await supabase.from('verification_requests').update({
+          status: 'failed',
+          failure_reason: state.rejection_detail || 'Rejected by quality gates',
+        }).eq('id', vId);
+        return vId;
+      }
+    }
+
+    // 5. Final status → manual_review (no live capture possible in batch)
+    await supabase.from('verification_requests').update({
+      status: 'manual_review',
+    }).eq('id', vId);
+
+    return vId;
+  } catch (err: any) {
+    // Mark the verification as failed on unexpected errors
+    await supabase.from('verification_requests').update({
+      status: 'failed',
+      failure_reason: err.message || 'Batch processing error',
+    }).eq('id', vId);
+    throw err;
+  }
+}
 
 /**
  * POST /api/v2/batch/upload
@@ -40,6 +227,14 @@ router.post('/upload',
       .optional()
       .isIn(['passport', 'drivers_license', 'national_id'])
       .withMessage('Invalid document type'),
+    body('items.*.front_document_url')
+      .optional()
+      .isURL()
+      .withMessage('front_document_url must be a valid URL'),
+    body('items.*.back_document_url')
+      .optional()
+      .isURL()
+      .withMessage('back_document_url must be a valid URL'),
   ],
   catchAsync(async (req: Request, res: Response) => {
     const errors = validationResult(req);
@@ -52,26 +247,12 @@ router.post('/upload',
 
     const job = await createBatch(developerId, items);
 
-    // Start async processing (fire-and-forget)
-    processBatch(job.id, async (item: BatchItemInput) => {
-      // Each batch item creates a verification via the internal service.
-      // For now, we initialize a verification record — actual document
-      // processing requires uploaded files (URLs in input_data).
-      const { supabase } = await import('@/config/database.js');
-      const { data, error } = await supabase
-        .from('verification_requests')
-        .insert({
-          user_id: item.user_id,
-          developer_id: developerId,
-          status: 'pending',
-          document_type: item.document_type || 'drivers_license',
-          is_sandbox: req.isSandbox || false,
-        })
-        .select('id')
-        .single();
+    const isSandbox = req.isSandbox || false;
 
-      if (error || !data) throw new Error('Failed to create verification');
-      return data.id;
+    // Start async processing (fire-and-forget)
+    // Each item goes through: download → engine extraction → gates → manual_review
+    processBatch(job.id, async (item: BatchItemInput) => {
+      return processBatchItem(item, developerId, isSandbox);
     }).catch(err => {
       logger.error(`Batch ${job.id} processing error:`, err);
     });
