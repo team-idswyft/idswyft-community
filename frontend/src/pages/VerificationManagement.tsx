@@ -21,6 +21,7 @@ import {
   XMarkIcon,
   ArrowsUpDownIcon,
   PhotoIcon,
+  ComputerDesktopIcon,
 } from '@heroicons/react/24/outline'
 
 // ─── Types ──────────────────────────────────────────────────
@@ -130,8 +131,18 @@ export function VerificationManagement() {
   const [overrideStatus, setOverrideStatus] = useState('verified')
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const [authReady, setAuthReady] = useState(false)
+  const [isMobile, setIsMobile] = useState(false)
 
   const LIMIT = 25
+
+  // ── Mobile viewport detection ──
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 768px)')
+    setIsMobile(mq.matches)
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mq.addEventListener('change', handler)
+    return () => mq.removeEventListener('change', handler)
+  }, [])
 
   // ── Auth guard (check cookie auth, then try developer escalation) ──
   useEffect(() => {
@@ -244,6 +255,44 @@ export function VerificationManagement() {
         v.user_id.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : verifications
+
+  // ── Mobile guard ──
+  if (isMobile) {
+    return (
+      <div style={{
+        background: C.bg, minHeight: '100vh', fontFamily: C.sans,
+        display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center',
+        padding: '32px 24px', textAlign: 'center',
+      }}>
+        <div style={{
+          background: C.panel, borderRadius: 16, padding: '48px 32px',
+          border: `1px solid ${C.border}`, maxWidth: 400,
+          backdropFilter: 'blur(12px)',
+        }}>
+          <ComputerDesktopIcon style={{ width: 48, height: 48, color: C.cyan, margin: '0 auto 20px' }} />
+          <h2 style={{ color: C.text, fontSize: 20, fontWeight: 600, margin: '0 0 12px', fontFamily: C.sans }}>
+            Desktop Required
+          </h2>
+          <p style={{ color: C.muted, fontSize: 14, lineHeight: 1.6, margin: '0 0 24px' }}>
+            Verification management requires a desktop browser for reviewing documents,
+            comparing images, and making approval decisions.
+          </p>
+          <button
+            onClick={() => navigate(-1)}
+            style={{
+              background: 'none', border: `1px solid ${C.border}`, borderRadius: 8,
+              color: C.text, padding: '10px 24px', cursor: 'pointer', fontFamily: C.sans,
+              fontSize: 14, fontWeight: 500, transition: 'border-color 0.2s',
+            }}
+            onMouseEnter={e => (e.currentTarget.style.borderColor = C.cyan)}
+            onMouseLeave={e => (e.currentTarget.style.borderColor = C.border)}
+          >
+            Go Back
+          </button>
+        </div>
+      </div>
+    )
+  }
 
   // ── Render ──
   return (

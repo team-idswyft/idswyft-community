@@ -22,7 +22,7 @@ const tiers = [
     hosting: 'Your infrastructure',
     support: 'Community (GitHub)',
     sla: 'None',
-    cta: { label: 'View on GitHub', href: GITHUB_URL, external: true },
+    cta: { label: 'View on GitHub', href: GITHUB_URL, external: true, disabled: false },
     highlighted: false,
   },
   {
@@ -35,12 +35,12 @@ const tiers = [
     hosting: 'Managed by Idswyft',
     support: 'Email',
     sla: '99.5% uptime',
-    cta: { label: 'Get Started', href: '/developer', external: false },
+    cta: { label: 'Get Started', href: '/developer', external: false, disabled: false },
     highlighted: false,
   },
   {
     name: 'Cloud Pro',
-    badge: 'Most Popular',
+    badge: 'Coming Soon',
     price: '$49',
     priceSuffix: '/mo',
     verifications: '2,000 / month',
@@ -48,7 +48,7 @@ const tiers = [
     hosting: 'Managed by Idswyft',
     support: 'Priority email',
     sla: '99.9% uptime',
-    cta: { label: 'Get Started', href: '/developer', external: false },
+    cta: { label: 'Coming Soon', href: '', external: false, disabled: true },
     highlighted: true,
   },
 ]
@@ -264,7 +264,24 @@ export function PricingPage() {
               </div>
 
               {/* CTA button */}
-              {tier.cta.external ? (
+              {tier.cta.disabled ? (
+                <span
+                  style={{
+                    display: 'block',
+                    textAlign: 'center',
+                    padding: '12px 24px',
+                    borderRadius: 8,
+                    fontWeight: 600,
+                    fontSize: 14,
+                    background: C.surface,
+                    border: `1px solid ${C.border}`,
+                    color: C.dim,
+                    cursor: 'default',
+                  }}
+                >
+                  {tier.cta.label}
+                </span>
+              ) : tier.cta.external ? (
                 <a
                   href={tier.cta.href}
                   target="_blank"

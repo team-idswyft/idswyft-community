@@ -9,6 +9,7 @@ import {
 } from '@heroicons/react/24/outline'
 import { clsx } from 'clsx'
 import { isCommunity } from '../../config/edition'
+import { CookieConsent } from '../CookieConsent'
 
 interface LayoutProps {
   children: ReactNode
@@ -341,6 +342,9 @@ export function Layout({ children }: LayoutProps) {
           </div>
         </div>
       </footer>
+
+      {/* Cookie consent — cloud edition only */}
+      <CookieConsent />
     </div>
   )
 }

@@ -2130,9 +2130,28 @@ const DemoPage: React.FC = () => {
         <h1 style={{ fontFamily: C.mono, fontSize: 24, fontWeight: 600, color: C.text, marginBottom: 8 }}>
           Live Demo
         </h1>
-        <p style={{ color: C.muted, fontSize: 14, marginBottom: 36 }}>
+        <p style={{ color: C.muted, fontSize: 14, marginBottom: 16 }}>
           Try a complete verification with a sandbox key. No signup required.
         </p>
+        <div style={{
+          background: 'rgba(34,211,238,0.04)',
+          border: `1px solid rgba(34,211,238,0.12)`,
+          borderRadius: 8,
+          padding: '12px 16px',
+          marginBottom: 36,
+          display: 'flex',
+          alignItems: 'flex-start',
+          gap: 10,
+        }}>
+          <svg style={{ width: 16, height: 16, color: C.cyan, flexShrink: 0, marginTop: 1 }} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
+          </svg>
+          <p style={{ color: C.muted, fontSize: 12, lineHeight: 1.5, margin: 0, fontFamily: C.sans }}>
+            <strong style={{ color: C.text, fontWeight: 500 }}>Privacy notice:</strong>{' '}
+            All documents and images uploaded during this demo are automatically deleted
+            within 24 hours. No biometric data is stored beyond the verification session.
+          </p>
+        </div>
         <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: isMobile ? 16 : 32 }}>
           {renderProgressIndicator()}
           {renderStepContent()}
