@@ -126,7 +126,7 @@ router.get('/verification/:id',
         *,
         user:users(*),
         developer:developers(*),
-        document:documents(*),
+        document:documents!verification_requests_document_id_fkey(*),
         selfie:selfies(*)
       `)
       .eq('id', id);

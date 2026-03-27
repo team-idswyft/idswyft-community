@@ -49,7 +49,7 @@ export class VerificationConsistencyService {
       .from('verification_requests')
       .select(`
         *,
-        documents(*),
+        documents!documents_verification_request_id_fkey(*),
         selfies(*)
       `)
       .eq('id', verificationId)
@@ -109,7 +109,7 @@ export class VerificationConsistencyService {
       .from('verification_requests')
       .select(`
         *,
-        documents(*),
+        documents!documents_verification_request_id_fkey(*),
         selfies(*)
       `)
       .eq('id', verificationId)
