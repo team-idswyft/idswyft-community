@@ -13,6 +13,27 @@ adminApi.interceptors.request.use((config) => {
   return config;
 });
 
+/**
+ * Try to exchange a developer JWT for an admin JWT.
+ * Returns true if successful (adminToken is stored in localStorage).
+ */
+export async function tryEscalateDeveloperToken(): Promise<boolean> {
+  const devToken = localStorage.getItem('developer_token');
+  if (!devToken) return false;
+  try {
+    const res = await fetch(`${API_BASE_URL}/api/v1/auth/admin/escalate`, {
+      method: 'POST',
+      headers: { 'Authorization': `Bearer ${devToken}`, 'Content-Type': 'application/json' },
+    });
+    if (!res.ok) return false;
+    const data = await res.json();
+    localStorage.setItem('adminToken', data.token);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function exportUserData(userId: string): Promise<void> {
   const response = await adminApi.get(`/users/${userId}/data-export`, {
     responseType: 'blob',
