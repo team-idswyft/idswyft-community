@@ -4,6 +4,22 @@ import { supabase } from '@/config/database.js';
 import config from '@/config/index.js';
 import { logger, logWebhookDelivery } from '@/utils/logger.js';
 import { Webhook, WebhookDelivery, WebhookPayload } from '@/types/index.js';
+import { encryptSecret, decryptSecret } from '@/utils/encryption.js';
+
+/** Encrypt a webhook secret_token before writing to the DB. */
+function encryptWebhookSecret(plaintext: string): string {
+  return encryptSecret(plaintext, config.encryptionKey);
+}
+
+/** Decrypt a webhook secret_token read from the DB. Returns null on failure. */
+function decryptWebhookSecret(ciphertext: string): string | null {
+  try {
+    return decryptSecret(ciphertext, config.encryptionKey);
+  } catch {
+    // Backwards-compat: if decryption fails, assume it's a legacy plaintext value
+    return ciphertext;
+  }
+}
 
 export class WebhookService {
   async createWebhook(data: {
@@ -13,9 +29,15 @@ export class WebhookService {
     secret_token?: string;
     events?: string[];
   }): Promise<Webhook> {
+    // Encrypt secret_token before persisting
+    const insertData = { ...data };
+    if (insertData.secret_token) {
+      insertData.secret_token = encryptWebhookSecret(insertData.secret_token);
+    }
+
     const { data: webhook, error } = await supabase
       .from('webhooks')
-      .insert(data)
+      .insert(insertData)
       .select('*')
       .single();
     
@@ -85,9 +107,15 @@ export class WebhookService {
   }
   
   async updateWebhook(id: string, updates: Partial<Webhook>): Promise<Webhook> {
+    // Encrypt secret_token if being updated
+    const safeUpdates = { ...updates };
+    if (safeUpdates.secret_token) {
+      safeUpdates.secret_token = encryptWebhookSecret(safeUpdates.secret_token);
+    }
+
     const { data: webhook, error } = await supabase
       .from('webhooks')
-      .update(updates)
+      .update(safeUpdates)
       .eq('id', id)
       .select('*')
       .single();
@@ -164,14 +192,17 @@ export class WebhookService {
           'X-Idswyft-Delivery-Attempt': attempt.toString()
         };
         
-        // Add signature if signing secret is provided
-        const signingSecret = webhook.secret_key || webhook.secret_token;
-        if (signingSecret) {
-          const signature = this.generateSignature(
-            JSON.stringify(delivery.payload),
-            signingSecret
-          );
-          headers['X-Idswyft-Signature'] = signature;
+        // Add signature if signing secret is provided (decrypt from DB storage)
+        const rawSecret = webhook.secret_key || webhook.secret_token;
+        if (rawSecret) {
+          const signingSecret = decryptWebhookSecret(rawSecret);
+          if (signingSecret) {
+            const signature = this.generateSignature(
+              JSON.stringify(delivery.payload),
+              signingSecret
+            );
+            headers['X-Idswyft-Signature'] = signature;
+          }
         }
         
         // Send webhook

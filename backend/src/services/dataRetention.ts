@@ -150,6 +150,44 @@ export class DataRetentionService {
   }
 
   /**
+   * Nullify PII in webhook_deliveries payloads older than `retentionDays`.
+   * Preserves the delivery audit trail (status, timestamps, attempts) but
+   * removes OCR data, names, DOB, and document numbers from the payload.
+   */
+  async runWebhookPayloadCleanup(retentionDays: number = 30): Promise<number> {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - retentionDays);
+
+    // Count affected rows first
+    const { count } = await supabase
+      .from('webhook_deliveries')
+      .select('*', { count: 'exact', head: true })
+      .lt('created_at', cutoff.toISOString())
+      .not('payload', 'is', null);
+
+    const toClean = count ?? 0;
+    if (toClean === 0) return 0;
+
+    const { error } = await supabase
+      .from('webhook_deliveries')
+      .update({ payload: null })
+      .lt('created_at', cutoff.toISOString())
+      .not('payload', 'is', null);
+
+    if (error) {
+      logger.error('Webhook payload cleanup failed', { error });
+      return 0;
+    }
+
+    logger.info(`Webhook payload cleanup: ${toClean} deliveries scrubbed`, {
+      retentionDays,
+      cutoff: cutoff.toISOString(),
+    });
+
+    return toClean;
+  }
+
+  /**
    * Delete api_activity_logs older than `retentionDays`.
    * These are high-volume analytics rows (one per API call) with no audit
    * requirement — safe to hard-delete after the retention window.

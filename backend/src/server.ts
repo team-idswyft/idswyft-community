@@ -346,6 +346,29 @@ const startServer = async () => {
         });
       }
 
+      // Webhook payload cleanup — daily at 3:30 AM UTC, nullifies PII from deliveries older than 30 days
+      {
+        const cron = await import('node-cron');
+        const { DataRetentionService } = await import('@/services/dataRetention.js');
+        const webhookRetentionService = new DataRetentionService();
+
+        cron.schedule('30 3 * * *', async () => {
+          try {
+            const count = await webhookRetentionService.runWebhookPayloadCleanup(30);
+            if (count > 0) {
+              logger.info(`Webhook payload cleanup: ${count} deliveries scrubbed`);
+            }
+          } catch (err) {
+            logger.error('Webhook payload cleanup cron failed', { error: err });
+          }
+        });
+
+        logger.info('Webhook payload cleanup scheduler started', {
+          retentionDays: 30,
+          schedule: '30 3 * * * (daily at 3:30 AM UTC)',
+        });
+      }
+
       // Monitoring cron — daily at 3 AM UTC: check expiring documents + process due re-verifications
       if (config.nodeEnv === 'production') {
         const cron = await import('node-cron');

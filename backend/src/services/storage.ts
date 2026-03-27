@@ -260,8 +260,31 @@ export class StorageService {
         const fullPath = path.join(process.cwd(), filePath);
         return await fs.readFile(fullPath);
       } else if (config.storage.provider === 's3') {
-        // S3 download implementation would go here
-        throw new Error('S3 download not implemented yet');
+        const { S3Client, GetObjectCommand } = await import('@aws-sdk/client-s3');
+
+        const client = new S3Client({
+          region: config.storage.awsRegion ?? 'us-east-1',
+          credentials: {
+            accessKeyId: config.storage.awsAccessKey!,
+            secretAccessKey: config.storage.awsSecretKey!,
+          },
+        });
+
+        const response = await client.send(new GetObjectCommand({
+          Bucket: config.storage.awsS3Bucket!,
+          Key: filePath,
+        }));
+
+        if (!response.Body) {
+          throw new Error('Empty response body from S3');
+        }
+
+        // Convert readable stream to Buffer
+        const chunks: Uint8Array[] = [];
+        for await (const chunk of response.Body as AsyncIterable<Uint8Array>) {
+          chunks.push(chunk);
+        }
+        return Buffer.concat(chunks);
       } else {
         throw new Error(`Unsupported storage provider: ${config.storage.provider}`);
       }
@@ -288,8 +311,20 @@ export class StorageService {
         const fullPath = path.join(process.cwd(), filePath);
         await fs.unlink(fullPath);
       } else if (config.storage.provider === 's3') {
-        // S3 delete implementation would go here
-        throw new Error('S3 delete not implemented yet');
+        const { S3Client, DeleteObjectCommand } = await import('@aws-sdk/client-s3');
+
+        const client = new S3Client({
+          region: config.storage.awsRegion ?? 'us-east-1',
+          credentials: {
+            accessKeyId: config.storage.awsAccessKey!,
+            secretAccessKey: config.storage.awsSecretKey!,
+          },
+        });
+
+        await client.send(new DeleteObjectCommand({
+          Bucket: config.storage.awsS3Bucket!,
+          Key: filePath,
+        }));
       }
 
       logger.info('File deleted', { filePath });
