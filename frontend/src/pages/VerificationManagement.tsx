@@ -267,9 +267,9 @@ export function VerificationManagement() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <button
-              onClick={() => navigate('/admin')}
+              onClick={() => navigate('/admin/login')}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, display: 'flex', padding: 4 }}
-              title="Back to Admin Dashboard"
+              title="Back"
             >
               <ArrowLeftIcon style={{ width: 20, height: 20 }} />
             </button>
@@ -545,6 +545,19 @@ export function VerificationManagement() {
 
                   {/* Actions */}
                   <div style={{ display: 'flex', alignItems: 'center', gap: 6 }} onClick={e => e.stopPropagation()}>
+                    {(v.status === 'verified' || v.status === 'failed') ? (
+                      <span style={{
+                        display: 'inline-flex', alignItems: 'center', gap: 4,
+                        color: v.status === 'verified' ? C.green : C.red,
+                        fontSize: 11, fontWeight: 600, fontFamily: C.sans,
+                      }}>
+                        {v.status === 'verified' ? (
+                          <><CheckCircleIcon style={{ width: 14, height: 14 }} /> Complete</>
+                        ) : (
+                          <><XCircleIcon style={{ width: 14, height: 14 }} /> Complete</>
+                        )}
+                      </span>
+                    ) : null}
                     {(v.status === 'manual_review' || v.status === 'pending') && (
                       <>
                         <button

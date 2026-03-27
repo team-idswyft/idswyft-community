@@ -101,8 +101,7 @@ app.use('/api', apiActivityLogger);
 app.use('/api/v2/verify', newVerificationRoutes);
 app.use('/api/verify/handoff', handoffRoutes);
 app.use('/api/developer', developerRoutes);
-// CSRF protection for state-changing admin endpoints (cookie-based session auth)
-app.use('/api/admin', csrfProtection);
+// Admin routes use JWT Bearer tokens — CSRF not needed (no cookie auth)
 app.use('/api/admin', adminRoutes);
 app.use('/api/admin/thresholds', adminThresholdsRoutes);
 app.use('/api/auth', authRoutes);
