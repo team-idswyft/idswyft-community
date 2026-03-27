@@ -91,8 +91,27 @@ router.get('/verifications',
 
     const result = await verificationService.getVerificationRequestsForAdmin(filters);
 
+    // Generate signed thumbnail URLs in parallel for each verification
+    const verifications = await Promise.all(
+      result.verifications.map(async (v: any) => {
+        let document_thumbnail = null;
+        let selfie_thumbnail = null;
+        try {
+          if (v.document?.file_path) {
+            document_thumbnail = await storageService.getFileUrl(v.document.file_path, 3600);
+          }
+        } catch { /* skip */ }
+        try {
+          if (v.selfie?.file_path) {
+            selfie_thumbnail = await storageService.getFileUrl(v.selfie.file_path, 3600);
+          }
+        } catch { /* skip */ }
+        return { ...v, document_thumbnail, selfie_thumbnail };
+      })
+    );
+
     res.json({
-      verifications: result.verifications,
+      verifications,
       pagination: {
         page: filters.page,
         limit: filters.limit,

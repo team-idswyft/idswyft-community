@@ -34,6 +34,8 @@ interface Verification {
   source?: string
   failure_reason?: string
   developer_id?: string
+  document_thumbnail?: string | null
+  selfie_thumbnail?: string | null
 }
 
 interface DocumentInfo {
@@ -392,15 +394,15 @@ export function VerificationManagement() {
         {/* ── Table ── */}
         <div style={{
           background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12,
-          overflow: 'hidden', backdropFilter: 'blur(12px)',
+          overflow: 'auto', backdropFilter: 'blur(12px)',
         }}>
           {/* Table header */}
           <div style={{
-            display: 'grid', gridTemplateColumns: '40px 1fr 1fr 140px 130px 140px 120px',
+            display: 'grid', gridTemplateColumns: '40px 80px 1fr 1fr 140px 130px 140px 200px', minWidth: 1020,
             padding: '12px 20px', borderBottom: `1px solid ${C.border}`,
             background: C.surface,
           }}>
-            {['', 'Verification ID', 'User ID', 'Status', 'Type', 'Created', 'Actions'].map((h, i) => (
+            {['', 'Preview', 'Verification ID', 'User ID', 'Status', 'Type', 'Created', 'Actions'].map((h, i) => (
               <div key={i} style={{
                 color: C.dim, fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
                 letterSpacing: '0.1em', fontFamily: C.sans,
@@ -455,7 +457,7 @@ export function VerificationManagement() {
                 <div
                   onClick={() => toggleExpand(v.id)}
                   style={{
-                    display: 'grid', gridTemplateColumns: '40px 1fr 1fr 140px 130px 140px 120px',
+                    display: 'grid', gridTemplateColumns: '40px 80px 1fr 1fr 140px 130px 140px 200px', minWidth: 1020,
                     padding: '14px 20px', borderBottom: `1px solid ${C.border}`,
                     cursor: 'pointer', transition: 'background 0.1s',
                     background: isExpanded ? C.surface : 'transparent',
@@ -468,6 +470,30 @@ export function VerificationManagement() {
                     {isExpanded
                       ? <ChevronDownIcon style={{ width: 14, height: 14, color: C.cyan }} />
                       : <ChevronRightIcon style={{ width: 14, height: 14, color: C.dim }} />}
+                  </div>
+
+                  {/* Thumbnails */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 4 }} onClick={e => e.stopPropagation()}>
+                    {v.document_thumbnail ? (
+                      <img
+                        src={v.document_thumbnail}
+                        alt="Doc"
+                        style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, border: `1px solid ${C.border}` }}
+                        onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                      />
+                    ) : (
+                      <div style={{ width: 32, height: 32, borderRadius: 4, background: C.codeBg, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <PhotoIcon style={{ width: 14, height: 14, color: C.dim }} />
+                      </div>
+                    )}
+                    {v.selfie_thumbnail ? (
+                      <img
+                        src={v.selfie_thumbnail}
+                        alt="Live"
+                        style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 16, border: `1px solid ${C.border}` }}
+                        onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                      />
+                    ) : null}
                   </div>
 
                   {/* Verification ID */}
