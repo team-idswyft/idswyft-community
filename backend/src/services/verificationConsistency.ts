@@ -50,7 +50,7 @@ export class VerificationConsistencyService {
       .select(`
         *,
         documents!documents_verification_request_id_fkey(*),
-        selfies(*)
+        selfies!selfies_verification_request_id_fkey(*)
       `)
       .eq('id', verificationId)
       .single();
@@ -110,7 +110,7 @@ export class VerificationConsistencyService {
       .select(`
         *,
         documents!documents_verification_request_id_fkey(*),
-        selfies(*)
+        selfies!selfies_verification_request_id_fkey(*)
       `)
       .eq('id', verificationId)
       .single();
