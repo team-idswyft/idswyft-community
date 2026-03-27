@@ -23,11 +23,11 @@ export const authenticateServiceToken = catchAsync(async (req: Request, res: Res
     throw new AuthenticationError('Service authentication not configured');
   }
   
-  // Use timing-safe comparison to prevent timing attacks
-  const tokenBuffer = Buffer.from(serviceToken);
-  const expectedBuffer = Buffer.from(expectedToken);
-  
-  if (tokenBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(tokenBuffer, expectedBuffer)) {
+  // HMAC-normalize both tokens so timingSafeEqual always compares equal-length
+  // digests — prevents leaking the expected token's length through timing.
+  const hmacKey = crypto.randomBytes(32);
+  const hmac = (v: string) => crypto.createHmac('sha256', hmacKey).update(v).digest();
+  if (!crypto.timingSafeEqual(hmac(serviceToken), hmac(expectedToken))) {
     logger.warn('Invalid service token attempted', {
       ip: req.ip,
       userAgent: req.get('User-Agent'),

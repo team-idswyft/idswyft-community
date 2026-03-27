@@ -767,10 +767,13 @@ export class IdswyftSDK {
 
     const providedSignature = signature.replace('sha256=', '');
 
-    return crypto.timingSafeEqual(
-      Buffer.from(expectedSignature, 'hex'),
-      Buffer.from(providedSignature, 'hex')
-    );
+    const expectedBuf = Buffer.from(expectedSignature, 'hex');
+    const providedBuf = Buffer.from(providedSignature, 'hex');
+
+    // Guard: timingSafeEqual throws RangeError on length mismatch
+    if (expectedBuf.length !== providedBuf.length) return false;
+
+    return crypto.timingSafeEqual(expectedBuf, providedBuf);
   }
 
   /**

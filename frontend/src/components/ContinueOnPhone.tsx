@@ -156,7 +156,7 @@ export const ContinueOnPhone: React.FC<ContinueOnPhoneProps> = ({
       <div className="border border-gray-200 rounded-2xl p-6 flex flex-col items-center text-center h-full justify-center gap-3">
         <div className="text-4xl">📱</div>
         <div>
-          <h3 className="font-semibold text-gray-900">Continue on Phone</h3>
+          <h3 className="font-semibold text-white">Continue on Phone</h3>
           <p className="text-sm text-gray-500 mt-1">
             Scan a QR code to complete verification on your mobile device
           </p>

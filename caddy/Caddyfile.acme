@@ -10,6 +10,12 @@
 #   - The DOMAIN env var must be set (e.g. verify.example.com)
 # ─────────────────────────────────────────────────
 
+# Explicit HTTP → HTTPS redirect (Caddy does this automatically for named
+# hosts, but being explicit ensures the redirect survives config changes)
+http://{$DOMAIN} {
+    redir https://{host}{uri} permanent
+}
+
 {$DOMAIN} {
     log {
         output stdout

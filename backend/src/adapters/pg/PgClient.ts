@@ -64,12 +64,23 @@ export class PgClient {
     args?: Record<string, unknown>
   ): Promise<{ data: any; error: { message: string; code?: string } | null }> {
     try {
-      // Special case: exec_sql / exec — direct SQL execution for setup scripts
-      // Some callers pass { sql: '...' }, others pass { query: '...' }
+      // Special case: exec_sql / exec — direct SQL execution for setup scripts.
+      // SECURITY: Only DDL and migration-tracking statements are allowed.
+      // This prevents accidental misuse if a route handler ever calls exec_sql.
       if (functionName === 'exec_sql' || functionName === 'exec') {
         const sql = (args?.sql ?? args?.query) as string;
         if (!sql) {
           return { data: null, error: { message: 'No SQL provided for exec' } };
+        }
+        const trimmed = sql.trimStart().toUpperCase();
+        const ALLOWED_PREFIXES = [
+          'CREATE', 'ALTER', 'DROP', 'DO ', 'DO$',
+          'INSERT INTO _MIGRATIONS',
+          'INSERT INTO PUBLIC._MIGRATIONS',
+          'GRANT', 'REVOKE', 'SET ', 'COMMENT',
+        ];
+        if (!ALLOWED_PREFIXES.some(p => trimmed.startsWith(p))) {
+          return { data: null, error: { message: `exec_sql blocked: only DDL statements are allowed (got ${trimmed.slice(0, 30)}...)` } };
         }
         await this.pool.query(sql);
         return { data: null, error: null };

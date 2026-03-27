@@ -7,6 +7,11 @@
 #   caddy/certs/key.pem    (private key)
 # ─────────────────────────────────────────────────
 
+# Explicit HTTP → HTTPS redirect
+http://{$DOMAIN} {
+    redir https://{host}{uri} permanent
+}
+
 {$DOMAIN} {
     tls /etc/caddy/certs/cert.pem /etc/caddy/certs/key.pem
 

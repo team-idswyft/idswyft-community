@@ -19,8 +19,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     && rm -rf /var/lib/apt/lists/*
 
 # Install all dependencies (including devDependencies for build)
-COPY package*.json ./
-RUN npm install --include=optional
+COPY package.json package-lock.json ./
+RUN npm ci --include=optional
 
 # Copy source and compile TypeScript
 COPY . .

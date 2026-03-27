@@ -4,9 +4,15 @@ set -euo pipefail
 # ─────────────────────────────────────────────────
 # Idswyft Community Edition — Install Script
 # ─────────────────────────────────────────────────
-# Usage:
+# Usage (recommended — verify before running):
+#   curl -fsSL https://raw.githubusercontent.com/team-idswyft/idswyft/main/install.sh -o install.sh
+#   sha256sum install.sh   # compare with published checksum in RELEASES
+#   bash install.sh
+#
+# Quick (less secure):
 #   curl -fsSL https://raw.githubusercontent.com/team-idswyft/idswyft/main/install.sh | bash
-#   or:
+#
+# Or clone and run locally:
 #   git clone https://github.com/team-idswyft/idswyft.git && cd idswyft && ./install.sh
 #
 # Options:
