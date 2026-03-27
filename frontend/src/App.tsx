@@ -6,7 +6,6 @@ import { DemoPage } from './pages/DemoPage'
 import UserVerificationPage from './pages/UserVerificationPage'
 import { LiveCapturePage } from './pages/LiveCapturePage'
 import MobileVerificationPage from './pages/MobileVerificationPage'
-import { AdminPage } from './pages/AdminPage'
 import { AdminLogin } from './pages/AdminLogin'
 import { VerificationManagement } from './pages/VerificationManagement'
 import { DocsPage } from './pages/DocsPage'
@@ -49,7 +48,7 @@ function App() {
         <Route path="/legal" element={<LegalPage />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin/verifications" element={<VerificationManagement />} />
-        <Route path="/admin/*" element={<AdminPage />} />
+        <Route path="/admin/*" element={<Navigate to="/admin/verifications" replace />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Layout>
