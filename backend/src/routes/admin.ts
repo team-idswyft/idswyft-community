@@ -91,21 +91,32 @@ router.get('/verifications',
 
     const result = await verificationService.getVerificationRequestsForAdmin(filters);
 
-    // Generate signed thumbnail URLs in parallel for each verification
+    // Batch-fetch documents & selfies by verification_request_id (the reliable FK)
+    const vIds = result.verifications.map((v: any) => v.id);
+    const [{ data: allDocs }, { data: allSelfies }] = await Promise.all([
+      supabase.from('documents').select('verification_request_id, file_path').in('verification_request_id', vIds),
+      supabase.from('selfies').select('verification_request_id, file_path').in('verification_request_id', vIds),
+    ]);
+
+    // Build lookup maps: verification_id → first file_path
+    const docMap = new Map<string, string>();
+    const selfieMap = new Map<string, string>();
+    for (const d of (allDocs || [])) {
+      if (d.file_path && !docMap.has(d.verification_request_id)) docMap.set(d.verification_request_id, d.file_path);
+    }
+    for (const s of (allSelfies || [])) {
+      if (s.file_path && !selfieMap.has(s.verification_request_id)) selfieMap.set(s.verification_request_id, s.file_path);
+    }
+
+    // Generate signed thumbnail URLs in parallel
     const verifications = await Promise.all(
       result.verifications.map(async (v: any) => {
         let document_thumbnail = null;
         let selfie_thumbnail = null;
-        try {
-          if (v.document?.file_path) {
-            document_thumbnail = await storageService.getFileUrl(v.document.file_path, 3600);
-          }
-        } catch { /* skip */ }
-        try {
-          if (v.selfie?.file_path) {
-            selfie_thumbnail = await storageService.getFileUrl(v.selfie.file_path, 3600);
-          }
-        } catch { /* skip */ }
+        const docPath = docMap.get(v.id);
+        const selfiePath = selfieMap.get(v.id);
+        try { if (docPath) document_thumbnail = await storageService.getFileUrl(docPath, 3600); } catch { /* skip */ }
+        try { if (selfiePath) selfie_thumbnail = await storageService.getFileUrl(selfiePath, 3600); } catch { /* skip */ }
         return { ...v, document_thumbnail, selfie_thumbnail };
       })
     );
