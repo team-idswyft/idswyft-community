@@ -8,6 +8,7 @@ import { LiveCapturePage } from './pages/LiveCapturePage'
 import MobileVerificationPage from './pages/MobileVerificationPage'
 import { AdminPage } from './pages/AdminPage'
 import { AdminLogin } from './pages/AdminLogin'
+import { VerificationManagement } from './pages/VerificationManagement'
 import { DocsPage } from './pages/DocsPage'
 import { MarkdownDocsPage } from './pages/MarkdownDocsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
@@ -47,6 +48,7 @@ function App() {
         <Route path="/status" element={<Status />} />
         <Route path="/legal" element={<LegalPage />} />
         <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin/verifications" element={<VerificationManagement />} />
         <Route path="/admin/*" element={<AdminPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>

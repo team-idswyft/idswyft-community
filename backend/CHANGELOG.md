@@ -5,6 +5,18 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.6.0] - 2026-03-26
+
+### Added
+- **Batch verification processing** — `POST /api/v2/batch/upload` now runs the full verification pipeline: downloads documents from provided URLs, processes through engine (OCR, barcode/MRZ extraction), runs quality gates and cross-validation, sets final status to `manual_review` (no live capture in batch mode)
+- **Admin status override** — `PUT /api/admin/verification/:id/review` accepts `decision: 'override'` with `new_status` field to set any valid status (verified, failed, manual_review, pending)
+- **Webhook forwarding on admin actions** — approve, reject, and override decisions now fire webhooks to the developer's registered endpoints using their scoped API key (same events as the automated pipeline)
+- **Verification Management page** — new dark-themed admin UI at `/admin/verifications` with stats bar, filterable/searchable table, expandable detail view with document images, and approve/reject/override actions with confirmation dialogs
+- **Enhanced verification detail endpoint** — `GET /api/admin/verification/:id` now returns all documents (front + back) from the documents table, not just the FK-linked document
+
+### Changed
+- Batch items that fail quality gates are correctly marked as `failed` with rejection reason instead of always ending at `manual_review`
+
 ## [1.5.4] - 2026-03-26
 
 ### Fixed
