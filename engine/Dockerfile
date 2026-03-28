@@ -57,8 +57,10 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
     && rm -rf /var/lib/apt/lists/*
 
-# Create non-root user
-RUN groupadd -r nodeuser && useradd -r -g nodeuser -s /bin/false nodeuser
+# Create non-root user with home directory (PaddleOCR caches models in ~/.cache)
+RUN groupadd -r nodeuser && useradd -r -g nodeuser -m -s /bin/false nodeuser \
+    && mkdir -p /home/nodeuser/.cache/ppu-paddle-ocr \
+    && chown -R nodeuser:nodeuser /home/nodeuser
 
 # Copy compiled output + node_modules + models from build stage
 COPY --from=build /app/dist ./dist

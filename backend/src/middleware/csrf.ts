@@ -1,5 +1,6 @@
 import { doubleCsrf } from 'csrf-csrf';
 import { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
 import config from '@/config/index.js';
 
 const isProd = config.nodeEnv === 'production';
@@ -19,14 +20,20 @@ export const { generateToken, doubleCsrfProtection } = doubleCsrf({
 });
 
 /**
- * Conditional CSRF middleware — only enforces when an auth cookie is present.
- * This allows unauthenticated routes (registration, OTP login) to pass through
- * while protecting all cookie-authenticated mutations from cross-site forgery.
+ * Conditional CSRF middleware — only enforces when a *valid* auth cookie is present.
+ * A stale/expired cookie (e.g. from a previous session) is ignored so that
+ * pre-auth flows like OTP send/verify are not blocked by CSRF enforcement.
  */
 export function conditionalCsrf(req: Request, res: Response, next: NextFunction): void {
-  if (req.cookies?.idswyft_token) {
-    doubleCsrfProtection(req, res, next);
-    return;
+  const token = req.cookies?.idswyft_token;
+  if (token) {
+    try {
+      jwt.verify(token, config.jwtSecret);
+      doubleCsrfProtection(req, res, next);
+      return;
+    } catch {
+      // Token expired/invalid — treat as unauthenticated, skip CSRF
+    }
   }
   next();
 }
