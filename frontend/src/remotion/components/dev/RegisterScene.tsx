@@ -11,7 +11,7 @@ const COMMAND = `curl -X POST https://idswyft.app/api/developer/register \\
   -d '{"email": "dev@example.com", "company": "Acme"}'`;
 
 const RESPONSE = JSON.stringify(
-  { success: true, api_key: 'idv_sk_live_7f3a9c...x2b1', developer_id: 'dev_8k2m...' },
+  { success: true, api_key: 'ik_7f3a9c2e8b1d...x2b1', developer_id: 'dev_8k2m...' },
   null,
   2,
 );

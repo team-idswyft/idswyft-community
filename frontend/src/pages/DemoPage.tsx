@@ -1450,7 +1450,7 @@ const DemoPage: React.FC = () => {
                       type="text"
                       value={apiKey}
                       onChange={(e) => setApiKey(e.target.value)}
-                      placeholder="sk_test_your_api_key_here"
+                      placeholder="ik_your_api_key_here"
                       style={{ background: '#0f1420', border: '1px solid rgba(255,255,255,0.07)', color: '#dde2ec', borderRadius: 6, padding: '10px 14px', width: '100%', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
                     />
                     <p style={{ marginTop: 4, fontSize: 11, color: '#4a5568' }}>

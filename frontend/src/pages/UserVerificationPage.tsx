@@ -211,7 +211,7 @@ const UserVerificationPage: React.FC = () => {
           background: C.bg, borderRadius: 6, padding: '6px 10px',
           wordBreak: 'break-all',
         }}>
-          /user-verification?api_key=<span style={{ color: C.cyan }}>sk_live_xxx</span>&user_id=<span style={{ color: C.cyan }}>user-uuid</span>
+          /user-verification?api_key=<span style={{ color: C.cyan }}>ik_your_api_key</span>&user_id=<span style={{ color: C.cyan }}>user-uuid</span>
         </div>
       </div>
     </div>

@@ -270,7 +270,7 @@ describe('IdswyftSDK', () => {
     it('should create API key', async () => {
       const mockResponse = {
         data: {
-          api_key: 'sk_test_123...',
+          api_key: 'ik_test_123...',
           key_id: 'key_abc123'
         }
       };
@@ -296,7 +296,7 @@ describe('IdswyftSDK', () => {
           api_keys: [{
             id: 'key_123',
             name: 'Test Key',
-            key_prefix: 'sk_test_',
+            key_prefix: 'ik_',
             environment: 'sandbox',
             is_active: true
           }]

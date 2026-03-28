@@ -5,7 +5,7 @@ import { CodeEditor, LINE_HEIGHT } from './CodeEditor';
 
 /** Condensed integration code for the video */
 const CODE = `const BASE = 'https://idswyft.app';
-const KEY  = 'idv_sk_live_7f3a9c...x2b1';
+const KEY  = 'ik_7f3a9c2e8b1d...x2b1';
 const headers = { 'X-API-Key': KEY };
 
 // 1. Initialize verification session

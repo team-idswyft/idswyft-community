@@ -109,7 +109,7 @@ export const DocsGuides: React.FC = () => {
 
       <Pre label="Option 1: Redirect (link or window.location)" code={`// Redirect the user to the hosted verification page
 window.location.href = 'https://idswyft.app/user-verification'
-  + '?api_key=sk_live_xxx'
+  + '?api_key=ik_your_api_key'
   + '&user_id=user-123'
   + '&redirect_url=' + encodeURIComponent('https://yourapp.com/done')
   + '&theme=dark';`} />
@@ -143,7 +143,7 @@ if (status === 'verified' && verificationId) {
 
       <Pre label="Option 2: Iframe embed (HTML)" code={`<!-- Embed the verification page inline on your site -->
 <iframe
-  src="https://idswyft.app/user-verification?api_key=sk_live_xxx&user_id=user-123&theme=dark"
+  src="https://idswyft.app/user-verification?api_key=ik_your_api_key&user_id=user-123&theme=dark"
   width="100%" height="700" frameborder="0"
   allow="camera; microphone"
   style="border: none; border-radius: 8px;"
@@ -201,7 +201,7 @@ async function pollStatus(verificationId, apiKey, baseUrl, {
 
 // ─── Full verification flow ────────────────────────────────────
 const BASE = '${apiUrl}';
-const KEY  = 'sk_live_your_key';
+const KEY  = 'ik_your_api_key';
 const headers = { 'X-API-Key': KEY };
 
 // Step 1: Initialize
@@ -271,7 +271,7 @@ console.log('Liveness:', final.liveness_results?.liveness_passed);`}
         python={`import requests, time
 
 BASE = '${apiUrl}'
-KEY  = 'sk_live_your_key'
+KEY  = 'ik_your_api_key'
 HEADERS = {'X-API-Key': KEY}
 
 # ─── Reusable polling helper with exponential backoff ──────────
@@ -403,7 +403,7 @@ print('Liveness:', final.get('liveness_results', {}).get('liveness_passed'))`} /
 curl -X POST ${apiUrl}/api/verify/handoff/create \\
   -H "Content-Type: application/json" \\
   -d '{
-    "api_key": "sk_live_your_key",
+    "api_key": "ik_your_api_key",
     "user_id": "user-uuid"
   }'
 
@@ -414,7 +414,7 @@ const handoff = await fetch(\`${apiUrl}/api/verify/handoff/create\`, {
   method: 'POST',
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify({
-    api_key: 'sk_live_your_key',
+    api_key: 'ik_your_api_key',
     user_id: 'user-uuid',
   }),
 }).then(r => r.json());
@@ -448,7 +448,7 @@ BASE = '${apiUrl}'
 # Create handoff session (api_key in body, not header)
 handoff = requests.post(f'{BASE}/api/verify/handoff/create',
     json={
-        'api_key': 'sk_live_your_key',
+        'api_key': 'ik_your_api_key',
         'user_id': 'user-uuid',
     },
 ).json()

@@ -43,7 +43,7 @@ export const DocsSdk: React.FC = () => {
       <Pre label="Initialize" code={`const { IdswyftSDK } = require('@idswyft/sdk');
 
 const sdk = new IdswyftSDK({
-  apiKey: 'sk_live_your_key',
+  apiKey: 'ik_your_api_key',
   baseURL: '${apiUrl}',     // optional, defaults to https://api.idswyft.app
   sandbox: false,            // set true for sandbox mode
 });`} />

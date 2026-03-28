@@ -14,11 +14,13 @@ export const API_DOCS_MARKDOWN = `# Idswyft API Documentation
 Every request must include your API key in the \`X-API-Key\` header.
 
 \`\`\`
-X-API-Key: sk_live_your_key
+X-API-Key: ik_your_api_key
 \`\`\`
 
-- **Live keys** (\`sk_live_\`) — production traffic, real verifications
-- **Sandbox keys** (\`sk_test_\`) — testing, same pipeline, separate quota
+All API keys use the \`ik_\` prefix. Sandbox mode is determined by the key's configuration, not its prefix:
+
+- **Production keys** — real verifications, production traffic
+- **Sandbox keys** — testing, same pipeline, separate quota
 
 ### Developer Authentication
 
@@ -198,7 +200,7 @@ Send users to the hosted page with a link or redirect. After verification, they 
 
 \`\`\`javascript
 window.location.href = 'https://idswyft.app/user-verification'
-  + '?api_key=sk_live_xxx'
+  + '?api_key=ik_your_key'
   + '&user_id=user-123'
   + '&redirect_url=' + encodeURIComponent('https://yourapp.com/done')
   + '&theme=dark';
@@ -237,7 +239,7 @@ Embed the hosted page inside your app. Users never leave your site.
 
 \`\`\`html
 <iframe
-  src="https://idswyft.app/user-verification?api_key=sk_live_xxx&user_id=user-123&theme=dark"
+  src="https://idswyft.app/user-verification?api_key=ik_your_key&user_id=user-123&theme=dark"
   width="100%" height="700" frameborder="0"
   allow="camera; microphone"
   style="border: none; border-radius: 8px;"
@@ -349,7 +351,7 @@ npm install @idswyft/sdk
 const { IdswyftSDK } = require('@idswyft/sdk');
 
 const sdk = new IdswyftSDK({
-  apiKey: 'sk_live_your_key',
+  apiKey: 'ik_your_api_key',
   baseURL: 'https://api.idswyft.app',
   sandbox: false,
 });

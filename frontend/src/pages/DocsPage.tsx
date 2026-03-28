@@ -186,20 +186,20 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
           </div>
           <div>
             <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>Auth Header</div>
-            <code style={{ fontFamily: C.mono, fontSize: '0.85rem', color: C.cyan }}>X-API-Key: sk_live_your_key</code>
+            <code style={{ fontFamily: C.mono, fontSize: '0.85rem', color: C.cyan }}>X-API-Key: ik_your_api_key</code>
           </div>
         </div>
       </div>
 
       <Pre label="Curl example" code={`curl -X POST ${apiUrl}/api/v2/verify/initialize \\
-  -H "X-API-Key: sk_live_your_key" \\
+  -H "X-API-Key: ik_your_api_key" \\
   -H "Content-Type: application/json" \\
   -d '{"user_id": "550e8400-e29b-41d4-a716-446655440000"}'`} />
 
       <Callout type="tip">
-        Use a <strong>sandbox key</strong> (prefix <code style={{ fontFamily: C.mono }}>sk_test_</code>) during development.
-        Sandbox mode uses the same pipeline with real OCR and face matching, but counts against a separate quota
-        and won't affect production metrics.
+        Use a <strong>sandbox key</strong> during development.
+        Sandbox mode is a property of the key (set in the Developer Portal), not a prefix distinction — all keys use the <code style={{ fontFamily: C.mono }}>ik_</code> prefix.
+        Sandbox mode uses the same pipeline with real OCR and face matching, but counts against a separate quota and won't affect production metrics.
       </Callout>
 
       <Divider />
