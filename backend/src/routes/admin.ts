@@ -340,8 +340,7 @@ router.put('/verification/:id/review',
 
 // Get developers list
 router.get('/developers',
-  authenticateJWT,
-  requireAdminRole(['admin']),
+  authenticateAdminOrReviewer as any,
   [
     query('page')
       .optional()

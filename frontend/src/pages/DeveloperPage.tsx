@@ -247,7 +247,7 @@ function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) => void
       method: 'POST',
       headers: { 'Content-Type': 'application/json', ...csrfHeader() },
       credentials: 'include',
-      body: JSON.stringify({ code }),
+      body: JSON.stringify({ code, state: returnedState }),
     })
       .then(r => r.json().then(data => ({ ok: r.ok, data })))
       .then(({ ok, data }) => {
@@ -393,11 +393,10 @@ function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) => void
   const startGitHub = async () => {
     setLoading(true)
     try {
-      const state = crypto.randomUUID()
-      sessionStorage.setItem('github_oauth_state', state)
-      const res = await fetch(`${API_BASE_URL}/api/auth/developer/github/url?state=${encodeURIComponent(state)}`, { credentials: 'include' })
+      const res = await fetch(`${API_BASE_URL}/api/auth/developer/github/url`, { credentials: 'include' })
       const data = await res.json()
       if (!data.url) throw new Error('GitHub OAuth not configured')
+      sessionStorage.setItem('github_oauth_state', data.state)
       window.location.href = data.url
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'GitHub login failed')

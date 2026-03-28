@@ -22,6 +22,7 @@ import {
   ArrowsUpDownIcon,
   PhotoIcon,
   ComputerDesktopIcon,
+  UsersIcon,
 } from '@heroicons/react/24/outline'
 
 // ─── Types ──────────────────────────────────────────────────
@@ -325,6 +326,19 @@ export function VerificationManagement() {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <button
+              onClick={() => navigate('/admin/developers')}
+              style={{
+                background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8,
+                color: C.muted, padding: '8px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                fontFamily: C.sans, fontSize: 13, transition: 'all 0.15s',
+              }}
+              onMouseEnter={e => { e.currentTarget.style.borderColor = C.cyanBorder; e.currentTarget.style.color = C.cyan }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.muted }}
+            >
+              <UsersIcon style={{ width: 14, height: 14 }} />
+              Developers
+            </button>
             <button
               onClick={() => { fetchVerifications(); fetchStats() }}
               style={{

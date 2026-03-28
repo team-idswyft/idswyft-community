@@ -1,6 +1,6 @@
 {
   "name": "idswyft-frontend",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "Frontend for Idswyft identity verification platform",
   "type": "module",
   "scripts": {
