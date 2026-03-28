@@ -587,7 +587,7 @@ export function HomePage() {
               padding: '4px 14px', borderRadius: 20, letterSpacing: '0.04em',
               border: `1px solid ${C.border}`,
             }}>
-              Most Popular
+              Coming Soon
             </div>
             <div style={{ fontFamily: C.mono, fontSize: 13, fontWeight: 600, color: C.muted, marginBottom: 12 }}>
               Cloud Pro
@@ -604,16 +604,16 @@ export function HomePage() {
                 </div>
               ))}
             </div>
-            <Link
-              to="/developer"
+            <span
               style={{
                 display: 'block', textAlign: 'center', padding: '10px 20px', borderRadius: 8,
-                fontWeight: 600, fontSize: 13, textDecoration: 'none',
-                border: `1px solid ${C.border}`, color: C.text,
+                fontWeight: 600, fontSize: 13,
+                background: C.surface, border: `1px solid ${C.border}`, color: C.dim,
+                cursor: 'default',
               }}
             >
-              Get Started
-            </Link>
+              Coming Soon
+            </span>
           </div>
         </div>
 
