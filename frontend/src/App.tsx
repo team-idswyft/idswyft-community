@@ -9,6 +9,10 @@ import MobileVerificationPage from './pages/MobileVerificationPage'
 import { AdminLogin } from './pages/AdminLogin'
 import { VerificationManagement } from './pages/VerificationManagement'
 import { DocsPage } from './pages/DocsPage'
+import { DocsGuides } from './pages/DocsGuides'
+import { DocsSdk } from './pages/DocsSdk'
+import { DocsFeatures } from './pages/DocsFeatures'
+import { DocsReference } from './pages/DocsReference'
 import { ReviewDashboardDocs } from './pages/ReviewDashboardDocs'
 import { MarkdownDocsPage } from './pages/MarkdownDocsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
@@ -43,6 +47,10 @@ function App() {
         <Route path="/verify/mobile" element={<MobileVerificationPage />} />
         <Route path="/docs/markdown" element={<MarkdownDocsPage />} />
         <Route path="/docs/review" element={<ReviewDashboardDocs />} />
+        <Route path="/docs/guides" element={<DocsGuides />} />
+        <Route path="/docs/sdk" element={<DocsSdk />} />
+        <Route path="/docs/features" element={<DocsFeatures />} />
+        <Route path="/docs/reference" element={<DocsReference />} />
         <Route path="/docs" element={<DocsPage />} />
         {/* Community-only setup wizard — redirect to portal in cloud */}
         <Route path="/setup" element={isCommunity ? <SetupPage /> : <Navigate to="/" replace />} />
