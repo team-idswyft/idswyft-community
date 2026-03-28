@@ -1,0 +1,22 @@
+# ─────────────────────────────────────────────────
+# CODEOWNERS — Require review from code owners
+# ─────────────────────────────────────────────────
+# When branch protection requires CODEOWNERS review,
+# PRs touching these paths need approval from the
+# listed owners before merging.
+#
+# Docs: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+# ─────────────────────────────────────────────────
+
+# Default: all changes require owner approval
+* @doobee46
+
+# Critical paths — explicitly listed for visibility
+backend/src/middleware/auth.ts    @doobee46
+backend/src/config/               @doobee46
+backend/Dockerfile                @doobee46
+engine/Dockerfile                 @doobee46
+frontend/Dockerfile               @doobee46
+docker-compose.yml                @doobee46
+install.sh                        @doobee46
+.github/                          @doobee46
