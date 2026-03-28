@@ -9,6 +9,7 @@ import MobileVerificationPage from './pages/MobileVerificationPage'
 import { AdminLogin } from './pages/AdminLogin'
 import { VerificationManagement } from './pages/VerificationManagement'
 import { DocsPage } from './pages/DocsPage'
+import { ReviewDashboardDocs } from './pages/ReviewDashboardDocs'
 import { MarkdownDocsPage } from './pages/MarkdownDocsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { LegalPage } from './pages/LegalPage'
@@ -41,6 +42,7 @@ function App() {
         <Route path="/live-capture" element={<LiveCapturePage />} />
         <Route path="/verify/mobile" element={<MobileVerificationPage />} />
         <Route path="/docs/markdown" element={<MarkdownDocsPage />} />
+        <Route path="/docs/review" element={<ReviewDashboardDocs />} />
         <Route path="/docs" element={<DocsPage />} />
         {/* Community-only setup wizard — redirect to portal in cloud */}
         <Route path="/setup" element={isCommunity ? <SetupPage /> : <Navigate to="/" replace />} />

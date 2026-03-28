@@ -350,6 +350,18 @@ export const DocsPage: React.FC = () => {
         </div>
         <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
           <a
+            href="/docs/review"
+            style={{
+              fontFamily: C.mono, fontSize: '0.72rem', fontWeight: 500,
+              color: C.muted, textDecoration: 'none',
+              padding: '4px 10px', borderRadius: 6,
+              border: `1px solid ${C.border}`,
+              transition: 'color 0.15s, border-color 0.15s',
+            }}
+            onMouseEnter={e => { (e.target as HTMLElement).style.color = C.cyan; (e.target as HTMLElement).style.borderColor = C.cyan; }}
+            onMouseLeave={e => { (e.target as HTMLElement).style.color = C.muted; (e.target as HTMLElement).style.borderColor = C.border; }}
+          >Review Dashboard</a>
+          <a
             href="/docs/markdown"
             style={{
               fontFamily: C.mono, fontSize: '0.72rem', fontWeight: 500,
@@ -2478,6 +2490,7 @@ await sdk.cancelMonitoringSchedule(schedule.schedule.id);`} />
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
             {[
               { icon: '🔑', title: 'Developer Portal', desc: 'Get API keys, view usage stats and analytics', href: '/developer', cta: 'Open Portal →' },
+              { icon: '🔍', title: 'Review Dashboard', desc: 'Review, approve, and manage verifications with your team', href: '/docs/review', cta: 'View Guide →' },
               { icon: '🎮', title: 'Live Demo', desc: 'Try the full verification flow with a sandbox key', href: '/demo', cta: 'Open Demo →' },
               { icon: '📦', title: 'JavaScript SDK', desc: 'TypeScript SDK with real-time events and embed component', href: 'https://www.npmjs.com/package/@idswyft/sdk', cta: 'npm install @idswyft/sdk' },
               { icon: '🔧', title: 'GitHub', desc: 'Source code, examples, and issue tracker', href: 'https://github.com/doobee46/idswyft', cta: 'View on GitHub →' },
