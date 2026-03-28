@@ -208,7 +208,7 @@ export const MarkdownDocsPage: React.FC = () => {
             Download .md
           </a>
 
-          <Pill color={C.green} bg={C.greenDim}>v1.2.0</Pill>
+          <Pill color={C.green} bg={C.greenDim}>v1.7.0</Pill>
         </div>
       </div>
 

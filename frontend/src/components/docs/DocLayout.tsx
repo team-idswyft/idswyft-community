@@ -88,7 +88,7 @@ export const DocLayout: React.FC<DocLayoutProps> = ({ slug, nav, children }) => 
             onMouseEnter={e => { e.currentTarget.style.color = C.cyan; e.currentTarget.style.borderColor = C.cyan; }}
             onMouseLeave={e => { e.currentTarget.style.color = C.muted; e.currentTarget.style.borderColor = C.border; }}
           >.md</Link>
-          <Pill color={C.green} bg={C.greenDim}>v1.2.0</Pill>
+          <Pill color={C.green} bg={C.greenDim}>v1.7.0</Pill>
           <Pill color={C.muted} bg="rgba(74,85,104,0.13)">March 2026</Pill>
         </div>
       </div>

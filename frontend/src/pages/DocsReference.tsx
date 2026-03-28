@@ -82,6 +82,51 @@ export const DocsReference: React.FC = () => {
 
       {[
         {
+          version: '1.7.0',
+          date: '2026-03-27',
+          added: [
+            'Reviewer invitation system — developers invite external reviewers with OTP-based access scoped to their verifications',
+            'Reviewer auth: POST /api/auth/reviewer/otp/send, POST /api/auth/reviewer/otp/verify',
+            'Reviewer management: POST /api/developer/reviewers/invite, GET /api/developer/reviewers, DELETE /api/developer/reviewers/:id',
+            'Reviewer management UI in Developer Portal settings (invite, list, revoke, copy login link)',
+          ],
+          fixed: [],
+          changed: [
+            'Admin verification endpoints scope queries by developer_id for reviewer tokens',
+            'Reviewers cannot use override decision (admin-only)',
+          ],
+        },
+        {
+          version: '1.6.0',
+          date: '2026-03-26',
+          added: [
+            'Batch verification processing — full pipeline (OCR, cross-validation, quality gates) without live capture',
+            'Admin status override with new_status field on PUT /api/admin/verification/:id/review',
+            'Webhook forwarding on admin review actions (approve, reject, override)',
+            'Verification Management page at /admin/verifications — stats, filterable table, detail view, review actions',
+          ],
+          fixed: [],
+          changed: [
+            'Batch items that fail quality gates correctly marked as failed with rejection reason',
+          ],
+        },
+        {
+          version: '1.5.0',
+          date: '2026-03-24',
+          added: [
+            'Community edition first-run setup wizard (auto-detects zero-developer state)',
+            'Mobile handoff link endpoint: PATCH /api/verify/handoff/:token/link',
+            'Engine Worker microservice — standalone container for ML verification (OCR, face detection, liveness, deepfake)',
+          ],
+          fixed: [
+            'Mobile handoff desktop notification — exponential backoff retry, 30-min session timeout',
+          ],
+          changed: [
+            'Core API image reduced from ~2GB to ~250MB — ML dependencies isolated in engine container (~1.5GB)',
+            'Docker Compose architecture: postgres + engine + api + frontend (4 containers)',
+          ],
+        },
+        {
           version: '1.2.0',
           date: '2026-03-20',
           added: [],
@@ -138,7 +183,7 @@ export const DocsReference: React.FC = () => {
           <div style={{ padding: '16px 24px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <Pill color={C.cyan} bg={C.cyanDim}>v{release.version}</Pill>
             <span style={{ fontFamily: C.mono, fontSize: '0.78rem', color: C.dim }}>{release.date}</span>
-            {release.version === '1.2.0' && <Pill color={C.green} bg={C.greenDim}>latest</Pill>}
+            {release.version === '1.7.0' && <Pill color={C.green} bg={C.greenDim}>latest</Pill>}
           </div>
           <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
             {release.added.length > 0 && (
@@ -196,7 +241,7 @@ export const DocsReference: React.FC = () => {
           { icon: '🔍', title: 'Review Dashboard', desc: 'Review, approve, and manage verifications with your team', href: '/docs/review', cta: 'View Guide →' },
           { icon: '🎮', title: 'Live Demo', desc: 'Try the full verification flow with a sandbox key', href: '/demo', cta: 'Open Demo →' },
           { icon: '📦', title: 'JavaScript SDK', desc: 'TypeScript SDK with real-time events and embed component', href: 'https://www.npmjs.com/package/@idswyft/sdk', cta: 'npm install @idswyft/sdk' },
-          { icon: '🔧', title: 'GitHub', desc: 'Source code, examples, and issue tracker', href: 'https://github.com/doobee46/idswyft', cta: 'View on GitHub →' },
+          { icon: '🔧', title: 'GitHub', desc: 'Source code, examples, and issue tracker', href: 'https://github.com/team-idswyft/idswyft', cta: 'View on GitHub →' },
           { icon: '✉️', title: 'Email Support', desc: 'Technical support and integration help', href: 'mailto:support@idswyft.app', cta: 'support@idswyft.app' },
         ].map(r => (
           <div key={r.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '20px', display: 'flex', flexDirection: 'column', gap: 8 }}>

@@ -5,7 +5,7 @@
 export const API_DOCS_MARKDOWN = `# Idswyft API Documentation
 
 > **Base URL:** \`https://api.idswyft.app\`
-> **Version:** v1.2.0 — March 2026
+> **Version:** v1.7.0 — March 2026
 
 ---
 
@@ -19,6 +19,16 @@ X-API-Key: sk_live_your_key
 
 - **Live keys** (\`sk_live_\`) — production traffic, real verifications
 - **Sandbox keys** (\`sk_test_\`) — testing, same pipeline, separate quota
+
+### Developer Authentication
+
+Developers authenticate via passwordless email OTP:
+
+1. \`POST /api/auth/developer/otp/send\` — send OTP to registered email
+2. \`POST /api/auth/developer/otp/verify\` — verify OTP, receive JWT (7-day expiry)
+3. Include JWT as \`Authorization: Bearer <token>\` for developer portal endpoints
+
+GitHub OAuth is also supported as an alternative login method.
 
 ---
 
@@ -69,8 +79,9 @@ Content-Type: multipart/form-data
 |-------|------|----------|-------------|
 | document_type | string | Yes | 'passport' \\| 'drivers_license' \\| 'national_id' \\| 'other' |
 | document | File | Yes | JPEG, PNG, WebP, or PDF. Max 10 MB |
+| country_code | string | No | ISO 3166-1 alpha-2 country code (e.g. 'US', 'GB'). Improves OCR accuracy for international documents |
 
-**Response (201):** Includes \`ocr_data\` with extracted fields and \`confidence_scores\`.
+**Response (201):** Includes \`ocr_data\` with extracted fields (name, DOB, document number, expiry, address) and \`confidence_scores\` per field.
 
 ### Step 3: Upload Back Document
 
@@ -86,7 +97,7 @@ Content-Type: multipart/form-data
 
 **Response (201):** Includes \`barcode_data\` and \`cross_validation_results\` with verdict (PASS/REVIEW), score, and failures.
 
-Cross-validation checks: PDF417/QR barcode decoding, ID number consistency, expiry date matching, photo consistency.
+Cross-validation checks: PDF417/QR barcode decoding, MRZ parsing (TD1/TD2/TD3 for international IDs), ID number consistency, expiry date matching, name matching with Levenshtein distance and token-set similarity.
 
 ### Step 4: Submit Live Capture
 
@@ -102,7 +113,7 @@ One endpoint, two gates, two liveness modes:
 | selfie | File | Yes | JPEG or PNG image captured live from the user's camera via getUserMedia(). Max 10 MB. Static file uploads will fail liveness. |
 | liveness_metadata | JSON string | No | Challenge data for head_turn liveness. Omit for passive mode |
 
-> **Important:** The selfie must be a live camera capture, not a file upload. The liveness engine runs anti-spoofing checks on every image -- even in passive mode. A static photo uploaded from disk will fail with ${'`'}LIVENESS_FAILED${'`'} because it lacks camera EXIF metadata and has re-compression artifacts. Always use ${'`'}getUserMedia()${'`'} to capture directly from the device camera.
+> **Important:** The selfie must be a live camera capture, not a file upload. The liveness engine runs anti-spoofing checks on every image — even in passive mode. A static photo uploaded from disk will fail with ${'`'}LIVENESS_FAILED${'`'} because it lacks camera EXIF metadata and has re-compression artifacts. Always use ${'`'}getUserMedia()${'`'} to capture directly from the device camera.
 
 #### Liveness Modes
 
@@ -130,7 +141,7 @@ One endpoint, two gates, two liveness modes:
 }
 \`\`\`
 
-Zero ML dependencies on the client \u2014 just \`getUserMedia()\` + \`canvas.toDataURL()\`. The server handles all face detection and yaw estimation.
+Zero ML dependencies on the client — just \`getUserMedia()\` + \`canvas.toDataURL()\`. The server handles all face detection and yaw estimation.
 
 > **Note:** Invalid liveness_metadata returns HTTP 400 with a \`VALIDATION_ERROR\` code. It does not silently fall back to passive mode. Always check your metadata format matches the schema above.
 
@@ -255,6 +266,31 @@ Build your own UI using the REST API directly. See the Verification Flow section
 
 ---
 
+## Mobile Handoff
+
+Let users start on desktop and continue on mobile. Useful when the desktop lacks a camera.
+
+### Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | \`/api/verify/handoff/create\` | Create handoff session (body: \`api_key\`, \`user_id\`) |
+| GET | \`/api/verify/handoff/:token/status\` | Poll session status from desktop |
+| PATCH | \`/api/verify/handoff/:token/link\` | Link a verification_id to the handoff session (mobile calls this) |
+
+### Flow
+
+1. Desktop calls \`POST /api/verify/handoff/create\` with \`api_key\` and \`user_id\` in request body — returns \`token\` (30-min expiry) + \`expires_at\`
+2. Build a verification URL with the token and display as a QR code
+3. User scans QR on mobile — hosted page handles verification
+4. Mobile links the verification to the handoff session via \`PATCH /api/verify/handoff/:token/link\`
+5. Desktop polls \`GET /api/verify/handoff/:token/status\` until \`status\` is \`completed\`
+6. Status response includes \`verification_id\` for fetching full results
+
+> **Note:** Handoff uses \`api_key\` in the request body, not the \`X-API-Key\` header. Expired sessions return HTTP 410.
+
+---
+
 ## Guides
 
 ### End-to-End Tutorial
@@ -277,17 +313,6 @@ async function pollStatus(vid, apiKey, baseUrl, { condition, maxAttempts = 60 } 
   throw new Error('Polling timed out');
 }
 \`\`\`
-
-### Mobile Handoff
-
-Let users start on desktop and continue on mobile:
-
-1. \`POST /api/verify/handoff/create\` with \`api_key\` and \`user_id\` in request body — returns \`token\` (10-min expiry) + \`expires_at\`
-2. Build a verification URL with the token and display as a QR code
-3. User opens on mobile — hosted page handles verification
-4. Poll \`GET /api/verify/handoff/:token/status\` until \`status\` is \`completed\`
-
-> **Note:** Handoff uses \`api_key\` in the request body, not the \`X-API-Key\` header. Expired sessions return HTTP 410.
 
 ### Building Custom UI
 
@@ -342,14 +367,17 @@ const sdk = new IdswyftSDK({
 | watch() | EventEmitter | Real-time event stream |
 | createBatch() | BatchJobResponse | Create batch job |
 | uploadAddressDocument() | AddressResult | Upload proof-of-address |
+| createMonitoringSchedule() | ScheduleResponse | Create re-verification schedule |
 
 ### Real-Time Events with watch()
 
 \`\`\`javascript
 const watcher = sdk.watch(verificationId);
 watcher.on('status_changed', (e) => console.log(e.status));
+watcher.on('step_completed', (e) => console.log(e.step, e.data));
 watcher.on('verification_complete', (e) => console.log(e.data.final_result));
 watcher.on('verification_failed', (e) => console.log(e.data.rejection_reason));
+watcher.on('error', (e) => console.error(e.message));
 watcher.destroy(); // cleanup
 \`\`\`
 
@@ -366,63 +394,88 @@ const embed = new IdswyftEmbed({ mode: 'modal', theme: 'dark' });
 embed.open(sessionToken, {
   onComplete: (result) => console.log(result.finalResult),
   onError: (error) => console.error(error.message),
+  onStepChange: (step) => console.log('Step:', step),
+  onClose: () => console.log('Embed closed'),
 });
 \`\`\`
 
-Modes: \`modal\` (full-screen overlay) or \`inline\` (fits your container).
+### Modes
+
+| Mode | Description |
+|------|-------------|
+| \`modal\` | Full-screen overlay with backdrop. Closes on backdrop click (configurable) |
+| \`inline\` | Fits your container. Set \`container\` option to a DOM element |
+
+### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| mode | 'modal' \\| 'inline' | 'modal' | Display mode |
+| container | HTMLElement | — | Required for inline mode |
+| theme | 'light' \\| 'dark' | 'dark' | UI theme |
+| width | string | '100%' | Container width (inline mode) |
+| height | string | '700px' | Container height (inline mode) |
+| closeOnBackdropClick | boolean | true | Allow closing modal by clicking backdrop |
+| verificationUrl | string | 'https://idswyft.app' | Override verification page URL |
 
 ---
 
 ## Analysis Engine
 
+All verification decisions are **deterministic** — no LLMs or probabilistic models are used for pass/fail decisions. LLMs are only used for OCR text extraction behind a provider interface.
+
 | Category | Capabilities |
 |----------|-------------|
-| OCR Extraction | PaddleOCR/Tesseract, name/DOB/ID number, AAMVA parsing, per-field confidence |
-| Document Quality | Blur detection, brightness/contrast, resolution check (≥800x600), auto-reject |
-| Cross-Validation | PDF417/QR decode, Levenshtein matching, front-back consistency, weighted scoring |
-| Liveness & Face Match | EXIF metadata, JPEG artifacts, color histogram, byte entropy, pixel variance, edge density, face detection (SSDMobilenetv1), 128-d embeddings, cosine similarity |
+| OCR Extraction | PaddleOCR/Tesseract, name/DOB/ID number, AAMVA field parsing (US DLs), MRZ parsing (TD1/TD2/TD3 for international IDs), state format validation, per-field confidence scores |
+| Document Quality | Sobel edge blur detection, brightness/contrast stats, resolution check (≥800x600), file size validation, overall quality score, auto-reject below threshold |
+| Cross-Validation | PDF417/QR barcode decode, MRZ parsing, Levenshtein distance matching, token-set name similarity, front OCR vs back barcode/MRZ check, date & ID number consistency, weighted field scoring |
+| Liveness & Face Match | EXIF metadata analysis, JPEG artifact detection, color histogram analysis, byte entropy scoring, pixel variance & edge density, face detection (SSDMobilenetv1), 128-d face embeddings, cosine similarity scoring, deepfake detection |
 
 ---
 
 ## Batch Verification
 
-Process hundreds of verifications at once.
+Process hundreds of verifications at once. Batch mode runs the full pipeline (OCR, barcode/MRZ extraction, quality gates, cross-validation) but skips live capture — verifications end at \`manual_review\` status for human decision.
 
 \`\`\`
-POST /api/v2/batch/upload          — Create batch job
-GET  /api/v2/batch/:id/status      — Get batch progress
-GET  /api/v2/batch/:id/results     — Get batch results
+POST /api/v2/batch/upload          — Create batch job (multipart CSV + document URLs)
+GET  /api/v2/batch/:id/status      — Get batch progress (items completed/failed/pending)
+GET  /api/v2/batch/:id/results     — Get batch results (per-item status and extracted data)
 POST /api/v2/batch/:id/cancel      — Cancel batch job
 \`\`\`
+
+Items that fail quality gates are marked as \`failed\` with a rejection reason. Passed items are set to \`manual_review\` for human decision via the Review Dashboard.
 
 ---
 
 ## Address Verification
 
-Verify proof-of-address documents (utility bills, bank statements). Requires completed identity verification.
+Verify proof-of-address documents (utility bills, bank statements). Requires a completed identity verification session.
 
 \`\`\`
 POST /api/v2/verify/:id/address-document    — Upload address document
-GET  /api/v2/verify/:id/address-status      — Get address status
+GET  /api/v2/verify/:id/address-status      — Get address verification status
 \`\`\`
 
 ---
 
 ## AML / Sanctions Screening
 
-Opt-in addon — enable per session with \`addons.aml_screening: true\`.
+Opt-in addon — enable per session with \`addons.aml_screening: true\` at initialization.
 
 | Risk Level | Score | Outcome |
 |-----------|-------|---------|
-| clear | < 0.5 | Verification proceeds |
-| potential_match | 0.5–0.84 | Routed to manual_review |
-| confirmed_match | ≥ 0.85 | Hard reject (failed) |
+| clear | < 0.5 | Verification proceeds normally |
+| potential_match | 0.5–0.84 | Routed to \`manual_review\` for human decision |
+| confirmed_match | ≥ 0.85 | Hard reject (\`failed\`) |
 
 Lists checked: OFAC SDN, EU Sanctions, UN Sanctions.
 
 ---
 
 ## Monitoring & Re-verification
+
+Schedule automatic re-verification for expiring documents.
 
 \`\`\`
 POST /api/v2/monitoring/schedules              — Create re-verification schedule
@@ -433,27 +486,127 @@ Webhook events: \`document.expiring\`, \`document.expired\`, \`reverification.du
 
 ---
 
+## Review Dashboard
+
+A web-based admin interface at \`/admin/verifications\` for reviewing, approving, and rejecting identity verifications. No code required — integrate the API, then use the dashboard for manual review decisions.
+
+### Access
+
+Two ways to access the dashboard:
+
+1. **Developer login** — log in at \`/developer\`, then navigate to \`/admin/verifications\`. Your developer session grants automatic access.
+2. **Reviewer login** — invited reviewers log in at \`/admin/login\` with passwordless OTP (email code). No passwords, no shared credentials.
+
+### Reviewer Management
+
+Developers can invite team members as reviewers from the Developer Portal:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | \`/api/developer/reviewers/invite\` | Invite a reviewer by email |
+| GET | \`/api/developer/reviewers\` | List all reviewers |
+| DELETE | \`/api/developer/reviewers/:id\` | Revoke a reviewer's access |
+
+Reviewer OTP authentication:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | \`/api/auth/reviewer/otp/send\` | Send OTP to reviewer email (rate limited: 5/15min per IP) |
+| POST | \`/api/auth/reviewer/otp/verify\` | Verify OTP, receive developer-scoped reviewer JWT (24h expiry) |
+
+Reviewers can only see verifications belonging to the developer who invited them. They cannot access API keys, billing, or other developers' data.
+
+### Dashboard Features
+
+- **Stats bar** — real-time counts: total, pending review, verified, failed
+- **Filterable table** — columns: ID, User ID, Status (badge), Document Type, Created At, Actions
+- **Status filter tabs** — All, Manual Review, Verified, Failed, Pending
+- **Expandable detail panel** — document images (front/back), OCR data, cross-validation results, face match score, quality scores, thumbnails
+- **Search** — search by verification ID or user ID
+
+### Review Actions
+
+| Action | Description | Webhook Event |
+|--------|-------------|---------------|
+| **Approve** | Sets status to \`verified\`. Decision is final. | \`verification.verified\` |
+| **Reject** | Sets status to \`failed\`. Optional reason included in webhook. | \`verification.failed\` |
+| **Override** | Sets any status (admin-only, not available to reviewers). Reason required. | \`verification.status_changed\` |
+
+All actions require a confirmation dialog. All actions are logged in the audit trail. Webhook notifications fire immediately after a decision.
+
+### Admin Verification Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | \`/api/admin/verifications?status=&page=&limit=\` | List verifications with pagination and status filter |
+| GET | \`/api/admin/verification/:id\` | Detail view with documents array, selfie URL, OCR data |
+| PUT | \`/api/admin/verification/:id/review\` | Submit review decision (body: \`decision\`, \`reason?\`, \`new_status?\`) |
+| GET | \`/api/admin/dashboard\` | Stats: total, pending, verified, failed, manual_review counts |
+
+---
+
+## Webhooks
+
+Register webhook URLs to receive real-time notifications when verification events occur.
+
+### Webhook Events
+
+| Event | Trigger |
+|-------|---------|
+| \`verification.verified\` | Verification approved (automated or manual) |
+| \`verification.failed\` | Verification failed or rejected |
+| \`verification.status_changed\` | Status override from Review Dashboard |
+| \`document.expiring\` | Document approaching expiry date |
+| \`document.expired\` | Document has expired |
+| \`reverification.due\` | Scheduled re-verification is due |
+
+### Webhook Security
+
+All webhooks are signed with HMAC-SHA256 using your webhook secret. Verify the \`X-Webhook-Signature\` header to confirm authenticity.
+
+### Webhook Management
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | \`/api/developer/webhooks\` | Register a webhook URL |
+| GET | \`/api/developer/webhooks\` | List registered webhooks |
+| DELETE | \`/api/developer/webhooks/:id\` | Delete a webhook |
+| GET | \`/api/developer/webhooks/:id/deliveries\` | View delivery logs |
+| POST | \`/api/developer/webhooks/:id/deliveries/:did/resend\` | Resend a failed delivery |
+
+Webhooks retry up to 3 times on failure with exponential backoff.
+
+---
+
 ## Verification Statuses
 
 | Status | Description | Terminal |
 |--------|-------------|----------|
-| AWAITING_FRONT | Waiting for front document | No |
-| AWAITING_BACK | Front processed, waiting for back | No |
-| CROSS_VALIDATING | Running cross-validation | No |
-| AWAITING_LIVE | Cross-val passed, waiting for selfie | No |
-| FACE_MATCHING | Running liveness + face match | No |
-| COMPLETE | All gates passed | Yes |
-| HARD_REJECTED | Rejected by a gate | Yes |
+| AWAITING_FRONT | Waiting for front document upload | No |
+| AWAITING_BACK | Front processed, waiting for back document | No |
+| CROSS_VALIDATING | Running cross-validation checks | No |
+| AWAITING_LIVE | Cross-validation passed, waiting for live capture | No |
+| FACE_MATCHING | Running liveness detection + face match | No |
+| COMPLETE | All gates passed — verification successful | Yes |
+| HARD_REJECTED | Rejected by a gate — verification failed | Yes |
+
+**Final result values** (returned in \`final_result\` field):
+
+| Value | Description |
+|-------|-------------|
+| \`verified\` | Identity confirmed by automated pipeline or manual approval |
+| \`failed\` | Verification failed — document unreadable, face mismatch, or manually rejected |
+| \`manual_review\` | Automated checks flagged something — requires human review via the Review Dashboard |
 
 ---
 
 ## Rate Limits
 
-| Scope | Limit |
-|-------|-------|
-| Per developer key | 1,000 req/hour |
-| Per user | 5 verifications/hour |
-| Enterprise | Custom |
+| Scope | Cloud Edition | Self-Hosted |
+|-------|--------------|-------------|
+| Per developer key | 1,000 req/hour | None by default (configurable) |
+| Per user | 5 verifications/hour | None by default (configurable) |
+| Monthly verification quota | 50/month (Starter) | Unlimited |
 
 ## HTTP Status Codes
 
@@ -461,15 +614,79 @@ Webhook events: \`document.expiring\`, \`document.expired\`, \`reverification.du
 |------|---------|
 | 200/201 | Success |
 | 400 | Bad request — validation error |
-| 401 | Unauthorized — invalid API key |
+| 401 | Unauthorized — invalid or missing API key |
 | 404 | Verification not found |
-| 409 | Conflict — session hard-rejected |
+| 409 | Conflict — session hard-rejected, cannot proceed |
+| 410 | Gone — handoff session expired |
 | 429 | Rate limit exceeded |
 | 500 | Internal server error |
 
 ---
 
+## Self-Hosted / Community Edition
+
+Idswyft is open source and can be self-hosted using Docker Compose.
+
+### Quick Start
+
+\`\`\`bash
+git clone https://github.com/team-idswyft/idswyft.git
+cd idswyft
+./install.sh     # Interactive setup — generates .env and starts containers
+\`\`\`
+
+### Architecture
+
+Four Docker containers:
+
+| Container | Purpose | Port |
+|-----------|---------|------|
+| postgres | PostgreSQL database | 5432 |
+| engine | ML verification engine (OCR, face detection, liveness, deepfake) | 3002 |
+| api | Express API server — orchestrates verifications | 3001 |
+| frontend | Nginx serving the React app | 80 |
+
+The engine worker handles all ML-heavy processing (TensorFlow, ONNX, PaddleOCR) in isolation. The API server communicates with the engine via HTTP (\`ENGINE_URL\` env var).
+
+### First-Run Setup
+
+On first boot, navigate to the frontend. If no developer account exists, a setup wizard guides you through creating the first account and API key — no OTP required for the initial setup.
+
+---
+
 ## Changelog
+
+### v1.7.0 (2026-03-27)
+
+**Added:**
+- Reviewer invitation system — developers can invite external reviewers with OTP-based access scoped to their verifications
+- Reviewer auth endpoints: \`POST /api/auth/reviewer/otp/send\`, \`POST /api/auth/reviewer/otp/verify\`
+- Reviewer management: \`POST /api/developer/reviewers/invite\`, \`GET /api/developer/reviewers\`, \`DELETE /api/developer/reviewers/:id\`
+- Reviewer management UI in Developer Portal settings
+
+**Changed:**
+- Admin verification endpoints scope queries by developer_id for reviewer tokens
+- Reviewers cannot use the override decision (admin-only)
+
+### v1.6.0 (2026-03-26)
+
+**Added:**
+- Batch verification processing — full pipeline (OCR, cross-validation, quality gates) without live capture
+- Admin status override — \`PUT /api/admin/verification/:id/review\` accepts \`decision: 'override'\` with \`new_status\`
+- Webhook forwarding on admin actions (approve, reject, override)
+- Verification Management page at \`/admin/verifications\` — stats bar, filterable table, detail view, review actions
+
+### v1.5.0 (2026-03-24)
+
+**Changed:**
+- Extracted ML verification engine into separate microservice (\`engine/\` directory)
+- Core API image reduced from ~2GB to ~250MB — ML dependencies isolated in engine container (~1.5GB)
+- Docker Compose architecture: postgres + engine + api + frontend (4 containers)
+
+**Added:**
+- Community edition first-run setup wizard (auto-detects zero-developer state)
+- Mobile handoff link endpoint: \`PATCH /api/verify/handoff/:token/link\`
+- Extended handoff session timeout to 30 minutes
 
 ### v1.2.0 (2026-03-20)
 
@@ -483,10 +700,10 @@ Webhook events: \`document.expiring\`, \`document.expired\`, \`reverification.du
 
 **Added:**
 - Visual authenticity checks (FFT, color distribution, deepfake detection)
-- Webhook resend endpoint
+- Webhook resend endpoint and delivery logs
 - Per-API-key scoping for webhooks
 - AML/sanctions screening addon
-- Email OTP + GitHub OAuth authentication
+- Email OTP + GitHub OAuth authentication (replaced password login)
 - US driver's license format validator
 
 **Fixed:**
@@ -505,12 +722,14 @@ Webhook events: \`document.expiring\`, \`document.expired\`, \`reverification.du
 ## Support
 
 - **Developer Portal:** https://idswyft.app/developer
+- **Review Dashboard:** https://idswyft.app/admin/verifications
 - **Live Demo:** https://idswyft.app/demo
+- **Documentation:** https://idswyft.app/docs
 - **SDK:** npm install @idswyft/sdk
-- **GitHub:** https://github.com/doobee46/idswyft
+- **GitHub:** https://github.com/team-idswyft/idswyft
 - **Email:** support@idswyft.app
 
 ---
 
-*Generated from Idswyft API v1.2.0 — https://idswyft.app/doc*
+*Generated from Idswyft API v1.7.0 — https://idswyft.app/docs*
 `;
