@@ -1,0 +1,661 @@
+# Idswyft API Documentation
+
+> Open-source identity verification platform. Verify government-issued IDs with OCR, liveness detection, and face matching.
+> Base URL: https://api.idswyft.app
+> Version: v1.7.0 — March 2026
+> Source of truth: backend/src/api-docs/apiDocsMarkdown.ts
+
+## Links
+
+- [Developer Portal](https://idswyft.app/developer): Register, get API keys, manage webhooks
+- [Review Dashboard](https://idswyft.app/admin/verifications): Review, approve, reject verifications
+- [Live Demo](https://idswyft.app/demo): Try the verification flow in sandbox mode
+- [Documentation](https://idswyft.app/docs): Full interactive documentation
+- [SDK](https://www.npmjs.com/package/@idswyft/sdk): JavaScript/TypeScript SDK
+- [GitHub](https://github.com/team-idswyft/idswyft): Source code (MIT license)
+- [Full API Docs (Markdown)](https://api.idswyft.app/api/docs/markdown): Machine-readable API docs
+
+---
+
+## Authentication
+
+Every API request must include your API key in the `X-API-Key` header.
+
+```
+X-API-Key: sk_live_your_key
+```
+
+- **Live keys** (`sk_live_`) — production traffic, real verifications
+- **Sandbox keys** (`sk_test_`) — testing, same pipeline, separate quota
+
+### Developer Authentication
+
+Developers authenticate via passwordless email OTP:
+
+1. `POST /api/auth/developer/otp/send` — send OTP to registered email
+2. `POST /api/auth/developer/otp/verify` — verify OTP, receive JWT (7-day expiry)
+3. Include JWT as `Authorization: Bearer <token>` for developer portal endpoints
+
+GitHub OAuth is also supported as an alternative login method.
+
+---
+
+## Verification Flow (5 Steps)
+
+The verification pipeline is a 5-step sequence. Each step unlocks the next.
+
+```
+1. Initialize → 2. Front Doc → 3. Back Doc (+ cross-validation) → 4. Live Capture (+ face match) → 5. Results
+```
+
+**Hard rejection:** If any gate fails, the session status becomes `HARD_REJECTED` and subsequent steps return HTTP 409.
+
+### Step 1: Start Session
+
+```
+POST /api/v2/verify/initialize
+Content-Type: application/json
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| user_id | UUID string | Yes | Your unique identifier for the user |
+| sandbox | boolean | No | Use sandbox mode (default: false) |
+| addons | object | No | Optional add-on features |
+| addons.aml_screening | boolean | No | Enable AML/sanctions screening |
+
+**Response (201):**
+
+```json
+{
+  "success": true,
+  "verification_id": "550e8400-e29b-41d4-a716-446655440001",
+  "status": "AWAITING_FRONT",
+  "current_step": 1,
+  "total_steps": 5
+}
+```
+
+### Step 2: Upload Front Document
+
+```
+POST /api/v2/verify/:id/front-document
+Content-Type: multipart/form-data
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| document_type | string | Yes | 'passport' | 'drivers_license' | 'national_id' | 'other' |
+| document | File | Yes | JPEG, PNG, WebP, or PDF. Max 10 MB |
+| country_code | string | No | ISO 3166-1 alpha-2 country code (e.g. 'US', 'GB'). Improves OCR accuracy for international documents |
+
+**Response (201):** Includes `ocr_data` with extracted fields (name, DOB, document number, expiry, address) and `confidence_scores` per field.
+
+### Step 3: Upload Back Document
+
+```
+POST /api/v2/verify/:id/back-document
+Content-Type: multipart/form-data
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| document_type | string | Yes | Must match Step 2 document_type |
+| document | File | Yes | JPEG, PNG, or WebP. Max 10 MB |
+
+**Response (201):** Includes `barcode_data` and `cross_validation_results` with verdict (PASS/REVIEW), score, and failures.
+
+Cross-validation checks: PDF417/QR barcode decoding, MRZ parsing (TD1/TD2/TD3 for international IDs), ID number consistency, expiry date matching, name matching with Levenshtein distance and token-set similarity.
+
+### Step 4: Submit Live Capture
+
+```
+POST /api/v2/verify/:id/live-capture
+Content-Type: multipart/form-data
+```
+
+One endpoint, two gates, two liveness modes:
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| selfie | File | Yes | JPEG or PNG image captured live from the user's camera via getUserMedia(). Max 10 MB. Static file uploads will fail liveness. |
+| liveness_metadata | JSON string | No | Challenge data for head_turn liveness. Omit for passive mode |
+
+> **Important:** The selfie must be a live camera capture, not a file upload. The liveness engine runs anti-spoofing checks on every image — even in passive mode. A static photo uploaded from disk will fail with `LIVENESS_FAILED` because it lacks camera EXIF metadata and has re-compression artifacts. Always use `getUserMedia()` to capture directly from the device camera.
+
+#### Liveness Modes
+
+| Mode | challenge_type | Security | Best For |
+|------|---------------|----------|----------|
+| Passive | _(omit metadata)_ | Basic | Low-risk onboarding, sandbox |
+| Head Turn | `head_turn` | Strong | All production identity verification |
+
+**Head-turn metadata shape:**
+
+```json
+{
+  "challenge_type": "head_turn",
+  "challenge_direction": "left",
+  "frames": [
+    { "frame_base64": "/9j/4AAQ...", "timestamp": 1000,  "phase": "turn1_start" },
+    { "frame_base64": "/9j/4BBR...", "timestamp": 4000,  "phase": "turn1_peak" },
+    { "frame_base64": "/9j/4CCG...", "timestamp": 7000,  "phase": "turn1_return" },
+    { "frame_base64": "/9j/4DDH...", "timestamp": 8200,  "phase": "turn_start" },
+    { "frame_base64": "/9j/4EEI...", "timestamp": 11200, "phase": "turn_peak" },
+    { "frame_base64": "/9j/4FFJ...", "timestamp": 14200, "phase": "turn_return" }
+  ],
+  "start_timestamp": 0,
+  "end_timestamp": 15000
+}
+```
+
+Zero ML dependencies on the client — just `getUserMedia()` + `canvas.toDataURL()`. The server handles all face detection and yaw estimation.
+
+> **Note:** Invalid liveness_metadata returns HTTP 400 with a `VALIDATION_ERROR` code. It does not silently fall back to passive mode. Always check your metadata format matches the schema above.
+
+**Response (201):**
+
+```json
+{
+  "success": true,
+  "verification_id": "...",
+  "status": "COMPLETE",
+  "face_match_results": {
+    "passed": true,
+    "similarity_score": 0.94,
+    "threshold_used": 0.6
+  },
+  "liveness_results": {
+    "liveness_passed": true,
+    "liveness_score": 0.96,
+    "liveness_mode": "head_turn"
+  },
+  "final_result": "verified"
+}
+```
+
+### Step 5: Get Results
+
+```
+GET /api/v2/verify/:id/status
+```
+
+Returns the full verification record: OCR data, cross-validation, liveness, face match, AML screening, and final decision.
+
+**Polling conditions:**
+
+| After | Poll until | Then |
+|-------|-----------|------|
+| Step 2 (front doc) | `ocr_data` is not null | Proceed to Step 3 |
+| Step 3 (back doc) | `cross_validation_results` is not null | If not failed, proceed to Step 4 |
+| Step 4 (live capture) | `final_result` is not null | Verification complete |
+
+---
+
+## Integration Options
+
+Three ways to add identity verification — from zero-code to full control. All use the same hosted page:
+
+```
+https://idswyft.app/user-verification
+```
+
+### Option 1: Redirect (Easiest)
+
+Send users to the hosted page with a link or redirect. After verification, they return to your `redirect_url`.
+
+```javascript
+window.location.href = 'https://idswyft.app/user-verification'
+  + '?api_key=sk_live_xxx'
+  + '&user_id=user-123'
+  + '&redirect_url=' + encodeURIComponent('https://yourapp.com/done')
+  + '&theme=dark';
+```
+
+**Redirect callback parameters:** When verification completes, the user is redirected to your `redirect_url` with these query parameters appended:
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| verification_id | UUID string | The verification session ID. Use this to fetch full results via `GET /api/v2/verify/:id/status` |
+| status | string | Result status: `verified`, `failed`, or `manual_review`. If `manual_review`, poll the status endpoint or listen for a webhook to get the final decision |
+| user_id | string | The user_id you passed when starting verification |
+
+### Option 2: Iframe Embed (No SDK needed)
+
+Embed the hosted page inside your app. Users never leave your site.
+
+```html
+<iframe
+  src="https://idswyft.app/user-verification?api_key=sk_live_xxx&user_id=user-123&theme=dark"
+  width="100%" height="700" frameborder="0"
+  allow="camera; microphone"
+  style="border: none; border-radius: 8px;"
+></iframe>
+```
+
+> **Important:** The iframe requires `allow="camera; microphone"` for liveness detection to work.
+
+### Option 3: SDK Embed (Recommended for SPAs)
+
+Use the `@idswyft/sdk` IdswyftEmbed component for modal or inline mode with event callbacks.
+
+### URL Parameters
+
+| Parameter | Type | Required | Description |
+|-----------|------|----------|-------------|
+| api_key | string | Yes | Your API key |
+| user_id | UUID | Yes | User identifier |
+| redirect_url | URL | No | Where to redirect after completion. Required for redirect; optional for iframe/embed |
+| theme | 'light' | 'dark' | No | UI theme (default: dark) |
+| address_verif | 'true' | No | Enable address verification step |
+
+---
+
+## Mobile Handoff
+
+Let users start on desktop and continue on mobile. Useful when the desktop lacks a camera.
+
+### Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/verify/handoff/create` | Create handoff session (body: `api_key`, `user_id`) |
+| GET | `/api/verify/handoff/:token/status` | Poll session status from desktop |
+| PATCH | `/api/verify/handoff/:token/link` | Link a verification_id to the handoff session (mobile calls this) |
+
+### Flow
+
+1. Desktop calls `POST /api/verify/handoff/create` with `api_key` and `user_id` in request body — returns `token` (30-min expiry) + `expires_at`
+2. Build a verification URL with the token and display as a QR code
+3. User scans QR on mobile — hosted page handles verification
+4. Mobile links the verification to the handoff session via `PATCH /api/verify/handoff/:token/link`
+5. Desktop polls `GET /api/verify/handoff/:token/status` until `status` is `completed`
+6. Status response includes `verification_id` for fetching full results
+
+> **Note:** Handoff uses `api_key` in the request body, not the `X-API-Key` header. Expired sessions return HTTP 410.
+
+---
+
+## JavaScript SDK
+
+```bash
+npm install @idswyft/sdk
+```
+
+```javascript
+const { IdswyftSDK } = require('@idswyft/sdk');
+
+const sdk = new IdswyftSDK({
+  apiKey: 'sk_live_your_key',
+  baseURL: 'https://api.idswyft.app',
+  sandbox: false,
+});
+```
+
+### SDK Methods
+
+| Method | Returns | Description |
+|--------|---------|-------------|
+| startVerification() | InitializeResponse | Create new session |
+| uploadFrontDocument() | VerificationResult | Upload front of ID |
+| uploadBackDocument() | VerificationResult | Upload back of ID |
+| uploadSelfie() | VerificationResult | Submit live capture |
+| getVerificationStatus() | VerificationResult | Get session status |
+| watch() | EventEmitter | Real-time event stream |
+| createBatch() | BatchJobResponse | Create batch job |
+| uploadAddressDocument() | AddressResult | Upload proof-of-address |
+| createMonitoringSchedule() | ScheduleResponse | Create re-verification schedule |
+
+### Real-Time Events with watch()
+
+```javascript
+const watcher = sdk.watch(verificationId);
+watcher.on('status_changed', (e) => console.log(e.status));
+watcher.on('step_completed', (e) => console.log(e.step, e.data));
+watcher.on('verification_complete', (e) => console.log(e.data.final_result));
+watcher.on('verification_failed', (e) => console.log(e.data.rejection_reason));
+watcher.on('error', (e) => console.error(e.message));
+watcher.destroy(); // cleanup
+```
+
+---
+
+## Embed Component
+
+Drop a complete verification UI into your app:
+
+```javascript
+import { IdswyftEmbed } from '@idswyft/sdk';
+
+const embed = new IdswyftEmbed({ mode: 'modal', theme: 'dark' });
+embed.open(sessionToken, {
+  onComplete: (result) => console.log(result.finalResult),
+  onError: (error) => console.error(error.message),
+  onStepChange: (step) => console.log('Step:', step),
+  onClose: () => console.log('Embed closed'),
+});
+```
+
+### Modes
+
+| Mode | Description |
+|------|-------------|
+| `modal` | Full-screen overlay with backdrop. Closes on backdrop click (configurable) |
+| `inline` | Fits your container. Set `container` option to a DOM element |
+
+### Options
+
+| Option | Type | Default | Description |
+|--------|------|---------|-------------|
+| mode | 'modal' | 'inline' | 'modal' | Display mode |
+| container | HTMLElement | — | Required for inline mode |
+| theme | 'light' | 'dark' | 'dark' | UI theme |
+| width | string | '100%' | Container width (inline mode) |
+| height | string | '700px' | Container height (inline mode) |
+| closeOnBackdropClick | boolean | true | Allow closing modal by clicking backdrop |
+| verificationUrl | string | 'https://idswyft.app' | Override verification page URL |
+
+---
+
+## Analysis Engine
+
+All verification decisions are **deterministic** — no LLMs or probabilistic models are used for pass/fail decisions. LLMs are only used for OCR text extraction behind a provider interface.
+
+| Category | Capabilities |
+|----------|-------------|
+| OCR Extraction | PaddleOCR/Tesseract, name/DOB/ID number, AAMVA field parsing (US DLs), MRZ parsing (TD1/TD2/TD3 for international IDs), state format validation, per-field confidence scores |
+| Document Quality | Sobel edge blur detection, brightness/contrast stats, resolution check (≥800x600), file size validation, overall quality score, auto-reject below threshold |
+| Cross-Validation | PDF417/QR barcode decode, MRZ parsing, Levenshtein distance matching, token-set name similarity, front OCR vs back barcode/MRZ check, date & ID number consistency, weighted field scoring |
+| Liveness & Face Match | EXIF metadata analysis, JPEG artifact detection, color histogram analysis, byte entropy scoring, pixel variance & edge density, face detection (SSDMobilenetv1), 128-d face embeddings, cosine similarity scoring, deepfake detection |
+
+---
+
+## Batch Verification
+
+Process hundreds of verifications at once. Batch mode runs the full pipeline (OCR, barcode/MRZ extraction, quality gates, cross-validation) but skips live capture — verifications end at `manual_review` status for human decision.
+
+```
+POST /api/v2/batch/upload          — Create batch job (multipart CSV + document URLs)
+GET  /api/v2/batch/:id/status      — Get batch progress (items completed/failed/pending)
+GET  /api/v2/batch/:id/results     — Get batch results (per-item status and extracted data)
+POST /api/v2/batch/:id/cancel      — Cancel batch job
+```
+
+Items that fail quality gates are marked as `failed` with a rejection reason. Passed items are set to `manual_review` for human decision via the Review Dashboard.
+
+---
+
+## Address Verification
+
+Verify proof-of-address documents (utility bills, bank statements). Requires a completed identity verification session.
+
+```
+POST /api/v2/verify/:id/address-document    — Upload address document
+GET  /api/v2/verify/:id/address-status      — Get address verification status
+```
+
+---
+
+## AML / Sanctions Screening
+
+Opt-in addon — enable per session with `addons.aml_screening: true` at initialization.
+
+| Risk Level | Score | Outcome |
+|-----------|-------|---------|
+| clear | < 0.5 | Verification proceeds normally |
+| potential_match | 0.5–0.84 | Routed to `manual_review` for human decision |
+| confirmed_match | >= 0.85 | Hard reject (`failed`) |
+
+Lists checked: OFAC SDN, EU Sanctions, UN Sanctions.
+
+---
+
+## Monitoring & Re-verification
+
+Schedule automatic re-verification for expiring documents.
+
+```
+POST /api/v2/monitoring/schedules              — Create re-verification schedule
+GET  /api/v2/monitoring/expiring-documents      — List expiring documents
+```
+
+Webhook events: `document.expiring`, `document.expired`, `reverification.due`.
+
+---
+
+## Review Dashboard
+
+A web-based admin interface at `/admin/verifications` for reviewing, approving, and rejecting identity verifications. No code required — integrate the API, then use the dashboard for manual review decisions.
+
+### Access
+
+Two ways to access the dashboard:
+
+1. **Developer login** — log in at `/developer`, then navigate to `/admin/verifications`. Your developer session grants automatic access.
+2. **Reviewer login** — invited reviewers log in at `/admin/login` with passwordless OTP (email code). No passwords, no shared credentials.
+
+### Reviewer Management
+
+Developers can invite team members as reviewers from the Developer Portal:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/developer/reviewers/invite` | Invite a reviewer by email |
+| GET | `/api/developer/reviewers` | List all reviewers |
+| DELETE | `/api/developer/reviewers/:id` | Revoke a reviewer's access |
+
+Reviewer OTP authentication:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth/reviewer/otp/send` | Send OTP to reviewer email (rate limited: 5/15min per IP) |
+| POST | `/api/auth/reviewer/otp/verify` | Verify OTP, receive developer-scoped reviewer JWT (24h expiry) |
+
+Reviewers can only see verifications belonging to the developer who invited them. They cannot access API keys, billing, or other developers' data.
+
+### Dashboard Features
+
+- **Stats bar** — real-time counts: total, pending review, verified, failed
+- **Filterable table** — columns: ID, User ID, Status (badge), Document Type, Created At, Actions
+- **Status filter tabs** — All, Manual Review, Verified, Failed, Pending
+- **Expandable detail panel** — document images (front/back), OCR data, cross-validation results, face match score, quality scores, thumbnails
+- **Search** — search by verification ID or user ID
+
+### Review Actions
+
+| Action | Description | Webhook Event |
+|--------|-------------|---------------|
+| **Approve** | Sets status to `verified`. Decision is final. | `verification.verified` |
+| **Reject** | Sets status to `failed`. Optional reason included in webhook. | `verification.failed` |
+| **Override** | Sets any status (admin-only, not available to reviewers). Reason required. | `verification.status_changed` |
+
+All actions require a confirmation dialog. All actions are logged in the audit trail. Webhook notifications fire immediately after a decision.
+
+### Admin Verification Endpoints
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/admin/verifications?status=&page=&limit=` | List verifications with pagination and status filter |
+| GET | `/api/admin/verification/:id` | Detail view with documents array, selfie URL, OCR data |
+| PUT | `/api/admin/verification/:id/review` | Submit review decision (body: `decision`, `reason?`, `new_status?`) |
+| GET | `/api/admin/dashboard` | Stats: total, pending, verified, failed, manual_review counts |
+
+---
+
+## Webhooks
+
+Register webhook URLs to receive real-time notifications when verification events occur.
+
+### Webhook Events
+
+| Event | Trigger |
+|-------|---------|
+| `verification.verified` | Verification approved (automated or manual) |
+| `verification.failed` | Verification failed or rejected |
+| `verification.status_changed` | Status override from Review Dashboard |
+| `document.expiring` | Document approaching expiry date |
+| `document.expired` | Document has expired |
+| `reverification.due` | Scheduled re-verification is due |
+
+### Webhook Security
+
+All webhooks are signed with HMAC-SHA256 using your webhook secret. Verify the `X-Webhook-Signature` header to confirm authenticity.
+
+### Webhook Management
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/developer/webhooks` | Register a webhook URL |
+| GET | `/api/developer/webhooks` | List registered webhooks |
+| DELETE | `/api/developer/webhooks/:id` | Delete a webhook |
+| GET | `/api/developer/webhooks/:id/deliveries` | View delivery logs |
+| POST | `/api/developer/webhooks/:id/deliveries/:did/resend` | Resend a failed delivery |
+
+Webhooks retry up to 3 times on failure with exponential backoff.
+
+---
+
+## Verification Statuses
+
+| Status | Description | Terminal |
+|--------|-------------|----------|
+| AWAITING_FRONT | Waiting for front document upload | No |
+| AWAITING_BACK | Front processed, waiting for back document | No |
+| CROSS_VALIDATING | Running cross-validation checks | No |
+| AWAITING_LIVE | Cross-validation passed, waiting for live capture | No |
+| FACE_MATCHING | Running liveness detection + face match | No |
+| COMPLETE | All gates passed — verification successful | Yes |
+| HARD_REJECTED | Rejected by a gate — verification failed | Yes |
+
+**Final result values** (returned in `final_result` field):
+
+| Value | Description |
+|-------|-------------|
+| `verified` | Identity confirmed by automated pipeline or manual approval |
+| `failed` | Verification failed — document unreadable, face mismatch, or manually rejected |
+| `manual_review` | Automated checks flagged something — requires human review via the Review Dashboard |
+
+---
+
+## Rate Limits
+
+| Scope | Cloud Edition | Self-Hosted |
+|-------|--------------|-------------|
+| Per developer key | 1,000 req/hour | None by default (configurable) |
+| Per user | 5 verifications/hour | None by default (configurable) |
+| Monthly verification quota | 50/month (Starter) | Unlimited |
+
+## HTTP Status Codes
+
+| Code | Meaning |
+|------|---------|
+| 200/201 | Success |
+| 400 | Bad request — validation error |
+| 401 | Unauthorized — invalid or missing API key |
+| 404 | Verification not found |
+| 409 | Conflict — session hard-rejected, cannot proceed |
+| 410 | Gone — handoff session expired |
+| 429 | Rate limit exceeded |
+| 500 | Internal server error |
+
+---
+
+## Self-Hosted / Community Edition
+
+Idswyft is open source and can be self-hosted using Docker Compose.
+
+### Quick Start
+
+```bash
+git clone https://github.com/team-idswyft/idswyft.git
+cd idswyft
+./install.sh     # Interactive setup — generates .env and starts containers
+```
+
+### Architecture
+
+Four Docker containers:
+
+| Container | Purpose | Port |
+|-----------|---------|------|
+| postgres | PostgreSQL database | 5432 |
+| engine | ML verification engine (OCR, face detection, liveness, deepfake) | 3002 |
+| api | Express API server — orchestrates verifications | 3001 |
+| frontend | Nginx serving the React app | 80 |
+
+The engine worker handles all ML-heavy processing (TensorFlow, ONNX, PaddleOCR) in isolation. The API server communicates with the engine via HTTP (`ENGINE_URL` env var).
+
+### First-Run Setup
+
+On first boot, navigate to the frontend. If no developer account exists, a setup wizard guides you through creating the first account and API key — no OTP required for the initial setup.
+
+---
+
+## Changelog
+
+### v1.7.0 (2026-03-27)
+
+**Added:**
+- Reviewer invitation system — developers can invite external reviewers with OTP-based access scoped to their verifications
+- Reviewer auth endpoints: `POST /api/auth/reviewer/otp/send`, `POST /api/auth/reviewer/otp/verify`
+- Reviewer management: `POST /api/developer/reviewers/invite`, `GET /api/developer/reviewers`, `DELETE /api/developer/reviewers/:id`
+
+**Changed:**
+- Admin verification endpoints scope queries by developer_id for reviewer tokens
+- Reviewers cannot use the override decision (admin-only)
+
+### v1.6.0 (2026-03-26)
+
+**Added:**
+- Batch verification processing — full pipeline (OCR, cross-validation, quality gates) without live capture
+- Admin status override with new_status field
+- Webhook forwarding on admin review actions (approve, reject, override)
+- Verification Management page at /admin/verifications
+
+### v1.5.0 (2026-03-24)
+
+**Added:**
+- Community edition first-run setup wizard
+- Mobile handoff link endpoint: `PATCH /api/verify/handoff/:token/link`
+- Engine Worker microservice — standalone container for ML verification
+
+**Changed:**
+- Core API image reduced from ~2GB to ~250MB — ML dependencies isolated in engine container (~1.5GB)
+- Docker Compose architecture: postgres + engine + api + frontend (4 containers)
+
+### v1.2.0 (2026-03-20)
+
+**Changed:**
+- Liveness system: removed dead MediaPipe code path, renamed MultiFrame to HeadTurn
+- Malformed liveness_metadata now returns HTTP 400 (VALIDATION_ERROR) instead of silently falling back to passive mode
+- Removed legacy multi_frame_color challenge type alias — only head_turn is accepted
+
+### v1.1.0 (2026-03-19)
+
+**Added:**
+- Visual authenticity checks (FFT, color distribution, deepfake detection)
+- Webhook resend endpoint and delivery logs
+- AML/sanctions screening addon
+- Email OTP + GitHub OAuth authentication
+
+### v1.0.0 (2025-12-01)
+
+**Added:**
+- Initial release — document OCR, face matching, verification pipeline
+- RESTful API, API key management, webhook system, sandbox environment
+
+---
+
+## Support
+
+- Developer Portal: https://idswyft.app/developer
+- Review Dashboard: https://idswyft.app/admin/verifications
+- Live Demo: https://idswyft.app/demo
+- Documentation: https://idswyft.app/docs
+- SDK: npm install @idswyft/sdk
+- GitHub: https://github.com/team-idswyft/idswyft
+- Email: support@idswyft.app
+
+---
+
+Generated from Idswyft API v1.7.0 — https://idswyft.app/docs
