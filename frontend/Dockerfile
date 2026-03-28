@@ -1,8 +1,10 @@
 FROM node:20-slim AS build
 WORKDIR /app
 
+# NOTE: Using `npm install` (not `npm ci`) because the lockfile may drift
+# on Windows dev machines with platform-specific optional deps (esbuild, rollup).
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm install
 
 # Edition flag — defaults to community for self-hosted
 ARG VITE_EDITION=community
