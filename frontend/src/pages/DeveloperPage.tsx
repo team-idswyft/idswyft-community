@@ -233,11 +233,13 @@ function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) => void
     const returnedState = params.get('state')
     if (!code) return
 
+    // Clear URL immediately to prevent re-firing on effect re-run
+    window.history.replaceState({}, '', window.location.pathname)
+
     // Verify OAuth state to prevent CSRF
     const storedState = sessionStorage.getItem('github_oauth_state')
     sessionStorage.removeItem('github_oauth_state')
     if (!returnedState || returnedState !== storedState) {
-      window.history.replaceState({}, '', window.location.pathname)
       toast.error('OAuth state mismatch. Please try again.')
       return
     }
@@ -251,12 +253,10 @@ function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) => void
     })
       .then(r => r.json().then(data => ({ ok: r.ok, data })))
       .then(({ ok, data }) => {
-        window.history.replaceState({}, '', window.location.pathname)
         if (!ok) throw new Error(data.message || 'GitHub login failed')
         onAuth('session', data.api_key?.key)
       })
       .catch((err: unknown) => {
-        window.history.replaceState({}, '', window.location.pathname)
         toast.error(err instanceof Error ? err.message : 'GitHub login failed')
       })
       .finally(() => setLoading(false))
