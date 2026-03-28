@@ -4,7 +4,6 @@ import {
   ShieldCheckIcon,
   CodeBracketIcon,
   DocumentTextIcon,
-  BuildingOfficeIcon,
   CurrencyDollarIcon
 } from '@heroicons/react/24/outline'
 import { clsx } from 'clsx'
@@ -15,23 +14,15 @@ interface LayoutProps {
   children: ReactNode
 }
 
-const getEnterpriseUrl = () => {
-  if (window.location.hostname.endsWith('.idswyft.app') || window.location.hostname === 'idswyft.app') {
-    return 'https://enterprise.idswyft.app'
-  }
-  return 'http://localhost:3015'
-}
-
 const getGitHubUrl = () => 'https://github.com/team-idswyft/idswyft'
 
-// Cloud navigation — full marketing nav with Enterprise link
+// Cloud navigation
 const cloudNavigation = [
   { name: 'Home', href: '/', icon: ShieldCheckIcon },
   { name: 'Developer', href: '/developer', icon: CodeBracketIcon },
   { name: 'Demo', href: '/demo', icon: DocumentTextIcon },
   { name: 'Docs', href: '/docs', icon: DocumentTextIcon },
   { name: 'Pricing', href: '/pricing', icon: CurrencyDollarIcon },
-  { name: 'Enterprise', href: getEnterpriseUrl(), icon: BuildingOfficeIcon, external: true },
 ]
 
 export function Layout({ children }: LayoutProps) {
@@ -121,8 +112,8 @@ export function Layout({ children }: LayoutProps) {
             {/* Navigation links - Centered */}
             <div className="hidden lg:flex items-center space-x-8">
               {cloudNavigation.slice(0, -1).map((item) => {
-                const isActive = !item.external && (location.pathname === item.href ||
-                  (item.href !== '/' && location.pathname.startsWith(item.href)))
+                const isActive = location.pathname === item.href ||
+                  (item.href !== '/' && location.pathname.startsWith(item.href))
 
                 return (
                   <Link
@@ -147,22 +138,6 @@ export function Layout({ children }: LayoutProps) {
 
             {/* Right side */}
             <div className="flex items-center space-x-3">
-              {/* Enterprise Link */}
-              <a
-                href={getEnterpriseUrl()}
-                target="_blank"
-                rel="noopener noreferrer"
-                className={clsx(
-                  'hidden sm:inline-flex items-center px-4 py-2 rounded-full text-sm font-medium transition-all hover:scale-105 transform',
-                  isDarkRoute
-                    ? 'text-slate-400 hover:text-white hover:bg-white/10'
-                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100/50'
-                )}
-              >
-                <BuildingOfficeIcon className="h-4 w-4 mr-1.5" />
-                Enterprise
-              </a>
-
               <a
                 href={getGitHubUrl()}
                 target="_blank"
@@ -225,29 +200,8 @@ export function Layout({ children }: LayoutProps) {
             )}>
               {cloudNavigation.map((item) => {
                 const Icon = item.icon
-                const isActive = !item.external && (location.pathname === item.href ||
-                  (item.href !== '/' && location.pathname.startsWith(item.href)))
-
-                if (item.external) {
-                  return (
-                    <a
-                      key={item.name}
-                      href={item.href}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className={clsx(
-                        'flex items-center px-3 py-2.5 rounded-xl text-base font-medium space-x-3 transition-colors',
-                        isDarkRoute
-                          ? 'text-slate-400 hover:bg-white/10 hover:text-white'
-                          : 'text-gray-600 hover:bg-gray-50/80 hover:text-gray-900'
-                      )}
-                    >
-                      <Icon className="h-5 w-5 flex-shrink-0" />
-                      <span>{item.name}</span>
-                    </a>
-                  )
-                }
+                const isActive = location.pathname === item.href ||
+                  (item.href !== '/' && location.pathname.startsWith(item.href))
 
                 return (
                   <Link

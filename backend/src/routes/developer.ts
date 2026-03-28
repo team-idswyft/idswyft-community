@@ -451,9 +451,9 @@ router.get('/stats',
       pending_requests: pendingRequests,
       manual_review_requests: manualReviewRequests,
       success_rate: totalRequests > 0 ? (successfulRequests / totalRequests * 100).toFixed(2) + '%' : '0%',
-      monthly_limit: 1000,
+      monthly_limit: 50,
       monthly_usage: totalRequests,
-      remaining_quota: Math.max(0, 1000 - totalRequests),
+      remaining_quota: Math.max(0, 50 - totalRequests),
       quota_reset_date: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString()
     });
   })
@@ -1257,7 +1257,7 @@ router.get('/analytics',
       .gte('created_at', monthStart.toISOString());
 
     const used = count ?? 0;
-    const limit = 1000;
+    const limit = 50;
 
     res.json({
       daily_volume,
