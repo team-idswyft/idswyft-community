@@ -4,37 +4,33 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Idswyft is an open-source identity verification platform designed to provide developers with easy-to-integrate APIs for document verification. The platform focuses on being minimal, developer-friendly, and cost-effective while maintaining security and compliance standards.
+Idswyft is an open-source identity verification platform. Developers integrate via API to verify government-issued IDs (passport, driver's license, national ID) with OCR, cross-validation, liveness detection, and face matching. Self-hostable via Docker Compose or available as a managed cloud service at idswyft.app.
 
-## Core Architecture
+## Repository Structure
 
-This is an MVP project with the following key components:
+```
+backend/     Express + TypeScript API server (v1.7.0)         → port 3001
+engine/      ML verification engine (TensorFlow, PaddleOCR)   → port 3002
+frontend/    Vite + React + TypeScript (edition-aware)         → port 5173 (dev)
+sdks/javascript/  npm SDK (idswyft-sdk v4.0.0)
+docker-compose.yml  4-container self-hosted stack
+install.sh          Interactive setup script
+```
 
-### Identity Verification Pipeline
-- **Document Processing**: OCR extraction using Tesseract for government-issued IDs (passport, driver's license, national ID)
-- **Authenticity Checks**: OpenCV-based image quality and tampering detection
-- **Face Recognition**: Optional selfie matching against document photos
-- **Verification States**: `pending`, `verified`, `failed`, `manual_review`
-- **Fallback Integration**: Optional paid API integration (Persona/Onfido) for high-risk cases
+## Technical Stack
 
-### API Architecture
-- RESTful API endpoints for verification workflows
-- API key management system for developer authentication
-- Webhook system for real-time verification status updates
-- Rate limiting and abuse protection mechanisms
-- Sandbox environment for developer testing
-
-### Data Storage & Security
-- Encrypted file storage for documents and selfies (local or S3-compatible)
-- GDPR/CCPA compliant data handling with retention policies
-- HTTPS-only communication
-- Role-based access control for admin dashboard
-
-### Admin Dashboard
-- Minimal web interface for monitoring verification requests
-- Manual review capabilities for flagged documents
-- Search and filter functionality by verification status
-- Export capabilities for compliance reporting
+| Component | Technology |
+|-----------|-----------|
+| Backend | Express 4, TypeScript 5, ESM modules |
+| Database | PostgreSQL 16 (via Supabase JS client + direct `pg` for migrations) |
+| Frontend | React 18, Vite 4, Tailwind CSS 3, Zustand, React Query |
+| OCR | PaddleOCR (ONNX, primary), Tesseract.js (fallback), optional LLM vision |
+| Face Recognition | vladmandic/face-api.js (TF.js + WASM backend) |
+| Deepfake Detection | EfficientNet-B0 via ONNX Runtime |
+| Tamper Detection | Sharp (ELA, entropy, FFT spectral analysis) |
+| Barcode | @zxing/library (PDF417, QR), MRZ parser |
+| Storage | Local filesystem or S3-compatible |
+| Auth | HMAC-SHA256 API keys, JWT (httpOnly cookies), OTP |
 
 ## Architectural Invariant: Deterministic Decisions
 
@@ -43,47 +39,105 @@ This is an MVP project with the following key components:
 - Gates use checksums, exact string matching, Levenshtein distance, cosine similarity with fixed thresholds
 - Same inputs must always produce the same verification result
 - LLMs may only read text from images (extraction) — never decide pass/fail/review
-- The LLM provider interface is isolated in `providers/ocr/LLMFieldExtractor.ts` — it must never be imported or called from gate logic, cross-validation, liveness scoring, or face matching
+- The LLM provider interface is isolated in `engine/src/providers/ocr/LLMFieldExtractor.ts` — it must never be imported or called from gate logic, cross-validation, liveness scoring, or face matching
 
-## Key Requirements
+## Verification Pipeline
 
-Based on the project specifications, when implementing features ensure:
+5-step state machine with automatic gate transitions:
 
-1. **Developer Integration**: API integration should take <30 minutes
-2. **User Experience**: Verification process should be <3 steps
-3. **Accuracy Target**: >90% document validation accuracy
-4. **File Formats**: Support JPEG, PNG, PDF for document uploads
-5. **Rate Limiting**: Implement per-user and per-developer request limits
-6. **Webhook Retry**: Up to 3 retry attempts for failed webhook deliveries
+```
+AWAITING_FRONT → AWAITING_BACK → CROSS_VALIDATING → AWAITING_LIVE → FACE_MATCHING → COMPLETE
+                                                                                   → HARD_REJECTED
+```
 
-## Development Priorities
+| Step | Route | What happens |
+|------|-------|-------------|
+| 1 | `POST /api/v2/verify/initialize` | Create session |
+| 2 | `POST /api/v2/verify/:id/front-document` | OCR, face detection, tamper detection |
+| 3 | `POST /api/v2/verify/:id/back-document` | Barcode/MRZ + auto cross-validation |
+| 4 | `POST /api/v2/verify/:id/live-capture` | Liveness (head-turn or passive) + auto face match |
+| 5 | `GET /api/v2/verify/:id/status` | Poll for final result |
 
-The project is structured around these core implementation areas (see Specs/tasks.md for detailed checklist):
+**Final results**: `verified`, `failed`, or `manual_review`
 
-1. Database schema with proper indexing and triggers
-2. Core API endpoints for document/selfie upload and status queries
-3. OCR and document processing pipeline
-4. Face recognition and liveness detection
-5. Webhook notification system
-6. Admin dashboard interface
-7. Sandbox environment setup
-8. Security and compliance implementation
+## Engine Worker Architecture
 
-## Technical Stack Considerations
+The engine (`engine/`) is a separate container (~1.5GB) that handles ML-heavy operations. The API container stays lightweight (~250MB).
 
-- **Backend**: Node.js or Python (as specified in PRD)
-- **Database**: PostgreSQL or SQLite
-- **OCR**: Tesseract integration
-- **Computer Vision**: OpenCV for image analysis
-- **Face Recognition**: face_recognition library
-- **Storage**: Local filesystem or S3-compatible storage
-- **Deployment**: Cloud-ready architecture for self-hosting
+- `ENGINE_URL` env var controls routing: set → call engine via HTTP; unset → local fallback functions
+- Three endpoints: `POST /extract/front`, `POST /extract/back`, `POST /extract/live`
+- Heavy deps (TensorFlow, ONNX, PaddleOCR, canvas) live only in the engine
 
-## Compliance Notes
+## Auth System
 
-When working with personal data and document processing:
-- All uploaded files must be encrypted at rest
-- Implement proper data retention and deletion policies
-- Ensure GDPR/CCPA compliance for data access requests
-- Use HTTPS for all file serving and API communications
-- Implement audit logging for verification activities
+6 auth mechanisms in `backend/src/middleware/auth.ts`:
+
+| Method | Header/Source | Use case |
+|--------|-------------|----------|
+| `authenticateAPIKey` | `X-API-Key` header | Developer API calls |
+| `authenticateServiceToken` | `X-Service-Token` header | Service-to-service |
+| `authenticateJWT` | `idswyft_token` cookie or Bearer | Admin dashboard |
+| `authenticateDeveloperJWT` | `idswyft_token` cookie or Bearer | Developer portal |
+| `authenticateReviewerJWT` | `idswyft_token` cookie or Bearer | Invited reviewers |
+| `authenticateAdminOrReviewer` | Cookie or Bearer | Shared admin endpoints |
+
+**API key format**: `ik_` prefix + 64 hex chars. Keys are HMAC-SHA256 hashed before storage. Sandbox mode is a boolean `is_sandbox` on the key, not a prefix distinction.
+
+## Edition System
+
+Build-time `VITE_EDITION` flag in `frontend/src/config/edition.ts`:
+- `community` (default): self-hosted, Dev Portal at `/`, minimal chrome
+- `cloud`: managed idswyft.app, marketing homepage at `/`, full navbar/footer
+
+## Docker Architecture
+
+4 containers (+ optional Caddy for HTTPS):
+
+```
+postgres:16-alpine → engine (ML, port 3002) → api (port 3001) → frontend (nginx, port 8080)
+```
+
+- Frontend uses `nginxinc/nginx-unprivileged:alpine` (non-root)
+- All containers run as non-root users
+- `install.sh` generates 256-bit secrets and handles HTTPS setup
+
+## Git Workflow
+
+- **`main`** is production — protected by branch rules, requires PR with approval
+- **`dev`** is the working branch — also protected, requires PR
+- CI runs `tsc --noEmit` on backend, frontend, and engine for all PRs
+- Docker images are built on `v*` tag push (not on merge to main)
+- CODEOWNERS requires `@doobee46` approval on all changes
+
+## Development
+
+```bash
+# Backend
+cd backend && npm install && npm run dev    # → localhost:3001
+
+# Frontend
+cd frontend && npm install && npm run dev   # → localhost:5173
+
+# Engine (optional, for ML features)
+cd engine && npm install && npm run dev     # → localhost:3002
+```
+
+**Migrations**: `cd backend && npm run migrate` — reads from `supabase/migrations/`, tracks in `_migrations` table.
+
+## Key Conventions
+
+- Use **"live capture"** not "selfie" — the system uses real-time camera with liveness detection
+- Design system: `C` tokens from `frontend/src/theme.ts` — dark theme default
+- Fonts: DM Sans (sans), IBM Plex Mono (mono)
+- Icons: heroicons/react
+- Webhook delivery is fire-and-forget: trigger after `res.json()`, never throw
+- Cross-validation: unreadable barcodes get verdict `REVIEW` (score 0.80), not auto-PASS
+
+## Compliance
+
+- Face embeddings stripped before DB persistence (GDPR Article 9)
+- Data retention with configurable `DATA_RETENTION_DAYS`
+- GDPR erasure covers all tables: documents, selfies, contexts, risk scores, webhook payloads
+- All uploaded files encrypted at rest
+- HTTPS enforced in production, PG SSL auto-enabled for non-local connections
+- CSP + HSTS headers on both nginx and Express
