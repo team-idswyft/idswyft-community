@@ -80,7 +80,7 @@ describe('createApiClient', () => {
       },
     };
 
-    await expect(errorHandler(fakeError)).rejects.toBeInstanceOf(RetryAfterError);
+    await expect(errorHandler!(fakeError)).rejects.toBeInstanceOf(RetryAfterError);
   });
 
   it('normalises non-429 errors to ApiError shape', async () => {
@@ -101,7 +101,7 @@ describe('createApiClient', () => {
       },
     };
 
-    await expect(errorHandler(fakeError)).rejects.toMatchObject({
+    await expect(errorHandler!(fakeError)).rejects.toMatchObject({
       message: 'Validation failed',
       fields: [{ field: 'email', message: 'Invalid email' }],
       correlationId: 'abc-123',

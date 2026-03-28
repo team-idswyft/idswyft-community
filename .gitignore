@@ -119,6 +119,10 @@ sdks/*/dist/
 sdks/*/build/
 sdks/*/*.egg-info/
 
+# npm auth tokens (must never be committed)
+.npmrc
+**/.npmrc
+
 # Test files
 *.test.js
 

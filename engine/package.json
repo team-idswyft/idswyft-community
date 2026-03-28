@@ -16,7 +16,7 @@
     "@vladmandic/face-api": "^1.7.14",
     "@zxing/library": "^0.21.3",
     "dotenv": "^17.2.2",
-    "express": "^4.18.2",
+    "express": "^4.22.1",
     "file-type": "^19.6.0",
     "image-size": "^1.0.2",
     "mrz": "^5.0.2",
