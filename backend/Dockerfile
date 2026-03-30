@@ -31,9 +31,10 @@ COPY shared/src/ shared/src/
 COPY shared/tsconfig.json shared/
 RUN cd shared && npx tsc && npx tsc-alias
 
-# Copy backend source and compile TypeScript
+# Copy backend source, entrypoint, and compile TypeScript
 COPY backend/src/ backend/src/
 COPY backend/tsconfig.json backend/
+COPY backend/docker-entrypoint.sh backend/docker-entrypoint.sh
 RUN cd backend && npx tsc && npx tsc-alias
 
 # Strip devDependencies — only production deps go to runtime stage
@@ -61,7 +62,7 @@ COPY --from=build /app/backend/package.json ./package.json
 
 # Entrypoint: auto-migrate then start server
 # sed converts Windows CRLF → LF (git on Windows may check out with \r\n)
-COPY backend/docker-entrypoint.sh ./docker-entrypoint.sh
+COPY --from=build /app/backend/docker-entrypoint.sh ./docker-entrypoint.sh
 RUN sed -i 's/\r$//' ./docker-entrypoint.sh && chmod +x ./docker-entrypoint.sh
 
 # Migrations are bind-mounted from supabase/migrations/ at runtime
