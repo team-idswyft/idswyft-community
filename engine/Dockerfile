@@ -35,6 +35,9 @@ COPY engine/package.json engine/
 # Install all dependencies (npm workspaces resolves @idswyft/shared)
 RUN npm install --include=optional
 
+# Copy pre-generated models (e.g., deepfake-detector.onnx from export script)
+COPY shared/models/ shared/models/
+
 # Download face detection model weights
 COPY engine/download-models.js engine/
 RUN cd engine && node download-models.js
@@ -80,6 +83,7 @@ COPY --from=build /app/node_modules /app/node_modules
 COPY --from=build /app/engine/dist ./dist
 COPY --from=build /app/engine/models ./models
 COPY --from=build /app/shared/dist /app/shared/dist
+COPY --from=build /app/shared/models /app/shared/models
 COPY --from=build /app/shared/package.json /app/shared/package.json
 COPY --from=build /app/engine/package.json ./package.json
 

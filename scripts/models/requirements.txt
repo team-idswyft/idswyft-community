@@ -1,0 +1,6 @@
+torch>=2.0
+timm>=0.9
+onnx>=1.14
+onnxruntime>=1.16
+onnxscript>=0.6
+huggingface_hub

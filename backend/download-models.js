@@ -121,7 +121,12 @@ async function downloadModels() {
   }
   
   // Attempt to download deepfake detector model (optional)
-  const deepfakePath = path.join(modelsDir, deepfakeModel.fileName);
+  // Stored in shared/models/ — matches OnnxDeepfakeDetector's path resolution
+  const sharedModelsDir = path.join(__dirname, '..', 'shared', 'models');
+  if (!fs.existsSync(sharedModelsDir)) {
+    fs.mkdirSync(sharedModelsDir, { recursive: true });
+  }
+  const deepfakePath = path.join(sharedModelsDir, deepfakeModel.fileName);
   if (fs.existsSync(deepfakePath)) {
     console.log(`⏭️  Skipped: ${deepfakeModel.fileName} (already exists)`);
     skipped++;
