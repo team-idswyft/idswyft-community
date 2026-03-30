@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { verifyHeadTurnLiveness } from '../HeadTurnVerifier.js';
-import type { FaceDetectionService } from '../HeadTurnVerifier.js';
-import type { HeadTurnLivenessMetadata, AnalysisFrame } from '../../../verification/models/headTurnLivenessSchema.js';
-import type { FaceBufferDetectionResult } from '../../../services/faceRecognition.js';
+import { verifyHeadTurnLiveness } from '@idswyft/shared';
+import type { FaceDetectionService } from '@idswyft/shared';
+import type { HeadTurnLivenessMetadata, AnalysisFrame } from '@idswyft/shared';
+import type { FaceBufferDetectionResult } from '@idswyft/shared';
 
 // ─── Helpers ─────────────────────────────────────────────
 

@@ -18,16 +18,18 @@ import { OCRService } from '@/services/ocr.js';
 import { BarcodeService } from '@/services/barcode.js';
 import { FaceRecognitionService } from '@/services/faceRecognition.js';
 import { extractMRZFromText, alpha3ToAlpha2 } from '@/services/mrz.js';
-import { createLivenessProvider } from '@/providers/liveness/index.js';
-import { verifyHeadTurnLiveness } from '@/providers/liveness/HeadTurnVerifier.js';
-import { HeadTurnLivenessMetadataSchema } from '@/verification/models/headTurnLivenessSchema.js';
-import type { HeadTurnLivenessMetadata } from '@/verification/models/headTurnLivenessSchema.js';
-import { SharpTamperDetector } from '@/providers/tampering/SharpTamperDetector.js';
-import { DocumentZoneValidator } from '@/providers/tampering/DocumentZoneValidator.js';
-import { createDeepfakeDetector } from '@/providers/deepfake/index.js';
+import {
+  createLivenessProvider, verifyHeadTurnLiveness,
+  HeadTurnLivenessMetadataSchema,
+  SharpTamperDetector, DocumentZoneValidator,
+  createDeepfakeDetector,
+} from '@idswyft/shared';
+import type {
+  HeadTurnLivenessMetadata,
+  FrontExtractionResult, BackExtractionResult, LiveCaptureResult,
+  LLMProviderConfig,
+} from '@idswyft/shared';
 import { getLivenessThresholdSync } from '@/config/verificationThresholds.js';
-import type { FrontExtractionResult, BackExtractionResult, LiveCaptureResult } from '@/verification/models/types.js';
-import type { LLMProviderConfig } from '@/providers/ocr/LLMFieldExtractor.js';
 
 const router = express.Router();
 

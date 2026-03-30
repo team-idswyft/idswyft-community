@@ -14,9 +14,13 @@
 import 'dotenv/config';
 import express from 'express';
 import { logger } from '@/utils/logger.js';
+import { configureSharedLogger } from '@idswyft/shared';
 import extractRouter from '@/routes/extract.js';
 
 const app = express();
+
+// Wire shared-package logger to engine's logger instance
+configureSharedLogger(logger);
 const PORT = parseInt(process.env.PORT || '3002');
 
 // JSON body parsing (for metadata fields)

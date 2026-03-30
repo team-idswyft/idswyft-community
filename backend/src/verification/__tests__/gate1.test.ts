@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { evaluateGate1 } from '../gates/gate1-frontDocument.js';
-import type { FrontExtractionResult } from '../models/types.js';
+import type { FrontExtractionResult } from '@idswyft/shared';
 
 function makeFrontResult(overrides: Partial<FrontExtractionResult> = {}): FrontExtractionResult {
   return {

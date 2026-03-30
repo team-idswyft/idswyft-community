@@ -75,9 +75,9 @@ services:
       MIGRATIONS_LENIENT: "true"
       ENGINE_URL: http://engine:3002
     volumes:
-      - uploads:/app/uploads
-      - temp:/app/temp
-      - ./supabase/migrations:/app/migrations:ro
+      - uploads:/app/backend/uploads
+      - temp:/app/backend/temp
+      - ./supabase/migrations:/app/backend/migrations:ro
     healthcheck:
       test: ["CMD", "wget", "-qO-", "http://localhost:3001/health"]
       interval: 30s

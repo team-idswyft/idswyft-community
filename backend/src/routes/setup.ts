@@ -1,9 +1,10 @@
 import { Router, Request, Response } from 'express';
-import { body, validationResult } from 'express-validator';
+import { body } from 'express-validator';
 import rateLimit from 'express-rate-limit';
 import { supabase } from '@/config/database.js';
 import { generateDeveloperToken, generateAPIKey } from '@/middleware/auth.js';
-import { catchAsync, ValidationError, AuthorizationError } from '@/middleware/errorHandler.js';
+import { catchAsync, AuthorizationError } from '@/middleware/errorHandler.js';
+import { validate } from '@/middleware/validate.js';
 import { logger } from '@/utils/logger.js';
 
 const router = Router();
@@ -51,12 +52,8 @@ router.post('/initialize',
     body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
     body('company').optional().isString().trim().escape().isLength({ max: 100 }).withMessage('Company name must be less than 100 characters'),
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     // First-run guard: only works when zero developers exist
     const { count, error: countError } = await supabase
       .from('developers')

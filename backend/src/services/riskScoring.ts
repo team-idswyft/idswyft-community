@@ -5,7 +5,7 @@
  * Higher score = higher risk.
  */
 
-import type { SessionState } from '@/verification/models/types.js';
+import type { SessionState } from '@idswyft/shared';
 
 export type RiskLevel = 'low' | 'medium' | 'high' | 'critical';
 

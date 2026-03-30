@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { evaluateGate4 } from '../gates/gate4-liveCapture.js';
-import type { LiveCaptureResult } from '../models/types.js';
+import type { LiveCaptureResult } from '@idswyft/shared';
 
 function makeLiveCaptureResult(overrides: Partial<LiveCaptureResult> = {}): LiveCaptureResult {
   return {

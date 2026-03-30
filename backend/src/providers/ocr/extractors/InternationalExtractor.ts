@@ -1,6 +1,5 @@
-import type { OCRData } from '../../../types/index.js';
+import type { OCRData, CountryDocFormat } from '@idswyft/shared';
 import type { FlatLine } from '../types.js';
-import type { CountryDocFormat } from '../internationalIdFormats.js';
 import { logger } from '@/utils/logger.js';
 import { BaseExtractor } from './BaseExtractor.js';
 import { flattenLines } from '../utils/flattenLines.js';

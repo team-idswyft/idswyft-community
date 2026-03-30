@@ -8,9 +8,10 @@
  */
 
 import express, { Request, Response } from 'express';
-import { param, body, query, validationResult } from 'express-validator';
+import { param, body, query } from 'express-validator';
 import { authenticateAPIKey } from '@/middleware/auth.js';
-import { catchAsync, ValidationError, NotFoundError } from '@/middleware/errorHandler.js';
+import { catchAsync, NotFoundError } from '@/middleware/errorHandler.js';
+import { validate } from '@/middleware/validate.js';
 import { logger } from '@/utils/logger.js';
 import {
   createSchedule,
@@ -38,12 +39,8 @@ router.post(
       .withMessage('interval_days must be between 30 and 730'),
     body('verification_request_id').optional().isUUID(),
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     const developer = (req as any).developer;
     const { user_id, interval_days, verification_request_id } = req.body;
 
@@ -86,12 +83,8 @@ router.get(
     query('page').optional().isInt({ min: 1 }),
     query('limit').optional().isInt({ min: 1, max: 100 }),
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     const developer = (req as any).developer;
     const { schedules, total } = await listSchedules(developer.id, {
       status: req.query.status as string,
@@ -124,12 +117,8 @@ router.get(
   '/schedules/:schedule_id',
   authenticateAPIKey,
   [param('schedule_id').isUUID()],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     const developer = (req as any).developer;
     const schedule = await getSchedule(req.params.schedule_id, developer.id);
 
@@ -159,12 +148,8 @@ router.delete(
   '/schedules/:schedule_id',
   authenticateAPIKey,
   [param('schedule_id').isUUID()],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     const developer = (req as any).developer;
     const { schedule_id } = req.params;
 
@@ -200,12 +185,8 @@ router.get(
     query('page').optional().isInt({ min: 1 }),
     query('limit').optional().isInt({ min: 1, max: 100 }),
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     const developer = (req as any).developer;
     const { alerts, total } = await getExpiringDocuments(developer.id, {
       days_ahead: req.query.days_ahead ? parseInt(req.query.days_ahead as string) : undefined,

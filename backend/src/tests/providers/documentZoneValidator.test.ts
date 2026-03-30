@@ -4,7 +4,7 @@ vi.mock('@/utils/logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-import { DocumentZoneValidator, DOCUMENT_LAYOUTS } from '../../providers/tampering/DocumentZoneValidator.js';
+import { DocumentZoneValidator, DOCUMENT_LAYOUTS } from '@idswyft/shared';
 
 describe('DocumentZoneValidator', () => {
   const validator = new DocumentZoneValidator();

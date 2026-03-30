@@ -5,7 +5,7 @@
  * from @vladmandic/face-api). No AI/LLM involvement in the decision.
  */
 
-import type { FaceMatchResult } from '../models/types.js';
+import type { FaceMatchResult } from '@idswyft/shared';
 
 /**
  * Compute cosine similarity between two vectors.

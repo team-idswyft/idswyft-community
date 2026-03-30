@@ -1,8 +1,7 @@
 // Dynamic imports — tesseract.js and jimp are only available in dev mode or the Engine Worker
 let Tesseract: any;
 let Jimp: any;
-import { OCRProvider } from '../types.js';
-import { OCRData } from '../../types/index.js';
+import type { OCRProvider, OCRData } from '@idswyft/shared';
 import { logger } from '@/utils/logger.js';
 
 async function ensureTesseractDeps() {

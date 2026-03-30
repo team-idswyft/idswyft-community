@@ -8,8 +8,7 @@
  * For non-US documents: delegates to validateIdNumber() from internationalIdFormats.
  */
 
-import { STATE_DL_FORMATS } from '../../providers/ocr/dlFormats.js';
-import { validateIdNumber } from '../../providers/ocr/internationalIdFormats.js';
+import { STATE_DL_FORMATS, validateIdNumber } from '@idswyft/shared';
 
 export interface DlValidationResult {
   valid: boolean;

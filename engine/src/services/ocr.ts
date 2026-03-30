@@ -6,10 +6,8 @@
  */
 
 import { logger } from '@/utils/logger.js';
-import { OCRData } from '@/types/index.js';
+import type { OCRData, OCRProvider, LLMProviderConfig } from '@idswyft/shared';
 import { createOCRProvider } from '@/providers/ocr/index.js';
-import type { OCRProvider } from '@/providers/types.js';
-import type { LLMProviderConfig } from '@/providers/ocr/LLMFieldExtractor.js';
 
 export class OCRService {
   private provider: OCRProvider;

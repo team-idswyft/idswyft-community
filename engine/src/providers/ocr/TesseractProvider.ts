@@ -1,7 +1,6 @@
 import Tesseract from 'tesseract.js';
 import Jimp from 'jimp';
-import { OCRProvider } from '../types.js';
-import { OCRData } from '../../types/index.js';
+import type { OCRProvider, OCRData } from '@idswyft/shared';
 import { logger } from '@/utils/logger.js';
 
 export class TesseractProvider implements OCRProvider {

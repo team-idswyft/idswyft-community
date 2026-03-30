@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { EnhancedHeuristicProvider } from '../EnhancedHeuristicProvider.js';
+import { EnhancedHeuristicProvider } from '@idswyft/shared';
 import * as fs from 'fs';
 import * as path from 'path';
 

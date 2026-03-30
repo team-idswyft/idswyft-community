@@ -10,9 +10,10 @@
  */
 
 import express, { Request, Response } from 'express';
-import { body, param, query, validationResult } from 'express-validator';
+import { body, param, query } from 'express-validator';
 import { authenticateAPIKey, checkSandboxMode } from '@/middleware/auth.js';
-import { catchAsync, ValidationError, NotFoundError } from '@/middleware/errorHandler.js';
+import { catchAsync, NotFoundError } from '@/middleware/errorHandler.js';
+import { validate } from '@/middleware/validate.js';
 import { logger } from '@/utils/logger.js';
 import {
   createBatch,
@@ -28,8 +29,8 @@ import { StorageService } from '@/services/storage.js';
 import { VerificationService } from '@/services/verification.js';
 import engineClient from '@/services/engineClient.js';
 import { VerificationSession } from '@/verification/session/VerificationSession.js';
-import { VerificationStatus } from '@/verification/models/types.js';
-import type { FrontExtractionResult, BackExtractionResult, SessionState } from '@/verification/models/types.js';
+import { VerificationStatus } from '@idswyft/shared';
+import type { FrontExtractionResult, BackExtractionResult, SessionState } from '@idswyft/shared';
 import { computeFaceMatch } from '@/verification/face/faceMatchService.js';
 import { getFaceMatchingThresholdSync } from '@/config/verificationThresholds.js';
 import { validateDownloadUrl } from '@/utils/validateUrl.js';
@@ -220,12 +221,8 @@ router.post('/upload',
       .isURL()
       .withMessage('back_document_url must be a valid URL'),
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     const developerId = (req as any).developer.id;
     const items: BatchItemInput[] = req.body.items;
 
@@ -260,12 +257,8 @@ router.get('/:id/status',
   [
     param('id').isUUID().withMessage('Batch ID must be a valid UUID'),
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     const developerId = (req as any).developer.id;
     const job = await getBatchStatus(req.params.id, developerId);
 
@@ -298,12 +291,8 @@ router.get('/:id/results',
   [
     param('id').isUUID().withMessage('Batch ID must be a valid UUID'),
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     const developerId = (req as any).developer.id;
     const results = await getBatchResults(req.params.id, developerId);
 
@@ -326,12 +315,8 @@ router.post('/:id/cancel',
   [
     param('id').isUUID().withMessage('Batch ID must be a valid UUID'),
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     const developerId = (req as any).developer.id;
     const cancelled = await cancelBatch(req.params.id, developerId);
 
@@ -361,12 +346,8 @@ router.get('/',
     query('page').optional().isInt({ min: 1 }).withMessage('Page must be a positive integer'),
     query('limit').optional().isInt({ min: 1, max: 100 }).withMessage('Limit must be between 1 and 100'),
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     const developerId = (req as any).developer.id;
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 20;

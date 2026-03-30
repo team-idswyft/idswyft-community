@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { crossValidate } from '../cross-validator/engine.js';
-import type { FrontExtractionResult, BackExtractionResult } from '../models/types.js';
+import type { FrontExtractionResult, BackExtractionResult } from '@idswyft/shared';
 
 function makeFront(overrides: Record<string, string> = {}): FrontExtractionResult {
   return {

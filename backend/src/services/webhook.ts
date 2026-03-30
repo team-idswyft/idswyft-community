@@ -4,7 +4,7 @@ import { supabase } from '@/config/database.js';
 import config from '@/config/index.js';
 import { logger, logWebhookDelivery } from '@/utils/logger.js';
 import { Webhook, WebhookDelivery, WebhookPayload } from '@/types/index.js';
-import { encryptSecret, decryptSecret } from '@/utils/encryption.js';
+import { encryptSecret, decryptSecret } from '@idswyft/shared';
 
 /** Encrypt a webhook secret_token before writing to the DB. */
 function encryptWebhookSecret(plaintext: string): string {

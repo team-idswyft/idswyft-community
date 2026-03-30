@@ -2,7 +2,7 @@
 let Jimp: any;
 import { statSync, readFileSync } from 'fs';
 import sizeOf from 'image-size';
-import { SharpTamperDetector } from '@/providers/tampering/SharpTamperDetector.js';
+import { SharpTamperDetector } from '@idswyft/shared';
 
 export interface DocumentQualityResult {
   isBlurry: boolean;

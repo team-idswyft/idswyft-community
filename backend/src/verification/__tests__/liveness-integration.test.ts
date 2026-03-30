@@ -1,9 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
 import { evaluateGate4 } from '../gates/gate4-liveCapture.js';
-import { createLivenessProvider } from '@/providers/liveness/index.js';
-import { EnhancedHeuristicProvider } from '@/providers/liveness/EnhancedHeuristicProvider.js';
+import { createLivenessProvider, EnhancedHeuristicProvider } from '@idswyft/shared';
+import type { LiveCaptureResult } from '@idswyft/shared';
 import { getLivenessThresholdSync } from '@/config/verificationThresholds.js';
-import type { LiveCaptureResult } from '../models/types.js';
 
 // Mock logger
 vi.mock('@/utils/logger.js', () => ({

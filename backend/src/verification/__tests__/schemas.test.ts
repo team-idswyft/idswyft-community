@@ -8,8 +8,8 @@ import {
   GateResultSchema,
   VerificationStatus,
   RejectionReason,
-  type SessionState,
-} from '../models/schemas.js';
+} from '@idswyft/shared';
+import type { SessionState } from '@idswyft/shared';
 
 describe('FrontExtractionResultSchema', () => {
   it('accepts valid front extraction data', () => {

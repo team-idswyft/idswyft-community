@@ -14,7 +14,7 @@
  * to retake the photo immediately than to let gibberish flow to Gate 3.
  */
 
-import type { FrontExtractionResult, GateResult } from '../models/types.js';
+import type { FrontExtractionResult, GateResult } from '@idswyft/shared';
 import { VERIFICATION_THRESHOLDS } from '../../config/verificationThresholds.js';
 import { logger } from '../../utils/logger.js';
 

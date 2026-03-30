@@ -75,7 +75,7 @@ jobs:
       - name: Build and push API image
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
-          context: ./backend
+          context: .
           file: ./backend/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}
@@ -115,7 +115,7 @@ jobs:
       - name: Build and push engine image
         uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6.19.2
         with:
-          context: ./engine
+          context: .
           file: ./engine/Dockerfile
           push: true
           tags: ${{ steps.meta.outputs.tags }}

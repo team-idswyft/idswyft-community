@@ -1,7 +1,8 @@
 import express, { Request, Response } from 'express';
-import { param, validationResult } from 'express-validator';
+import { param } from 'express-validator';
 import { authenticateServiceToken } from '@/middleware/auth.js';
 import { catchAsync } from '@/middleware/errorHandler.js';
+import { validate } from '@/middleware/validate.js';
 import { supabase } from '@/config/database.js';
 import { logger } from '@/utils/logger.js';
 
@@ -207,11 +208,7 @@ router.get('/developers', authenticateServiceToken, catchAsync(async (req: Reque
 }));
 
 // Get single developer detail
-router.get('/developers/:id', authenticateServiceToken, [param('id').isUUID()], catchAsync(async (req: Request, res: Response) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ success: false, error: 'Invalid developer ID format' });
-  }
+router.get('/developers/:id', authenticateServiceToken, [param('id').isUUID()], validate, catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
 
   const { data: developer, error } = await supabase
@@ -241,11 +238,7 @@ router.get('/developers/:id', authenticateServiceToken, [param('id').isUUID()], 
 }));
 
 // Suspend developer
-router.post('/developers/:id/suspend', authenticateServiceToken, [param('id').isUUID()], catchAsync(async (req: Request, res: Response) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ success: false, error: 'Invalid developer ID format' });
-  }
+router.post('/developers/:id/suspend', authenticateServiceToken, [param('id').isUUID()], validate, catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
 
   const { data: developer, error } = await supabase
@@ -265,11 +258,7 @@ router.post('/developers/:id/suspend', authenticateServiceToken, [param('id').is
 }));
 
 // Unsuspend developer
-router.post('/developers/:id/unsuspend', authenticateServiceToken, [param('id').isUUID()], catchAsync(async (req: Request, res: Response) => {
-  const errors = validationResult(req);
-  if (!errors.isEmpty()) {
-    return res.status(400).json({ success: false, error: 'Invalid developer ID format' });
-  }
+router.post('/developers/:id/unsuspend', authenticateServiceToken, [param('id').isUUID()], validate, catchAsync(async (req: Request, res: Response) => {
   const { id } = req.params;
 
   const { data: developer, error } = await supabase

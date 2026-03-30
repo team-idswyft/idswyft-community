@@ -14,7 +14,7 @@
  * This gate runs after Gate 5 (face match) and before COMPLETE.
  */
 
-import type { GateResult } from '../models/types.js';
+import type { GateResult } from '@idswyft/shared';
 import type { AMLScreeningResult } from '@/providers/aml/types.js';
 
 export function evaluateGate6(amlResult: AMLScreeningResult | null): GateResult {

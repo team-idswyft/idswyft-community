@@ -1,9 +1,10 @@
 import express, { Request, Response } from 'express';
 import multer from 'multer';
-import { body, param, validationResult } from 'express-validator';
+import { body, param } from 'express-validator';
 import { authenticateAPIKey, authenticateUser, checkSandboxMode } from '@/middleware/auth.js';
 import { verificationRateLimit } from '@/middleware/rateLimit.js';
 import { catchAsync, ValidationError, FileUploadError } from '@/middleware/errorHandler.js';
+import { validate } from '@/middleware/validate.js';
 import { StorageService } from '@/services/storage.js';
 import { VerificationService } from '@/services/verification.js';
 import { OCRService } from '@/services/ocr.js';
@@ -14,29 +15,37 @@ import { logger, logVerificationEvent } from '@/utils/logger.js';
 import { validateFileType } from '@/middleware/fileValidation.js';
 import { supabase } from '@/config/database.js';
 import { VERIFICATION_THRESHOLDS, getFaceMatchingThresholdSync, getLivenessThresholdSync } from '@/config/verificationThresholds.js';
-import { createLivenessProvider } from '@/providers/liveness/index.js';
-import { verifyHeadTurnLiveness } from '@/providers/liveness/HeadTurnVerifier.js';
-import { HeadTurnLivenessMetadataSchema } from '@/verification/models/headTurnLivenessSchema.js';
-import type { HeadTurnLivenessMetadata } from '@/verification/models/headTurnLivenessSchema.js';
+import {
+  createLivenessProvider,
+  verifyHeadTurnLiveness,
+  HeadTurnLivenessMetadataSchema,
+  VerificationStatus,
+  SharpTamperDetector,
+  DocumentZoneValidator,
+  createDeepfakeDetector,
+  decryptSecret,
+} from '@idswyft/shared';
+import type {
+  HeadTurnLivenessMetadata,
+  FrontExtractionResult,
+  BackExtractionResult,
+  LiveCaptureResult,
+  SessionState,
+  LLMProviderConfig,
+} from '@idswyft/shared';
 import { createAMLProvider } from '@/providers/aml/index.js';
 import { computeRiskScore } from '@/services/riskScoring.js';
 import { broadcastStatusChange } from '@/services/realtime.js';
+import { saveSessionState, loadSessionState } from '@/services/sessionPersistence.js';
 
 import { VerificationSession } from '@/verification/session/VerificationSession.js';
 import type { SessionDeps, SessionHydration } from '@/verification/session/VerificationSession.js';
-import { VerificationStatus } from '@/verification/models/types.js';
-import type { FrontExtractionResult, BackExtractionResult, LiveCaptureResult, SessionState } from '@/verification/models/types.js';
 import { computeFaceMatch } from '@/verification/face/faceMatchService.js';
 import { SessionFlowError } from '@/verification/exceptions.js';
 import { WebhookService } from '@/services/webhook.js';
 import type { WebhookPayload, VerificationSource } from '@/types/index.js';
-import type { LLMProviderConfig } from '@/providers/ocr/LLMFieldExtractor.js';
-import { decryptSecret } from '@/utils/encryption.js';
 import { config } from '@/config/index.js';
 import sharp from 'sharp';
-import { SharpTamperDetector } from '@/providers/tampering/SharpTamperDetector.js';
-import { DocumentZoneValidator } from '@/providers/tampering/DocumentZoneValidator.js';
-import { createDeepfakeDetector } from '@/providers/deepfake/index.js';
 import engineClient from '@/services/engineClient.js';
 
 const router = express.Router();
@@ -56,38 +65,6 @@ const upload = multer({
     fieldSize: 10 * 1024 * 1024, // 10 MB for text fields (liveness_metadata contains base64 frames)
   },
 });
-
-// ─── Session persistence helpers ──────────────────────────────
-
-/** Save session state to verification_contexts table */
-async function saveSessionState(verificationId: string, state: Readonly<SessionState>): Promise<void> {
-  // Strip biometric data (GDPR Article 9) — embeddings only needed in-memory for face match
-  const sanitized: any = JSON.parse(JSON.stringify(state));
-  if (sanitized.front_extraction) sanitized.front_extraction.face_embedding = null;
-  if (sanitized.live_capture) sanitized.live_capture.face_embedding = null;
-
-  const context = {
-    verification_id: verificationId,
-    context: JSON.stringify(sanitized),
-    updated_at: new Date().toISOString(),
-  };
-
-  await supabase
-    .from('verification_contexts')
-    .upsert(context, { onConflict: 'verification_id' });
-}
-
-/** Load session state from verification_contexts table */
-async function loadSessionState(verificationId: string): Promise<SessionState | null> {
-  const { data } = await supabase
-    .from('verification_contexts')
-    .select('context')
-    .eq('verification_id', verificationId)
-    .single();
-
-  if (!data?.context) return null;
-  return typeof data.context === 'string' ? JSON.parse(data.context) : data.context;
-}
 
 /** Addons that can be requested per-verification */
 interface VerificationAddons {
@@ -647,12 +624,8 @@ router.post('/initialize',
     body('addons.aml_screening').optional().isBoolean().withMessage('aml_screening must be a boolean'),
     body('addons.address_verification').optional().isBoolean().withMessage('address_verification must be a boolean'),
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     const { user_id, document_type = 'drivers_license', issuing_country } = req.body;
     const addons: VerificationAddons = req.body.addons || {};
     const source: VerificationSource = req.body.source || 'api';
@@ -723,12 +696,8 @@ router.post('/:verification_id/front-document',
     body('document_type').optional().isIn(['passport', 'drivers_license', 'national_id', 'other']).withMessage('Invalid document type'),
     body('issuing_country').optional().isLength({ min: 2, max: 2 }).isAlpha().withMessage('Issuing country must be a 2-letter ISO code'),
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     if (!req.file) {
       throw new FileUploadError('Document file is required');
     }
@@ -858,12 +827,8 @@ router.post('/:verification_id/back-document',
     body('document_type').optional().isIn(['passport', 'drivers_license', 'national_id', 'other']).withMessage('Invalid document type'),
     body('issuing_country').optional().isLength({ min: 2, max: 2 }).isAlpha().withMessage('Issuing country must be a 2-letter ISO code'),
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     if (!req.file) {
       throw new FileUploadError('Document file is required');
     }
@@ -994,12 +959,8 @@ router.post('/:verification_id/cross-validation',
   [
     param('verification_id').isUUID().withMessage('Invalid verification ID'),
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     const { verification_id } = req.params;
     const verification = await requireOwnedVerification(req, verification_id);
     const isSandbox = (verification as any).is_sandbox || false;
@@ -1034,12 +995,8 @@ router.post('/:verification_id/live-capture',
   [
     param('verification_id').isUUID().withMessage('Invalid verification ID'),
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     if (!req.file) {
       throw new FileUploadError('Document file is required');
     }
@@ -1252,12 +1209,8 @@ router.post('/:verification_id/restart',
   [
     param('verification_id').isUUID().withMessage('Invalid verification ID'),
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     const { verification_id } = req.params;
     const verification = await requireOwnedVerification(req, verification_id);
 
@@ -1338,12 +1291,8 @@ router.get('/:verification_id/status',
   [
     param('verification_id').isUUID().withMessage('Invalid verification ID'),
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     const { verification_id } = req.params;
     const verification = await requireOwnedVerification(req, verification_id);
     const isSandbox = (verification as any).is_sandbox || false;

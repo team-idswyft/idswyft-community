@@ -4,8 +4,7 @@ import { VerificationService } from './verification.js';
 import { ProviderMetricsService } from './providerMetrics.js';
 import { OCRData } from '@/types/index.js';
 import { createOCRProvider } from '@/providers/ocr/index.js';
-import type { OCRProvider } from '@/providers/types.js';
-import type { LLMProviderConfig } from '@/providers/ocr/LLMFieldExtractor.js';
+import type { OCRProvider, LLMProviderConfig } from '@idswyft/shared';
 
 export class OCRService {
   private storageService: StorageService;

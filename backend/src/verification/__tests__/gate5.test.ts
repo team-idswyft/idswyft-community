@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { evaluateGate5 } from '../gates/gate5-faceMatch.js';
-import type { FaceMatchResult } from '../models/types.js';
+import type { FaceMatchResult } from '@idswyft/shared';
 
 function makeFaceMatchResult(overrides: Partial<FaceMatchResult> = {}): FaceMatchResult {
   return {

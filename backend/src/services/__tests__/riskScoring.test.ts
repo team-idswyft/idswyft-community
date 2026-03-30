@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from 'vitest';
 import { computeRiskScore, RiskScore } from '../riskScoring.js';
-import type { SessionState } from '@/verification/models/types.js';
+import type { SessionState } from '@idswyft/shared';
 
 /** Build a minimal SessionState with optional overrides. */
 function makeState(overrides: Partial<SessionState> = {}): SessionState {

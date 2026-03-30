@@ -6,7 +6,7 @@
  * with per-field breakdown and overall weighted score.
  */
 
-import type { FrontExtractionResult, BackExtractionResult, CrossValidationResult } from '../models/types.js';
+import type { FrontExtractionResult, BackExtractionResult, CrossValidationResult } from '@idswyft/shared';
 import { FIELD_WEIGHTS, THRESHOLD_PASS, THRESHOLD_REVIEW } from './config.js';
 import { compareIdNumber, compareName, compareDate, compareNationality } from './comparators.js';
 import { normalizeDate } from './normalizers.js';

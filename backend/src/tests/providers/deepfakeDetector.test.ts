@@ -5,8 +5,7 @@ vi.mock('@/utils/logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-import { OnnxDeepfakeDetector } from '../../providers/deepfake/OnnxDeepfakeDetector.js';
-import { createDeepfakeDetector } from '../../providers/deepfake/index.js';
+import { OnnxDeepfakeDetector, createDeepfakeDetector } from '@idswyft/shared';
 
 describe('OnnxDeepfakeDetector', () => {
   describe('extractFaceCrop', () => {

@@ -3,14 +3,12 @@ import {
   type PaddleOcrResult,
   type RecognitionResult,
 } from 'ppu-paddle-ocr';
-import { OCRProvider } from '../types.js';
-import { OCRData } from '../../types/index.js';
+import type { OCRProvider, OCRData, CountryDocFormat, LLMProviderConfig } from '@idswyft/shared';
+import {
+  getCountryFormat, INTERNATIONAL_HEADER_NOISE, STATE_DL_FORMATS,
+  findLowConfidenceFields, extractFieldsWithLLM, mergeLLMResults,
+} from '@idswyft/shared';
 import { logger } from '@/utils/logger.js';
-import { getCountryFormat, INTERNATIONAL_HEADER_NOISE } from './internationalIdFormats.js';
-import type { CountryDocFormat } from './internationalIdFormats.js';
-import { STATE_DL_FORMATS } from './dlFormats.js';
-import { findLowConfidenceFields, extractFieldsWithLLM, mergeLLMResults } from './LLMFieldExtractor.js';
-import type { LLMProviderConfig } from './LLMFieldExtractor.js';
 
 // ── Types ─────────────────────────────────────────────────────
 
@@ -87,7 +85,7 @@ const DL_FIELD_TOKENS = new Set([
 ]);
 
 // Re-export STATE_DL_FORMATS from shared module for backward compatibility
-export { STATE_DL_FORMATS } from './dlFormats.js';
+export { STATE_DL_FORMATS } from '@idswyft/shared';
 
 // AAMVA field codes found in OCR'd text from PDF417 zones or raw text
 const AAMVA_CODES: Record<string, keyof OCRData> = {

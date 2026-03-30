@@ -1,7 +1,8 @@
 import express, { Request, Response } from 'express';
-import { body, validationResult } from 'express-validator';
+import { body } from 'express-validator';
 import { authenticateAPIKey } from '@/middleware/auth.js';
 import { catchAsync, ValidationError, NotFoundError } from '@/middleware/errorHandler.js';
+import { validate } from '@/middleware/validate.js';
 import { WebhookService } from '@/services/webhook.js';
 import { WEBHOOK_EVENT_NAMES } from '@/constants/webhookEvents.js';
 import { logger } from '@/utils/logger.js';
@@ -27,12 +28,8 @@ router.post('/register',
       .isLength({ min: 10, max: 100 })
       .withMessage('Secret token must be between 10 and 100 characters')
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-    
     const { url, is_sandbox = false, secret_token } = req.body;
     const developerId = req.developer!.id;
 
@@ -114,12 +111,8 @@ router.put('/:webhookId',
       .isLength({ min: 10, max: 100 })
       .withMessage('Secret token must be between 10 and 100 characters')
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-    
     const { webhookId } = req.params;
     const developerId = req.developer!.id;
 

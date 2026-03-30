@@ -4,7 +4,7 @@ vi.mock('@/utils/logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-import { FrequencyAnalyzer } from '../../providers/tampering/FrequencyAnalyzer.js';
+import { FrequencyAnalyzer } from '@idswyft/shared';
 
 describe('FrequencyAnalyzer', () => {
   const analyzer = new FrequencyAnalyzer();

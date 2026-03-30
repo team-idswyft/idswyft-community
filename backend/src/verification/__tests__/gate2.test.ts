@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { evaluateGate2 } from '../gates/gate2-backDocument.js';
-import type { BackExtractionResult, FrontExtractionResult } from '../models/types.js';
+import type { BackExtractionResult, FrontExtractionResult } from '@idswyft/shared';
 
 function makeBackResult(overrides: Partial<BackExtractionResult> = {}): BackExtractionResult {
   return {

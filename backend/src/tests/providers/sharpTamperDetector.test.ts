@@ -5,7 +5,7 @@ vi.mock('@/utils/logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
 }));
 
-import { SharpTamperDetector } from '../../providers/tampering/SharpTamperDetector.js';
+import { SharpTamperDetector } from '@idswyft/shared';
 
 describe('SharpTamperDetector (6 checks)', () => {
   const detector = new SharpTamperDetector();

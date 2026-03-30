@@ -12,7 +12,7 @@
 
 import { randomUUID } from 'crypto';
 import { SessionFlowError } from '../exceptions.js';
-import { VerificationStatus } from '../models/types.js';
+import { VerificationStatus } from '@idswyft/shared';
 import type {
   VerificationStatusType,
   FrontExtractionResult,
@@ -22,7 +22,7 @@ import type {
   FaceMatchResult,
   GateResult,
   SessionState,
-} from '../models/types.js';
+} from '@idswyft/shared';
 
 import { evaluateGate1 } from '../gates/gate1-frontDocument.js';
 import { evaluateGate2 } from '../gates/gate2-backDocument.js';

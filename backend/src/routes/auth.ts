@@ -2,12 +2,13 @@ import crypto from 'crypto';
 import express, { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
-import { body, validationResult } from 'express-validator';
+import { body } from 'express-validator';
 import validator from 'validator';
 import { supabase } from '@/config/database.js';
 import config from '@/config/index.js';
 import { generateAdminToken, generateDeveloperToken, generateRegistrationToken, verifyRegistrationToken, generateReviewerToken, generateAPIKey, authenticateJWT, authenticateDeveloperJWT } from '@/middleware/auth.js';
 import { catchAsync, ValidationError, AuthenticationError } from '@/middleware/errorHandler.js';
+import { validate } from '@/middleware/validate.js';
 import { TotpService } from '@/services/totpService.js';
 import { createAndSendOtp, verifyOtp } from '@/services/otpService.js';
 import * as githubOAuth from '@/services/githubOAuthService.js';
@@ -70,14 +71,10 @@ router.post('/admin/login',
       .isLength({ min: 8 })
       .withMessage('Password must be at least 8 characters'),
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-    
     const { email, password } = req.body;
-    
+
     // Get admin user
     const { data: adminUser, error } = await supabase
       .from('admin_users')
@@ -220,12 +217,8 @@ const emailValidation = [
 router.post('/developer/otp/send',
   otpSendLimiter,
   emailValidation,
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     const { email } = req.body;
 
     // Always return success to prevent email enumeration
@@ -250,12 +243,8 @@ router.post('/developer/otp/verify',
       .isNumeric()
       .withMessage('6-digit numeric code is required'),
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     const { email, code } = req.body;
     const result = await verifyOtp(email, code);
 
@@ -309,12 +298,8 @@ router.post('/developer/otp/complete-registration',
     body('name').isString().trim().isLength({ min: 1 }).withMessage('Name is required'),
     body('company').optional().isString().trim(),
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     const { registration_token, name, company } = req.body;
 
     // Verify the registration token
@@ -405,12 +390,8 @@ router.post('/developer/otp/complete-registration',
 router.post('/reviewer/otp/send',
   otpSendLimiter,
   emailValidation,
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     const { email } = req.body;
 
     // Check email exists in verification_reviewers and is not revoked
@@ -449,12 +430,8 @@ router.post('/reviewer/otp/verify',
       .isNumeric()
       .withMessage('6-digit numeric code is required'),
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     const { email, code } = req.body;
     const result = await verifyOtp(email, code);
 
@@ -523,12 +500,8 @@ router.post('/developer/github/callback',
     body('code').isString().matches(/^[a-f0-9]{10,40}$/).withMessage('Invalid GitHub authorization code'),
     body('state').isString().notEmpty().withMessage('OAuth state parameter is required'),
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     if (!config.github.clientId || !config.github.clientSecret) {
       throw new AuthenticationError('GitHub authentication is not configured');
     }

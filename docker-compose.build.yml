@@ -8,18 +8,21 @@
 # The build: directives here override the image: directives in
 # docker-compose.yml, telling Compose to build from source and tag
 # the result with the ghcr.io image name.
+#
+# API and Engine use repo root as build context so the shared/
+# workspace package is accessible during the build.
 # ─────────────────────────────────────────────────
 
 services:
   engine:
     build:
-      context: ./engine
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: engine/Dockerfile
 
   api:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
 
   frontend:
     build:

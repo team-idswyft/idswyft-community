@@ -9,9 +9,7 @@
  */
 
 import { logger } from '@/utils/logger.js';
-import type { FrontExtractionResult, BackExtractionResult, LiveCaptureResult } from '@/verification/models/types.js';
-import type { LLMProviderConfig } from '@/providers/ocr/LLMFieldExtractor.js';
-import type { HeadTurnLivenessMetadata } from '@/verification/models/headTurnLivenessSchema.js';
+import type { FrontExtractionResult, BackExtractionResult, LiveCaptureResult, LLMProviderConfig, HeadTurnLivenessMetadata } from '@idswyft/shared';
 
 const ENGINE_URL = process.env.ENGINE_URL || '';
 const ENGINE_TIMEOUT = parseInt(process.env.ENGINE_TIMEOUT || '60000'); // 60s default

@@ -1,8 +1,8 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { VerificationSession } from '../session/VerificationSession.js';
 import { SessionFlowError } from '../exceptions.js';
-import { VerificationStatus } from '../models/types.js';
-import type { FrontExtractionResult, BackExtractionResult, LiveCaptureResult, FaceMatchResult, CrossValidationResult } from '../models/types.js';
+import { VerificationStatus } from '@idswyft/shared';
+import type { FrontExtractionResult, BackExtractionResult, LiveCaptureResult, FaceMatchResult, CrossValidationResult } from '@idswyft/shared';
 
 // ─── Mock dependencies ─────────────────────────────────────────
 // The session delegates to step functions; we mock those to isolate state machine logic.

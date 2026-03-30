@@ -4,8 +4,8 @@
  * (OCR, face detection, etc.) when only read access is needed.
  */
 import { supabase } from '@/config/database.js';
-import { VerificationStatus } from '@/verification/models/types.js';
-import type { SessionState } from '@/verification/models/types.js';
+import { VerificationStatus } from '@idswyft/shared';
+import type { SessionState } from '@idswyft/shared';
 
 /** Load session state from verification_contexts table */
 export async function loadSessionState(verificationId: string): Promise<SessionState | null> {

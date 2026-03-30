@@ -13,7 +13,7 @@
  * handles the missing-embedding case separately.
  */
 
-import type { LiveCaptureResult, GateResult } from '../models/types.js';
+import type { LiveCaptureResult, GateResult } from '@idswyft/shared';
 
 const FACE_CONFIDENCE_THRESHOLD = 0.5;
 

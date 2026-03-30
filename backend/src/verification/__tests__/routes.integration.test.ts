@@ -16,7 +16,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
-import { VerificationStatus } from '../../verification/models/types.js';
+import { VerificationStatus } from '@idswyft/shared';
 
 // ─── Mock external deps before importing routes ───────────────
 
@@ -180,6 +180,11 @@ vi.mock('@/utils/logger.js', () => ({
   logVerificationEvent: vi.fn(),
 }));
 
+// Validate middleware — passthrough (express-validator chains tested separately)
+vi.mock('@/middleware/validate.js', () => ({
+  validate: (_req: any, _res: any, next: any) => next(),
+}));
+
 // Thresholds — must include all sub-objects accessed by gates
 vi.mock('@/config/verificationThresholds.js', () => ({
   VERIFICATION_THRESHOLDS: {
@@ -192,6 +197,7 @@ vi.mock('@/config/verificationThresholds.js', () => ({
     QUALITY: { minimum_acceptable: 0.50, good_quality: 0.75 },
   },
   getFaceMatchingThresholdSync: vi.fn(() => 0.60),
+  getLivenessThresholdSync: vi.fn(() => 0.50),
   getFaceMatchingThreshold: vi.fn(async () => 0.60),
   getLivenessThreshold: vi.fn(async () => 0.50),
   validateScores: vi.fn(() => ({ passed: true })),

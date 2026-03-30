@@ -1,4 +1,4 @@
-import { OCRProvider } from '../types.js';
+import type { OCRProvider } from '@idswyft/shared';
 import { PaddleOCRProvider } from './PaddleOCRProvider.js';
 import { TesseractProvider } from './TesseractProvider.js';
 

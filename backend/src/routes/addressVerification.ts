@@ -9,10 +9,11 @@
 
 import express, { Request, Response } from 'express';
 import multer from 'multer';
-import { param, body, validationResult } from 'express-validator';
+import { param, body } from 'express-validator';
 import { authenticateAPIKey } from '@/middleware/auth.js';
 import { verificationRateLimit } from '@/middleware/rateLimit.js';
-import { catchAsync, ValidationError, FileUploadError } from '@/middleware/errorHandler.js';
+import { catchAsync, FileUploadError } from '@/middleware/errorHandler.js';
+import { validate } from '@/middleware/validate.js';
 import { StorageService } from '@/services/storage.js';
 import { VerificationService } from '@/services/verification.js';
 import { validateFileType } from '@/middleware/fileValidation.js';
@@ -48,12 +49,8 @@ router.post(
       .isIn(VALID_ADDRESS_DOC_TYPES)
       .withMessage(`document_type must be one of: ${VALID_ADDRESS_DOC_TYPES.join(', ')}`),
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     const { verification_id } = req.params;
     const documentType = req.body.document_type as AddressDocumentType;
     const file = req.file;
@@ -169,12 +166,8 @@ router.get(
   '/:verification_id/address-status',
   authenticateAPIKey,
   [param('verification_id').isUUID()],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     const { verification_id } = req.params;
 
     const { data: verification, error } = await supabase

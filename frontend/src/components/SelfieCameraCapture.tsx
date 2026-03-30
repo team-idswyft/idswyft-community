@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { computeLaplacianVariance } from '../utils/camera/computeLaplacianVariance';
+import { selfieCameraCss } from '../utils/camera/cameraAnimations';
+import { useCameraStream } from '../utils/camera/useCameraStream';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 interface SelfieCameraCaptureProps {
@@ -29,53 +32,6 @@ const GUIDANCE: Record<FaceStatus, string> = {
   adjusting: 'Center your face\u2026 hold steady',
   ready:     'Perfect! Capturing\u2026',
 };
-
-// ─── CSS (injected once) ──────────────────────────────────────────────────────
-const cameraCss = `
-@keyframes selfiePulse { 0%,100%{opacity:0.6} 50%{opacity:1} }
-@keyframes shutterFlash { 0%{opacity:0} 10%{opacity:0.8} 100%{opacity:0} }
-@keyframes camFadeIn { from{opacity:0} to{opacity:1} }
-`;
-
-// ─── Laplacian focus analysis (copied from IDCameraCapture — self-contained) ─
-function computeLaplacianVariance(
-  ctx: CanvasRenderingContext2D,
-  x: number, y: number, w: number, h: number,
-): number {
-  const imageData = ctx.getImageData(x, y, w, h);
-  const pixels = imageData.data;
-  const width = w;
-  const height = h;
-
-  const gray = new Float32Array(width * height);
-  for (let i = 0; i < gray.length; i++) {
-    const idx = i * 4;
-    gray[i] = 0.299 * pixels[idx] + 0.587 * pixels[idx + 1] + 0.114 * pixels[idx + 2];
-  }
-
-  let sum = 0;
-  let sumSq = 0;
-  let count = 0;
-
-  for (let row = 1; row < height - 1; row++) {
-    for (let col = 1; col < width - 1; col++) {
-      const idx = row * width + col;
-      const lap =
-        gray[idx - width] +
-        gray[idx - 1] +
-        -4 * gray[idx] +
-        gray[idx + 1] +
-        gray[idx + width];
-      sum += lap;
-      sumSq += lap * lap;
-      count++;
-    }
-  }
-
-  if (count === 0) return 0;
-  const mean = sum / count;
-  return (sumSq / count) - (mean * mean);
-}
 
 // ─── Skin-tone detection ──────────────────────────────────────────────────────
 function analyzeFaceInOval(
@@ -169,8 +125,7 @@ const SelfieCameraCapture: React.FC<SelfieCameraCaptureProps> = ({
   const videoRef = useRef<HTMLVideoElement>(null);
   const analysisCanvasRef = useRef<HTMLCanvasElement>(null);
   const captureCanvasRef = useRef<HTMLCanvasElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const animFrameRef = useRef<number>(0);
+  const { streamRef, animFrameRef, stopStream } = useCameraStream();
   const readySinceRef = useRef<number | null>(null);
   const capturedBlobRef = useRef<Blob | null>(null);
   const lastAnalysisRef = useRef<number>(0);
@@ -185,12 +140,6 @@ const SelfieCameraCapture: React.FC<SelfieCameraCaptureProps> = ({
       stopStream();
       if (capturedUrl) URL.revokeObjectURL(capturedUrl);
     };
-  }, []);
-
-  const stopStream = useCallback(() => {
-    if (animFrameRef.current) cancelAnimationFrame(animFrameRef.current);
-    streamRef.current?.getTracks().forEach(t => t.stop());
-    streamRef.current = null;
   }, []);
 
   // ── Start camera (front-facing) ─────────────────────────────────────────
@@ -402,7 +351,7 @@ const SelfieCameraCapture: React.FC<SelfieCameraCaptureProps> = ({
   if (error) {
     return (
       <div style={overlayStyle}>
-        <style>{cameraCss}</style>
+        <style>{selfieCameraCss}</style>
         <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', flex: 1, padding: 32, textAlign: 'center', gap: 16 }}>
           <div style={{ fontSize: 48, opacity: 0.5 }}>!</div>
           <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: '#e8f4f8', lineHeight: 1.5 }}>{error}</p>
@@ -422,7 +371,7 @@ const SelfieCameraCapture: React.FC<SelfieCameraCaptureProps> = ({
 
   return (
     <div style={overlayStyle}>
-      <style>{cameraCss}</style>
+      <style>{selfieCameraCss}</style>
 
       {/* Hidden canvases */}
       <canvas ref={analysisCanvasRef} style={{ display: 'none' }} />

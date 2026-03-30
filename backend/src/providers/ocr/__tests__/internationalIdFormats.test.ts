@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { getCountryFormat, validateIdNumber, INTERNATIONAL_ID_FORMATS } from '../internationalIdFormats.js';
+import { getCountryFormat, validateIdNumber, INTERNATIONAL_ID_FORMATS } from '@idswyft/shared';
 
 describe('International ID Format Registry', () => {
   describe('getCountryFormat', () => {

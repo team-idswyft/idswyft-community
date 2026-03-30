@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { evaluateGate3 } from '../gates/gate3-crossValidation.js';
-import type { CrossValidationResult } from '../models/types.js';
+import type { CrossValidationResult } from '@idswyft/shared';
 
 function makeCrossValResult(overrides: Partial<CrossValidationResult> = {}): CrossValidationResult {
   return {

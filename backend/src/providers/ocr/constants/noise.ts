@@ -1,4 +1,4 @@
-import { INTERNATIONAL_HEADER_NOISE } from '../internationalIdFormats.js';
+import { INTERNATIONAL_HEADER_NOISE } from '@idswyft/shared';
 
 /** Specimen / watermark labels found on sample documents */
 export const SPECIMEN_LABELS = /\b(EXEMPLAR|SPECIMEN|MUSTER|MOD[ÈE]LE|MODELO|MUESTRA|ESEMPIO|EKSEMPLAR|ESIMERKKIKAPPALE|WZÓR)\b/i;

@@ -12,7 +12,7 @@
  *   - Non-US document with valid MRZ (barcode not required)
  */
 
-import type { BackExtractionResult, FrontExtractionResult, GateResult } from '../models/types.js';
+import type { BackExtractionResult, FrontExtractionResult, GateResult } from '@idswyft/shared';
 
 export function evaluateGate2(
   back: BackExtractionResult,

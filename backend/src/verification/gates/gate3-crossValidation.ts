@@ -11,7 +11,7 @@
  *   - Score >= 0.75 → REVIEW (still passes gate, flags for human review)
  */
 
-import type { CrossValidationResult, GateResult } from '../models/types.js';
+import type { CrossValidationResult, GateResult } from '@idswyft/shared';
 
 export function evaluateGate3(crossVal: CrossValidationResult): GateResult {
   // Document expired takes priority

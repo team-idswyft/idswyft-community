@@ -1,7 +1,8 @@
 import express, { Request, Response } from 'express';
-import { body, query, param, validationResult } from 'express-validator';
+import { body, query, param } from 'express-validator';
 import { authenticateJWT, requireAdminRole, authenticateAdminOrReviewer } from '@/middleware/auth.js';
 import { catchAsync, ValidationError, NotFoundError, AuthorizationError } from '@/middleware/errorHandler.js';
+import { validate } from '@/middleware/validate.js';
 import { VerificationService } from '@/services/verification.js';
 import { WebhookService } from '@/services/webhook.js';
 import { StorageService } from '@/services/storage.js';
@@ -71,12 +72,8 @@ router.get('/verifications',
       .isInt({ min: 1, max: 100 })
       .withMessage('Limit must be between 1 and 100')
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     // Reviewer: always scoped to their developer — never trust query param
     const scopedDeveloperId = req.reviewer
       ? req.reviewer.developer_id
@@ -141,12 +138,8 @@ router.get('/verification/:id',
       .isUUID()
       .withMessage('Verification ID must be a valid UUID')
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     const { id } = req.params;
 
     // Get verification with related data
@@ -229,12 +222,8 @@ router.put('/verification/:id/review',
       .isIn(['verified', 'failed', 'manual_review', 'pending'])
       .withMessage('new_status must be verified, failed, manual_review, or pending'),
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     const { id } = req.params;
     const { decision, reason, new_status } = req.body;
     const adminUserId = req.user?.id || req.reviewer?.id || '';
@@ -351,12 +340,8 @@ router.get('/developers',
       .isInt({ min: 1, max: 100 })
       .withMessage('Limit must be between 1 and 100')
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-    
     const page = parseInt(req.query.page as string) || 1;
     const limit = parseInt(req.query.limit as string) || 50;
     const offset = (page - 1) * limit;
@@ -415,12 +400,8 @@ router.get('/analytics',
       .isUUID()
       .withMessage('Developer ID must be a valid UUID')
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-    
     const period = req.query.period as string || '30d';
     const developerId = req.query.developer_id as string;
     
@@ -591,12 +572,8 @@ router.get('/analytics/funnel',
     query('period').optional().isIn(['7d', '30d', '90d']).withMessage('Period must be 7d, 30d, or 90d'),
     query('developer_id').optional().isUUID().withMessage('Developer ID must be a valid UUID'),
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     const period = parsePeriodFilter(req);
     const developerId = req.query.developer_id as string | undefined;
     const funnel = await getConversionFunnel(period, developerId);
@@ -611,12 +588,8 @@ router.get('/analytics/rejections',
   [
     query('period').optional().isIn(['7d', '30d', '90d']).withMessage('Period must be 7d, 30d, or 90d'),
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     const period = parsePeriodFilter(req);
     const rejections = await getGateRejectionBreakdown(period);
     res.json({ rejections });
@@ -630,12 +603,8 @@ router.get('/analytics/fraud-patterns',
   [
     query('period').optional().isIn(['7d', '30d', '90d']).withMessage('Period must be 7d, 30d, or 90d'),
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     const period = parsePeriodFilter(req);
     const patterns = await getFraudPatterns(period);
     res.json({ patterns });
@@ -649,12 +618,8 @@ router.get('/analytics/risk-distribution',
   [
     query('period').optional().isIn(['7d', '30d', '90d']).withMessage('Period must be 7d, 30d, or 90d'),
   ],
+  validate,
   catchAsync(async (req: Request, res: Response) => {
-    const errors = validationResult(req);
-    if (!errors.isEmpty()) {
-      throw new ValidationError('Validation failed', 'multiple', errors.array());
-    }
-
     const period = parsePeriodFilter(req);
     const distribution = await getRiskDistribution(period);
     res.json({ distribution });

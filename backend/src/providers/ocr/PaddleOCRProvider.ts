@@ -2,12 +2,10 @@
 // In production Docker, the engine handles OCR via HTTP (ENGINE_URL).
 let PaddleOcrService: any;
 type PaddleOcrResult = any;
-import { OCRProvider } from '../types.js';
+import type { OCRProvider, LLMProviderConfig } from '@idswyft/shared';
+import { getCountryFormat, findLowConfidenceFields, extractFieldsWithLLM, mergeLLMResults } from '@idswyft/shared';
 import { OCRData } from '../../types/index.js';
 import { logger } from '@/utils/logger.js';
-import { getCountryFormat } from './internationalIdFormats.js';
-import { findLowConfidenceFields, extractFieldsWithLLM, mergeLLMResults } from './LLMFieldExtractor.js';
-import type { LLMProviderConfig } from './LLMFieldExtractor.js';
 import { DriversLicenseExtractor } from './extractors/DriversLicenseExtractor.js';
 import { PassportExtractor } from './extractors/PassportExtractor.js';
 import { NationalIdExtractor } from './extractors/NationalIdExtractor.js';
@@ -16,7 +14,7 @@ import { GenericExtractor } from './extractors/GenericExtractor.js';
 
 // ── Public API re-exports ─────────────────────────────────────
 export { standardizeDateFormat } from './utils/dateUtils.js';
-export { STATE_DL_FORMATS } from './dlFormats.js';
+export { STATE_DL_FORMATS } from '@idswyft/shared';
 
 // ── Provider ──────────────────────────────────────────────────
 

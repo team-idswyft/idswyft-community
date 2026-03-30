@@ -7,7 +7,7 @@
  * PASS if similarity >= threshold → VERIFICATION SUCCESS.
  */
 
-import type { FaceMatchResult, GateResult } from '../models/types.js';
+import type { FaceMatchResult, GateResult } from '@idswyft/shared';
 
 export function evaluateGate5(faceMatch: FaceMatchResult): GateResult {
   if (!faceMatch.passed) {

@@ -16,8 +16,9 @@ import { generateAPIKey, authenticateAPIKey } from './middleware/auth.js';
 import { apiActivityLogger } from './middleware/apiLogger.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { logger } from './utils/logger.js';
+import { configureSharedLogger } from '@idswyft/shared';
 import newVerificationRoutes from './routes/newVerification.js';
-import developerRoutes from './routes/developer.js';
+import developerRoutes from './routes/developer/index.js';
 import adminRoutes from './routes/admin.js';
 import adminThresholdsRoutes from './routes/admin-thresholds.js';
 import authRoutes from './routes/auth.js';
@@ -33,6 +34,9 @@ import setupRoutes from './routes/setup.js';
 import { API_DOCS_MARKDOWN } from './api-docs/apiDocsMarkdown.js';
 
 const app = express();
+
+// Wire shared-package logger to backend's Winston instance
+configureSharedLogger(logger);
 
 // Trust proxy for production deployment (Railway, etc.)
 if (config.nodeEnv === 'production') {
