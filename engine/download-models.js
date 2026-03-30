@@ -42,26 +42,34 @@ const modelFiles = [
 /**
  * Download a file from URL to local path
  */
-function downloadFile(url, filePath) {
+function downloadFile(url, filePath, redirects = 0) {
   return new Promise((resolve, reject) => {
-    console.log(`📥 Downloading: ${path.basename(filePath)}`);
-    
+    if (redirects === 0) console.log(`📥 Downloading: ${path.basename(filePath)}`);
+    if (redirects > 5) { reject(new Error('Too many redirects')); return; }
+
     const file = fs.createWriteStream(filePath);
-    
+
     https.get(url, (response) => {
+      // Follow redirects (GitHub releases return 302)
+      if ([301, 302, 307, 308].includes(response.statusCode) && response.headers.location) {
+        file.close();
+        fs.unlink(filePath, () => {});
+        return downloadFile(response.headers.location, filePath, redirects + 1).then(resolve, reject);
+      }
+
       if (response.statusCode !== 200) {
         reject(new Error(`Failed to download ${url}: ${response.statusCode}`));
         return;
       }
-      
+
       response.pipe(file);
-      
+
       file.on('finish', () => {
         file.close();
         console.log(`✅ Downloaded: ${path.basename(filePath)}`);
         resolve();
       });
-      
+
     }).on('error', (error) => {
       fs.unlink(filePath, () => {}); // Delete partial file
       reject(error);
@@ -72,8 +80,8 @@ function downloadFile(url, filePath) {
 // Deepfake detector model (optional — system works without it)
 const deepfakeModel = {
   fileName: 'deepfake-detector.onnx',
-  // Placeholder URL — replace with actual model hosting when available
-  url: process.env.DEEPFAKE_MODEL_URL || null,
+  url: process.env.DEEPFAKE_MODEL_URL ||
+    'https://github.com/team-idswyft/idswyft/releases/download/models-v1.0.0/deepfake-detector.onnx',
 };
 
 /**
