@@ -473,7 +473,9 @@ function mapStatusForResponse(state: Readonly<SessionState>): {
 
   let finalResult: string | null = null;
   if (state.current_step === VerificationStatus.COMPLETE) {
-    finalResult = state.cross_validation?.verdict === 'REVIEW' ? 'manual_review' : 'verified';
+    const needsReview = state.cross_validation?.verdict === 'REVIEW'
+      || !!state.face_match?.skipped_reason;
+    finalResult = needsReview ? 'manual_review' : 'verified';
   } else if (state.current_step === VerificationStatus.HARD_REJECTED) {
     finalResult = 'failed';
   }
@@ -1146,6 +1148,7 @@ router.post('/:verification_id/live-capture',
         liveness_score: liveResult.liveness_score,
         liveness_mode: headTurnMetadata ? 'head_turn' : 'passive',
       },
+      deepfake_check: liveResult.deepfake_check ?? null,
       final_result: mapped.final_result,
       rejection_reason: state.rejection_reason,
       rejection_detail: state.rejection_detail,
@@ -1330,6 +1333,7 @@ router.get('/:verification_id/status',
       cross_validation_results: state.cross_validation ?? null,
       face_match_results: state.face_match ?? null,
       liveness_results: state.liveness ?? null,
+      deepfake_check: state.deepfake_check ?? null,
       aml_screening: state.aml_screening ?? null,
       risk_score: riskScore,
       barcode_extraction_failed: state.back_extraction ? !state.back_extraction.qr_payload : null,

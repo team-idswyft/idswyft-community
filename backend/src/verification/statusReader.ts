@@ -41,7 +41,9 @@ export function mapStatusForResponse(state: Readonly<SessionState>): {
 
   let finalResult: string | null = null;
   if (state.current_step === VerificationStatus.COMPLETE) {
-    finalResult = state.cross_validation?.verdict === 'REVIEW' ? 'manual_review' : 'verified';
+    const needsReview = state.cross_validation?.verdict === 'REVIEW'
+      || !!state.face_match?.skipped_reason;
+    finalResult = needsReview ? 'manual_review' : 'verified';
   } else if (state.current_step === VerificationStatus.HARD_REJECTED) {
     finalResult = 'failed';
   }

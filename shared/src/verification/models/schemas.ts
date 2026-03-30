@@ -200,6 +200,7 @@ export interface SessionState {
   cross_validation: CrossValidationResult | null;
   face_match: FaceMatchResult | null;
   liveness: { passed: boolean; score: number } | null;
+  deepfake_check: { isReal: boolean; realProbability: number; fakeProbability: number } | null;
   aml_screening: AMLScreeningSessionResult | null;
   created_at: string;
   updated_at: string;
