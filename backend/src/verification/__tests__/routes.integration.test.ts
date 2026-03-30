@@ -13,7 +13,7 @@
  *   - SessionFlowError handling (out-of-order steps)
  */
 
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from 'vitest';
 import express from 'express';
 import request from 'supertest';
 import { VerificationStatus } from '@idswyft/shared';
@@ -235,11 +235,14 @@ function fakeJpegBuffer(): Buffer {
 describe('V2 Verification Routes — Integration', () => {
   let app: express.Express;
 
-  beforeEach(async () => {
+  beforeAll(async () => {
+    app = await createApp();
+  });
+
+  beforeEach(() => {
     vi.clearAllMocks();
     contextStore.clear();
     verificationStore.clear();
-    app = await createApp();
   });
 
   describe('POST /api/v2/verify/initialize', () => {

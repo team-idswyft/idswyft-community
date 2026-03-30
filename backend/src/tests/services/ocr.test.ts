@@ -57,34 +57,37 @@ vi.mock('../../services/providerMetrics.js', () => ({
   },
 }));
 
+// Mock the provider factory at module level — avoids slow dynamic imports in test body
+const mockProcessDocument = vi.fn();
+vi.mock('@/providers/ocr/index.js', () => ({
+  createOCRProvider: vi.fn(() => ({
+    name: 'paddle',
+    processDocument: mockProcessDocument,
+  })),
+}));
+
+import { createOCRProvider } from '@/providers/ocr/index.js';
+import { OCRService } from '../../services/ocr.js';
+
 describe('OCRService provider delegation', () => {
   afterEach(() => {
     delete process.env.OPENAI_API_KEY;
     delete process.env.OCR_PROVIDER;
     vi.restoreAllMocks();
+    mockProcessDocument.mockReset();
   });
 
   it('throws when provider fails (no silent fallback)', async () => {
-    // Mock the provider factory to return a provider that throws
-    const { createOCRProvider } = await import('@/providers/ocr/index.js');
-    vi.spyOn(
-      await import('@/providers/ocr/index.js'),
-      'createOCRProvider',
-    ).mockReturnValue({
-      name: 'crashing-provider',
-      processDocument: vi.fn().mockRejectedValue(new Error('OCR engine crashed')),
-    });
+    mockProcessDocument.mockRejectedValue(new Error('OCR engine crashed'));
 
-    const { OCRService } = await import('../../services/ocr.js');
     const service = new OCRService();
 
     await expect(service.processDocument('doc-1', '/fake/path.jpg', 'passport'))
       .rejects.toThrow('OCR processing failed');
   });
 
-  it('defaults to paddle provider when OCR_PROVIDER is unset', async () => {
+  it('defaults to paddle provider when OCR_PROVIDER is unset', () => {
     delete process.env.OCR_PROVIDER;
-    const { createOCRProvider } = await import('@/providers/ocr/index.js');
     const provider = createOCRProvider();
     expect(provider.name).toBe('paddle');
   });
