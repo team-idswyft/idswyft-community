@@ -28,6 +28,7 @@ interface WebhooksSectionProps {
 }
 
 export function WebhooksSection({ token, apiKeys }: WebhooksSectionProps) {
+  const authHeaders = { Authorization: `Bearer ${token}` } as Record<string, string>
   const [webhookUrl, setWebhookUrl] = useState('')
   const [webhookApiKeyId, setWebhookApiKeyId] = useState<string | null>(null)
   const [selectedWebhookEvents, setSelectedWebhookEvents] = useState<string[]>([...WEBHOOK_EVENT_NAMES])
@@ -50,6 +51,7 @@ export function WebhooksSection({ token, apiKeys }: WebhooksSectionProps) {
     const fetchWebhooks = async () => {
       try {
         const res = await fetch(`${API_BASE_URL}/api/developer/webhooks`, {
+          headers: authHeaders,
           credentials: 'include' as RequestCredentials,
         })
         if (res.ok) {
@@ -83,7 +85,7 @@ export function WebhooksSection({ token, apiKeys }: WebhooksSectionProps) {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/webhooks`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...csrfHeader() },
+        headers: { 'Content-Type': 'application/json', ...authHeaders, ...csrfHeader() },
         credentials: 'include' as RequestCredentials,
         body: JSON.stringify({ url, events: selectedWebhookEvents, api_key_id: webhookApiKeyId }),
       })
@@ -110,7 +112,7 @@ export function WebhooksSection({ token, apiKeys }: WebhooksSectionProps) {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/webhooks/${id}`, {
         method: 'DELETE',
-        headers: csrfHeader(),
+        headers: { ...authHeaders, ...csrfHeader() },
         credentials: 'include' as RequestCredentials,
       })
       if (!res.ok) throw new Error('Failed to remove webhook')
@@ -130,7 +132,7 @@ export function WebhooksSection({ token, apiKeys }: WebhooksSectionProps) {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/webhooks/${id}/test`, {
         method: 'POST',
-        headers: csrfHeader(),
+        headers: { ...authHeaders, ...csrfHeader() },
         credentials: 'include' as RequestCredentials,
         signal: controller.signal,
       })
@@ -158,6 +160,7 @@ export function WebhooksSection({ token, apiKeys }: WebhooksSectionProps) {
     if (!token) return
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/webhooks/${id}/secret`, {
+        headers: authHeaders,
         credentials: 'include' as RequestCredentials,
       })
       const data = await res.json()
@@ -182,6 +185,7 @@ export function WebhooksSection({ token, apiKeys }: WebhooksSectionProps) {
     setDeliveriesLoading(webhookId)
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/webhooks/${webhookId}/deliveries`, {
+        headers: authHeaders,
         credentials: 'include' as RequestCredentials,
       })
       if (res.ok) {
@@ -198,13 +202,14 @@ export function WebhooksSection({ token, apiKeys }: WebhooksSectionProps) {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/webhooks/${webhookId}/deliveries/${deliveryId}/resend`, {
         method: 'POST',
-        headers: csrfHeader(),
+        headers: { ...authHeaders, ...csrfHeader() },
         credentials: 'include' as RequestCredentials,
       })
       if (res.ok) {
         toast.success('Webhook resent')
         // Refresh deliveries for this webhook
         const listRes = await fetch(`${API_BASE_URL}/api/developer/webhooks/${webhookId}/deliveries`, {
+          headers: authHeaders,
           credentials: 'include' as RequestCredentials,
         })
         if (listRes.ok) {

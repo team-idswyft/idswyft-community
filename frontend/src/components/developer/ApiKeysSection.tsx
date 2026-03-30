@@ -17,9 +17,10 @@ import { inputStyle, labelStyle, copyToClipboard } from './types'
 
 // --- CreateKeyModal ---
 
-function CreateKeyModal({ onClose, onCreated }: {
+function CreateKeyModal({ onClose, onCreated, token }: {
   onClose: () => void
   onCreated: (key: ApiKey, fullKey: string) => void
+  token: string
 }) {
   const [name, setName] = useState('')
   const [isSandbox, setIsSandbox] = useState(false)
@@ -31,7 +32,7 @@ function CreateKeyModal({ onClose, onCreated }: {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/api-key`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...csrfHeader() }, credentials: 'include' as RequestCredentials,
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...csrfHeader() }, credentials: 'include' as RequestCredentials,
         body: JSON.stringify({ name, is_sandbox: isSandbox }),
       })
       const data = await res.json()
@@ -119,6 +120,7 @@ interface ApiKeysSectionProps {
 }
 
 export function ApiKeysSection({ token, apiKeys, setApiKeys, stats, newFullKey, setNewFullKey, onUnauthorized, renderAfterStats }: ApiKeysSectionProps) {
+  const authHeaders = { Authorization: `Bearer ${token}` } as Record<string, string>
   const [showCreate, setShowCreate] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [expandedKeyId, setExpandedKeyId] = useState<string | null>(null)
@@ -150,7 +152,7 @@ export function ApiKeysSection({ token, apiKeys, setApiKeys, stats, newFullKey, 
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/api-key/${id}`, {
         method: 'DELETE',
-        headers: csrfHeader(),
+        headers: { ...authHeaders, ...csrfHeader() },
         credentials: 'include' as RequestCredentials,
       })
       if (res.status === 401) { onUnauthorized(); return }
@@ -169,6 +171,7 @@ export function ApiKeysSection({ token, apiKeys, setApiKeys, stats, newFullKey, 
     setLogsLoadingForKey(keyId)
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/activity?api_key_id=${encodeURIComponent(keyId)}`, {
+        headers: authHeaders,
         credentials: 'include' as RequestCredentials,
       })
       const data = await res.json()
@@ -271,6 +274,7 @@ export function ApiKeysSection({ token, apiKeys, setApiKeys, stats, newFullKey, 
     setVerificationDetailError(null)
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/verifications/${verificationId}`, {
+        headers: authHeaders,
         credentials: 'include' as RequestCredentials,
       })
       const data = await res.json()
@@ -628,6 +632,7 @@ export function ApiKeysSection({ token, apiKeys, setApiKeys, stats, newFullKey, 
         <CreateKeyModal
           onClose={() => setShowCreate(false)}
           onCreated={handleCreated}
+          token={token}
         />
       )}
 

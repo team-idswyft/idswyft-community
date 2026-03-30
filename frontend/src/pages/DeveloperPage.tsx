@@ -53,9 +53,13 @@ export function DeveloperPage() {
   const [newFullKey, setNewFullKey] = useState<string | null>(null)
   const [showSettings, setShowSettings] = useState(false)
 
+  const authHeaders = (t: string) => ({ Authorization: `Bearer ${t}`, } as Record<string, string>)
+
   const fetchKeys = async () => {
+    if (!token) return
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/api-keys`, {
+        headers: authHeaders(token),
         credentials: 'include' as RequestCredentials,
       })
       if (res.status === 401) { setToken(null); return }
@@ -64,8 +68,10 @@ export function DeveloperPage() {
   }
 
   const fetchStats = async () => {
+    if (!token) return
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/stats`, {
+        headers: authHeaders(token),
         credentials: 'include' as RequestCredentials,
       })
       if (res.ok) setStats(await res.json())
@@ -86,7 +92,7 @@ export function DeveloperPage() {
   }
 
   const handleLogout = () => {
-    fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include', headers: csrfHeader() }).catch(() => {})
+    fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include', headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...csrfHeader() } }).catch(() => {})
     clearCsrfToken()
     setToken(null)
     setApiKeys([])

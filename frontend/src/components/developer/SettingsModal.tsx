@@ -22,6 +22,7 @@ interface SettingsModalProps {
 }
 
 export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModalProps) {
+  const authHeaders = { Authorization: `Bearer ${token}` } as Record<string, string>
   // Profile settings
   const [profileName, setProfileName] = useState('')
   const [profileCompany, setProfileCompany] = useState('')
@@ -63,6 +64,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
     setProfileLoading(true)
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/profile`, {
+        headers: authHeaders,
         credentials: 'include' as RequestCredentials,
       })
       if (res.ok) {
@@ -82,7 +84,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/profile`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', ...csrfHeader() }, credentials: 'include' as RequestCredentials,
+        headers: { 'Content-Type': 'application/json', ...authHeaders, ...csrfHeader() }, credentials: 'include' as RequestCredentials,
         body: JSON.stringify({ name: profileName, company: profileCompany || null }),
       })
       if (res.ok) {
@@ -102,7 +104,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/avatar`, {
         method: 'POST',
-        headers: csrfHeader(),
+        headers: { ...authHeaders, ...csrfHeader() },
         credentials: 'include' as RequestCredentials,
         body: formData,
       })
@@ -121,6 +123,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
     setLlmLoading(true)
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/settings/llm`, {
+        headers: authHeaders,
         credentials: 'include' as RequestCredentials,
       })
       if (res.ok) {
@@ -145,7 +148,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
       if (llmProvider === 'custom') body.endpoint_url = llmEndpointUrl || null
       const res = await fetch(`${API_BASE_URL}/api/developer/settings/llm`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', ...csrfHeader() }, credentials: 'include' as RequestCredentials,
+        headers: { 'Content-Type': 'application/json', ...authHeaders, ...csrfHeader() }, credentials: 'include' as RequestCredentials,
         body: JSON.stringify(body),
       })
       if (res.ok) {
@@ -165,7 +168,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/settings/llm`, {
         method: 'PUT',
-        headers: { 'Content-Type': 'application/json', ...csrfHeader() }, credentials: 'include' as RequestCredentials,
+        headers: { 'Content-Type': 'application/json', ...authHeaders, ...csrfHeader() }, credentials: 'include' as RequestCredentials,
         body: JSON.stringify({ provider: null }),
       })
       if (res.ok) {
@@ -183,6 +186,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
   const fetchReviewers = async () => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/reviewers`, {
+        headers: authHeaders,
         credentials: 'include' as RequestCredentials,
       })
       if (res.ok) {
@@ -198,7 +202,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/reviewers/invite`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...csrfHeader() }, credentials: 'include' as RequestCredentials,
+        headers: { 'Content-Type': 'application/json', ...authHeaders, ...csrfHeader() }, credentials: 'include' as RequestCredentials,
         body: JSON.stringify({ email: reviewerEmail, name: reviewerName || undefined }),
       })
       const data = await res.json()
@@ -219,7 +223,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/reviewers/${id}`, {
         method: 'DELETE',
-        headers: csrfHeader(),
+        headers: { ...authHeaders, ...csrfHeader() },
         credentials: 'include' as RequestCredentials,
       })
       if (res.ok) {
@@ -238,13 +242,13 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/account`, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json', ...csrfHeader() },
+        headers: { 'Content-Type': 'application/json', ...authHeaders, ...csrfHeader() },
         credentials: 'include' as RequestCredentials,
         body: JSON.stringify({ confirm_email: deleteAccountEmail }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.message || 'Failed to delete account')
-      fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include', headers: csrfHeader() }).catch(() => {})
+      fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include', headers: { ...authHeaders, ...csrfHeader() } }).catch(() => {})
       clearCsrfToken()
       toast.success('Account deleted')
       onAccountDeleted()
