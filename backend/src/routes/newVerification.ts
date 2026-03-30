@@ -109,6 +109,8 @@ async function hydrateSession(verificationId: string, isSandbox: boolean): Promi
     back_extraction: savedState.back_extraction,
     cross_validation: savedState.cross_validation,
     face_match: savedState.face_match,
+    liveness: (savedState as any).liveness ?? null,
+    deepfake_check: (savedState as any).deepfake_check ?? null,
     aml_screening: (savedState as any).aml_screening ?? null,
     created_at: savedState.created_at,
     completed_at: savedState.completed_at,
