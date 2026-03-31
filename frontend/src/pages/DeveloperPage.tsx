@@ -53,7 +53,7 @@ export function DeveloperPage() {
   const [newFullKey, setNewFullKey] = useState<string | null>(null)
   const [showSettings, setShowSettings] = useState(false)
 
-  const authHeaders = (t: string) => ({ Authorization: `Bearer ${t}`, } as Record<string, string>)
+  const authHeaders = (t: string) => t === 'session' ? {} as Record<string, string> : { Authorization: `Bearer ${t}` } as Record<string, string>
 
   const fetchKeys = async () => {
     if (!token) return

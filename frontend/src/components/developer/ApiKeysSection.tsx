@@ -32,7 +32,7 @@ function CreateKeyModal({ onClose, onCreated, token }: {
     try {
       const res = await fetch(`${API_BASE_URL}/api/developer/api-key`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${token}`, ...csrfHeader() }, credentials: 'include' as RequestCredentials,
+        headers: { 'Content-Type': 'application/json', ...(token !== 'session' ? { Authorization: `Bearer ${token}` } : {}), ...csrfHeader() }, credentials: 'include' as RequestCredentials,
         body: JSON.stringify({ name, is_sandbox: isSandbox }),
       })
       const data = await res.json()
@@ -120,7 +120,7 @@ interface ApiKeysSectionProps {
 }
 
 export function ApiKeysSection({ token, apiKeys, setApiKeys, stats, newFullKey, setNewFullKey, onUnauthorized, renderAfterStats }: ApiKeysSectionProps) {
-  const authHeaders = { Authorization: `Bearer ${token}` } as Record<string, string>
+  const authHeaders = (token === 'session' ? {} : { Authorization: `Bearer ${token}` }) as Record<string, string>
   const [showCreate, setShowCreate] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
   const [expandedKeyId, setExpandedKeyId] = useState<string | null>(null)

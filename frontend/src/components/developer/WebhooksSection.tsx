@@ -28,7 +28,7 @@ interface WebhooksSectionProps {
 }
 
 export function WebhooksSection({ token, apiKeys }: WebhooksSectionProps) {
-  const authHeaders = { Authorization: `Bearer ${token}` } as Record<string, string>
+  const authHeaders = (token === 'session' ? {} : { Authorization: `Bearer ${token}` }) as Record<string, string>
   const [webhookUrl, setWebhookUrl] = useState('')
   const [webhookApiKeyId, setWebhookApiKeyId] = useState<string | null>(null)
   const [selectedWebhookEvents, setSelectedWebhookEvents] = useState<string[]>([...WEBHOOK_EVENT_NAMES])

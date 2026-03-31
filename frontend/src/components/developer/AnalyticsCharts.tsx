@@ -425,7 +425,8 @@ export function AnalyticsCharts({ token }: { token: string }) {
     async function fetchAnalytics() {
       try {
         const res = await fetch(`${API_BASE_URL}/api/developer/analytics`, {
-          headers: { Authorization: `Bearer ${token}` },
+          headers: token === 'session' ? {} : { Authorization: `Bearer ${token}` },
+          credentials: 'include' as RequestCredentials,
         })
         if (!res.ok) throw new Error('Failed to fetch analytics')
         const json = await res.json()

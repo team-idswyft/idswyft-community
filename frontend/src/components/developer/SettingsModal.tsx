@@ -22,7 +22,7 @@ interface SettingsModalProps {
 }
 
 export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModalProps) {
-  const authHeaders = { Authorization: `Bearer ${token}` } as Record<string, string>
+  const authHeaders = (token === 'session' ? {} : { Authorization: `Bearer ${token}` }) as Record<string, string>
   // Profile settings
   const [profileName, setProfileName] = useState('')
   const [profileCompany, setProfileCompany] = useState('')
