@@ -8,14 +8,14 @@ const OPENSANCTIONS_API = 'https://api.opensanctions.org/match/default';
  * Always reported in lists_checked for audit compliance, even when no matches are found.
  * See: https://www.opensanctions.org/datasets/default/
  */
-const DEFAULT_LISTS_CHECKED = [
+export const DEFAULT_LISTS_CHECKED = [
   'us_ofac_sdn',
   'eu_fsf',
   'un_sc_sanctions',
   'gb_hmt_sanctions',
   'ca_dfatd_sema_sanctions',
   'au_dfat_sanctions',
-];
+] as const;
 
 /**
  * OpenSanctionsProvider — Uses the free OpenSanctions API for name+DOB matching
