@@ -804,16 +804,49 @@ export class DriversLicenseExtractor extends BaseExtractor {
     labelMap: Map<string, LabelMapEntry>,
   ): NameResult | null {
     const CITY_STATE_RE = /[A-Z][A-Z\s]+,?\s+[A-Z]{2}[,\s]+\d{5}/;
+    const STREET_SUFFIXES = /\b(?:ST(?:REET)?|AVE(?:NUE)?|BLVD|BOULEVARD|DR(?:IVE)?|RD|ROAD|LN|LANE|WAY|CT|COURT|PL(?:ACE)?|TER(?:RACE)?|CIR(?:CLE)?|HWY|HIGHWAY|PKWY|PARKWAY|SQ(?:UARE)?|TPKE|TURNPIKE|TRL|TRAIL)\b/i;
+
+    // Fix 5: Aggressive "8"/"9" stripping — handles both "8 123" and merged "8123"
     const normalizeAddr = (s: string) =>
-      s.replace(/^[89]\s+/, '')
+      s.replace(/^[89]\s+/, '')        // "8 123 MAIN" → "123 MAIN"
+       .replace(/^8([1-9]\d{2,4}\s)/, '$1') // "8123 MAIN" → "123 MAIN" (preserves "812 MAIN", "80 MAIN")
        .replace(/,/g, ' ')
+       .replace(/\./g, '')             // "ST." → "ST"
+       .replace(/([A-Z])-([A-Z])/gi, '$1 $2') // "SAMPLE-STREET" → "SAMPLE STREET" (preserves zip hyphens)
+       .replace(/\s\d\s+(?=APT|STE|SUITE|UNIT|#|BLDG)/gi, ' ') // "STREET 6 APT" → "STREET APT"
+       .replace(/\s[a-z]\s(?=[A-Z])/g, ' ')   // "BOULEVARD n NEW" → "BOULEVARD NEW"
+       .replace(/\b((?:APT|STE|SUITE|UNIT)\s+\d+)\s+[A-Z]\s/gi, '$1 ') // "APT 2 R TOPEKA" → "APT 2 TOPEKA"
        .replace(/\s+/g, ' ')
+       .replace(/(\d{5}(?:-?\d{4})?)\s+[A-Z]{1,4}$/, '$1') // strip trailing noise after zip
        .trim();
 
-    const findCityLine = (startIdx: number): string | null => {
+    // Fix 1: Normalize a raw OCR line — trim whitespace + strip AAMVA [89] prefix
+    const normLine = (raw: string) => raw.trim().replace(/^[89]\s+/, '');
+
+    // Fix 4: Collect apartment/unit lines between street and city
+    const isAamvaNameLine = (s: string) => /^[12]\s+[A-Z]/i.test(s);
+
+    const findAddressBlock = (startIdx: number): { apt: string; city: string } | null => {
+      let apt = '';
       for (let offset = 1; offset <= 3 && startIdx + offset < lines.length; offset++) {
-        const candidate = lines[startIdx + offset].text.trim().replace(/^[89]\s+/, '');
-        if (CITY_STATE_RE.test(candidate)) return candidate;
+        const candidate = normLine(lines[startIdx + offset].text);
+        if (CITY_STATE_RE.test(candidate)) {
+          // Strip known DL field prefixes from city line (e.g. "CLASA C SACRAMENTO" → "SACRAMENTO")
+          const city = candidate
+            .replace(/^(?:CLAS[SA]?\s+\S+\s+)/i, '')       // "CLASA C SACRAMENTO" → "SACRAMENTO"
+            .replace(/^(?:\d+[a-z]?\s+(?![\d]))/i, '');     // "9 CLASS" etc
+          return { apt, city };
+        }
+        // Skip AAMVA name prefix lines (e.g. "1 SAMPLE", "2 BRENDA T")
+        if (isAamvaNameLine(candidate)) continue;
+        // Intermediate line — apartment/unit or additional address line
+        if (/\b(?:APT|STE|SUITE|UNIT|#|BLDG|FL|FLOOR)\b/i.test(candidate) ||
+            (candidate.length < 25 &&
+             !/\b(?:SEX|HGT|EYE|CLAS|CLASS|END|REST|RESTR|EXP|ISS|DOB|DONOR|VETERAN)\b/i.test(candidate) &&
+             !/\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/.test(candidate) &&
+             !/\b(?:4[ab]|15|16|17|18)\s/.test(candidate))) {
+          apt += ' ' + candidate;
+        }
       }
       return null;
     };
@@ -821,11 +854,20 @@ export class DriversLicenseExtractor extends BaseExtractor {
     // Strategy A: Label-based
     const labelLine = labelMap.get('address');
     if (labelLine) {
+      // If the label line IS a street address (e.g. "8123 STREET ADDRESS"), use it as street
+      const normLabelText = normLine(labelLine.text);
+      if (/^\d{1,5}\s+[A-Z]/.test(normLabelText) && normLabelText.length > 5) {
+        let address = normLabelText;
+        const block = findAddressBlock(labelLine.lineIndex);
+        if (block) address += block.apt + ' ' + block.city;
+        return { value: normalizeAddr(address), confidence: labelLine.confidence };
+      }
+
       const afterLabel = this.valueAfterLabel(labelLine.text, /\bADDR(?:ESS)?\b/i);
       if (afterLabel && afterLabel.length > 5) {
         let address = afterLabel;
-        const city = findCityLine(labelLine.lineIndex);
-        if (city) address += ' ' + city;
+        const block = findAddressBlock(labelLine.lineIndex);
+        if (block) address += block.apt + ' ' + block.city;
         return { value: normalizeAddr(address), confidence: labelLine.confidence };
       }
 
@@ -835,16 +877,16 @@ export class DriversLicenseExtractor extends BaseExtractor {
         const isLabel = /\baddr(?:ess)?\b/i.test(aamvaVal);
         if (!isLabel && aamvaVal.length > 5) {
           let address = aamvaVal;
-          const city = findCityLine(labelLine.lineIndex);
-          if (city) address += ' ' + city;
+          const block = findAddressBlock(labelLine.lineIndex);
+          if (block) address += block.apt + ' ' + block.city;
           return { value: normalizeAddr(address), confidence: labelLine.confidence };
         }
         if (isLabel) {
           const streetLine = lines[labelLine.lineIndex + 1];
           if (streetLine && streetLine.text.trim().length > 5) {
             let address = streetLine.text.trim();
-            const city = findCityLine(labelLine.lineIndex + 1);
-            if (city) address += ' ' + city;
+            const block = findAddressBlock(labelLine.lineIndex + 1);
+            if (block) address += block.apt + ' ' + block.city;
             return { value: normalizeAddr(address), confidence: streetLine.confidence };
           }
         }
@@ -853,33 +895,101 @@ export class DriversLicenseExtractor extends BaseExtractor {
       const nextText = this.nextLineText(lines, labelLine.lineIndex);
       if (nextText && nextText.length > 5) {
         let address = nextText;
-        const city = findCityLine(labelLine.lineIndex + 1);
-        if (city) address += ' ' + city;
+        const block = findAddressBlock(labelLine.lineIndex + 1);
+        if (block) address += block.apt + ' ' + block.city;
         return { value: normalizeAddr(address), confidence: labelLine.confidence };
       }
     }
 
-    // Strategy B: Line matching street address pattern
-    const STREET_SUFFIXES = /\b(?:ST(?:REET)?|AVE(?:NUE)?|BLVD|BOULEVARD|DR(?:IVE)?|RD|ROAD|LN|LANE|WAY|CT|COURT|PL(?:ACE)?|TER(?:RACE)?|CIR(?:CLE)?|HWY|HIGHWAY|PKWY|PARKWAY|SQ(?:UARE)?|TPKE|TURNPIKE|TRL|TRAIL)\b/i;
+    // Strategy B: Line matching street address pattern (with Fix 1 normalization)
     const addrLines: FlatLine[] = [];
 
     for (const line of lines) {
-      const text = line.text.replace(/^8\s+/, '');
+      const text = normLine(line.text);
       if (/^\d{1,5}\s+[A-Z]/.test(text) && STREET_SUFFIXES.test(text)) {
         addrLines.push(line);
       }
     }
 
-    if (addrLines.length === 0) return null;
+    // Fix 6: Relax suffix — accept street without suffix if city follows
+    if (addrLines.length === 0) {
+      for (let i = 0; i < lines.length; i++) {
+        const text = normLine(lines[i].text);
+        if (/^\d{1,5}\s+[A-Z]/i.test(text) &&
+            !isAamvaNameLine(text) &&
+            text.split(/\s+/).length >= 3) {
+          const block = findAddressBlock(i);
+          if (block) {
+            addrLines.push(lines[i]);
+            break;
+          }
+        }
+      }
+    }
 
-    const firstLine = addrLines[0];
-    const firstIdx  = lines.indexOf(firstLine);
+    if (addrLines.length > 0) {
+      const firstLine = addrLines[0];
+      const firstIdx  = lines.indexOf(firstLine);
+      let address = normLine(firstLine.text);
+      const block = findAddressBlock(firstIdx);
+      if (block) address += block.apt + ' ' + block.city;
+      return { value: normalizeAddr(address), confidence: firstLine.confidence };
+    }
 
-    let address = firstLine.text.replace(/^8\s+/, '');
-    const city = findCityLine(firstIdx);
-    if (city) address += ' ' + city;
+    // Fix 2: Strategy B.5 — address embedded mid-line after "8 " prefix (e.g. CT)
+    for (const line of lines) {
+      const m = line.text.match(/\b8\s+(\d{1,5}\s+[A-Z].+)/);
+      if (m) {
+        const candidate = m[1];
+        if (STREET_SUFFIXES.test(candidate) || /\d{5}/.test(candidate)) {
+          let address = candidate;
+          const idx = lines.indexOf(line);
+          const block = findAddressBlock(idx);
+          if (block) address += block.apt + ' ' + block.city;
+          return { value: normalizeAddr(address), confidence: line.confidence };
+        }
+      }
+    }
 
-    return { value: normalizeAddr(address), confidence: firstLine.confidence };
+    // Fix 3: Strategy C — reverse city/state/zip lookup, work backwards for street
+    for (let i = 0; i < lines.length; i++) {
+      const text = normLine(lines[i].text);
+      if (!CITY_STATE_RE.test(text)) continue;
+
+      // Check if the same line also has street (combined line like IL)
+      const combined = text.match(/^(\d{1,5}\s+.+?)\s+((?:[A-Z][A-Z\s]+,?\s+)?[A-Z]{2}[,\s]+\d{5}.*)$/);
+      if (combined) {
+        return { value: normalizeAddr(combined[1] + ' ' + combined[2]), confidence: lines[i].confidence };
+      }
+
+      // Look at 1-3 preceding lines for street address
+      for (let back = 1; back <= 3 && i - back >= 0; back++) {
+        const prev = normLine(lines[i - back].text);
+        // Must start with house number, but skip AAMVA name prefixes (1/2) and DL field lines
+        if (/^\d{1,5}\s+[A-Z]/.test(prev) &&
+            !/^[12]\s+[A-Z]{2,}$/i.test(prev) &&
+            !/\b(?:4d|DL[#:]|LIC)/i.test(prev)) {
+          // Require street suffix OR the line is 3+ words (avoids single-word name matches)
+          if (!STREET_SUFFIXES.test(prev) && prev.split(/\s+/).length < 3) continue;
+          // Collect intermediate lines (APT, Suite, etc.)
+          let address = prev;
+          for (let mid = i - back + 1; mid < i; mid++) {
+            const midText = normLine(lines[mid].text);
+            if (/\b(?:APT|STE|SUITE|UNIT|#|BLDG|FL|FLOOR)\b/i.test(midText) ||
+                (midText.length < 25 &&
+                 !/\b(?:SEX|HGT|EYE|CLAS|CLASS|END|REST|RESTR|EXP|ISS|DOB|DONOR|VETERAN)\b/i.test(midText) &&
+                 !/\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/.test(midText) &&
+                 !/\b(?:4[ab]|15|16|17|18)\s/.test(midText))) {
+              address += ' ' + midText;
+            }
+          }
+          address += ' ' + text;
+          return { value: normalizeAddr(address), confidence: lines[i].confidence };
+        }
+      }
+    }
+
+    return null;
   }
 
   // ── Physical descriptors ───────────────────────────────────
