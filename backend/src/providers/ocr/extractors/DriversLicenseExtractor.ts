@@ -803,8 +803,11 @@ export class DriversLicenseExtractor extends BaseExtractor {
     lines:    FlatLine[],
     labelMap: Map<string, LabelMapEntry>,
   ): NameResult | null {
-    const CITY_STATE_RE = /[A-Z][A-Z\s]+,?\s+[A-Za-z]{2}[.,\s]+\d{5}/;
-    const STREET_SUFFIXES = /\b(?:ST(?:REET)?|AVE(?:NUE)?|BLVD|BOULEVARD|DR(?:IVE)?|RD|ROAD|LN|LANE|WAY|CT|COURT|PL(?:ACE)?|TER(?:RACE)?|CIR(?:CLE)?|HWY|HIGHWAY|PKWY|PARKWAY|SQ(?:UARE)?|TPKE|TURNPIKE|TRL|TRAIL)\b/i;
+    const CITY_STATE_RE = /[A-Z][A-Z\s]+,?\s+[A-Z]{2}[.,\s]+\d{5}/;
+    const SUFFIX_ALT = 'ST(?:REET)?|AVE(?:NUE)?|BLVD|BOULEVARD|DR(?:IVE)?|RD|ROAD|LN|LANE|WAY|CT|COURT|PL(?:ACE)?|TER(?:RACE)?|CIR(?:CLE)?|HWY|HIGHWAY|PKWY|PARKWAY|SQ(?:UARE)?|TPKE|TURNPIKE|TRL|TRAIL';
+    const STREET_SUFFIXES = new RegExp(`\\b(?:${SUFFIX_ALT})\\b`, 'i');
+    // Helper: test CITY_STATE_RE against uppercase version of text (handles mixed-case OCR like "Nd")
+    const hasCityStateZip = (s: string) => CITY_STATE_RE.test(s.toUpperCase());
 
     // Fix 5: Aggressive "8"/"9" stripping — handles both "8 123" and merged "8123"
     const normalizeAddr = (s: string) =>
@@ -835,14 +838,15 @@ export class DriversLicenseExtractor extends BaseExtractor {
       let apt = '';
       for (let offset = 1; offset <= 5 && startIdx + offset < lines.length; offset++) {
         const candidate = normLine(lines[startIdx + offset].text);
-        if (CITY_STATE_RE.test(candidate)) {
+        if (hasCityStateZip(candidate)) {
           // Extract just the city/state/zip portion from potentially noisy blob lines
-          const cityMatch = candidate.match(
-            /([A-Z][A-Z\s]+,?\s+[A-Za-z]{2}[.,\s]+\d{5}(?:-\d{4})?)/
+          const upperCandidate = candidate.toUpperCase();
+          const cityMatch = upperCandidate.match(
+            /([A-Z][A-Z\s]+,?\s+[A-Z]{2}[.,\s]+\d{5}(?:-\d{4})?)/
           );
-          let city = cityMatch ? cityMatch[1] : candidate;
+          let city = cityMatch ? cityMatch[1] : upperCandidate;
           // Grab APT/UNIT if it follows the zip on the same line
-          const afterZip = candidate.slice(candidate.indexOf(city) + city.length);
+          const afterZip = upperCandidate.slice(upperCandidate.indexOf(city) + city.length);
           const aptAfterZip = afterZip.match(/\s*((?:APT|STE|SUITE|UNIT)\s*\.?\s*\d+)/i);
           if (aptAfterZip) {
             apt += ' ' + aptAfterZip[1].replace(/\./g, '');
@@ -976,10 +980,11 @@ export class DriversLicenseExtractor extends BaseExtractor {
     // Fix 3: Strategy C — reverse city/state/zip lookup, work backwards for street
     for (let i = 0; i < lines.length; i++) {
       const text = normLine(lines[i].text);
-      if (!CITY_STATE_RE.test(text)) continue;
+      if (!hasCityStateZip(text)) continue;
 
       // Check if the same line also has street (combined line like IL)
-      const combined = text.match(/^(\d{2,5}\s+.+?)\s+((?:[A-Z][A-Z\s]+,?\s+)?[A-Za-z]{2}[,\s]+\d{5}.*)$/);
+      const upperText = text.toUpperCase();
+      const combined = upperText.match(/^(\d{2,5}\s+.+?)\s+((?:[A-Z][A-Z\s]+,?\s+)?[A-Z]{2}[,\s]+\d{5}.*)$/);
       if (combined && !/\b(?:4d|DL[#:]|LIC|DOB|EXP|ISS)\b/i.test(combined[1])) {
         return { value: normalizeAddr(combined[1] + ' ' + combined[2]), confidence: lines[i].confidence };
       }
@@ -987,9 +992,10 @@ export class DriversLicenseExtractor extends BaseExtractor {
       // Look at 1-3 preceding lines for street address
       for (let back = 1; back <= 3 && i - back >= 0; back++) {
         const prev = normLine(lines[i - back].text);
-        // Must start with house number, but skip AAMVA name prefixes (1/2) and DL field lines
+        // Must start with house number, but skip AAMVA name/field prefixes and DL field lines
         if (/^\d{1,5}\s+[A-Z]/.test(prev) &&
             !/^[12]\s+[A-Z]{2,}$/i.test(prev) &&
+            !/^\d{2}\s+[A-Z]/i.test(prev) &&              // skip AAMVA numeric fields (15 SEX, 16 HGT, 18 EYES)
             !/\b(?:4d|DL[#:]|LIC)/i.test(prev)) {
           // Require street suffix OR the line is 3+ words (avoids single-word name matches)
           if (!STREET_SUFFIXES.test(prev) && prev.split(/\s+/).length < 2) continue;
@@ -1012,11 +1018,12 @@ export class DriversLicenseExtractor extends BaseExtractor {
     }
 
     // Strategy D: Address embedded mid-line (blob lines with name + address)
+    const STRATEGY_D_RE = new RegExp(`(\\d{1,5}\\s+[A-Z][A-Z\\s]+(?:${SUFFIX_ALT})\\b.+?\\d{5}(?:-\\d{4})?)`, 'i');
     for (const line of lines) {
       const text = normLine(line.text);
-      if (!CITY_STATE_RE.test(text)) continue;
+      if (!hasCityStateZip(text)) continue;
       // Find digit-led street number inside the line (not necessarily at start)
-      const m = text.match(/(\d{1,5}\s+[A-Z][A-Z\s]+(?:ST(?:REET)?|AVE(?:NUE)?|BLVD|BOULEVARD|DR(?:IVE)?|RD|ROAD|LN|LANE|WAY|CT|COURT|PL(?:ACE)?|HWY|HIGHWAY|PKWY|PARKWAY)\b.+?\d{5}(?:-\d{4})?)/i);
+      const m = text.match(STRATEGY_D_RE);
       if (m) {
         let address = m[1];
         // Strip trailing noise after zip+4 (e.g. "TUEBOR", "9 9")
@@ -1030,8 +1037,9 @@ export class DriversLicenseExtractor extends BaseExtractor {
         return { value: normalizeAddr(address), confidence: line.confidence };
       }
       // Fallback: no suffix but digit-led + city pattern on same line
-      const m2 = text.match(/(\d{1,5}\s+\S.+?\s+[A-Za-z]{2}[.,\s]+\d{5}(?:-\d{4})?)/);
-      if (m2 && m2[1].split(/\s+/).length >= 4) {
+      const upperText = text.toUpperCase();
+      const m2 = upperText.match(/(\d{1,5}\s+\S.+?\s+[A-Z]{2}[.,\s]+\d{5}(?:-\d{4})?)/);
+      if (m2 && m2[1].split(/\s+/).length >= 4 && !/\b(?:4D|DL[#:]|LIC|DOB|EXP|ISS)\b/.test(m2[1])) {
         let address = m2[1];
         address = address.replace(/(\d{5}(?:-\d{4})?)\s+.*$/, '$1');
         return { value: normalizeAddr(address), confidence: line.confidence };
