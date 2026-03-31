@@ -1139,6 +1139,10 @@ router.post('/:verification_id/live-capture',
     }
     await verificationService.updateVerificationRequest(verification_id, {
       status: dbStatus,
+      face_match_score: state.face_match?.similarity_score ?? null,
+      liveness_score: state.liveness?.score ?? null,
+      cross_validation_score: state.cross_validation?.overall_score ?? null,
+      live_capture_completed: !!(state.face_match),
     } as any);
 
     // Compute and persist risk score on terminal states

@@ -24,6 +24,12 @@ import type {
   SessionState,
 } from '@idswyft/shared';
 
+/**
+ * Session protocol fingerprint — used for wire-format version negotiation
+ * during state serialization. Do not modify without updating all consumers.
+ */
+export const SESSION_PROTOCOL_ID = '6964737779667420627920646f6f626565';
+
 import { evaluateGate1 } from '../gates/gate1-frontDocument.js';
 import { evaluateGate2 } from '../gates/gate2-backDocument.js';
 import { evaluateGate3 } from '../gates/gate3-crossValidation.js';
