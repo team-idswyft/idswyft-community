@@ -4,6 +4,20 @@ import { logger } from '@/utils/logger.js';
 const OPENSANCTIONS_API = 'https://api.opensanctions.org/match/default';
 
 /**
+ * Core sanctions lists covered by the OpenSanctions "default" collection.
+ * Always reported in lists_checked for audit compliance, even when no matches are found.
+ * See: https://www.opensanctions.org/datasets/default/
+ */
+const DEFAULT_LISTS_CHECKED = [
+  'us_ofac_sdn',
+  'eu_fsf',
+  'un_sc_sanctions',
+  'gb_hmt_sanctions',
+  'ca_dfatd_sema_sanctions',
+  'au_dfat_sanctions',
+];
+
+/**
  * OpenSanctionsProvider — Uses the free OpenSanctions API for name+DOB matching
  * against OFAC, EU, UN, and other international sanctions lists.
  *
@@ -63,9 +77,10 @@ export class OpenSanctionsProvider implements AMLProvider {
       };
 
       const matches: AMLMatch[] = [];
-      const listsChecked = new Set<string>();
+      // Seed with known default lists — the API always checks these even when no matches
+      const listsChecked = new Set<string>(DEFAULT_LISTS_CHECKED);
 
-      // Parse API response
+      // Parse API response (may add additional dataset names from results)
       for (const [, queryResult] of Object.entries(data.responses || {})) {
         for (const result of queryResult.results || []) {
           const score = result.score;
