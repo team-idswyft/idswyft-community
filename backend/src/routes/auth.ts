@@ -41,7 +41,7 @@ function setAuthCookie(res: Response, token: string, maxAge = 7 * 24 * 60 * 60 *
   res.cookie('idswyft_token', token, {
     httpOnly: true,
     secure: process.env.NODE_ENV === 'production',
-    sameSite: 'strict',
+    sameSite: 'lax',
     maxAge,
     path: '/',
   });
@@ -497,7 +497,7 @@ function cleanExpiredOAuthStates(): void {
 // POST /api/auth/developer/github/callback — exchange GitHub code for session
 router.post('/developer/github/callback',
   [
-    body('code').isString().matches(/^[a-f0-9]{10,40}$/).withMessage('Invalid GitHub authorization code'),
+    body('code').isString().matches(/^[a-zA-Z0-9_\-]{10,256}$/).withMessage('Invalid GitHub authorization code'),
     body('state').isString().notEmpty().withMessage('OAuth state parameter is required'),
   ],
   validate,
