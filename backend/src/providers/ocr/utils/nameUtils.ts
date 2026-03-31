@@ -40,9 +40,12 @@ export function isHeaderNoise(text: string): boolean {
 
   // Compound noise: check if text is made entirely of known noise words
   // (handles OCR-merged tokens by also checking if each word STARTS WITH a noise word)
+  // Prefix matching only for multi-word text — prevents false positives
+  // on single-word surnames (e.g., "MOTORIST" matching noise word "motor")
+  const usePrefix = words.length > 1;
   const matchCount = words.filter(w =>
     COMPOUND_NOISE_WORDS.has(w) ||
-    [...COMPOUND_NOISE_WORDS].some(nw => w.startsWith(nw) && w.length <= nw.length + 4)
+    (usePrefix && [...COMPOUND_NOISE_WORDS].some(nw => w.startsWith(nw) && w.length <= nw.length + 4))
   ).length;
   // All words are noise, OR for 4+ word strings allow 1 non-noise word (OCR garble tolerance)
   if (words.length > 0 && matchCount === words.length) return true;

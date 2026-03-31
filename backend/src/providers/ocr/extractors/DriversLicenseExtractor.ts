@@ -529,7 +529,9 @@ export class DriversLicenseExtractor extends BaseExtractor {
         if (/\d{3,}/.test(l.text))           return false;
         if (/[:\-]/.test(l.text))            return false;
         if (/^class\b/i.test(l.text))        return false;
-        return nameScore(l.text) > 0.4;
+        if (/\b(?:street|st|ave|blvd|rd|dr|ln|ct|apt|ste|hwy|way|pkwy)\b/i.test(l.text)) return false;
+        // Sanitize before scoring — removes trailing digits/noise (e.g., "MICHELLE, MARIE D 8" → "MICHELLE MARIE D")
+        return nameScore(sanitizeName(l.text.trim())) > 0.4;
       })
       .sort((a, b) => b.y - a.y);
 
