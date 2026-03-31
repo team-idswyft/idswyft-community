@@ -192,9 +192,7 @@ export function ApiKeysSection({ token, apiKeys, setApiKeys, stats, newFullKey, 
       return
     }
     setExpandedKeyId(keyId)
-    if (!keyLogs[keyId]) {
-      await fetchKeyLogs(keyId)
-    }
+    await fetchKeyLogs(keyId)
   }
 
   const inferResourceLabel = (endpoint: string) => {

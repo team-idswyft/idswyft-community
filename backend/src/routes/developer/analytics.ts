@@ -7,7 +7,6 @@ import { catchAsync, ValidationError, NotFoundError, AuthenticationError } from 
 import { validate } from '@/middleware/validate.js';
 import { logger } from '@/utils/logger.js';
 import rateLimit from 'express-rate-limit';
-import { getRecentActivities } from '@/middleware/apiLogger.js';
 import { loadSessionState, mapStatusForResponse, fetchRiskScore } from '@/verification/statusReader.js';
 import {
   getConversionFunnel,
@@ -108,16 +107,26 @@ router.get('/activity',
       }
     }
 
-    // Get recent activities from memory (fast) and optionally filter by API key
-    const recentActivities = getRecentActivities(developer.id)
-      .filter(activity => !apiKeyIdParam || activity.api_key_id === apiKeyIdParam);
+    // Query persisted activity logs from DB (survives server restarts)
+    let activityQuery = supabase
+      .from('api_activity_logs')
+      .select('api_key_id, timestamp, method, endpoint, status_code, response_time_ms, user_agent, ip_address, error_message')
+      .eq('developer_id', developer.id)
+      .order('timestamp', { ascending: false })
+      .limit(100);
 
-    // Get verification statistics from database
-    const { data: verificationStats, error: statsError } = await supabase
-      .from('verification_requests')
-      .select('status')
-      .eq('developer_id', developer.id);
+    if (apiKeyIdParam) {
+      activityQuery = activityQuery.eq('api_key_id', apiKeyIdParam);
+    }
 
+    const [{ data: activityRows, error: activityError }, { data: verificationStats, error: statsError }] = await Promise.all([
+      activityQuery,
+      supabase.from('verification_requests').select('status').eq('developer_id', developer.id),
+    ]);
+
+    if (activityError) {
+      logger.error('Failed to get activity logs:', activityError);
+    }
     if (statsError) {
       logger.error('Failed to get verification stats:', statsError);
     }
@@ -131,24 +140,23 @@ router.get('/activity',
       manual_review_requests: verificationStats?.filter((v: any) => v.status === 'manual_review').length || 0
     };
 
-    // Format recent activities for frontend
-    const formattedActivities = recentActivities.slice(0, 50).map(activity => ({
-      api_key_id: activity.api_key_id,
-      timestamp: activity.timestamp || new Date(),
-      method: activity.method,
-      endpoint: activity.endpoint,
-      status_code: activity.status_code,
-      response_time_ms: activity.response_time_ms,
-      user_agent: activity.user_agent,
-      ip_address: activity.ip_address,
-      error_message: activity.error_message
+    const formattedActivities = (activityRows || []).map((row: any) => ({
+      api_key_id: row.api_key_id,
+      timestamp: row.timestamp,
+      method: row.method,
+      endpoint: row.endpoint,
+      status_code: row.status_code,
+      response_time_ms: row.response_time_ms,
+      user_agent: row.user_agent,
+      ip_address: row.ip_address,
+      error_message: row.error_message,
     }));
 
     // Derive session IDs from endpoint paths and fetch true verification outcomes.
     const sessionIdRegex = /[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}/ig;
     const sessionIds = Array.from(
       new Set(
-        formattedActivities.flatMap(activity => {
+        formattedActivities.flatMap((activity: any) => {
           const matches = activity.endpoint?.match(sessionIdRegex) || [];
           return matches;
         })
@@ -176,7 +184,7 @@ router.get('/activity',
     res.json({
       statistics: stats,
       recent_activities: formattedActivities,
-      total_activities: recentActivities.length,
+      total_activities: formattedActivities.length,
       session_outcomes: sessionOutcomes
     });
   })
