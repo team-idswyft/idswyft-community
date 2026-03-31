@@ -99,7 +99,7 @@ describe('computeRiskScore', () => {
     // All signals default to 0 → risk score = 100 (max risk)
     expect(result.overall_score).toBeGreaterThanOrEqual(70);
     expect(result.risk_level).toBe('critical');
-    expect(result.risk_factors.length).toBe(5);
+    expect(result.risk_factors.length).toBe(6);
   });
 
   it('includes all expected risk factors', () => {
@@ -120,6 +120,7 @@ describe('computeRiskScore', () => {
     expect(signals).toContain('cross_validation');
     expect(signals).toContain('liveness_proxy');
     expect(signals).toContain('document_expiry');
+    expect(signals).toContain('aml_screening');
   });
 
   it('assigns mild concern when no expiry date available', () => {

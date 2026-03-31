@@ -9,6 +9,7 @@ import {
   normalizeDate,
   normalizeNationality,
 } from './normalizers.js';
+import { normalizeAddress } from '../address/addressNormalizer.js';
 
 /**
  * Levenshtein distance-based similarity.
@@ -144,4 +145,41 @@ export function compareNationality(front: string, back: string): number {
 
   if (!normFront || !normBack) return 0.0;
   return normFront === normBack ? 1.0 : 0.0;
+}
+
+/**
+ * Compare addresses using word-overlap scoring.
+ * Normalizes abbreviations (Street→St, Avenue→Ave) then counts matching tokens.
+ * Tokens match if one contains the other or Levenshtein distance <= 2.
+ * Returns 0.0–1.0 (matched words / max words).
+ */
+export function compareAddress(front: string, back: string): number {
+  const normFront = normalizeAddress(front);
+  const normBack = normalizeAddress(back);
+
+  if (!normFront || !normBack) return 0.0;
+  if (normFront === normBack) return 1.0;
+
+  const words1 = normFront.split(/\s+/).filter(w => w.length > 1);
+  const words2 = normBack.split(/\s+/).filter(w => w.length > 1);
+
+  const totalWords = Math.max(words1.length, words2.length);
+  if (totalWords === 0) return 0.0;
+
+  let matches = 0;
+  const used = new Set<number>();
+
+  for (const w1 of words1) {
+    for (let j = 0; j < words2.length; j++) {
+      if (used.has(j)) continue;
+      const w2 = words2[j];
+      if (w1 === w2 || w1.includes(w2) || w2.includes(w1) || levenshteinSimilarity(w1, w2) >= 0.75) {
+        matches++;
+        used.add(j);
+        break;
+      }
+    }
+  }
+
+  return matches / totalWords;
 }

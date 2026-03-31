@@ -131,6 +131,14 @@ const DlFormatValidationSchema = z.object({
   detail: z.string(),
 });
 
+// --- Address Validation (supplementary, weight 0) ---
+const AddressValidationSchema = z.object({
+  score: z.number().min(0).max(1),
+  verdict: z.enum(['PASS', 'REVIEW', 'FAIL']),
+  front_address: z.string(),
+  back_address: z.string(),
+});
+
 // --- Cross-Validation Result ---
 export const CrossValidationResultSchema = z.object({
   overall_score: confidence,
@@ -139,6 +147,7 @@ export const CrossValidationResultSchema = z.object({
   document_expired: z.boolean(),
   verdict: z.enum(['PASS', 'REVIEW', 'REJECT']),
   dl_format_validation: DlFormatValidationSchema.optional(),
+  address_validation: AddressValidationSchema.optional(),
 });
 
 export type CrossValidationResult = z.infer<typeof CrossValidationResultSchema>;
@@ -184,7 +193,15 @@ export interface AMLScreeningSessionResult {
   risk_level: 'clear' | 'potential_match' | 'confirmed_match';
   match_found: boolean;
   match_count: number;
+  matches: Array<{
+    listed_name: string;
+    list_source: string;
+    score: number;
+    match_type: string;
+  }>;
   lists_checked: string[];
+  screened_name: string;
+  screened_dob: string | null;
   screened_at: string;
 }
 

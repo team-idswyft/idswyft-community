@@ -2,7 +2,7 @@
 
 > Open-source identity verification platform. Verify government-issued IDs with OCR, liveness detection, and face matching.
 > Base URL: https://api.idswyft.app
-> Version: v1.7.0 — March 2026
+> Version: v1.7.2 — March 2026
 > Source of truth: backend/src/api-docs/apiDocsMarkdown.ts
 
 ## Links
@@ -61,7 +61,7 @@ Content-Type: application/json
 | user_id | UUID string | Yes | Your unique identifier for the user |
 | sandbox | boolean | No | Use sandbox mode (default: false) |
 | addons | object | No | Optional add-on features |
-| addons.aml_screening | boolean | No | Enable AML/sanctions screening |
+| addons.aml_screening | boolean | No | Override AML screening (default: auto-enabled when `AML_PROVIDER` is configured; set `false` to disable for this session) |
 
 **Response (201):**
 
@@ -104,7 +104,7 @@ Content-Type: multipart/form-data
 
 **Response (201):** Includes `barcode_data` and `cross_validation_results` with verdict (PASS/REVIEW), score, and failures.
 
-Cross-validation checks: PDF417/QR barcode decoding, MRZ parsing (TD1/TD2/TD3 for international IDs), ID number consistency, expiry date matching, name matching with Levenshtein distance and token-set similarity.
+Cross-validation checks: PDF417/QR barcode decoding, MRZ parsing (TD1/TD2/TD3 for international IDs), ID number consistency, expiry date matching, name matching with Levenshtein distance and token-set similarity, address matching (supplementary — word-overlap scoring with abbreviation normalization, does not affect verdict).
 
 ### Step 4: Submit Live Capture
 
@@ -364,7 +364,7 @@ All verification decisions are **deterministic** — no LLMs or probabilistic mo
 |----------|-------------|
 | OCR Extraction | PaddleOCR/Tesseract, name/DOB/ID number, AAMVA field parsing (US DLs), MRZ parsing (TD1/TD2/TD3 for international IDs), state format validation, per-field confidence scores |
 | Document Quality | Sobel edge blur detection, brightness/contrast stats, resolution check (≥800x600), file size validation, overall quality score, auto-reject below threshold |
-| Cross-Validation | PDF417/QR barcode decode, MRZ parsing, Levenshtein distance matching, token-set name similarity, front OCR vs back barcode/MRZ check, date & ID number consistency, weighted field scoring |
+| Cross-Validation | PDF417/QR barcode decode, MRZ parsing, Levenshtein distance matching, token-set name similarity, front OCR vs back barcode/MRZ check, date & ID number consistency, weighted field scoring, address cross-validation (supplementary) |
 | Liveness & Face Match | EXIF metadata analysis, JPEG artifact detection, color histogram analysis, byte entropy scoring, pixel variance & edge density, face detection (SSDMobilenetv1), 128-d face embeddings, cosine similarity scoring, deepfake detection |
 
 ---
@@ -397,15 +397,26 @@ GET  /api/v2/verify/:id/address-status      — Get address verification status
 
 ## AML / Sanctions Screening
 
-Opt-in addon — enable per session with `addons.aml_screening: true` at initialization.
+AML screening runs automatically on all non-sandbox verifications when the `AML_PROVIDER` environment variable is set (e.g., `opensanctions`, `offline`, or comma-separated for multiple providers). Screening happens after face matching (Gate 6) and results are persisted to the `aml_screenings` table.
 
-| Risk Level | Score | Outcome |
-|-----------|-------|---------|
-| clear | < 0.5 | Verification proceeds normally |
-| potential_match | 0.5–0.84 | Routed to `manual_review` for human decision |
-| confirmed_match | >= 0.85 | Hard reject (`failed`) |
+**Configuration:**
+- `AML_PROVIDER=opensanctions` — OpenSanctions API
+- `AML_PROVIDER=offline` — local offline list
+- `AML_PROVIDER=opensanctions,offline` — both run in parallel, results merged
+- Developers can opt out via `aml_enabled: false` on their developer record
+- Per-session override: `addons.aml_screening: false` disables for that session
 
-Lists checked: OFAC SDN, EU Sanctions, UN Sanctions.
+| Risk Level | Risk Score | Outcome |
+|-----------|-----------|---------|
+| clear | 0 | Verification proceeds normally |
+| potential_match | 60 | Routed to `manual_review` for human decision |
+| confirmed_match | 100 | Hard reject (`failed`) |
+
+The `aml_screening` field in the status response includes: `risk_level`, `match_found`, `match_count`, `matches` (array with `listed_name`, `list_source`, `score`, `match_type`), `lists_checked`, `screened_name`, `screened_dob`, and `screened_at`.
+
+AML contributes 10% weight to the composite risk score (factor: `aml_screening`).
+
+Lists checked: OFAC SDN, EU Sanctions, UN Sanctions (depends on configured provider).
 
 ---
 
@@ -592,6 +603,21 @@ On first boot, navigate to the frontend. If no developer account exists, a setup
 
 ## Changelog
 
+### v1.7.2 (2026-03-30)
+
+**Added:**
+- AML screening auto-trigger — runs automatically on all non-sandbox verifications when `AML_PROVIDER` is set
+- Multi-provider AML support — comma-separated `AML_PROVIDER` runs providers in parallel with match deduplication
+- AML result persistence to `aml_screenings` DB table with full match details
+- AML risk scoring factor (weight 0.10) integrated into composite risk score
+- Address cross-validation — supplementary comparison between front OCR address and back barcode address
+- Developer-level AML toggle: `aml_enabled` column (default true)
+
+**Changed:**
+- Risk scoring weights rebalanced to accommodate AML factor
+- `aml_screening` in status response now includes `matches` array, `screened_name`, `screened_dob`
+- `cross_validation_results` now includes optional `address_validation` field
+
 ### v1.7.0 (2026-03-27)
 
 **Added:**
@@ -657,4 +683,4 @@ On first boot, navigate to the frontend. If no developer account exists, a setup
 
 ---
 
-Generated from Idswyft API v1.7.0 — https://idswyft.app/docs
+Generated from Idswyft API v1.7.2 — https://idswyft.app/docs

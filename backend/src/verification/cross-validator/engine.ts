@@ -8,7 +8,7 @@
 
 import type { FrontExtractionResult, BackExtractionResult, CrossValidationResult } from '@idswyft/shared';
 import { FIELD_WEIGHTS, THRESHOLD_PASS, THRESHOLD_REVIEW } from './config.js';
-import { compareIdNumber, compareName, compareDate, compareNationality } from './comparators.js';
+import { compareIdNumber, compareName, compareDate, compareNationality, compareAddress } from './comparators.js';
 import { normalizeDate } from './normalizers.js';
 import { validateDlNumber } from './dlNumberValidator.js';
 import type { DlValidationResult } from './dlNumberValidator.js';
@@ -159,6 +159,27 @@ export function crossValidate(
     console.log(`     id_number: "${frontIdNumber}" | detail: ${dlValidation.detail}`);
   }
 
+  // ── Address Validation (weight 0 — supplementary signal) ──
+  const frontAddress = extractFrontField(frontOcr, 'address');
+  const backAddress = extractBackField(backPayload, 'address');
+  let addressValidation: CrossValidationResult['address_validation'] = undefined;
+
+  if (frontAddress.trim() && backAddress.trim()) {
+    const addrScore = compareAddress(frontAddress, backAddress);
+    const addrVerdict = addrScore >= 0.70 ? 'PASS' as const
+      : addrScore >= 0.40 ? 'REVIEW' as const
+      : 'FAIL' as const;
+    addressValidation = {
+      score: Math.round(addrScore * 100) / 100,
+      verdict: addrVerdict,
+      front_address: frontAddress,
+      back_address: backAddress,
+    };
+    const addrIcon = addrVerdict === 'PASS' ? '✅' : addrVerdict === 'REVIEW' ? '🔍' : '⚠️';
+    console.log(`${addrIcon} address_validation (w=0, supplementary): score=${addrScore.toFixed(3)}, verdict=${addrVerdict}`);
+    console.log(`     front: "${frontAddress}" | back: "${backAddress}"`);
+  }
+
   // Normalize score: only count fields that were actually compared
   const overallScore = matchedWeight > 0
     ? Math.round((weightedScore / matchedWeight) * 100) / 100
@@ -199,5 +220,6 @@ export function crossValidate(
     document_expired: documentExpired,
     verdict,
     dl_format_validation: dlValidation.verdict !== 'SKIP' ? dlValidation : undefined,
+    address_validation: addressValidation,
   };
 }

@@ -33,7 +33,8 @@ import type {
   SessionState,
   LLMProviderConfig,
 } from '@idswyft/shared';
-import { createAMLProvider } from '@/providers/aml/index.js';
+import { createAMLProviders } from '@/providers/aml/index.js';
+import { screenAll } from '@/providers/aml/multiScreen.js';
 import { computeRiskScore } from '@/services/riskScoring.js';
 import { broadcastStatusChange } from '@/services/realtime.js';
 import { saveSessionState, loadSessionState } from '@/services/sessionPersistence.js';
@@ -56,7 +57,7 @@ const ocrService = new OCRService();
 const barcodeService = new BarcodeService();
 const faceRecognitionService = new FaceRecognitionService();
 const webhookService = new WebhookService();
-const amlProvider = createAMLProvider();
+const amlProviders = createAMLProviders();
 
 const upload = multer({
   storage: multer.memoryStorage(),
@@ -73,7 +74,13 @@ interface VerificationAddons {
 }
 
 /** Create a VerificationSession with real service deps, optionally hydrated from DB */
-function createSession(isSandbox: boolean, hydration?: SessionHydration, addons?: VerificationAddons): VerificationSession {
+function createSession(isSandbox: boolean, hydration?: SessionHydration, addons?: VerificationAddons, developerAmlEnabled?: boolean): VerificationSession {
+  // AML auto-triggers when: providers configured, not sandbox, developer hasn't disabled, addon not explicitly false
+  const amlEnabled = amlProviders.length > 0
+    && !isSandbox
+    && developerAmlEnabled !== false
+    && addons?.aml_screening !== false;
+
   const deps: SessionDeps = {
     extractFront: async (buffer: Buffer): Promise<FrontExtractionResult> => {
       // Save buffer to temp storage, run OCR, extract face
@@ -88,8 +95,8 @@ function createSession(isSandbox: boolean, hydration?: SessionHydration, addons?
     },
     computeFaceMatch,
     faceMatchThreshold: getFaceMatchingThresholdSync(isSandbox),
-    screenAML: (addons?.aml_screening && amlProvider)
-      ? async (fullName, dob, nationality) => amlProvider.screen({ full_name: fullName, date_of_birth: dob, nationality })
+    screenAML: amlEnabled
+      ? async (fullName, dob, nationality) => screenAll(amlProviders, { full_name: fullName, date_of_birth: dob, nationality })
       : undefined,
   };
 
@@ -97,7 +104,7 @@ function createSession(isSandbox: boolean, hydration?: SessionHydration, addons?
 }
 
 /** Hydrate a session from DB for a given verification ID */
-async function hydrateSession(verificationId: string, isSandbox: boolean): Promise<VerificationSession> {
+async function hydrateSession(verificationId: string, isSandbox: boolean, developerId?: string): Promise<VerificationSession> {
   const savedState = await loadSessionState(verificationId);
   const hydration: SessionHydration = savedState ? {
     session_id: savedState.session_id,
@@ -118,18 +125,35 @@ async function hydrateSession(verificationId: string, isSandbox: boolean): Promi
     session_id: verificationId,
   };
 
-  // Read addons from the verification_requests row to preserve per-request flags
+  // Read addons + developer_id from the verification_requests row
   let addons: VerificationAddons | undefined;
+  let resolvedDeveloperId = developerId;
   const { data: row } = await supabase
     .from('verification_requests')
-    .select('addons')
+    .select('addons, developer_id')
     .eq('id', verificationId)
     .single();
   if (row?.addons && typeof row.addons === 'object') {
     addons = row.addons as VerificationAddons;
   }
+  if (!resolvedDeveloperId && row?.developer_id) {
+    resolvedDeveloperId = row.developer_id;
+  }
 
-  return createSession(isSandbox, hydration, addons);
+  // Look up developer's aml_enabled setting
+  let developerAmlEnabled: boolean | undefined;
+  if (resolvedDeveloperId) {
+    const { data: dev } = await supabase
+      .from('developers')
+      .select('aml_enabled')
+      .eq('id', resolvedDeveloperId)
+      .single();
+    if (dev && typeof dev.aml_enabled === 'boolean') {
+      developerAmlEnabled = dev.aml_enabled;
+    }
+  }
+
+  return createSession(isSandbox, hydration, addons, developerAmlEnabled);
 }
 
 // ─── Developer LLM config lookup ────────────────────────────────
@@ -293,6 +317,12 @@ async function extractBackDocument(
     id_number: barcodeData.pdf417_data.parsed_data.licenseNumber || barcodeData.parsed_data?.id_number || '',
     expiry_date: barcodeData.pdf417_data.parsed_data.expirationDate || '',
     nationality: '',
+    address: [
+      barcodeData.pdf417_data.parsed_data.address,
+      barcodeData.pdf417_data.parsed_data.city,
+      barcodeData.pdf417_data.parsed_data.state,
+      barcodeData.pdf417_data.parsed_data.zipCode,
+    ].filter(Boolean).join(', ') || '',
   } : (barcodeData?.parsed_data ? {
     first_name: barcodeData.parsed_data.first_name || '',
     last_name: barcodeData.parsed_data.last_name || '',
@@ -301,6 +331,7 @@ async function extractBackDocument(
     id_number: barcodeData.parsed_data.id_number || '',
     expiry_date: barcodeData.parsed_data.expiry_date || '',
     nationality: '',
+    address: (barcodeData.parsed_data as any).address || '',
   } : null);
 
   // Attempt MRZ detection from raw OCR text (especially for non-US documents)
@@ -321,6 +352,7 @@ async function extractBackDocument(
       id_number: mrzResult.fields.document_number || '',
       expiry_date: mrzResult.fields.expiry_date || '',
       nationality: mrzResult.fields.nationality || '',
+      address: '',
     };
     // Tag the barcode_format as MRZ
     const mrzFormatMap: Record<string, 'MRZ_TD1' | 'MRZ_TD2' | 'MRZ_TD3'> = {
@@ -1127,6 +1159,22 @@ router.post('/:verification_id/live-capture',
       } catch (err) {
         logger.warn('Failed to compute/store risk score (non-blocking):', err);
       }
+    }
+
+    // Persist AML screening result to audit table (non-blocking)
+    if (state.aml_screening) {
+      supabase.from('aml_screenings').insert({
+        verification_request_id: verification_id,
+        full_name: state.aml_screening.screened_name,
+        date_of_birth: state.aml_screening.screened_dob || null,
+        risk_level: state.aml_screening.risk_level,
+        match_found: state.aml_screening.match_found,
+        matches: state.aml_screening.matches,
+        lists_checked: state.aml_screening.lists_checked,
+        screened_at: state.aml_screening.screened_at,
+      }).then(({ error }: { error: any }) => {
+        if (error) logger.warn('Failed to persist AML screening (non-blocking):', error);
+      });
     }
 
     logVerificationEvent('live_capture_processed', verification_id, {

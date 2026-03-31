@@ -65,7 +65,16 @@ export interface SessionHydration {
   face_match?: FaceMatchResult | null;
   liveness?: { passed: boolean; score: number } | null;
   deepfake_check?: { isReal: boolean; realProbability: number; fakeProbability: number } | null;
-  aml_screening?: { risk_level: string; match_found: boolean; match_count: number; lists_checked: string[]; screened_at: string } | null;
+  aml_screening?: {
+    risk_level: string;
+    match_found: boolean;
+    match_count: number;
+    matches: Array<{ listed_name: string; list_source: string; score: number; match_type: string }>;
+    lists_checked: string[];
+    screened_name: string;
+    screened_dob: string | null;
+    screened_at: string;
+  } | null;
   created_at?: string;
   completed_at?: string | null;
 }
@@ -230,7 +239,15 @@ export class VerificationSession {
             risk_level: amlResult.risk_level,
             match_found: amlResult.match_found,
             match_count: amlResult.matches.length,
+            matches: amlResult.matches.map(m => ({
+              listed_name: m.listed_name,
+              list_source: m.list_source,
+              score: m.score,
+              match_type: m.match_type,
+            })),
             lists_checked: amlResult.lists_checked,
+            screened_name: amlResult.screened_name,
+            screened_dob: amlResult.screened_dob,
             screened_at: amlResult.screened_at,
           };
 

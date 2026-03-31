@@ -212,6 +212,12 @@ router.post('/back', upload.single('file'), async (req: Request, res: Response) 
       id_number: barcodeData.pdf417_data.parsed_data.licenseNumber || barcodeData.parsed_data?.id_number || '',
       expiry_date: barcodeData.pdf417_data.parsed_data.expirationDate || '',
       nationality: '',
+      address: [
+        barcodeData.pdf417_data.parsed_data.address,
+        barcodeData.pdf417_data.parsed_data.city,
+        barcodeData.pdf417_data.parsed_data.state,
+        barcodeData.pdf417_data.parsed_data.zipCode,
+      ].filter(Boolean).join(', ') || '',
     } : (barcodeData?.parsed_data ? {
       first_name: barcodeData.parsed_data.first_name || '',
       last_name: barcodeData.parsed_data.last_name || '',
@@ -220,6 +226,7 @@ router.post('/back', upload.single('file'), async (req: Request, res: Response) 
       id_number: barcodeData.parsed_data.id_number || '',
       expiry_date: barcodeData.parsed_data.expiry_date || '',
       nationality: '',
+      address: (barcodeData.parsed_data as any).address || '',
     } : null);
 
     // 3. MRZ detection from raw OCR text
@@ -239,6 +246,7 @@ router.post('/back', upload.single('file'), async (req: Request, res: Response) 
         id_number: mrzResult.fields.document_number || '',
         expiry_date: mrzResult.fields.expiry_date || '',
         nationality: mrzResult.fields.nationality || '',
+        address: '',
       };
       const mrzFormatMap: Record<string, 'MRZ_TD1' | 'MRZ_TD2' | 'MRZ_TD3'> = {
         TD1: 'MRZ_TD1', TD2: 'MRZ_TD2', TD3: 'MRZ_TD3',

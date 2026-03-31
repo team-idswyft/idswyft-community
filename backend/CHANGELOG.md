@@ -5,6 +5,26 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.7.2] - 2026-03-30
+
+### Added
+- **AML screening auto-trigger** — AML now runs automatically on all non-sandbox verifications when providers are configured (`AML_PROVIDER` env var). No longer requires `addons.aml_screening: true` per session. Developers can opt out via `aml_enabled` column on `developers` table.
+- **Multi-provider AML screening** — `AML_PROVIDER` supports comma-separated values (e.g., `opensanctions,offline`). All providers run in parallel; matches are deduplicated and the highest risk level wins.
+- **AML result persistence** — full screening results (matches, risk level, lists checked, screened name/DOB) are now stored in the `aml_screenings` DB table for audit trail
+- **Expanded AML session state** — `aml_screening` in verification status now includes `matches` array (listed_name, list_source, score, match_type), `screened_name`, and `screened_dob`
+- **AML risk scoring integration** — risk score now includes `aml_screening` factor (weight 0.10): `clear` → 0, `potential_match` → 60, `confirmed_match` → 100
+- **Address cross-validation** — front OCR address is now compared against back PDF417/barcode address as a supplementary signal (weight 0, does not affect verdict). Uses word-overlap scoring with address normalization (abbreviation expansion). Thresholds: ≥0.70 PASS, ≥0.40 REVIEW, <0.40 FAIL.
+- `address` field added to `qr_payload` in back extraction (both engine worker and local fallback)
+- `address_validation` field in `cross_validation_results` (score, verdict, front/back addresses)
+- `aml_enabled` developer column (migration 35) — defaults to true, set false to opt out
+- `createAMLProviders()` factory function replacing `createAMLProvider()`
+- `screenAll()` multi-provider orchestrator with `Promise.allSettled` and match deduplication
+
+### Changed
+- Risk scoring weights rebalanced: `ocr_confidence` 0.20→0.18, `face_match` 0.25→0.22, `cross_validation` 0.20→0.18, `liveness_proxy` 0.20→0.17, `document_expiry` 0.15 (unchanged), `aml_screening` 0.10 (new). Total: 1.00
+- `AMLScreeningSessionResult` type expanded with `matches`, `screened_name`, `screened_dob` fields
+- `CrossValidationResult` type expanded with optional `address_validation` field
+
 ## [1.7.0] - 2026-03-27
 
 ### Added

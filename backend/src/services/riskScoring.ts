@@ -29,37 +29,37 @@ export interface RiskScore {
 export function computeRiskScore(state: SessionState): RiskScore {
   const factors: RiskFactor[] = [];
 
-  // ── OCR Confidence (weight: 0.20) ────────────────────────
+  // ── OCR Confidence (weight: 0.18) ────────────────────────
   const ocrConf = state.front_extraction?.ocr_confidence ?? 0;
   const ocrRisk = Math.round((1 - ocrConf) * 100);
   factors.push({
     signal: 'ocr_confidence',
     score: ocrRisk,
-    weight: 0.20,
+    weight: 0.18,
     detail: `OCR confidence: ${(ocrConf * 100).toFixed(0)}%`,
   });
 
-  // ── Face Match Score (weight: 0.25) ──────────────────────
+  // ── Face Match Score (weight: 0.22) ──────────────────────
   const faceScore = state.face_match?.similarity_score ?? 0;
   const faceRisk = Math.round((1 - faceScore) * 100);
   factors.push({
     signal: 'face_match',
     score: faceRisk,
-    weight: 0.25,
+    weight: 0.22,
     detail: `Face match similarity: ${(faceScore * 100).toFixed(0)}%`,
   });
 
-  // ── Cross-Validation Score (weight: 0.20) ────────────────
+  // ── Cross-Validation Score (weight: 0.18) ────────────────
   const crossScore = state.cross_validation?.overall_score ?? 0;
   const crossRisk = Math.round((1 - crossScore) * 100);
   factors.push({
     signal: 'cross_validation',
     score: crossRisk,
-    weight: 0.20,
+    weight: 0.18,
     detail: `Cross-validation score: ${(crossScore * 100).toFixed(0)}%`,
   });
 
-  // ── Liveness Score (weight: 0.20) ────────────────────────
+  // ── Liveness Score (weight: 0.17) ────────────────────────
   // The actual liveness score (from EnhancedHeuristicProvider) is computed in
   // extractLiveCapture() but only returned in LiveCaptureResult — it's not
   // persisted on SessionState. Using front_extraction.face_confidence as a
@@ -69,7 +69,7 @@ export function computeRiskScore(state: SessionState): RiskScore {
   factors.push({
     signal: 'liveness_proxy',
     score: livenessRisk,
-    weight: 0.20,
+    weight: 0.17,
     detail: `Face detection confidence: ${(faceConf * 100).toFixed(0)}%`,
   });
 
@@ -97,6 +97,29 @@ export function computeRiskScore(state: SessionState): RiskScore {
     score: expiryRisk,
     weight: 0.15,
     detail: expiryDate ? `Expires: ${expiryDate}` : 'No expiry date detected',
+  });
+
+  // ── AML Screening (weight: 0.10) ────────────────────────
+  const aml = state.aml_screening;
+  let amlRisk = 0;
+  let amlDetail = 'AML screening not performed';
+  if (aml) {
+    if (aml.risk_level === 'confirmed_match') {
+      amlRisk = 100;
+      amlDetail = `AML: confirmed match (${aml.match_count} match${aml.match_count !== 1 ? 'es' : ''})`;
+    } else if (aml.risk_level === 'potential_match') {
+      amlRisk = 60;
+      amlDetail = `AML: potential match (${aml.match_count} match${aml.match_count !== 1 ? 'es' : ''})`;
+    } else {
+      amlRisk = 0;
+      amlDetail = 'AML: clear';
+    }
+  }
+  factors.push({
+    signal: 'aml_screening',
+    score: amlRisk,
+    weight: 0.10,
+    detail: amlDetail,
   });
 
   // ── Weighted average ─────────────────────────────────────
