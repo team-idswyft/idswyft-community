@@ -20,11 +20,24 @@ export const { generateToken, doubleCsrfProtection } = doubleCsrf({
 });
 
 /**
+ * Paths that are exempt from CSRF enforcement because they use alternative
+ * protection mechanisms (e.g. OAuth state parameter).
+ */
+const CSRF_EXEMPT_PATHS = [
+  '/api/auth/developer/github/callback', // protected by HMAC-signed OAuth state
+];
+
+/**
  * Conditional CSRF middleware — only enforces when a *valid* auth cookie is present.
  * A stale/expired cookie (e.g. from a previous session) is ignored so that
  * pre-auth flows like OTP send/verify are not blocked by CSRF enforcement.
  */
 export function conditionalCsrf(req: Request, res: Response, next: NextFunction): void {
+  // Skip CSRF for routes with alternative protection (OAuth callbacks, etc.)
+  if (CSRF_EXEMPT_PATHS.includes(req.originalUrl.split('?')[0])) {
+    next();
+    return;
+  }
   const token = req.cookies?.idswyft_token;
   if (token) {
     try {
