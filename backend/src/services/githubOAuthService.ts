@@ -1,5 +1,6 @@
 import config from '@/config/index.js';
 import { logger } from '@/utils/logger.js';
+import { AuthenticationError } from '@/middleware/errorHandler.js';
 
 interface GitHubUser {
   id: number;
@@ -45,18 +46,20 @@ export async function exchangeCodeForToken(code: string): Promise<string> {
       client_id: config.github.clientId,
       client_secret: config.github.clientSecret,
       code,
+      redirect_uri: config.github.redirectUri,
     }),
   });
 
   if (!response.ok) {
-    throw new Error(`GitHub token exchange failed: ${response.status}`);
+    logger.error('GitHub token exchange HTTP error', { status: response.status });
+    throw new AuthenticationError(`GitHub token exchange failed: ${response.status}`);
   }
 
   const data = await response.json() as { access_token?: string; error?: string; error_description?: string };
 
   if (data.error || !data.access_token) {
     logger.error('GitHub OAuth error', { error: data.error, description: data.error_description });
-    throw new Error(data.error_description || 'GitHub authentication failed');
+    throw new AuthenticationError(data.error_description || 'GitHub authentication failed');
   }
 
   return data.access_token;
@@ -76,7 +79,8 @@ export async function getGitHubUser(accessToken: string): Promise<GitHubUser> {
   ]);
 
   if (!userResponse.ok) {
-    throw new Error(`GitHub user fetch failed: ${userResponse.status}`);
+    logger.error('GitHub user fetch failed', { status: userResponse.status });
+    throw new AuthenticationError(`GitHub user fetch failed: ${userResponse.status}`);
   }
 
   const user = await userResponse.json() as GitHubUser;
@@ -97,7 +101,7 @@ export async function getGitHubUser(accessToken: string): Promise<GitHubUser> {
   }
 
   if (!user.email) {
-    throw new Error('No verified email found on your GitHub account');
+    throw new AuthenticationError('No verified email found on your GitHub account');
   }
 
   return user;

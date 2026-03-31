@@ -481,17 +481,32 @@ router.post('/reviewer/otp/verify',
 
 // ─── GitHub OAuth ──────────────────────────────────────────────────────────────
 
-// Server-side OAuth state map (CSRF protection)
-const oauthStateMap = new Map<string, { createdAt: number }>();
 const OAUTH_STATE_TTL = 10 * 60 * 1000; // 10 minutes
 
-function cleanExpiredOAuthStates(): void {
-  const now = Date.now();
-  for (const [key, val] of oauthStateMap) {
-    if (now - val.createdAt > OAUTH_STATE_TTL) {
-      oauthStateMap.delete(key);
-    }
-  }
+/**
+ * Generate an HMAC-signed OAuth state that is self-verifiable without server-side storage.
+ * Format: `timestamp.random.hmac` — survives server restarts and multi-instance deploys.
+ */
+function generateOAuthState(): string {
+  const timestamp = Date.now().toString(36);
+  const random = crypto.randomBytes(16).toString('hex');
+  const payload = `${timestamp}.${random}`;
+  const hmac = crypto.createHmac('sha256', config.jwtSecret).update(payload).digest('hex').slice(0, 16);
+  return `${payload}.${hmac}`;
+}
+
+function verifyOAuthState(state: string): boolean {
+  const parts = state.split('.');
+  if (parts.length !== 3) return false;
+  const [timestamp, random, hmac] = parts;
+  // Verify HMAC
+  const payload = `${timestamp}.${random}`;
+  const expectedHmac = crypto.createHmac('sha256', config.jwtSecret).update(payload).digest('hex').slice(0, 16);
+  if (!crypto.timingSafeEqual(Buffer.from(hmac), Buffer.from(expectedHmac))) return false;
+  // Verify TTL
+  const createdAt = parseInt(timestamp, 36);
+  if (Date.now() - createdAt > OAUTH_STATE_TTL) return false;
+  return true;
 }
 
 // POST /api/auth/developer/github/callback — exchange GitHub code for session
@@ -506,13 +521,11 @@ router.post('/developer/github/callback',
       throw new AuthenticationError('GitHub authentication is not configured');
     }
 
-    // Validate OAuth state (CSRF protection — mandatory)
+    // Validate OAuth state (CSRF protection — HMAC-signed, no server storage needed)
     const { code, state } = req.body;
-    cleanExpiredOAuthStates();
-    if (!oauthStateMap.has(state)) {
+    if (!verifyOAuthState(state)) {
       throw new AuthenticationError('Invalid or expired OAuth state');
     }
-    oauthStateMap.delete(state);
 
     // Exchange code for access token
     const accessToken = await githubOAuth.exchangeCodeForToken(code);
@@ -673,10 +686,8 @@ router.get('/developer/github/url',
       return res.json({ url: null, configured: false });
     }
 
-    // Generate server-side state for CSRF protection
-    cleanExpiredOAuthStates();
-    const state = crypto.randomBytes(16).toString('hex');
-    oauthStateMap.set(state, { createdAt: Date.now() });
+    // Generate HMAC-signed state (self-verifiable, no server storage needed)
+    const state = generateOAuthState();
 
     const url = githubOAuth.getAuthorizationUrl(state);
     res.json({ url, state, configured: true });
