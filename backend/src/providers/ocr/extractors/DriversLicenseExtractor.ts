@@ -11,7 +11,7 @@ import {
   isHeaderNoise, sanitizeName, reorderSuffix, nameScore,
   CandidateAccumulator,
 } from '../utils/nameUtils.js';
-import { DL_FIELD_TOKENS } from '../constants/noise.js';
+import { DL_FIELD_TOKENS, NAME_SUFFIXES } from '../constants/noise.js';
 import {
   AAMVA_CODES, AAMVA_NAME_RE, AAMVA_ALT_RE,
   LABEL_PATTERNS, DL_NUMBER_PATTERNS,
@@ -333,7 +333,20 @@ export class DriversLicenseExtractor extends BaseExtractor {
     // Strategy A: LN + FN labels (California style)
     const lnLine = labelMap.get('last_name');
     const fnLine = labelMap.get('first_name');
-    if (lnLine || fnLine) {
+    // Skip Strategy A if label lines are AAMVA-prefixed AND contain real names (not labels)
+    // (e.g. "01 LASTNAME" with actual name → skip; "2 GIVEN NAMES" with label → don't skip)
+    // Only treat as label if content has explicit multi-word label phrases (with spaces)
+    const LABEL_PHRASES = /^(?:LAST\s+NAME|FIRST\s+NAME|FAMILY\s+NAME|GIVEN\s+NAMES?|SURNAME|FULL\s+NAME|LN|FN)$/i;
+    const isAamvaNameLine = (line: LabelMapEntry | undefined): boolean => {
+      if (!line) return false;
+      if (!/^\s*0?[12][.\s]/.test(line.text)) return false;
+      const afterPrefix = line.text.replace(/^\s*0?[12][.\s]*/, '').trim();
+      if (LABEL_PHRASES.test(afterPrefix)) return false; // Multi-word label, not a name
+      return true;
+    };
+    const lnIsAamva = isAamvaNameLine(lnLine);
+    const fnIsAamva = isAamvaNameLine(fnLine);
+    if ((lnLine || fnLine) && !lnIsAamva && !fnIsAamva) {
       const lastName  = lnLine ? this.extractNameFromLine(lnLine, lines, /\b(?:LN|LAST\s*NAME|FAMILY\s*NAME|SURNAME)\b/i) : '';
       const firstName = fnLine ? this.extractNameFromLine(fnLine, lines, /\b(?:FN|FIRST\s*NAME|GIVEN\s*NAME)\b/i) : '';
       if (lastName || firstName) {
@@ -389,9 +402,27 @@ export class DriversLicenseExtractor extends BaseExtractor {
 
     // Strategy C: AAMVA field number prefixes ("1MARTINEZ", "2ELENA")
     for (const line of lines) {
-      const trimmedText = line.text.trimStart();
+      let trimmedText = line.text.trimStart();
       let nameText: string | null = null;
+
+      // Preprocessing: strip leading single noise char before AAMVA prefix (e.g. "S 1 SAMPLE")
+      if (/^[A-Za-z]\s+0?[12]\s/.test(trimmedText)) {
+        trimmedText = trimmedText.replace(/^[A-Za-z]\s+/, '');
+      }
+      // Preprocessing: strip trailing short noise containing lowercase (e.g. "2. JANICE St")
+      // Preserve all-uppercase tokens (middle initials like "T" in "2 BRENDA T")
+      {
+        const trailingMatch = trimmedText.match(/\s+([A-Za-z]{1,3})\s*$/);
+        if (trailingMatch && /[a-z]/.test(trailingMatch[1])) {
+          trimmedText = trimmedText.slice(0, trailingMatch.index!);
+        }
+      }
+
       let prefixChar = trimmedText[0];
+      // Handle zero-padded AAMVA prefix: "01..." → treat as '1', "02..." → treat as '2'
+      if (prefixChar === '0' && /^0[12]/.test(trimmedText)) {
+        prefixChar = trimmedText[1];
+      }
 
       const m = trimmedText.match(AAMVA_NAME_RE);
       if (m) {
@@ -406,17 +437,54 @@ export class DriversLicenseExtractor extends BaseExtractor {
 
       if (nameText && nameScore(nameText.replace(/[,.]/g, '')) > 0.4) {
         const isLast  = prefixChar === '1';
+        // Apply same preprocessing to partner candidates as main line
+        const preprocessLine = (t: string) => {
+          let s = t.trimStart();
+          if (/^[A-Za-z]\s+0?[12]\s/.test(s)) s = s.replace(/^[A-Za-z]\s+/, '');
+          const tm = s.match(/\s+([A-Za-z]{1,3})\s*$/);
+          if (tm && /[a-z]/.test(tm[1])) s = s.slice(0, tm.index!);
+          return s;
+        };
         const partner = lines.find(l =>
           l !== line &&
           l.y > line.y - 10 && l.y < line.y + 100 &&
-          l.text.trimStart().match(isLast ? /^2\s*[A-Z]/ : /^1\s*[A-Z]/)
+          preprocessLine(l.text).match(isLast ? /^0?2[.\s]*[A-Z]/ : /^0?1[.\s]*[A-Z]/)
         );
         if (partner) {
-          const partnerM = partner.text.trimStart().match(AAMVA_NAME_RE);
+          const partnerM = preprocessLine(partner.text).match(AAMVA_NAME_RE);
           const parts = isLast
             ? [partnerM?.[1]?.trim(), nameText!.trim()]
             : [nameText!.trim(), partnerM?.[1]?.trim()];
-          const full = sanitizeName(parts.filter(Boolean).join(' '));
+          let full = sanitizeName(parts.filter(Boolean).join(' '));
+
+          // Check for middle name/suffix on adjacent line after the pair
+          // (e.g. SD: "Ta MIDDLENAME, JR" where "Ta" is garbled AAMVA prefix)
+          if (partnerM) {
+            const pairIdxMax = Math.max(lines.indexOf(line), lines.indexOf(partner));
+            for (let d = 1; d <= 2; d++) {
+              const midLine = lines[pairIdxMax + d];
+              if (!midLine) continue;
+              // Skip address lines (AAMVA field 8) and lines with digits
+              if (/^\s*8\s/.test(midLine.text)) break;
+              if (/\d/.test(midLine.text.replace(/^[A-Za-z]{1,2}\s+/, ''))) break;
+              // Strip garbled prefix (1-2 non-digit chars + space) and commas
+              const midText = midLine.text.replace(/^[A-Za-z]{1,2}\s+/, '').replace(/,/g, '').trim();
+              if (!midText || /\d{3,}/.test(midText)) break; // stop at address/numeric lines
+              const midWords = midText.split(/\s+/).filter(w =>
+                /^[A-Z][A-Z]+$/.test(w) || NAME_SUFFIXES.has(w.toUpperCase())
+              );
+              if (midWords.length > 0 && midWords.every(w => !isHeaderNoise(w) && !DL_FIELD_TOKENS.has(w.toLowerCase()))) {
+                // Insert middle name(s) between FN and LN, suffix at end
+                const midNames = midWords.filter(w => !NAME_SUFFIXES.has(w.toUpperCase()));
+                const midSuffixes = midWords.filter(w => NAME_SUFFIXES.has(w.toUpperCase()));
+                const firstName = isLast ? partnerM[1].trim() : nameText!.trim();
+                const lastName = isLast ? nameText!.trim() : partnerM[1].trim();
+                full = sanitizeName([firstName, ...midNames, lastName, ...midSuffixes].join(' '));
+                break;
+              }
+            }
+          }
+
           if (nameScore(full) > 0.4) {
             if (partnerM) {
               return { value: full, confidence: (line.confidence + partner.confidence) / 2 };
@@ -428,12 +496,14 @@ export class DriversLicenseExtractor extends BaseExtractor {
           }
         }
 
-        // No numbered partner found — check adjacent non-prefixed line
+        // No numbered partner found — check nearby non-prefixed lines (±3)
         const lineIdx = lines.indexOf(line);
-        const adjacentIdx = isLast ? lineIdx + 1 : lineIdx - 1;
-        const adjacent = lines[adjacentIdx];
-        if (adjacent && !isHeaderNoise(adjacent.text) && !/\d/.test(adjacent.text) &&
-            nameScore(adjacent.text) > 0.2) {
+        for (let d = 1; d <= 3; d++) {
+          const adjacentIdx = isLast ? lineIdx + d : lineIdx - d;
+          const adjacent = lines[adjacentIdx];
+          if (!adjacent) continue;
+          if (isHeaderNoise(adjacent.text) || /\d/.test(adjacent.text)) continue;
+          if (nameScore(adjacent.text) <= 0.2) continue;
           const parts = isLast
             ? [adjacent.text.trim(), nameText!.trim()]
             : [nameText!.trim(), adjacent.text.trim()];
@@ -443,6 +513,38 @@ export class DriversLicenseExtractor extends BaseExtractor {
               value:      full,
               confidence: (line.confidence + adjacent.confidence) / 2,
             };
+          }
+        }
+
+        // Extract missing partner name from DL header/number blob lines
+        // (e.g. NV: "U 4dDL NO. 1234567890 SAMPLE 3 DOB 10/27/1969")
+        const DL_BLOB_KW = /(?:DL|DRIVER|LICENSE|IDENTIFICATION|DOB|EXP|ISS|CLASS)/i;
+        for (const blobLine of lines) {
+          if (blobLine === line) continue;
+          if (!DL_BLOB_KW.test(blobLine.text)) continue;
+          // Extract uppercase words that look like names from the blob
+          // Use matchAll to get word positions for context checking
+          const blobWordRe = /\b([A-Z]{3,})\b/g;
+          let blobWordMatch: RegExpExecArray | null;
+          while ((blobWordMatch = blobWordRe.exec(blobLine.text)) !== null) {
+            const word = blobWordMatch[1];
+            const wordStart = blobWordMatch.index;
+            const wordEnd = wordStart + word.length;
+            // Skip words adjacent to hyphens/digits (part of doc numbers like "SAM-67-1234")
+            const charBefore = wordStart > 0 ? blobLine.text[wordStart - 1] : ' ';
+            const charAfter = wordEnd < blobLine.text.length ? blobLine.text[wordEnd] : ' ';
+            if (/[\d\-]/.test(charBefore) || /[\d\-]/.test(charAfter)) continue;
+            if (isHeaderNoise(word) || DL_FIELD_TOKENS.has(word.toLowerCase())) continue;
+            if (/^(?:DRIVER|LICENSE|IDENTIFICATION|LICENCE|STATE|DEPARTMENT|CARD|MOTOR|VEHICLE|PERMIT|NONE|ORGAN|DONOR|VETERAN|USA)$/i.test(word)) continue;
+            if (nameScore(word) > 0) {
+              const parts = isLast
+                ? [word, nameText!.trim()]
+                : [nameText!.trim(), word];
+              const combined = sanitizeName(parts.join(' '));
+              if (nameScore(combined) > 0.4 && combined.split(/\s+/).length >= 2) {
+                return { value: combined, confidence: (line.confidence + blobLine.confidence) / 2 };
+              }
+            }
           }
         }
 
@@ -458,25 +560,31 @@ export class DriversLicenseExtractor extends BaseExtractor {
     // Strategy C.2: Standalone AAMVA prefix ("1" or "2" alone on its own line)
     for (let i = 0; i < lines.length; i++) {
       const trimmed = lines[i].text.trim();
-      if (trimmed !== '1' && trimmed !== '2') continue;
-      const isLastPrefix = trimmed === '1';
+      if (!/^0?[12]$/.test(trimmed)) continue;
+      const isLastPrefix = trimmed === '1' || trimmed === '01';
 
       let nameValue: string | null = null;
       let nameConf = 0;
-      for (const adj of [lines[i - 1], lines[i + 1]]) {
-        if (!adj) continue;
-        const adjText = adj.text.trim();
-        if (/^[12]\s/.test(adjText) || /^[12]$/.test(adjText)) continue;
-        if (isHeaderNoise(adjText) || /\d{3,}/.test(adjText)) continue;
-        if (/^[A-Z][A-Z'\-\s]+$/.test(adjText) && nameScore(adjText) > 0.3) {
-          nameValue = adjText;
-          nameConf = adj.confidence;
-          break;
+      for (let d = 1; d <= 3 && !nameValue; d++) {
+        // Prefer the line AFTER the prefix (name follows its AAMVA number on the DL)
+        const candidates = isLastPrefix
+          ? [lines[i + d], lines[i - d]]
+          : [lines[i + d], lines[i - d]];
+        for (const adj of candidates) {
+          if (!adj) continue;
+          const adjText = adj.text.trim();
+          if (/^0?[12]\s/.test(adjText) || /^0?[12]$/.test(adjText)) continue;
+          if (isHeaderNoise(adjText) || /\d{3,}/.test(adjText)) continue;
+          if (/^[A-Z][A-Z'\-\s]+$/.test(adjText) && nameScore(adjText) > 0.3) {
+            nameValue = adjText;
+            nameConf = adj.confidence;
+            break;
+          }
         }
       }
       if (!nameValue) continue;
 
-      const partnerPrefix = isLastPrefix ? /^2\s*([A-Z][A-Z'\-,.\s]+)$/ : /^1\s*([A-Z][A-Z'\-,.\s]+)$/;
+      const partnerPrefix = isLastPrefix ? /^0?2\s*([A-Z][A-Z'\-,.\s]+)$/ : /^0?1\s*([A-Z][A-Z'\-,.\s]+)$/;
       const partner = lines.find(l => partnerPrefix.test(l.text));
       if (partner) {
         const partnerM = partner.text.match(partnerPrefix);
@@ -491,17 +599,41 @@ export class DriversLicenseExtractor extends BaseExtractor {
         }
       }
 
+      // No AAMVA partner — check nearby non-prefixed name lines (e.g. AK: "SAMPLECARD")
+      const stIdx = i;
+      for (let d = 1; d <= 3; d++) {
+        // Search in the opposite direction from where nameValue was found
+        for (const nearIdx of [stIdx - d, stIdx + d]) {
+          if (nearIdx < 0 || nearIdx >= lines.length) continue;
+          const near = lines[nearIdx];
+          const nearText = near.text.trim();
+          if (nearText === nameValue) continue;
+          if (/^0?[12](\s|$)/.test(nearText)) continue; // skip AAMVA-prefixed lines
+          if (isHeaderNoise(nearText) || /\d{3,}/.test(nearText)) continue;
+          if (nameScore(nearText) <= 0.2) continue;
+          if (!/^[A-Z][A-Z'\-\s]+$/.test(nearText)) continue;
+          const parts = isLastPrefix
+            ? [nearText, nameValue]
+            : [nameValue, nearText];
+          const combined = sanitizeName(parts.join(' '));
+          if (nameScore(combined) > 0.4 && combined.split(/\s+/).length >= 2) {
+            return { value: combined, confidence: (nameConf + near.confidence) / 2 };
+          }
+        }
+      }
+
       const full = sanitizeName(nameValue);
       if (nameScore(full) > 0.4) {
-        return { value: full, confidence: nameConf };
+        const result = acc.tryReturn({ value: full, confidence: nameConf });
+        if (result) return result;
       }
     }
 
     // Strategy C.5: Embedded AAMVA in blob lines (WA, VT, MT)
     for (const line of lines) {
       if (line.text.length < 60) continue;
-      const lastM = line.text.match(/\b1\s*([A-Z][A-Z'\-]+)\b/);
-      const firstM = line.text.match(/\b2\s*([A-Z][A-Z'\-\s]*[A-Z])\b/);
+      const lastM = line.text.match(/\b0?1\s*([A-Z][A-Z'\-]+)\b/);
+      const firstM = line.text.match(/\b0?2\s*([A-Z][A-Z'\-\s]*[A-Z])\b/);
       if (lastM && firstM) {
         const lastName = sanitizeName(lastM[1].trim());
         const firstName = sanitizeName(firstM[1].trim());
@@ -608,6 +740,14 @@ export class DriversLicenseExtractor extends BaseExtractor {
       const best = candidates.sort((a, b) => nameScore(b.text) - nameScore(a.text))[0];
       const cleaned = sanitizeName(best.text.trim());
       if (nameScore(cleaned) > 0.4) {
+        // If there's a single-word fallback (likely LN from Strategy A), combine with this FN
+        if (acc.fallback && acc.fallback.value.split(/\s+/).length === 1 &&
+            !cleaned.toLowerCase().includes(acc.fallback.value.toLowerCase())) {
+          const combined = `${cleaned} ${acc.fallback.value}`;
+          if (nameScore(combined) > 0.4) {
+            return { value: combined, confidence: (best.confidence + acc.fallback.confidence) / 2 };
+          }
+        }
         const result = acc.tryReturn({ value: cleaned, confidence: best.confidence });
         if (result) return result;
       }
@@ -657,12 +797,32 @@ export class DriversLicenseExtractor extends BaseExtractor {
           } else if (aamvaM && aamvaM[1] === '1') {
             combined = `${singleWord} ${namePart}`;
           } else {
+            // No AAMVA hint — try both orders, pick higher nameScore
             const opt1 = `${singleWord} ${namePart}`;
             const opt2 = `${namePart} ${singleWord}`;
             combined = nameScore(opt1) >= nameScore(opt2) ? opt1 : opt2;
           }
           if (nameScore(combined) > 0.4) {
             return { value: combined, confidence: (acc.fallback!.confidence + near.confidence) / 2 };
+          }
+        }
+      }
+    }
+
+    // Strategy E: Extract name appended to header line (e.g. NV: "NEVADA DRIVER LICENSE SMITH")
+    if (!acc.fallback || acc.fallback.value.split(/\s+/).length < 2) {
+      const HEADER_KW = /^(?:DRIVER|LICENSE|IDENTIFICATION|LICENCE|STATE|DEPARTMENT|CARD|MOTOR|VEHICLE|PERMIT)$/i;
+      for (const line of lines) {
+        const text = line.text.trim();
+        const headerMatch = text.match(
+          /^(?:.*(?:DRIVER|LICENSE|IDENTIFICATION|LICENCE|STATE|DEPARTMENT).*?)\s+([A-Z][A-Z]{2,})$/
+        );
+        if (headerMatch) {
+          const candidate = headerMatch[1];
+          if (!isHeaderNoise(candidate) && !HEADER_KW.test(candidate) &&
+              !DL_FIELD_TOKENS.has(candidate.toLowerCase()) && nameScore(candidate) > 0) {
+            const result = acc.tryReturn({ value: candidate, confidence: line.confidence });
+            if (result) return result;
           }
         }
       }

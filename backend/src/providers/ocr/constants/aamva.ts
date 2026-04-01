@@ -15,10 +15,10 @@ export const AAMVA_CODES: Record<string, keyof OCRData> = {
 };
 
 /** Regex matching AAMVA name field prefixes: "1MARTINEZ", "2 ELENA" */
-export const AAMVA_NAME_RE = /^[12]\s*([A-Z][A-Z'\-,.\s]+?)(?:\s+\d{2,})?$/;
+export const AAMVA_NAME_RE = /^0?[12][.\s]*([A-Z][A-Z'\-,.\s]+?)(?:\s+\d{2,})?$/;
 
 /** Alternate regex: handles "21 BRENDA" where AAMVA prefix "2" is stuck to another digit */
-export const AAMVA_ALT_RE = /^([12])(\d)\s+([A-Z][A-Z'\-,.\s]+)$/;
+export const AAMVA_ALT_RE = /^0?([12])(\d)\s+([A-Z][A-Z'\-,.\s]+)$/;
 
 /**
  * Label patterns used by buildLabelMap() to identify semantic fields.
