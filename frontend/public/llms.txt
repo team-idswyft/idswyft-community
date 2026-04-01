@@ -75,6 +75,49 @@ Content-Type: application/json
 }
 ```
 
+### Alternative: Re-verify a Returning User
+
+For returning users who have already been verified, use the re-verification endpoint to perform a liveness-only re-check instead of the full 5-step flow.
+
+```
+POST /api/v2/verify/re-verify
+Content-Type: application/json
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| user_id | UUID string | Yes | Same user_id used in the original verification |
+| previous_verification_id | UUID string | Yes | ID of a previously completed verification (status must be `verified`) |
+| source | string | No | 'api' | 'vaas' | 'demo' (default: 'api') |
+
+**Response (201):**
+
+```json
+{
+  "success": true,
+  "verification_id": "660e8400-e29b-41d4-a716-446655440002",
+  "parent_verification_id": "550e8400-e29b-41d4-a716-446655440001",
+  "verification_mode": "liveness_only",
+  "status": "AWAITING_LIVE",
+  "current_step": 4,
+  "total_steps": 5,
+  "message": "Re-verification initialized — ready to upload live capture (liveness-only mode)"
+}
+```
+
+**Two modes based on face embedding availability:**
+
+| Mode | `verification_mode` | Starting Step | When |
+|------|---------------------|---------------|------|
+| Liveness-only | `liveness_only` | `AWAITING_LIVE` (step 4) | Face embedding from parent is still available |
+| Document refresh | `document_refresh` | `AWAITING_FRONT` (step 1) | Face embedding was GDPR-stripped — user re-uploads front doc, then skips back doc + cross-validation |
+
+**Constraints:**
+- Parent verification must have `status: "verified"`
+- Parent must belong to the same developer and user
+- Cannot chain re-verifications — parent must be a full (`verification_mode: "full"`) verification
+- After initialization, proceed to `POST /api/v2/verify/:id/live-capture` (liveness_only) or `POST /api/v2/verify/:id/front-document` (document_refresh)
+
 ### Step 2: Upload Front Document
 
 ```

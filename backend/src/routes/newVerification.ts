@@ -723,6 +723,130 @@ router.post('/initialize',
   })
 );
 
+// ─── Re-verification: liveness-only re-check for returning users ────────────
+router.post('/re-verify',
+  authenticateAPIKey,
+  checkSandboxMode,
+  verificationRateLimit,
+  [
+    body('user_id').isUUID().withMessage('User ID must be a valid UUID'),
+    body('previous_verification_id').isUUID().withMessage('Previous verification ID must be a valid UUID'),
+    body('source').optional().isIn(['api', 'vaas', 'demo']).withMessage('Source must be api, vaas, or demo'),
+  ],
+  validate,
+  catchAsync(async (req: Request, res: Response) => {
+    const { user_id, previous_verification_id } = req.body;
+    const source: VerificationSource = req.body.source || 'api';
+
+    req.body.user_id = user_id;
+    await new Promise((resolve, reject) => {
+      authenticateUser(req as any, res as any, (err: any) => {
+        if (err) reject(err);
+        else resolve(true);
+      });
+    });
+
+    const isSandbox = req.isSandbox || false;
+    const developerId = (req as any).developer.id;
+
+    // Load and validate the parent verification
+    const { data: parentVerification, error: parentError } = await supabase
+      .from('verification_requests')
+      .select('id, user_id, developer_id, status, issuing_country, verification_mode')
+      .eq('id', previous_verification_id)
+      .single();
+
+    if (parentError || !parentVerification) {
+      throw new ValidationError('Previous verification not found', 'previous_verification_id', previous_verification_id);
+    }
+    if (parentVerification.developer_id !== developerId) {
+      throw new ValidationError('Previous verification belongs to a different developer', 'previous_verification_id', previous_verification_id);
+    }
+    if (parentVerification.user_id !== user_id) {
+      throw new ValidationError('Previous verification belongs to a different user', 'previous_verification_id', previous_verification_id);
+    }
+    if (parentVerification.status !== 'verified') {
+      throw new ValidationError('Previous verification must have status "verified" to re-verify', 'previous_verification_id', parentVerification.status);
+    }
+    if (parentVerification.verification_mode && parentVerification.verification_mode !== 'full') {
+      throw new ValidationError('Cannot re-verify from another re-verification — use the original verification', 'previous_verification_id', previous_verification_id);
+    }
+
+    // Load parent session to get face embedding for matching
+    const parentState = await loadSessionState(previous_verification_id);
+    if (!parentState?.front_extraction) {
+      throw new ValidationError('Previous verification has no front extraction data — cannot re-verify', 'previous_verification_id', previous_verification_id);
+    }
+
+    // Check if face embedding is still available (GDPR stripping nullifies it on terminal states).
+    // If missing, the session starts at AWAITING_FRONT so the user must re-upload their ID photo.
+    const hasFaceEmbedding = parentState.front_extraction.face_embedding
+      && parentState.front_extraction.face_embedding.length > 0;
+    const startStep = hasFaceEmbedding
+      ? VerificationStatus.AWAITING_LIVE
+      : VerificationStatus.AWAITING_FRONT;
+    const mode = hasFaceEmbedding ? 'liveness_only' : 'document_refresh';
+
+    // Create new verification record linked to parent
+    const verificationRecord = await verificationService.createVerificationRequest({
+      user_id,
+      developer_id: developerId,
+      is_sandbox: isSandbox,
+      source,
+    });
+
+    // Set parent link and verification mode
+    await supabase.from('verification_requests').update({
+      parent_verification_id: previous_verification_id,
+      verification_mode: mode,
+      session_started_at: new Date().toISOString(),
+      issuing_country: parentVerification.issuing_country,
+    }).eq('id', verificationRecord.id);
+
+    // Create session — either at AWAITING_LIVE (with face embedding) or AWAITING_FRONT (refresh)
+    const hydration: SessionHydration = {
+      session_id: verificationRecord.id,
+      current_step: startStep,
+      issuing_country: parentVerification.issuing_country,
+    };
+    if (hasFaceEmbedding) {
+      hydration.front_extraction = parentState.front_extraction;
+    }
+    const session = createSession(isSandbox, hydration);
+    await saveSessionState(verificationRecord.id, session.getState());
+
+    logVerificationEvent('re_verification_initialized', verificationRecord.id, {
+      userId: user_id,
+      previousVerificationId: previous_verification_id,
+      developerId,
+      sandbox: isSandbox,
+      mode,
+    });
+
+    const mapped = mapStatusForResponse(session.getState());
+
+    res.status(201).json({
+      success: true,
+      verification_id: verificationRecord.id,
+      parent_verification_id: previous_verification_id,
+      verification_mode: mode,
+      status: mapped.status,
+      current_step: mapped.current_step,
+      total_steps: mapped.total_steps,
+      message: hasFaceEmbedding
+        ? 'Re-verification initialized — ready to upload live capture (liveness-only mode)'
+        : 'Re-verification initialized — face embedding expired, please re-upload front document first',
+    });
+
+    // Fire webhook
+    fireWebhookEvent(
+      'verification.started',
+      verificationRecord.id, developerId, user_id,
+      session.getState(), isSandbox, (req as any).apiKey?.id
+    );
+  })
+);
+
 router.post('/:verification_id/front-document',
   authenticateAPIKey,
   verificationRateLimit,
