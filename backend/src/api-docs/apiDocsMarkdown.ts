@@ -510,6 +510,69 @@ embed.open(sessionToken, {
 | closeOnBackdropClick | boolean | true | Allow closing modal by clicking backdrop |
 | verificationUrl | string | 'https://idswyft.app' | Override verification page URL |
 
+## React Component
+
+Drop-in React component for SPAs. Install:
+
+\`\`\`bash
+npm install @idswyft/react
+\`\`\`
+
+### Component Usage
+
+\`\`\`tsx
+import { IdswyftVerification } from '@idswyft/react';
+
+function App() {
+  return (
+    <IdswyftVerification
+      apiKey="ik_your_api_key"
+      userId="user-123"
+      mode="modal"
+      theme="dark"
+      onComplete={(result) => console.log('Verified!', result.finalResult)}
+      onError={(error) => console.error(error.message)}
+      onClose={() => setShowVerification(false)}
+    />
+  );
+}
+\`\`\`
+
+### Hook Usage
+
+\`\`\`tsx
+import { useIdswyftVerification } from '@idswyft/react';
+
+function VerifyButton() {
+  const { open, isOpen, result } = useIdswyftVerification({
+    apiKey: 'ik_your_api_key',
+  });
+
+  return (
+    <>
+      <button onClick={() => open('user-123')}>Verify Identity</button>
+      {result && <p>Result: {result.finalResult}</p>}
+    </>
+  );
+}
+\`\`\`
+
+### Props
+
+| Prop | Type | Default | Description |
+|------|------|---------|-------------|
+| apiKey | string | — | API key (required) |
+| userId | string | — | User ID (required) |
+| mode | 'modal' \\| 'inline' | 'inline' | Display mode |
+| theme | 'light' \\| 'dark' | 'dark' | UI theme |
+| documentType | string | — | Limit to specific document type |
+| onComplete | function | — | Called when verification succeeds |
+| onError | function | — | Called on error |
+| onStepChange | function | — | Called on step progress |
+| onClose | function | — | Called when user closes modal |
+
+Works with Next.js, Vite, and Create React App. Requires React 17+.
+
 ---
 
 ## Analysis Engine
