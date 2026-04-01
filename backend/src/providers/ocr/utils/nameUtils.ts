@@ -65,6 +65,24 @@ export function sanitizeName(name: string): string {
     if (/^\d+$/.test(t))           return false;
     return true;
   });
+  // Fix 4: Truncate at first token containing 6+ consecutive digits (DOB, doc number)
+  const cutIdx = cleaned.findIndex(t => /\d{6,}/.test(t));
+  if (cutIdx > 0) cleaned.length = cutIdx;
+  // Fix 3: Strip leading single char (OCR artifact, e.g. "s SAMPLE", "K SAMPLE")
+  if (cleaned.length >= 2 && cleaned[0].length === 1) {
+    cleaned.shift();
+  }
+  // Fix 2: Strip trailing single letter if adjacent to stripped digit/field token
+  if (cleaned.length >= 2 && cleaned[cleaned.length - 1].length === 1) {
+    const lastToken = cleaned[cleaned.length - 1];
+    const lastOrigIdx = tokens.indexOf(lastToken);
+    if (lastOrigIdx >= 0 && lastOrigIdx + 1 < tokens.length) {
+      const nextOrig = tokens[lastOrigIdx + 1];
+      if (/^\d+$/.test(nextOrig) || DL_FIELD_TOKENS.has(nextOrig.toLowerCase())) {
+        cleaned.pop();
+      }
+    }
+  }
   return cleaned.length === 0 ? name : cleaned.join(' ');
 }
 
@@ -90,6 +108,9 @@ export function nameScore(text: string): number {
   if (/\d{3,}/.test(t))                           return 0;  // contains long number
   if (/[:\/<>@#$%^&*=+]/.test(t))                 return 0;  // special chars
   if (/^(class|iss|exp|dob|sex|hgt|wt)\b/i.test(t)) return 0;
+  // All words are DL field tokens — not a real name
+  const allWords = t.split(/\s+/);
+  if (allWords.length > 0 && allWords.every(w => DL_FIELD_TOKENS.has(w.toLowerCase()))) return 0;
 
   let score = 0;
   // All caps alphabetic with spaces/hyphens/apostrophes — classic DL name
