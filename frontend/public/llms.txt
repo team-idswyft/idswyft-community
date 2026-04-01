@@ -515,7 +515,7 @@ All verification decisions are **deterministic** — no LLMs or probabilistic mo
 
 | Category | Capabilities |
 |----------|-------------|
-| OCR Extraction | PaddleOCR/Tesseract, name/DOB/ID number, AAMVA field parsing (US DLs), MRZ parsing (TD1/TD2/TD3 for international IDs), state format validation, per-field confidence scores |
+| OCR Extraction | PaddleOCR/Tesseract, name/DOB/ID number, AAMVA field parsing (US DLs), MRZ parsing (TD1/TD2/TD3 for international IDs), state format validation, per-field confidence scores, multi-language awareness (Latin scripts fully supported; Cyrillic/Arabic/CJK/Devanagari/Thai detection with custom model support) |
 | Document Quality | Sobel edge blur detection, brightness/contrast stats, resolution check (≥800x600), file size validation, overall quality score, auto-reject below threshold |
 | Cross-Validation | PDF417/QR barcode decode, MRZ parsing, Levenshtein distance matching, token-set name similarity, front OCR vs back barcode/MRZ check, date & ID number consistency, weighted field scoring, address cross-validation (supplementary) |
 | Liveness & Face Match | EXIF metadata analysis, JPEG artifact detection, color histogram analysis, byte entropy scoring, pixel variance & edge density, face detection (SSDMobilenetv1), 128-d face embeddings, cosine similarity scoring, deepfake detection |

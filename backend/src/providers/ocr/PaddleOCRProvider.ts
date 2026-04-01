@@ -11,6 +11,7 @@ import { PassportExtractor } from './extractors/PassportExtractor.js';
 import { NationalIdExtractor } from './extractors/NationalIdExtractor.js';
 import { InternationalExtractor } from './extractors/InternationalExtractor.js';
 import { GenericExtractor } from './extractors/GenericExtractor.js';
+import { getDocumentScript, isDefaultModelSupported } from './constants/languageMap.js';
 
 // ── Public API re-exports ─────────────────────────────────────
 export { standardizeDateFormat } from './utils/dateUtils.js';
@@ -53,8 +54,16 @@ export class PaddleOCRProvider implements OCRProvider {
       confidence_scores: {},
     };
 
-    // Country-aware routing: use international extraction for non-US countries
+    // Language awareness: log when non-Latin script detected
     const country = issuingCountry?.toUpperCase();
+    if (country && !isDefaultModelSupported(country)) {
+      const script = getDocumentScript(country);
+      logger.info('Non-Latin script detected — extraction quality may vary', {
+        country, script, documentType,
+      });
+    }
+
+    // Country-aware routing: use international extraction for non-US countries
     const countryFormat = country ? getCountryFormat(country, documentType) : null;
 
     if (country && country !== 'US' && countryFormat) {
