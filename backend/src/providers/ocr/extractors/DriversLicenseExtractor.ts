@@ -97,6 +97,19 @@ export class DriversLicenseExtractor extends BaseExtractor {
       }
     }
 
+    // For dl_number, prefer a line that has digits after the label over one
+    // that merely contains "DL" in state name text (e.g. "GEORGIA DL USA GA")
+    const dlEntry = map.get('dl_number');
+    if (dlEntry && !/\d{5,}/.test(dlEntry.text)) {
+      for (let i = dlEntry.lineIndex + 1; i < lines.length; i++) {
+        const line = lines[i];
+        if (LABEL_PATTERNS[0][1].test(line.text) && /\d{5,}/.test(line.text)) {
+          map.set('dl_number', { ...line, lineIndex: i });
+          break;
+        }
+      }
+    }
+
     return map;
   }
 
@@ -167,7 +180,7 @@ export class DriversLicenseExtractor extends BaseExtractor {
     if (labelLine) {
       // Try space-separated digit groups first (e.g., "DLN: 99 999 999")
       const spacedM = labelLine.text.match(
-        /(?:4d\s*)?(?:DLn?|DL\s*(?:NO\.?|#?)|LIC(?:ENSE)?\s*(?:NO\.?|#?)|OL\s*NO\.?)\s*[:\s]*(\d[\d\s]{5,18}\d)\b/i,
+        /(?:4d\s*)?(?:DLn?|DL\s*(?:NO\.?|#?)|LIC(?:ENSE)?\.?\s*(?:NO\.?|#?)|OL\s*NO\.?)\s*[:\s]*(\d[\d\s]{5,18}\d)\b/i,
       );
       if (spacedM && /\s/.test(spacedM[1])) {
         const groups = spacedM[1].trim().split(/\s+/);
@@ -185,14 +198,38 @@ export class DriversLicenseExtractor extends BaseExtractor {
 
       // Try full alphanumeric DL number after label
       const fullAlphaM = labelLine.text.match(
-        /(?:4d\s*)?(?:DLn?|DL\s*(?:NO\.?|#?)|LIC(?:ENSE)?\s*(?:NO\.?|#?)|OL\s*NO\.?)\s*([A-Z]{0,3}\d[\dA-Z]{4,14})\b/i,
+        /(?:4d\s*)?(?:DLn?|DL\s*(?:NO\.?|#?)|LIC(?:ENSE)?\.?\s*(?:NO\.?|#?)|OL\s*NO\.?)\s*([A-Z]{0,3}\d[\dA-Z]{4,14})\b/i,
       );
       if (fullAlphaM) {
-        const cleaned = fullAlphaM[1].replace(/[\s\-]/g, '');
+        let cleaned = fullAlphaM[1].replace(/[\s\-]/g, '');
+        // Strip AAMVA field suffix concatenated by OCR (e.g. "999999999DOB")
+        const sfx = cleaned.match(
+          /^([A-Z]{0,3}\d{6,})(?:DOB|SEX|CLASS|CLAS|EXP|ISS|HGT|WGT|EYES?|HAIR|DD|RESTR)/i,
+        );
+        if (sfx) cleaned = sfx[1];
+        // Strip leading 'E' (AAMVA endorsements field label) bleeding into DL number
+        // No US state uses E-prefix + 10+ digits as a DL number format
+        if (/^E\d{10,}$/i.test(cleaned)) {
+          cleaned = cleaned.slice(1);
+        }
         if (/\d/.test(cleaned) && cleaned.length >= 5 && cleaned.length <= 15
             && !this.looksLikeDate(cleaned)) {
           return cleaned;
         }
+      }
+
+      // Try letter + hyphenated digits (FL "D123-456-83-789-0", IL "P142-4558-7924", MN "A123-456-789-123")
+      const hyphenM = labelLine.text.match(
+        /(?:4d\s*)?(?:DLn?|DL\s*(?:NO\.?|#?)|LIC(?:ENSE)?\.?\s*(?:NO\.?|#?))\s*[:\s]*([A-Z]\d{1,4}(?:-\d{1,4}){2,5})\b/i,
+      );
+      if (hyphenM) return hyphenM[1];
+
+      // Try letter + spaced digit groups (MI "S 000 123 456 789")
+      const letterSpacedM = labelLine.text.match(
+        /(?:4d\s*)?(?:DLn?|DL\s*(?:NO\.?|#?)|LIC(?:ENSE)?\.?\s*(?:NO\.?|#?))\s*[:\s]*([A-Z]\s+\d{3}(?:\s+\d{3}){2,4})\b/i,
+      );
+      if (letterSpacedM) {
+        return letterSpacedM[1].replace(/\s/g, '');
       }
 
       // Handle concatenated OCR: "DLN0000234578919Clas"
@@ -225,9 +262,18 @@ export class DriversLicenseExtractor extends BaseExtractor {
 
       // Fallback: strip optional class letter + capture digits only
       const digitsOnlyM = labelLine.text.match(
-        /(?:4d\s*)?(?:DLn?|DL\s*#?|LIC\s*#?)\s*[A-Z]?\s*(\d{6,15})/i,
+        /(?:4d\s*)?(?:DLn?|DL\s*#?|LIC\.?\s*#?)\s*[A-Z]?\s*(\d{6,15})/i,
       );
       if (digitsOnlyM) return digitsOnlyM[1].replace(/[\s\-]/g, '');
+
+      // Fallback for "4d" AAMVA code when DL label is OCR'd wrong (e.g. "4d DI 12345678")
+      const aamva4dM = labelLine.text.match(
+        /\b4d\s+[A-Z]{1,3}\s+([A-Z]{0,3}\d{6,14})\b/i,
+      );
+      if (aamva4dM) {
+        const cleaned4d = aamva4dM[1].replace(/[\s\-]/g, '');
+        if (!this.looksLikeDate(cleaned4d)) return cleaned4d;
+      }
 
       // Try "ID" prefix followed by spaced digits
       const idPrefixM = labelLine.text.match(
@@ -255,9 +301,18 @@ export class DriversLicenseExtractor extends BaseExtractor {
     }
 
     // Strategy B: Regex scan for DL number patterns across all lines
-    const DL_LABEL_RE = /(?:\b4d\b|DLn?(?:\b|(?=\d))|\bDL\s*(?:NO\.?|#)|\bLIC(?:ENSE)?\s*(?:NO\.?|#)|\bOL\s*NO\b)/i;
+    const DL_LABEL_RE = /(?:\b4d\b|DLn?(?:\b|(?=\d))|\bDL\s*(?:NO\.?|#)|\bLIC(?:ENSE)?\.?\s*(?:NO\.?|#)|\bOL\s*NO\b)/i;
     const priorityLines = lines.filter(l => DL_LABEL_RE.test(l.text));
     const otherLines = lines.filter(l => !DL_LABEL_RE.test(l.text));
+
+    // Pre-scan: try hyphenated letter+digit pattern on ALL lines (including date-containing ones)
+    // because hyphenated DL numbers like "D123-456-83-789-0" can contain date-like substrings
+    const HYPHEN_DL_RE = /\b([A-Z]\d{1,4}(?:-\d{1,4}){2,5})\b/;
+    for (const line of [...priorityLines, ...otherLines]) {
+      if (isHeaderNoise(line.text)) continue;
+      const hm = line.text.match(HYPHEN_DL_RE);
+      if (hm) return hm[1];
+    }
 
     for (const line of [...priorityLines, ...otherLines]) {
       if (/\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}/.test(line.text)) continue;
@@ -266,7 +321,17 @@ export class DriversLicenseExtractor extends BaseExtractor {
       for (const pattern of DL_NUMBER_PATTERNS) {
         const m = line.text.match(pattern);
         if (m) {
-          const candidate = m[1].replace(/[\s]/g, '');
+          let candidate = m[1].replace(/[\s]/g, '');
+          // Strip AAMVA field suffix concatenated by OCR (e.g. "999999999DOB")
+          const suffixStrip = candidate.match(
+            /^([A-Z]{0,3}\d{6,})(?:DOB|SEX|CLASS|CLAS|EXP|ISS|HGT|WGT|EYES?|HAIR|DD|RESTR)/i,
+          );
+          if (suffixStrip) candidate = suffixStrip[1];
+          // Strip leading 'E' (AAMVA endorsements field label) bleeding into DL number
+          // No US state uses E-prefix + 10+ digits as a DL number format
+          if (/^E\d{10,}$/i.test(candidate)) {
+            candidate = candidate.slice(1);
+          }
           if (!this.looksLikeDate(candidate) && !isHeaderNoise(candidate)) {
             return candidate;
           }
@@ -293,6 +358,11 @@ export class DriversLicenseExtractor extends BaseExtractor {
       while (groups.length > 1 && groups[groups.length - 1].length === 1) {
         groups.pop();
       }
+      // Drop trailing short groups that bleed into a following date (e.g. "123456789 01/12/2017")
+      const afterSpaced = withoutLabel.slice(spacedM[0].length);
+      while (groups.length > 1 && groups[groups.length - 1].length <= 2 && /^[\/\-\.]/.test(afterSpaced)) {
+        groups.pop();
+      }
       const collapsed = groups.join('');
       if (collapsed.length >= 6 && collapsed.length <= 15 && !this.looksLikeDate(collapsed)) {
         return collapsed;
@@ -317,8 +387,20 @@ export class DriversLicenseExtractor extends BaseExtractor {
   }
 
   private looksLikeDate(s: string): boolean {
-    return /^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}$/.test(s)
-      || /^\d{8}$/.test(s);
+    if (/^\d{1,2}[\/\-\.]\d{1,2}[\/\-\.]\d{2,4}$/.test(s)) return true;
+    // Only reject 8-digit numbers that look like valid MMDDYYYY or YYYYMMDD dates
+    if (/^\d{8}$/.test(s)) {
+      const mm1 = parseInt(s.slice(0, 2), 10);
+      const dd1 = parseInt(s.slice(2, 4), 10);
+      const yy1 = parseInt(s.slice(4, 8), 10);
+      if (mm1 >= 1 && mm1 <= 12 && dd1 >= 1 && dd1 <= 31 && yy1 >= 1900 && yy1 <= 2099) return true;
+      const yy2 = parseInt(s.slice(0, 4), 10);
+      const mm2 = parseInt(s.slice(4, 6), 10);
+      const dd2 = parseInt(s.slice(6, 8), 10);
+      if (yy2 >= 1900 && yy2 <= 2099 && mm2 >= 1 && mm2 <= 12 && dd2 >= 1 && dd2 <= 31) return true;
+      return false;
+    }
+    return false;
   }
 
   // ── Name extraction ────────────────────────────────────────

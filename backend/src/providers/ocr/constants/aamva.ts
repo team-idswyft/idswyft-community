@@ -25,7 +25,7 @@ export const AAMVA_ALT_RE = /^([12])(\d)\s+([A-Z][A-Z'\-,.\s]+)$/;
  * Hoisted to module-level to avoid re-allocation on every call.
  */
 export const LABEL_PATTERNS: Array<[string, RegExp]> = [
-  ['dl_number',   /(?:4d\b|DLn?(?:\b|(?=\d))|DL\s*(?:NO\.?|#)|LIC(?:ENSE)?\s*(?:NO\.?|NUMBER|#)|OL\s*NO\.?|OPERATOR\s*(?:LICENSE|LIC)\s*(?:NO|#)?|PERMIT\s*NO|CUSTOMER\s*ID|CID\b|ID\s*NO\.?|ID(?=\s*\d)|(?:^|\s)I(?=\d{3}\s*\d{3}))/i],
+  ['dl_number',   /(?:4d\b|DLn?(?:\b|(?=\d))|DL\s*(?:NO\.?|#)|LIC(?:ENSE)?\.?\s*(?:NO\.?|NUMBER|#)|OL\s*NO\.?|OPERATOR\s*(?:LICENSE|LIC)\s*(?:NO|#)?|PERMIT\s*NO|CUSTOMER\s*ID|CID\b|ID\s*NO\.?|ID(?=\s*\d)|(?:^|\s)I(?=\d{3}\s*\d{3}))/i],
   ['last_name',   /\b(?:LN|LAST\s*NAME|FAMILY\s*NAME|SURNAME)\b/i],
   ['first_name',  /\b(?:FN|FIRST\s*NAME|GIVEN\s*NAMES?)\b/i],
   ['full_name',   /\b(?:FULL\s*)?NAME\b/i],
@@ -63,6 +63,11 @@ export const DL_NUMBER_PATTERNS: RegExp[] = [
   /\b(X\d{8})\b/,
   // Missouri R-suffix: letter + 6 digits + R (e.g., A123456R)
   /\b([A-Z]\d{6}R)\b/,
+  // Letter + hyphenated digits: FL "D123-456-83-789-0", IL "P142-4558-7924",
+  //   MN "A123-456-789-123", KS "K12-34-5678"
+  /\b([A-Z]\d{1,4}(?:-\d{1,4}){2,5})\b/,
+  // Letter + spaced digit groups: MI "S 000 123 456 789"
+  /\b([A-Z]\s+\d{3}(?:\s+\d{3}){2,4})\b/,
   // Letter(s) + digits: 1-3 letters + 6-14 digits (CA, FL, IL, MI, MN, MD, WI,
   //   MA, VA, ND 3L+6D, NJ 1L+14D, etc.)
   /\b([A-Z]{1,3}\d{6,14})\b/,
