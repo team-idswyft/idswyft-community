@@ -190,12 +190,91 @@ router.get('/verification/:id',
     // Legacy single document_url for backward compat
     const documentUrl = documentUrls.length > 0 ? documentUrls[0].url : null;
 
+    // Fetch debug data: gate context, OCR, risk scores, AML
+    const [ctxRes, riskRes, amlRes] = await Promise.all([
+      supabase.from('verification_contexts').select('context').eq('verification_id', id).maybeSingle(),
+      supabase.from('verification_risk_scores').select('overall_score, risk_level, risk_factors, computed_at').eq('verification_request_id', id).maybeSingle(),
+      supabase.from('aml_screenings').select('risk_level, match_found, match_count, matches, lists_checked, screened_at').eq('verification_request_id', id).maybeSingle(),
+    ]);
+
+    if (ctxRes.error) logger.warn('Debug: verification_contexts query failed', { id, error: ctxRes.error.message });
+    if (riskRes.error) logger.warn('Debug: risk_scores query failed', { id, error: riskRes.error.message });
+    if (amlRes.error) logger.warn('Debug: aml_screenings query failed', { id, error: amlRes.error.message });
+
+    const ctx: any = ctxRes.data?.context || {};
+    const frontDoc = (allDocuments || []).find((d: any) => !d.is_back_of_id);
+    const backDoc = (allDocuments || []).find((d: any) => d.is_back_of_id);
+
+    const debug = {
+      gates: {
+        ocr: {
+          extracted: frontDoc?.ocr_extracted ?? null,
+          quality_score: frontDoc?.quality_score ?? null,
+          quality_analysis: frontDoc?.quality_analysis ?? null,
+          fields: frontDoc?.ocr_data ?? null,
+          back_fields: backDoc?.ocr_data ?? null,
+          barcode_data: backDoc?.barcode_data ?? null,
+        },
+        cross_validation: {
+          score: verification.cross_validation_score,
+          verdict: ctx.cross_validation?.verdict ?? null,
+          mismatches: ctx.cross_validation?.mismatches ?? [],
+          results: frontDoc?.cross_validation_results ?? backDoc?.cross_validation_results ?? null,
+        },
+        liveness: {
+          score: verification.liveness_score,
+          passed: ctx.liveness?.passed ?? null,
+        },
+        deepfake: {
+          is_real: ctx.deepfake_check?.isReal ?? null,
+          real_probability: ctx.deepfake_check?.realProbability ?? null,
+          fake_probability: ctx.deepfake_check?.fakeProbability ?? null,
+        },
+        face_match: {
+          score: verification.face_match_score,
+          passed: ctx.face_match?.passed ?? null,
+        },
+        photo_consistency: {
+          score: verification.photo_consistency_score,
+        },
+        address: {
+          status: verification.address_verification_status,
+          score: verification.address_match_score,
+        },
+      },
+      risk: riskRes.data ? {
+        overall_score: riskRes.data.overall_score,
+        risk_level: riskRes.data.risk_level,
+        factors: riskRes.data.risk_factors,
+        computed_at: riskRes.data.computed_at,
+      } : null,
+      aml: amlRes.data ? {
+        risk_level: amlRes.data.risk_level,
+        match_found: amlRes.data.match_found,
+        match_count: amlRes.data.match_count,
+        matches: amlRes.data.matches,
+        lists_checked: amlRes.data.lists_checked,
+        screened_at: amlRes.data.screened_at,
+      } : null,
+      timing: {
+        session_started_at: verification.session_started_at,
+        processing_completed_at: verification.processing_completed_at,
+      },
+      decision: {
+        failure_reason: verification.failure_reason,
+        manual_review_reason: verification.manual_review_reason,
+        reviewed_by: verification.reviewed_by,
+        reviewed_at: verification.reviewed_at,
+      },
+    };
+
     res.json({
       verification: {
         ...verification,
         document_url: documentUrl,
         selfie_url: selfieUrl,
         documents: documentUrls,
+        debug,
       }
     });
   })

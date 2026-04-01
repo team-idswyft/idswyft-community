@@ -48,6 +48,22 @@ interface DocumentInfo {
   url: string | null
 }
 
+interface GateDebug {
+  gates: {
+    ocr: { extracted: boolean | null; quality_score: number | null; quality_analysis: any; fields: Record<string, string> | null; back_fields: Record<string, string> | null; barcode_data: any }
+    cross_validation: { score: number | null; verdict: string | null; mismatches: Array<{ field: string; front: string; back: string }>; results: any }
+    liveness: { score: number | null; passed: boolean | null }
+    deepfake: { is_real: boolean | null; real_probability: number | null; fake_probability: number | null }
+    face_match: { score: number | null; passed: boolean | null }
+    photo_consistency: { score: number | null }
+    address: { status: string | null; score: number | null }
+  }
+  risk: { overall_score: number; risk_level: string; factors: Array<{ factor?: string; name?: string; weight?: number; score?: number }>; computed_at: string } | null
+  aml: { risk_level: string; match_found: boolean; match_count: number; matches: any; lists_checked: string[]; screened_at: string } | null
+  timing: { session_started_at: string | null; processing_completed_at: string | null }
+  decision: { failure_reason: string | null; manual_review_reason: string | null; reviewed_by: string | null; reviewed_at: string | null }
+}
+
 interface VerificationDetail {
   id: string
   user_id: string
@@ -62,6 +78,7 @@ interface VerificationDetail {
   documents: DocumentInfo[]
   user?: { id: string; full_name?: string; email?: string } | null
   developer?: { id: string; company_name?: string; email?: string } | null
+  debug?: GateDebug
 }
 
 interface Stats {
@@ -106,6 +123,44 @@ const formatTime = (iso: string) => {
 
 const authFetchOpts = (): RequestInit => ({ credentials: 'include' })
 const authFetchOptsJson = (): RequestInit => ({ credentials: 'include', headers: { 'Content-Type': 'application/json', ...csrfHeader() } })
+
+/** Returns theme color for a 0-1 score: green ≥0.7, amber ≥0.4, red <0.4, dim if null */
+const scoreColor = (score: number | null): string => {
+  if (score === null || score === undefined) return C.dim
+  if (score >= 0.7) return C.green
+  if (score >= 0.4) return C.amber
+  return C.red
+}
+
+/** Format a 0-1 score as percentage, or '—' if null */
+const fmtScore = (score: number | null): string => {
+  if (score === null || score === undefined) return '—'
+  return `${(score * 100).toFixed(0)}%`
+}
+
+/** Inline score bar component */
+function ScoreBar({ label, score, passed }: { label: string; score: number | null; passed?: boolean | null }) {
+  const pct = score !== null && score !== undefined ? Math.round(score * 100) : 0
+  const color = scoreColor(score)
+  return (
+    <div style={{ marginBottom: 8 }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 3 }}>
+        <span style={{ color: C.muted, fontSize: 11, fontWeight: 500 }}>{label}</span>
+        <span style={{ color, fontSize: 12, fontFamily: C.mono, fontWeight: 600 }}>
+          {fmtScore(score)}
+          {passed !== null && passed !== undefined && (
+            <span style={{ marginLeft: 6, color: passed ? C.green : C.red, fontSize: 10 }}>
+              {passed ? 'PASS' : 'FAIL'}
+            </span>
+          )}
+        </span>
+      </div>
+      <div style={{ height: 4, borderRadius: 2, background: C.border, overflow: 'hidden' }}>
+        <div style={{ width: `${pct}%`, height: '100%', borderRadius: 2, background: color, transition: 'width 0.3s ease' }} />
+      </div>
+    </div>
+  )
+}
 
 // ─── Component ──────────────────────────────────────────────
 
@@ -667,7 +722,7 @@ export function VerificationManagement() {
                       </div>
                     )}
 
-                    {!detailLoading && detail && (
+                    {!detailLoading && detail && (<>
                       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 20, paddingTop: 8 }}>
 
                         {/* Left: Documents */}
@@ -825,7 +880,130 @@ export function VerificationManagement() {
                           </div>
                         </div>
                       </div>
-                    )}
+
+                      {/* ── Debug: Verification Gate Analysis ── */}
+                      {detail.debug && (
+                        <div style={{ marginTop: 16 }}>
+                          <div style={{ color: C.dim, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.1em', marginBottom: 12 }}>
+                            Verification Gate Analysis
+                          </div>
+
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
+                            {/* Gate Scores */}
+                            <div style={{ background: C.codeBg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 16 }}>
+                              <div style={{ color: C.text, fontSize: 12, fontWeight: 600, marginBottom: 12 }}>Gate Scores</div>
+                              <ScoreBar label="OCR Quality" score={detail.debug.gates.ocr.quality_score} />
+                              <ScoreBar label="Cross-Validation" score={detail.debug.gates.cross_validation.score} passed={detail.debug.gates.cross_validation.verdict === 'PASS' ? true : detail.debug.gates.cross_validation.verdict === 'REJECT' ? false : null} />
+                              <ScoreBar label="Liveness" score={detail.debug.gates.liveness.score} passed={detail.debug.gates.liveness.passed} />
+                              <ScoreBar label="Deepfake Check" score={detail.debug.gates.deepfake.real_probability} passed={detail.debug.gates.deepfake.is_real} />
+                              <ScoreBar label="Face Match" score={detail.debug.gates.face_match.score} passed={detail.debug.gates.face_match.passed} />
+                              {detail.debug.gates.photo_consistency.score !== null && (
+                                <ScoreBar label="Photo Consistency" score={detail.debug.gates.photo_consistency.score} />
+                              )}
+                              {detail.debug.gates.address.score !== null && (
+                                <ScoreBar label="Address Match" score={detail.debug.gates.address.score} />
+                              )}
+                            </div>
+
+                            {/* OCR Extracted Fields */}
+                            <div style={{ background: C.codeBg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 16 }}>
+                              <div style={{ color: C.text, fontSize: 12, fontWeight: 600, marginBottom: 12 }}>OCR Fields (Front)</div>
+                              {detail.debug.gates.ocr.fields ? (
+                                <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                                  <tbody>
+                                    {Object.entries(detail.debug.gates.ocr.fields).map(([key, val]) => (
+                                      <tr key={key} style={{ borderBottom: `1px solid ${C.border}` }}>
+                                        <td style={{ padding: '4px 8px 4px 0', color: C.dim, fontSize: 10, fontWeight: 500, whiteSpace: 'nowrap' }}>
+                                          {key.replace(/_/g, ' ')}
+                                        </td>
+                                        <td style={{ padding: '4px 0', color: val ? C.text : C.dim, fontSize: 11, fontFamily: C.mono, wordBreak: 'break-all' }}>
+                                          {val || '—'}
+                                        </td>
+                                      </tr>
+                                    ))}
+                                  </tbody>
+                                </table>
+                              ) : (
+                                <div style={{ color: C.dim, fontSize: 11 }}>No OCR data available</div>
+                              )}
+                              {detail.debug.gates.cross_validation.mismatches && detail.debug.gates.cross_validation.mismatches.length > 0 && (
+                                <div style={{ marginTop: 12 }}>
+                                  <div style={{ color: C.amber, fontSize: 11, fontWeight: 600, marginBottom: 4 }}>Cross-Validation Mismatches</div>
+                                  {detail.debug.gates.cross_validation.mismatches.map((m, i) => (
+                                    <div key={i} style={{ color: C.muted, fontSize: 10, fontFamily: C.mono, padding: '2px 0' }}>
+                                      {m.field}: front="{m.front}" vs back="{m.back}"
+                                    </div>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+
+                            {/* Risk & AML */}
+                            <div style={{ background: C.codeBg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 16 }}>
+                              {detail.debug.risk ? (
+                                <>
+                                  <div style={{ color: C.text, fontSize: 12, fontWeight: 600, marginBottom: 12 }}>Risk Assessment</div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                                    <span style={{
+                                      fontSize: 20, fontWeight: 700, fontFamily: C.mono,
+                                      color: detail.debug.risk.overall_score <= 30 ? C.green : detail.debug.risk.overall_score <= 60 ? C.amber : C.red,
+                                    }}>
+                                      {detail.debug.risk.overall_score}
+                                    </span>
+                                    <span style={{
+                                      fontSize: 10, fontWeight: 600, textTransform: 'uppercase', padding: '2px 6px', borderRadius: 4,
+                                      background: detail.debug.risk.risk_level === 'low' ? C.greenDim : detail.debug.risk.risk_level === 'medium' ? C.amberDim : C.redDim,
+                                      color: detail.debug.risk.risk_level === 'low' ? C.green : detail.debug.risk.risk_level === 'medium' ? C.amber : C.red,
+                                    }}>
+                                      {detail.debug.risk.risk_level}
+                                    </span>
+                                  </div>
+                                  {detail.debug.risk.factors && (
+                                    <div>
+                                      {(Array.isArray(detail.debug.risk.factors) ? detail.debug.risk.factors : []).map((f, i) => (
+                                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', padding: '2px 0' }}>
+                                          <span style={{ color: C.dim, fontSize: 10 }}>{f.factor || f.name}</span>
+                                          <span style={{ color: C.muted, fontSize: 10, fontFamily: C.mono }}>{f.weight ?? f.score}</span>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
+                                </>
+                              ) : (
+                                <div style={{ color: C.dim, fontSize: 11 }}>No risk assessment data</div>
+                              )}
+
+                              {detail.debug.aml && (
+                                <div style={{ marginTop: 16, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+                                  <div style={{ color: C.text, fontSize: 12, fontWeight: 600, marginBottom: 8 }}>AML Screening</div>
+                                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                                    <span style={{
+                                      fontSize: 10, fontWeight: 600, textTransform: 'uppercase', padding: '2px 6px', borderRadius: 4,
+                                      background: detail.debug.aml.match_found ? C.redDim : C.greenDim,
+                                      color: detail.debug.aml.match_found ? C.red : C.green,
+                                    }}>
+                                      {detail.debug.aml.match_found ? 'MATCH FOUND' : 'CLEAR'}
+                                    </span>
+                                  </div>
+                                  <div style={{ color: C.dim, fontSize: 10, marginTop: 4 }}>
+                                    Lists: {(detail.debug.aml.lists_checked || []).join(', ') || '—'}
+                                  </div>
+                                </div>
+                              )}
+
+                              {detail.debug.timing.processing_completed_at && detail.debug.timing.session_started_at && (
+                                <div style={{ marginTop: 16, paddingTop: 12, borderTop: `1px solid ${C.border}` }}>
+                                  <div style={{ color: C.text, fontSize: 12, fontWeight: 600, marginBottom: 4 }}>Processing Time</div>
+                                  <div style={{ color: C.cyan, fontSize: 14, fontFamily: C.mono, fontWeight: 600 }}>
+                                    {((new Date(detail.debug.timing.processing_completed_at).getTime() - new Date(detail.debug.timing.session_started_at).getTime()) / 1000).toFixed(1)}s
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                      )}
+                    </>)}
 
                     {!detailLoading && !detail && (
                       <div style={{ padding: 24, textAlign: 'center', color: C.dim, fontSize: 13 }}>
