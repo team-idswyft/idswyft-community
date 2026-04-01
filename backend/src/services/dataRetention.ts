@@ -64,6 +64,15 @@ export class DataRetentionService {
         .delete()
         .in('verification_request_id', verificationIds);
 
+      // Delete phone OTP codes and rate limits
+      await supabase.from('phone_otp_codes')
+        .delete()
+        .in('verification_request_id', verificationIds);
+
+      await supabase.from('phone_otp_rate_limits')
+        .delete()
+        .in('verification_request_id', verificationIds);
+
       // Nullify webhook delivery payloads (preserve delivery audit trail, remove PII)
       await supabase.from('webhook_deliveries')
         .update({ payload: null })
@@ -150,6 +159,8 @@ export class DataRetentionService {
     await supabase.from('verification_risk_scores').delete().in('verification_request_id', ids);
     await supabase.from('expiry_alerts').delete().in('verification_request_id', ids);
     await supabase.from('reverification_schedules').delete().in('verification_request_id', ids);
+    await supabase.from('phone_otp_codes').delete().in('verification_request_id', ids);
+    await supabase.from('phone_otp_rate_limits').delete().in('verification_request_id', ids);
     await supabase.from('verification_requests').delete().in('id', ids);
 
     logger.info(`Demo cleanup: ${ids.length} verifications deleted`, {

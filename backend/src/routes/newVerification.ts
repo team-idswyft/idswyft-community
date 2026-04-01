@@ -46,6 +46,8 @@ import { SessionFlowError } from '@/verification/exceptions.js';
 import { WebhookService } from '@/services/webhook.js';
 import type { WebhookPayload, VerificationSource } from '@/types/index.js';
 import { config } from '@/config/index.js';
+import { createAndSendPhoneOtp, verifyPhoneOtp } from '@/services/phoneOtpService.js';
+import { decryptSMSConfig } from '@/services/smsService.js';
 import sharp from 'sharp';
 import engineClient from '@/services/engineClient.js';
 
@@ -1529,6 +1531,105 @@ router.get('/:verification_id/status',
       }),
       created_at: state.created_at,
       updated_at: state.updated_at,
+    });
+  })
+);
+
+// ─── Phone OTP (optional verification step) ─────────────────────────────────
+
+/**
+ * Fetch the developer's SMS config for a verification request.
+ * Returns null if SMS is not configured (self-hosted mode).
+ */
+async function getSMSConfigForVerification(verificationRequestId: string) {
+  const { data: vr, error: vrError } = await supabase
+    .from('verification_requests')
+    .select('developer_id')
+    .eq('id', verificationRequestId)
+    .single();
+
+  if (vrError || !vr?.developer_id) {
+    if (vrError) logger.warn('Failed to fetch developer_id for SMS config', { verificationRequestId, error: vrError.message });
+    return null;
+  }
+
+  const { data: dev, error: devError } = await supabase
+    .from('developers')
+    .select('sms_provider, sms_api_key_encrypted, sms_api_secret_encrypted, sms_phone_number')
+    .eq('id', vr.developer_id)
+    .single();
+
+  if (devError || !dev) {
+    if (devError) logger.warn('Failed to fetch SMS config for developer', { developerId: vr.developer_id, error: devError.message });
+    return null;
+  }
+
+  return decryptSMSConfig(dev);
+}
+
+router.post('/:verification_id/phone-otp/send',
+  authenticateAPIKey,
+  [
+    param('verification_id').isUUID().withMessage('Invalid verification ID'),
+    body('phone_number').matches(/^\+[1-9]\d{6,14}$/).withMessage('Phone number must be in E.164 format (e.g. +15551234567)'),
+  ],
+  validate,
+  catchAsync(async (req: Request, res: Response) => {
+    const { verification_id } = req.params;
+    const { phone_number } = req.body;
+
+    await requireOwnedVerification(req, verification_id);
+
+    const smsConfig = await getSMSConfigForVerification(verification_id);
+    const result = await createAndSendPhoneOtp(verification_id, phone_number, smsConfig);
+
+    if (!result.success) {
+      return res.status(429).json({ success: false, message: result.reason });
+    }
+
+    const response: any = {
+      success: true,
+      message: smsConfig
+        ? 'Verification code sent via SMS.'
+        : 'SMS provider not configured. Code returned in response (self-hosted mode).',
+    };
+
+    // Self-hosted: return plaintext code when no SMS provider is configured
+    if (result.code) {
+      response.code = result.code;
+      response.self_hosted = true;
+    }
+
+    res.json(response);
+  })
+);
+
+router.post('/:verification_id/phone-otp/verify',
+  authenticateAPIKey,
+  [
+    param('verification_id').isUUID().withMessage('Invalid verification ID'),
+    body('code').matches(/^\d{6}$/).withMessage('Code must be a 6-digit number'),
+  ],
+  validate,
+  catchAsync(async (req: Request, res: Response) => {
+    const { verification_id } = req.params;
+    const { code } = req.body;
+
+    await requireOwnedVerification(req, verification_id);
+
+    const result = await verifyPhoneOtp(verification_id, code);
+
+    if (!result.valid) {
+      return res.status(400).json({
+        success: false,
+        message: result.reason,
+      });
+    }
+
+    res.json({
+      success: true,
+      message: 'Phone number verified successfully.',
+      phone_verified: true,
     });
   })
 );

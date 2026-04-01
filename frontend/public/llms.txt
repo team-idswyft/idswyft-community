@@ -234,6 +234,53 @@ Returns the full verification record: OCR data, cross-validation, liveness, face
 
 ---
 
+## Optional: Phone OTP Verification
+
+Add SMS-based phone verification as an optional step during any verification session. Requires the developer to configure their own SMS provider (Twilio or Vonage) via the Developer Settings API.
+
+### Configure SMS Provider
+
+```
+PUT /api/developer/settings/sms
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `provider` | string | Yes | `twilio` or `vonage` (send `null` to clear) |
+| `api_key` | string | Yes | Twilio Account SID / Vonage API key |
+| `api_secret` | string | Yes | Twilio Auth Token / Vonage API secret |
+| `phone_number` | string | Yes | Sender phone in E.164 format (e.g. `+15551234567`) |
+
+Credentials are encrypted at rest (AES-256-GCM). When no SMS provider is configured, the OTP code is returned in the API response for self-hosted/testing use.
+
+### Send Phone OTP
+
+```
+POST /api/v2/verify/:id/phone-otp/send
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `phone_number` | string | Yes | Recipient phone in E.164 format |
+
+**Rate limit:** 3 codes per session per hour. Code expires after 10 minutes.
+
+### Verify Phone OTP
+
+```
+POST /api/v2/verify/:id/phone-otp/verify
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `code` | string | Yes | 6-digit verification code |
+
+**Response:** `{ "success": true, "phone_verified": true }`
+
+Max 3 attempts per code. After exhaustion, request a new code.
+
+---
+
 ## Integration Options
 
 Three ways to add identity verification — from zero-code to full control. All use the same hosted page:

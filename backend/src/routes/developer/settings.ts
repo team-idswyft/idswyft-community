@@ -98,4 +98,92 @@ router.put('/settings/llm',
   })
 );
 
+// ─── SMS Provider Settings ──────────────────────────────────
+
+const VALID_SMS_PROVIDERS = ['twilio', 'vonage'];
+
+router.get('/settings/sms',
+  authenticateDeveloperJWT,
+  catchAsync(async (req: Request, res: Response) => {
+    const developerId = (req as any).developer.id;
+
+    const { data } = await supabase
+      .from('developers')
+      .select('sms_provider, sms_api_key_encrypted, sms_api_secret_encrypted, sms_phone_number')
+      .eq('id', developerId)
+      .single();
+
+    if (!data?.sms_provider) {
+      return res.json({ configured: false, provider: null, api_key_preview: null, phone_number: null });
+    }
+
+    let apiKeyPreview: string | null = null;
+    if (data.sms_api_key_encrypted) {
+      try {
+        const decrypted = decryptSecret(data.sms_api_key_encrypted, config.encryptionKey);
+        apiKeyPreview = maskApiKey(decrypted);
+      } catch {
+        apiKeyPreview = '****';
+      }
+    }
+
+    res.json({
+      configured: true,
+      provider: data.sms_provider,
+      api_key_preview: apiKeyPreview,
+      phone_number: data.sms_phone_number || null,
+    });
+  })
+);
+
+router.put('/settings/sms',
+  authenticateDeveloperJWT,
+  [
+    body('provider').isIn([...VALID_SMS_PROVIDERS, null, '']).withMessage(`Provider must be one of: ${VALID_SMS_PROVIDERS.join(', ')}`),
+    body('api_key').optional({ nullable: true }).isString().isLength({ min: 10 }).withMessage('API key / Account SID must be at least 10 characters'),
+    body('api_secret').optional({ nullable: true }).isString().isLength({ min: 10 }).withMessage('Auth token / API secret must be at least 10 characters'),
+    body('phone_number').optional({ nullable: true }).matches(/^\+[1-9]\d{6,14}$/).withMessage('Phone number must be in E.164 format (e.g. +15551234567)'),
+  ],
+  validate,
+  catchAsync(async (req: Request, res: Response) => {
+    const developerId = (req as any).developer.id;
+    const { provider, api_key, api_secret, phone_number } = req.body;
+
+    // Allow clearing SMS config
+    if (!provider) {
+      await supabase
+        .from('developers')
+        .update({ sms_provider: null, sms_api_key_encrypted: null, sms_api_secret_encrypted: null, sms_phone_number: null })
+        .eq('id', developerId);
+
+      return res.json({ success: true, message: 'SMS configuration removed' });
+    }
+
+    if (!api_key || !api_secret || !phone_number) {
+      throw new ValidationError('API key, API secret, and phone number are all required', 'provider', provider);
+    }
+
+    const encryptedKey = encryptSecret(api_key, config.encryptionKey);
+    const encryptedSecret = encryptSecret(api_secret, config.encryptionKey);
+
+    await supabase
+      .from('developers')
+      .update({
+        sms_provider: provider,
+        sms_api_key_encrypted: encryptedKey,
+        sms_api_secret_encrypted: encryptedSecret,
+        sms_phone_number: phone_number,
+      })
+      .eq('id', developerId);
+
+    res.json({
+      success: true,
+      message: `SMS provider set to ${provider}`,
+      provider,
+      api_key_preview: maskApiKey(api_key),
+      phone_number,
+    });
+  })
+);
+
 export default router;
