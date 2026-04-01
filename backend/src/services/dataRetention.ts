@@ -55,6 +55,15 @@ export class DataRetentionService {
         .delete()
         .in('verification_request_id', verificationIds);
 
+      // Delete expiry alerts and monitoring schedules
+      await supabase.from('expiry_alerts')
+        .delete()
+        .in('verification_request_id', verificationIds);
+
+      await supabase.from('reverification_schedules')
+        .delete()
+        .in('verification_request_id', verificationIds);
+
       // Nullify webhook delivery payloads (preserve delivery audit trail, remove PII)
       await supabase.from('webhook_deliveries')
         .update({ payload: null })
@@ -139,6 +148,8 @@ export class DataRetentionService {
     await supabase.from('selfies').delete().in('verification_request_id', ids);
     await supabase.from('verification_contexts').delete().in('verification_id', ids);
     await supabase.from('verification_risk_scores').delete().in('verification_request_id', ids);
+    await supabase.from('expiry_alerts').delete().in('verification_request_id', ids);
+    await supabase.from('reverification_schedules').delete().in('verification_request_id', ids);
     await supabase.from('verification_requests').delete().in('id', ids);
 
     logger.info(`Demo cleanup: ${ids.length} verifications deleted`, {
@@ -192,6 +203,42 @@ export class DataRetentionService {
    * These are high-volume analytics rows (one per API call) with no audit
    * requirement — safe to hard-delete after the retention window.
    */
+  /**
+   * Delete expiry_alerts older than `retentionDays` where webhook was already sent.
+   * Alerts that haven't been delivered are preserved regardless of age.
+   */
+  async runExpiryAlertCleanup(retentionDays: number = 180): Promise<number> {
+    const cutoff = new Date();
+    cutoff.setDate(cutoff.getDate() - retentionDays);
+
+    const { count } = await supabase
+      .from('expiry_alerts')
+      .select('*', { count: 'exact', head: true })
+      .eq('webhook_sent', true)
+      .lt('created_at', cutoff.toISOString());
+
+    const toDelete = count ?? 0;
+    if (toDelete === 0) return 0;
+
+    const { error } = await supabase
+      .from('expiry_alerts')
+      .delete()
+      .eq('webhook_sent', true)
+      .lt('created_at', cutoff.toISOString());
+
+    if (error) {
+      logger.error('Expiry alert cleanup failed', { error });
+      return 0;
+    }
+
+    logger.info(`Expiry alert cleanup: ${toDelete} alerts deleted`, {
+      retentionDays,
+      cutoff: cutoff.toISOString(),
+    });
+
+    return toDelete;
+  }
+
   async runActivityLogCleanup(retentionDays: number = 7): Promise<number> {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - retentionDays);

@@ -538,7 +538,7 @@ POST /api/v2/monitoring/schedules              — Create re-verification schedu
 GET  /api/v2/monitoring/expiring-documents      — List expiring documents
 \`\`\`
 
-Webhook events: \`document.expiring\`, \`document.expired\`, \`reverification.due\`.
+Webhook events: \`document.expiry_warning\`, \`verification.reverification_due\`.
 
 ---
 
@@ -612,9 +612,8 @@ Register webhook URLs to receive real-time notifications when verification event
 | \`verification.verified\` | Verification approved (automated or manual) |
 | \`verification.failed\` | Verification failed or rejected |
 | \`verification.status_changed\` | Status override from Review Dashboard |
-| \`document.expiring\` | Document approaching expiry date |
-| \`document.expired\` | Document has expired |
-| \`reverification.due\` | Scheduled re-verification is due |
+| \`document.expiry_warning\` | Document approaching or past expiry (alert_type: 90_day, 60_day, 30_day, expired) |
+| \`verification.reverification_due\` | Scheduled re-verification is due |
 
 ### Webhook Security
 

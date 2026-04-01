@@ -103,4 +103,53 @@ describe('DataRetentionService', () => {
     const count = await service.runRetentionCleanup(90);
     expect(count).toBe(2);
   });
+
+  it('deleteUserData cleans up expiry_alerts and reverification_schedules', async () => {
+    const fromCalls: string[] = [];
+    (supabase.from as any).mockImplementation((table: string) => {
+      fromCalls.push(table);
+      if (table === 'verification_requests' && fromCalls.filter(t => t === 'verification_requests').length === 1) {
+        return {
+          select: vi.fn().mockReturnThis(),
+          eq: vi.fn().mockResolvedValue({
+            data: [{ id: 'ver-1', documents: [], selfies: [] }],
+            error: null,
+          }),
+        };
+      }
+      return makeChainableMock({ data: null, error: null });
+    });
+
+    const { DataRetentionService } = await import('../../services/dataRetention.js');
+    const service = new DataRetentionService();
+    await service.deleteUserData('user-1', 'gdpr-request');
+
+    expect(fromCalls).toContain('expiry_alerts');
+    expect(fromCalls).toContain('reverification_schedules');
+  });
+
+  it('runExpiryAlertCleanup deletes old sent alerts', async () => {
+    (supabase.from as any).mockImplementation(() => makeChainableMock({
+      data: null, error: null, count: 5,
+    }));
+
+    const { DataRetentionService } = await import('../../services/dataRetention.js');
+    const service = new DataRetentionService();
+
+    const count = await service.runExpiryAlertCleanup(180);
+    expect(count).toBe(5);
+    expect(supabase.from).toHaveBeenCalledWith('expiry_alerts');
+  });
+
+  it('runExpiryAlertCleanup returns 0 when nothing to clean', async () => {
+    (supabase.from as any).mockImplementation(() => makeChainableMock({
+      data: null, error: null, count: 0,
+    }));
+
+    const { DataRetentionService } = await import('../../services/dataRetention.js');
+    const service = new DataRetentionService();
+
+    const count = await service.runExpiryAlertCleanup(180);
+    expect(count).toBe(0);
+  });
 });
