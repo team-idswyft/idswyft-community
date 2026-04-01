@@ -641,6 +641,224 @@ router.get('/provider-metrics',
   })
 );
 
+// ── Audit Log Export ─────────────────────────────────────────────────
+// Export verification decisions with full gate-by-gate reasoning.
+// Supports CSV (for compliance teams) and JSON (for programmatic access).
+router.get('/audit/export',
+  authenticateAdminOrReviewer,
+  [
+    query('from').optional().isISO8601().withMessage('from must be ISO8601 date'),
+    query('to').optional().isISO8601().withMessage('to must be ISO8601 date'),
+    query('status').optional().isIn(['pending', 'verified', 'failed', 'manual_review']).withMessage('Invalid status'),
+    query('developer_id').optional().isUUID().withMessage('developer_id must be a valid UUID'),
+    query('format').optional().isIn(['csv', 'json']).withMessage('format must be csv or json'),
+    query('limit').optional().isInt({ min: 1, max: 5000 }).withMessage('limit must be between 1 and 5000'),
+    query('offset').optional().isInt({ min: 0 }).withMessage('offset must be >= 0'),
+    query('include_sandbox').optional().isBoolean().withMessage('include_sandbox must be boolean'),
+  ],
+  validate,
+  catchAsync(async (req: Request, res: Response) => {
+    const format = (req.query.format as string) || 'json';
+    const limit = Math.min(parseInt(req.query.limit as string) || 1000, 5000);
+    const offset = Math.max(parseInt(req.query.offset as string) || 0, 0);
+    const includeSandbox = req.query.include_sandbox === 'true';
+
+    // Reviewer: always scoped to their developer
+    const developerId = req.reviewer
+      ? req.reviewer.developer_id
+      : (req.query.developer_id as string | undefined);
+
+    // Build query
+    let q = supabase
+      .from('verification_requests')
+      .select(`
+        id, user_id, developer_id, status, source, issuing_country, is_sandbox,
+        face_match_score, liveness_score, cross_validation_score, photo_consistency_score,
+        address_verification_status, address_match_score,
+        failure_reason, manual_review_reason, reviewed_by, reviewed_at,
+        created_at, session_started_at, processing_completed_at, updated_at,
+        addons, aml_enabled
+      `)
+      .order('created_at', { ascending: false })
+      .range(offset, offset + limit - 1);
+
+    if (developerId) q = q.eq('developer_id', developerId);
+    if (req.query.status) q = q.eq('status', req.query.status as string);
+    if (req.query.from) q = q.gte('created_at', req.query.from as string);
+    if (req.query.to) q = q.lte('created_at', req.query.to as string);
+    if (!includeSandbox) q = q.eq('is_sandbox', false);
+
+    const { data: verifications, error } = await q;
+    if (error) {
+      logger.error('Audit export query failed:', { error: error.message });
+      throw new Error('Failed to query verification records');
+    }
+
+    const vIds = (verifications || []).map((v: any) => v.id);
+
+    // Helper: chunk .in() queries to avoid PostgREST URL length limits
+    async function batchIn(table: string, column: string, ids: string[], selectCols: string) {
+      if (!ids.length) return [];
+      const CHUNK = 500;
+      const chunks = [];
+      for (let i = 0; i < ids.length; i += CHUNK) {
+        chunks.push(supabase.from(table).select(selectCols).in(column, ids.slice(i, i + CHUNK)));
+      }
+      const results = await Promise.all(chunks);
+      const rows: any[] = [];
+      for (const r of results) {
+        if (r.error) logger.warn(`Audit export: ${table} query failed`, { error: r.error.message });
+        if (r.data) rows.push(...r.data);
+      }
+      return rows;
+    }
+
+    // Batch-fetch contexts, documents, risk scores, AML screenings
+    const [contexts, documents, riskScores, amlScreenings] = await Promise.all([
+      batchIn('verification_contexts', 'verification_id', vIds, 'verification_id, context'),
+      batchIn('documents', 'verification_request_id', vIds, 'verification_request_id, document_type, ocr_data, ocr_extracted, quality_score, cross_validation_results, is_back_of_id'),
+      batchIn('verification_risk_scores', 'verification_request_id', vIds, 'verification_request_id, overall_score, risk_level, risk_factors'),
+      batchIn('aml_screenings', 'verification_request_id', vIds, 'verification_request_id, risk_level, match_found, lists_checked, screened_at'),
+    ]);
+
+    // Build lookup maps
+    const contextMap = new Map(contexts.map((c: any) => [c.verification_id, c.context]));
+    const docMap = new Map<string, any[]>();
+    for (const d of documents) {
+      const list = docMap.get(d.verification_request_id) || [];
+      list.push(d);
+      docMap.set(d.verification_request_id, list);
+    }
+    const riskMap = new Map(riskScores.map((r: any) => [r.verification_request_id, r]));
+    const amlMap = new Map(amlScreenings.map((a: any) => [a.verification_request_id, a]));
+
+    // Assemble audit records
+    const records = (verifications || []).map((v: any) => {
+      const ctx: any = contextMap.get(v.id) || {};
+      const docs = docMap.get(v.id) || [];
+      const risk: any = riskMap.get(v.id);
+      const aml: any = amlMap.get(v.id);
+      const frontDoc = docs.find((d: any) => !d.is_back_of_id);
+
+      return {
+        verification_id: v.id,
+        user_id: v.user_id,
+        developer_id: v.developer_id,
+        status: v.status,
+        source: v.source,
+        issuing_country: v.issuing_country,
+        is_sandbox: v.is_sandbox,
+        created_at: v.created_at,
+        processing_completed_at: v.processing_completed_at,
+
+        // Gate results
+        gates: {
+          ocr: {
+            extracted: frontDoc?.ocr_extracted ?? null,
+            quality_score: frontDoc?.quality_score ?? null,
+            fields_extracted: frontDoc?.ocr_data ? Object.keys(frontDoc.ocr_data).filter((k: string) => frontDoc.ocr_data[k]) : [],
+          },
+          cross_validation: {
+            score: v.cross_validation_score,
+            verdict: ctx.cross_validation?.verdict ?? null,
+            mismatches: ctx.cross_validation?.mismatches ?? [],
+          },
+          liveness: {
+            score: v.liveness_score,
+            passed: ctx.liveness?.passed ?? null,
+          },
+          deepfake: {
+            is_real: ctx.deepfake_check?.isReal ?? null,
+            real_probability: ctx.deepfake_check?.realProbability ?? null,
+          },
+          face_match: {
+            score: v.face_match_score,
+            passed: ctx.face_match?.passed ?? null,
+          },
+          aml_screening: aml ? {
+            risk_level: aml.risk_level,
+            match_found: aml.match_found,
+            lists_checked: aml.lists_checked,
+            screened_at: aml.screened_at,
+          } : null,
+        },
+
+        // Risk assessment
+        risk: risk ? {
+          overall_score: risk.overall_score,
+          risk_level: risk.risk_level,
+          factors: risk.risk_factors,
+        } : null,
+
+        // Decision trail
+        decision: {
+          failure_reason: v.failure_reason,
+          manual_review_reason: v.manual_review_reason,
+          reviewed_by: v.reviewed_by,
+          reviewed_at: v.reviewed_at,
+        },
+      };
+    });
+
+    if (format === 'csv') {
+      // Flatten records into CSV
+      const csvHeaders = [
+        'verification_id', 'user_id', 'developer_id', 'status', 'source',
+        'issuing_country', 'is_sandbox', 'created_at', 'processing_completed_at',
+        'ocr_extracted', 'ocr_quality_score', 'ocr_fields',
+        'cross_validation_score', 'cross_validation_verdict',
+        'liveness_score', 'liveness_passed',
+        'deepfake_is_real', 'deepfake_probability',
+        'face_match_score', 'face_match_passed',
+        'aml_risk_level', 'aml_match_found', 'aml_lists_checked',
+        'risk_overall_score', 'risk_level',
+        'failure_reason', 'manual_review_reason', 'reviewed_by', 'reviewed_at',
+      ];
+
+      const escapeCSV = (val: any): string => {
+        if (val === null || val === undefined) return '';
+        const str = Array.isArray(val) ? val.join('; ') : String(val);
+        // Sanitize formula injection for spreadsheet applications
+        const sanitized = /^[=+\-@\t\r]/.test(str) ? `'${str}` : str;
+        return sanitized.includes(',') || sanitized.includes('"') || sanitized.includes('\n')
+          ? `"${sanitized.replace(/"/g, '""')}"` : sanitized;
+      };
+
+      const csvRows = records.map((r: any) => [
+        r.verification_id, r.user_id, r.developer_id, r.status, r.source,
+        r.issuing_country, r.is_sandbox, r.created_at, r.processing_completed_at,
+        r.gates.ocr.extracted, r.gates.ocr.quality_score, r.gates.ocr.fields_extracted,
+        r.gates.cross_validation.score, r.gates.cross_validation.verdict,
+        r.gates.liveness.score, r.gates.liveness.passed,
+        r.gates.deepfake.is_real, r.gates.deepfake.real_probability,
+        r.gates.face_match.score, r.gates.face_match.passed,
+        r.gates.aml_screening?.risk_level, r.gates.aml_screening?.match_found, r.gates.aml_screening?.lists_checked,
+        r.risk?.overall_score, r.risk?.risk_level,
+        r.decision.failure_reason, r.decision.manual_review_reason, r.decision.reviewed_by, r.decision.reviewed_at,
+      ].map(escapeCSV).join(','));
+
+      const csv = '\xEF\xBB\xBF' + [csvHeaders.join(','), ...csvRows].join('\n');
+      res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+      res.setHeader('Content-Disposition', `attachment; filename="audit-export-${new Date().toISOString().slice(0, 10)}.csv"`);
+      return res.send(csv);
+    }
+
+    // JSON format
+    res.json({
+      export_date: new Date().toISOString(),
+      record_count: records.length,
+      filters: {
+        from: req.query.from || null,
+        to: req.query.to || null,
+        status: req.query.status || null,
+        developer_id: developerId || null,
+        include_sandbox: includeSandbox,
+      },
+      records,
+    });
+  })
+);
+
 // GDPR / Right-to-erasure endpoint
 router.delete('/user/:userId/data',
   authenticateJWT,
