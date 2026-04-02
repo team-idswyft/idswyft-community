@@ -36,7 +36,8 @@ const css = `
 `;
 
 // ─── Step definitions ───────────────────────────────────────────────────────
-const STEP_LABELS = ['Front ID', 'Back ID', 'Checking', 'Live Photo', 'Complete'];
+const FULL_STEP_LABELS = ['Front ID', 'Back ID', 'Checking', 'Live Photo', 'Complete'];
+const AGE_ONLY_STEP_LABELS = ['Upload ID', 'Complete'];
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 type Screen = 'front' | 'back' | 'checking' | 'live' | 'done';
@@ -45,10 +46,10 @@ const SCREENS: Screen[] = ['front', 'back', 'checking', 'live', 'done'];
 // ─── Sub-Components ─────────────────────────────────────────────────────────
 
 /* Step progress tracker */
-const StepTracker: React.FC<{ activeIdx: number }> = ({ activeIdx }) => (
+const StepTracker: React.FC<{ activeIdx: number; labels?: string[] }> = ({ activeIdx, labels = FULL_STEP_LABELS }) => (
   <div style={{ padding: '12px 24px 0' }}>
     <div style={{ display: 'flex', gap: 6 }}>
-      {STEP_LABELS.map((_, i) => {
+      {labels.map((_, i) => {
         const state = i < activeIdx ? 'done' : i === activeIdx ? 'active' : 'pending';
         return (
           <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, position: 'relative',
@@ -66,7 +67,7 @@ const StepTracker: React.FC<{ activeIdx: number }> = ({ activeIdx }) => (
       })}
     </div>
     <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-      {STEP_LABELS.map((label, i) => {
+      {labels.map((label, i) => {
         const state = i < activeIdx ? 'done' : i === activeIdx ? 'active' : 'pending';
         return (
           <span key={i} style={{
@@ -374,6 +375,9 @@ const LivenessCues: React.FC<{ hidden?: boolean }> = ({ hidden }) => {
 const MobileVerificationPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
+  const verificationMode = searchParams.get('verification_mode') as 'full' | 'age_only' | null;
+  const ageThreshold = searchParams.get('age_threshold') ? parseInt(searchParams.get('age_threshold')!, 10) : undefined;
+  const isAgeOnly = verificationMode === 'age_only';
 
   // Handoff state
   const [apiKey, setApiKey] = useState<string | null>(null);
@@ -479,7 +483,12 @@ const MobileVerificationPage: React.FC = () => {
       const res = await fetch(`${API_BASE_URL}/api/v2/verify/initialize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-API-Key': key },
-        body: JSON.stringify({ user_id: uid, ...(source && { source }) }),
+        body: JSON.stringify({
+          user_id: uid,
+          ...(source && { source }),
+          ...(verificationMode && { verification_mode: verificationMode }),
+          ...(ageThreshold && { age_threshold: ageThreshold }),
+        }),
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'Failed to start'); }
       const data = await res.json();
@@ -584,6 +593,12 @@ const MobileVerificationPage: React.FC = () => {
         setFrontFile(null);
         if (frontPreviewUrl) URL.revokeObjectURL(frontPreviewUrl);
         setFrontPreviewUrl(null);
+        return;
+      }
+
+      // Age-only mode: front-document response includes final result directly
+      if (isAgeOnly && data?.age_verification) {
+        showFinalResult(data);
         return;
       }
 
@@ -927,7 +942,7 @@ const MobileVerificationPage: React.FC = () => {
       </div>
 
       {/* Step progress */}
-      <StepTracker activeIdx={screenIdx} />
+      <StepTracker activeIdx={isAgeOnly ? (screenIdx >= 4 ? 1 : 0) : screenIdx} labels={isAgeOnly ? AGE_ONLY_STEP_LABELS : FULL_STEP_LABELS} />
 
       {/* Screen content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', marginTop: 20 }}>
@@ -941,14 +956,16 @@ const MobileVerificationPage: React.FC = () => {
               fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 400,
               textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--teal)',
               marginBottom: 8,
-            }}>Step 1 of 5 — Front of ID</span>
+            }}>{isAgeOnly ? 'Step 1 of 1 — Upload ID' : 'Step 1 of 5 — Front of ID'}</span>
 
             <h1 style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.12, letterSpacing: '-0.025em', marginBottom: 8 }}>
-              Scan the front<br />of your ID
+              {isAgeOnly ? <>Upload your ID<br />to verify your age</> : <>Scan the front<br />of your ID</>}
             </h1>
 
             <p style={{ fontSize: 13, fontWeight: 400, color: 'var(--muted)', lineHeight: 1.55, marginBottom: 16 }}>
-              Position your ID card and take a clear photo. Make sure all four corners are visible and the text is clear.
+              {isAgeOnly
+                ? `We'll check your date of birth to confirm you are ${ageThreshold ?? 18}+. No other data is stored.`
+                : 'Position your ID card and take a clear photo. Make sure all four corners are visible and the text is clear.'}
             </p>
 
             {/* Document type selector */}
@@ -1231,12 +1248,17 @@ const MobileVerificationPage: React.FC = () => {
 
               if (isVerified) {
                 // Success state — the premium completion screen
-                const checklist = [
-                  'Identity document verified',
-                  'Document details confirmed',
-                  'Liveness check passed',
-                  'Face matched successfully',
-                ];
+                const checklist = isAgeOnly
+                  ? [
+                      'Document scanned',
+                      `Age requirement (${finalResult.age_verification?.age_threshold ?? ageThreshold ?? 18}+) met`,
+                    ]
+                  : [
+                      'Identity document verified',
+                      'Document details confirmed',
+                      'Liveness check passed',
+                      'Face matched successfully',
+                    ];
                 return (
                   <>
                     {/* Success ring */}
@@ -1252,14 +1274,16 @@ const MobileVerificationPage: React.FC = () => {
                       fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
                       textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--teal)',
                       marginBottom: 8,
-                    }}>Verification complete</span>
+                    }}>{isAgeOnly ? 'Age verified' : 'Verification complete'}</span>
 
                     <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.025em', marginBottom: 8 }}>
                       You're all set
                     </h1>
 
                     <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.55, marginBottom: 24 }}>
-                      Your identity has been verified. You can close this tab and return to your desktop.
+                      {isAgeOnly
+                        ? 'Your age has been verified. You can close this tab and return to your desktop.'
+                        : 'Your identity has been verified. You can close this tab and return to your desktop.'}
                     </p>
 
                     {/* Checklist */}
@@ -1305,12 +1329,16 @@ const MobileVerificationPage: React.FC = () => {
                   </div>
 
                   <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.025em', marginBottom: 8 }}>
-                    {isFailed ? 'Verification Failed' : 'Under Review'}
+                    {isFailed
+                      ? isAgeOnly ? 'Age Verification Failed' : 'Verification Failed'
+                      : 'Under Review'}
                   </h1>
 
                   <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.55, marginBottom: 16 }}>
                     {isFailed
-                      ? 'We were unable to verify your identity. Please return to your desktop to see details.'
+                      ? isAgeOnly
+                        ? (finalResult.message || 'Age verification could not be completed.')
+                        : 'We were unable to verify your identity. Please return to your desktop to see details.'
                       : 'Your verification is being reviewed. You will be notified of the result.'}
                   </p>
 

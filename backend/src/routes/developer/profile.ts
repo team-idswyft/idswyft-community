@@ -200,12 +200,13 @@ router.post('/avatar',
 
 // ─── Reviewer Management ────────────────────────────────────────────────────
 
-// POST /api/developer/reviewers/invite — invite a reviewer
+// POST /api/developer/reviewers/invite — invite a reviewer or org admin
 router.post('/reviewers/invite',
   authenticateDeveloperJWT,
   [
     body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
     body('name').optional().trim().escape().isLength({ max: 100 }).withMessage('Name must be less than 100 characters'),
+    body('role').optional().isIn(['reviewer', 'admin']).withMessage('Role must be reviewer or admin'),
   ],
   validate,
   catchAsync(async (req: Request, res: Response) => {
@@ -213,6 +214,7 @@ router.post('/reviewers/invite',
     if (!developer) throw new AuthenticationError('Developer authentication required');
 
     const { email, name } = req.body;
+    const role = req.body.role || 'reviewer';
 
     // Check if reviewer already exists for this developer
     const { data: existing } = await supabase
@@ -229,7 +231,7 @@ router.post('/reviewers/invite',
         // Reactivate revoked reviewer
         const { data, error } = await supabase
           .from('verification_reviewers')
-          .update({ status: 'invited', name: name || undefined, invited_at: new Date().toISOString() })
+          .update({ status: 'invited', name: name || undefined, role, invited_at: new Date().toISOString() })
           .eq('id', existing.id)
           .select('*')
           .single();
@@ -241,7 +243,7 @@ router.post('/reviewers/invite',
     } else {
       const { data, error } = await supabase
         .from('verification_reviewers')
-        .insert({ developer_id: developer.id, email, name: name || null })
+        .insert({ developer_id: developer.id, email, name: name || null, role })
         .select('*')
         .single();
       if (error) throw new Error('Failed to invite reviewer');
@@ -253,19 +255,20 @@ router.post('/reviewers/invite',
     const loginUrl = `${process.env.FRONTEND_URL || 'https://idswyft.app'}/admin/login`;
     const safeName = name ? esc(name) : '';
     const safeDevName = esc(developer.name || developer.email);
-    const subject = `You've been invited to review verifications on Idswyft`;
+    const roleLabel = role === 'admin' ? 'Organization Admin' : 'Reviewer';
+    const subject = `You've been invited as ${roleLabel} on Idswyft`;
     const html = `<p>Hi${safeName ? ` ${safeName}` : ''},</p>
-<p><strong>${safeDevName}</strong> has invited you to review identity verifications on Idswyft.</p>
+<p><strong>${safeDevName}</strong> has invited you as <strong>${roleLabel}</strong> to manage identity verifications on Idswyft.</p>
 <p>To get started, visit: <a href="${loginUrl}">${loginUrl}</a></p>
 <p>Enter your email address and use the one-time code sent to you to sign in.</p>
 <p>&mdash; Idswyft</p>`;
-    const text = `Hi${name ? ` ${name}` : ''},\n\n${developer.name || developer.email} has invited you to review verifications on Idswyft.\n\nVisit ${loginUrl} to sign in with your email.\n\n— Idswyft`;
+    const text = `Hi${name ? ` ${name}` : ''},\n\n${developer.name || developer.email} has invited you as ${roleLabel} on Idswyft.\n\nVisit ${loginUrl} to sign in with your email.\n\n— Idswyft`;
 
     emailService.sendEmail({ to: email, subject, html, text }).catch(err => {
       logger.error('Failed to send reviewer invitation email', { email, error: err });
     });
 
-    logger.info('Reviewer invited', { developerId: developer.id, reviewerEmail: email });
+    logger.info('Reviewer invited', { developerId: developer.id, reviewerEmail: email, role });
 
     res.status(201).json({ reviewer });
   })

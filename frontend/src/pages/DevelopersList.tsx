@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { API_BASE_URL } from '../config/api'
-import { tryEscalateDeveloperToken } from '../lib/adminApiInstance'
 import { fetchCsrfToken, csrfHeader, clearCsrfToken } from '../lib/csrf'
 import { C, injectFonts } from '../theme'
+import '../styles/patterns.css'
 import {
   ChevronDownIcon,
   ChevronRightIcon,
@@ -90,15 +90,14 @@ export function DevelopersList() {
     return () => mq.removeEventListener('change', handler)
   }, [])
 
-  // ── Auth guard ──
+  // ── Auth guard (cookie-only, no escalation) ──
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/admin/dashboard`, { credentials: 'include' })
+    fetch(`${API_BASE_URL}/api/admin/developers?limit=1`, { credentials: 'include' })
       .then(res => {
         if (res.ok) { setAuthReady(true); fetchCsrfToken(); return }
-        return tryEscalateDeveloperToken().then(ok => {
-          if (ok) { setAuthReady(true); fetchCsrfToken() }
-          else navigate('/admin/login')
-        })
+        // Not a platform admin — redirect to verifications or login
+        if (res.status === 401) navigate('/admin/login')
+        else navigate('/admin/verifications')
       })
       .catch(() => navigate('/admin/login'))
   }, [navigate])
@@ -177,14 +176,8 @@ export function DevelopersList() {
 
   // ── Render ──
   return (
-    <div style={{ background: C.bg, minHeight: '100vh', fontFamily: C.sans }}>
-      {/* Scan-line overlay */}
-      <div style={{
-        position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0,
-        background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px)',
-      }} />
-
-      <div style={{ position: 'relative', zIndex: 1, maxWidth: 1400, margin: '0 auto', padding: '32px 24px' }}>
+    <div className="pattern-crosshatch pattern-faint pattern-fade-edges pattern-full" style={{ background: C.bg, minHeight: '100vh', fontFamily: C.sans }}>
+      <div style={{ maxWidth: 1400, margin: '0 auto', padding: '32px 24px' }}>
 
         {/* ── Header ── */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
@@ -197,7 +190,10 @@ export function DevelopersList() {
               <ArrowLeftIcon style={{ width: 20, height: 20 }} />
             </button>
             <div>
-              <h1 style={{ color: C.text, fontSize: 24, fontWeight: 600, margin: 0, letterSpacing: '-0.02em' }}>
+              <div style={{ fontFamily: C.mono, fontSize: 11, color: C.muted, letterSpacing: '0.08em', marginBottom: 8 }}>
+                idswyft / developer-signups
+              </div>
+              <h1 style={{ fontFamily: C.mono, color: C.text, fontSize: 24, fontWeight: 600, margin: 0 }}>
                 Developer Signups
               </h1>
               <p style={{ color: C.dim, fontSize: 13, margin: '4px 0 0', fontFamily: C.mono }}>

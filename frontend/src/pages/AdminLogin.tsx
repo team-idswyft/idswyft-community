@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { tryEscalateDeveloperToken } from '../lib/adminApiInstance';
 import { API_BASE_URL } from '../config/api';
 import { C, injectFonts } from '../theme';
+import '../styles/patterns.css';
 
 export const AdminLogin: React.FC = () => {
   const navigate = useNavigate();
@@ -12,25 +12,20 @@ export const AdminLogin: React.FC = () => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [selfHostedCode, setSelfHostedCode] = useState<string | null>(null);
-  const [escalating, setEscalating] = useState(false);
+  const [checkingAuth, setCheckingAuth] = useState(false);
   const otpInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => { injectFonts(); }, []);
 
-  // Try escalating developer session or check existing cookie auth
+  // Check existing cookie auth — no escalation, OTP-only
   useEffect(() => {
-    setEscalating(true);
-    // Try to access a protected endpoint — if the cookie is valid, skip login
+    setCheckingAuth(true);
     fetch(`${API_BASE_URL}/api/admin/dashboard`, { credentials: 'include' })
       .then(res => {
-        if (res.ok) { navigate('/admin/verifications'); return; }
-        // No valid admin/reviewer cookie — try developer escalation
-        return tryEscalateDeveloperToken().then(ok => {
-          if (ok) navigate('/admin/verifications');
-          else setEscalating(false);
-        });
+        if (res.ok) navigate('/admin/verifications');
+        else setCheckingAuth(false);
       })
-      .catch(() => setEscalating(false));
+      .catch(() => setCheckingAuth(false));
   }, [navigate]);
 
   // Auto-focus OTP input when step changes
@@ -104,8 +99,8 @@ export const AdminLogin: React.FC = () => {
     }
   };
 
-  // Spinner while escalating developer token
-  if (escalating) {
+  // Spinner while checking existing auth
+  if (checkingAuth) {
     return (
       <div style={{
         minHeight: '100vh',
@@ -154,7 +149,7 @@ export const AdminLogin: React.FC = () => {
   };
 
   return (
-    <div style={{
+    <div className="pattern-shield pattern-faint pattern-fade-edges" style={{
       minHeight: '100vh',
       background: C.bg,
       display: 'flex',
@@ -189,12 +184,15 @@ export const AdminLogin: React.FC = () => {
             style={{ height: 32, margin: '0 auto 24px' }}
             onError={(e) => { e.currentTarget.style.display = 'none'; }}
           />
+          <div style={{ fontFamily: C.mono, fontSize: 11, color: C.muted, letterSpacing: '0.08em', marginBottom: 8 }}>
+            idswyft / review-dashboard
+          </div>
           <h1 style={{
             color: C.text,
+            fontFamily: C.mono,
             fontSize: 24,
             fontWeight: 600,
             margin: '0 0 8px',
-            letterSpacing: '-0.02em',
           }}>
             Verification Management
           </h1>

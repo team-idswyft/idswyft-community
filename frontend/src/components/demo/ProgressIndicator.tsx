@@ -3,10 +3,11 @@ import React from 'react';
 interface ProgressIndicatorProps {
   currentStep: number;
   isMobile: boolean;
+  stepLabels?: string[];
 }
 
-export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({ currentStep, isMobile }) => {
-  const steps = ['Start', 'Front ID', 'Back ID', 'Live Capture', 'Results', 'Address'];
+export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({ currentStep, isMobile, stepLabels }) => {
+  const steps = stepLabels || ['Start', 'Front ID', 'Back ID', 'Live Capture', 'Results', 'Address'];
   const circleSize = isMobile ? 26 : 32;
   return (
     <div style={{ marginBottom: isMobile ? 24 : 36 }}>

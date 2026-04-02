@@ -26,9 +26,9 @@ const StatusBadge = ({ status }: { status: string }) => {
 const NAV: NavItem[] = [
   { id: 'overview',  label: 'Overview',           depth: 0 },
   { id: 'access',    label: 'Getting Access',      depth: 0 },
-  { id: 'dev-login', label: 'Developer Login',     depth: 1 },
-  { id: 'reviewers', label: 'Invite Reviewers',    depth: 1 },
-  { id: 'reviewer-login', label: 'Reviewer Login', depth: 1 },
+  { id: 'roles',     label: 'Roles',               depth: 1 },
+  { id: 'reviewers', label: 'Invite Team Members', depth: 1 },
+  { id: 'reviewer-login', label: 'OTP Login',      depth: 1 },
   { id: 'dashboard', label: 'The Dashboard',       depth: 0 },
   { id: 'stats',     label: 'Stats Bar',           depth: 1 },
   { id: 'table',     label: 'Verification Table',  depth: 1 },
@@ -84,55 +84,62 @@ export const ReviewDashboardDocs: React.FC = () => (
     <SectionAnchor id="access" />
     <H2>Getting Access</H2>
     <Lead>
-      There are two ways to access the dashboard: as the developer who owns the API key, or as an
-      invited reviewer. Both use passwordless OTP — no passwords to manage.
+      Developers invite team members from the Developer Portal. Team members access the dashboard
+      via passwordless OTP — no passwords to manage.
     </Lead>
 
-    {/* Developer login */}
-    <SectionAnchor id="dev-login" />
+    {/* Roles */}
+    <SectionAnchor id="roles" />
     <h3 style={{ fontFamily: C.sans, fontSize: '1rem', fontWeight: 600, color: C.text, margin: '0 0 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
       <span style={{ color: C.cyan, fontFamily: C.mono, fontWeight: 400, fontSize: '0.85rem' }}>1.</span>
-      Developer Login
+      Roles
     </h3>
     <div style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.75, marginBottom: 20, maxWidth: 680 }}>
-      If you're the developer who registered the API key, your Developer Portal session automatically
-      grants access to the Review Dashboard. Just navigate to:
+      There are two roles for the Review Dashboard. Both are scoped to the developer's verifications
+      and sign in via OTP.
     </div>
 
-    <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
-      {[
-        { step: '1', text: 'Log in at /developer' },
-        { step: '2', text: 'Session escalates automatically' },
-        { step: '3', text: 'Navigate to /admin/verifications' },
-      ].map(s => (
-        <div key={s.step} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, flex: '1 1 180px' }}>
-          <div style={{ width: 24, height: 24, borderRadius: '50%', background: C.cyanDim, border: `1px solid ${C.cyanBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: C.mono, fontSize: '0.7rem', fontWeight: 700, color: C.cyan, flexShrink: 0 }}>{s.step}</div>
-          <span style={{ fontFamily: C.sans, fontSize: '0.82rem', color: C.text }}>{s.text}</span>
+    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24, maxWidth: 680 }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', padding: '2px 6px', borderRadius: 4, background: 'rgba(167,139,250,0.12)', color: '#a78bfa' }}>Admin</span>
+          <span style={{ fontFamily: C.sans, fontSize: '0.9rem', fontWeight: 600, color: C.text }}>Organization Admin</span>
         </div>
-      ))}
+        <div style={{ fontFamily: C.sans, fontSize: '0.78rem', color: C.muted, lineHeight: 1.55 }}>
+          Approve, reject, <strong>override</strong> verifications. Access analytics, manage GDPR erasure requests, and manage the reviewer team.
+        </div>
+      </div>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '20px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+          <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', padding: '2px 6px', borderRadius: 4, background: 'rgba(136,150,170,0.1)', color: C.muted }}>Reviewer</span>
+          <span style={{ fontFamily: C.sans, fontSize: '0.9rem', fontWeight: 600, color: C.text }}>Reviewer</span>
+        </div>
+        <div style={{ fontFamily: C.sans, fontSize: '0.78rem', color: C.muted, lineHeight: 1.55 }}>
+          Approve or reject verifications. Cannot override, access analytics, or manage GDPR requests.
+        </div>
+      </div>
     </div>
 
     <Callout type="note">
-      Developer sessions see <strong>all verifications</strong> for their API key. This is the account
-      that created the key in the Developer Portal.
+      Developers never see the Review Dashboard directly. They manage their API keys in the Developer Portal
+      and invite Organization Admins to handle day-to-day verification review.
     </Callout>
 
-    {/* Invite reviewers */}
+    {/* Invite team members */}
     <SectionAnchor id="reviewers" />
     <h3 style={{ fontFamily: C.sans, fontSize: '1rem', fontWeight: 600, color: C.text, margin: '32px 0 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
       <span style={{ color: C.cyan, fontFamily: C.mono, fontWeight: 400, fontSize: '0.85rem' }}>2.</span>
-      Invite Reviewers
+      Invite Team Members
     </h3>
     <div style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.75, marginBottom: 20, maxWidth: 680 }}>
-      To give team members access without sharing your developer credentials, invite them as reviewers
-      from the Developer Portal:
+      From the Developer Portal, invite team members as Organization Admins or Reviewers:
     </div>
 
     <div style={{ display: 'flex', gap: 8, marginBottom: 24, flexWrap: 'wrap' }}>
       {[
         { step: '1', text: 'Open Developer Portal → Settings (gear icon)' },
-        { step: '2', text: 'Scroll to "Verification Reviewers"' },
-        { step: '3', text: 'Enter email + optional name → Invite' },
+        { step: '2', text: 'Scroll to "Team Management"' },
+        { step: '3', text: 'Enter email, name, select role → Invite' },
       ].map(s => (
         <div key={s.step} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, flex: '1 1 180px' }}>
           <div style={{ width: 24, height: 24, borderRadius: '50%', background: C.cyanDim, border: `1px solid ${C.cyanBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: C.mono, fontSize: '0.7rem', fontWeight: 700, color: C.cyan, flexShrink: 0 }}>{s.step}</div>
@@ -142,8 +149,8 @@ export const ReviewDashboardDocs: React.FC = () => (
     </div>
 
     <Callout type="warning">
-      Reviewers can only see verifications belonging to <strong>your</strong> developer account. They
-      cannot access API keys, billing, or other developers' data. Each reviewer gets their own
+      All team members can only see verifications belonging to <strong>your</strong> developer account. They
+      cannot access API keys, billing, or other developers' data. Each person gets their own
       OTP-based login.
     </Callout>
 
@@ -151,17 +158,18 @@ export const ReviewDashboardDocs: React.FC = () => (
     <SectionAnchor id="reviewer-login" />
     <h3 style={{ fontFamily: C.sans, fontSize: '1rem', fontWeight: 600, color: C.text, margin: '32px 0 10px', display: 'flex', alignItems: 'center', gap: 8 }}>
       <span style={{ color: C.cyan, fontFamily: C.mono, fontWeight: 400, fontSize: '0.85rem' }}>3.</span>
-      Reviewer Login
+      OTP Login
     </h3>
     <div style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.75, marginBottom: 20, maxWidth: 680 }}>
-      Invited reviewers access the dashboard at{' '}
+      Both Organization Admins and Reviewers access the dashboard at{' '}
       <code style={{ fontFamily: C.mono, color: C.cyan, fontSize: '0.82rem' }}>/admin/login</code>.
       They enter their email, receive an OTP code, and are taken directly to the Review Dashboard.
-      No passwords, no account creation required.
+      No passwords, no account creation required. A role badge in the header shows the user's
+      access level.
     </div>
 
     <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '20px 24px', marginBottom: 24, maxWidth: 500 }}>
-      <div style={{ fontFamily: C.mono, fontSize: '0.72rem', color: C.dim, marginBottom: 12, letterSpacing: '0.06em' }}>REVIEWER LOGIN FLOW</div>
+      <div style={{ fontFamily: C.mono, fontSize: '0.72rem', color: C.dim, marginBottom: 12, letterSpacing: '0.06em' }}>OTP LOGIN FLOW</div>
       {[
         'Reviewer navigates to /admin/login',
         'Enters their invited email address',
@@ -189,13 +197,14 @@ export const ReviewDashboardDocs: React.FC = () => (
     <SectionAnchor id="stats" />
     <h3 style={{ fontFamily: C.sans, fontSize: '1rem', fontWeight: 600, color: C.text, margin: '0 0 10px' }}>Stats Bar</h3>
     <div style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.75, marginBottom: 20, maxWidth: 680 }}>
-      At the top of the page, four stat cards show real-time counts:
+      At the top of the page, five stat cards show real-time counts:
     </div>
 
-    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 10, marginBottom: 28 }}>
+    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 10, marginBottom: 28 }}>
       {[
-        { label: 'Total', value: '—', color: C.cyan },
-        { label: 'Pending Review', value: '—', color: C.amber },
+        { label: 'Total', value: '—', color: C.text },
+        { label: 'Review', value: '—', color: C.amber },
+        { label: 'Pending', value: '—', color: C.cyan },
         { label: 'Verified', value: '—', color: C.green },
         { label: 'Failed', value: '—', color: C.red },
       ].map(s => (
@@ -215,15 +224,16 @@ export const ReviewDashboardDocs: React.FC = () => (
     </div>
 
     <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 24 }}>
-      <div style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1.5fr 1.5fr 2fr 1fr', gap: 0, padding: '10px 16px', borderBottom: `1px solid ${C.border}`, fontFamily: C.mono, fontSize: '0.7rem', color: C.dim, letterSpacing: '0.04em' }}>
-        <span>ID</span><span>USER ID</span><span>STATUS</span><span>DOC TYPE</span><span>CREATED</span><span>ACTIONS</span>
+      <div style={{ display: 'grid', gridTemplateColumns: '40px 2fr 2fr 1.5fr 1.5fr 2fr 1fr', gap: 0, padding: '10px 16px', borderBottom: `1px solid ${C.border}`, fontFamily: C.mono, fontSize: '0.7rem', color: C.dim, letterSpacing: '0.04em' }}>
+        <span></span><span>ID</span><span>USER ID</span><span>STATUS</span><span>DOC TYPE</span><span>CREATED</span><span>ACTIONS</span>
       </div>
       {[
         { id: 'a3f8...c2d1', user: '9e7b...4a01', status: 'manual_review', doc: 'drivers_license', date: '2 min ago' },
         { id: 'b1e2...d4f5', user: '3c8a...7b02', status: 'verified', doc: 'passport', date: '15 min ago' },
         { id: 'c9d0...e6a3', user: '5f2d...1c03', status: 'failed', doc: 'national_id', date: '1 hour ago' },
       ].map(row => (
-        <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '2fr 2fr 1.5fr 1.5fr 2fr 1fr', gap: 0, padding: '10px 16px', borderBottom: `1px solid ${C.border}`, fontFamily: C.sans, fontSize: '0.8rem', color: C.text, alignItems: 'center' }}>
+        <div key={row.id} style={{ display: 'grid', gridTemplateColumns: '40px 2fr 2fr 1.5fr 1.5fr 2fr 1fr', gap: 0, padding: '10px 16px', borderBottom: `1px solid ${C.border}`, fontFamily: C.sans, fontSize: '0.8rem', color: C.text, alignItems: 'center' }}>
+          <span style={{ color: C.dim, fontSize: '0.7rem' }}>▸</span>
           <span style={{ fontFamily: C.mono, fontSize: '0.75rem', color: C.muted }}>{row.id}</span>
           <span style={{ fontFamily: C.mono, fontSize: '0.75rem', color: C.muted }}>{row.user}</span>
           <span><StatusBadge status={row.status} /></span>
@@ -266,8 +276,8 @@ export const ReviewDashboardDocs: React.FC = () => (
         { title: 'OCR Data', desc: 'Extracted name, date of birth, document number, expiry' },
         { title: 'Cross-Validation', desc: 'Front OCR vs back barcode consistency scores' },
         { title: 'Face Match', desc: 'Similarity score between document photo and live capture' },
-        { title: 'Quality Scores', desc: 'Image blur, brightness, resolution assessments' },
-        { title: 'Thumbnails', desc: 'Quick-view thumbnails for document and live capture images' },
+        { title: 'Gate Analysis', desc: 'Score bars for OCR, cross-validation, liveness, deepfake, and face match gates' },
+        { title: 'Risk Assessment', desc: 'Overall risk score, risk level, contributing factors, and AML screening results' },
       ].map(d => (
         <div key={d.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 16px' }}>
           <div style={{ fontFamily: C.sans, fontSize: '0.82rem', fontWeight: 600, color: C.text, marginBottom: 4 }}>{d.title}</div>
@@ -319,12 +329,14 @@ export const ReviewDashboardDocs: React.FC = () => (
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
         <div style={{ width: 10, height: 10, borderRadius: '50%', background: C.amber }} />
         <span style={{ fontFamily: C.sans, fontSize: '0.95rem', fontWeight: 600, color: C.text }}>Override</span>
+        <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', padding: '2px 6px', borderRadius: 4, background: 'rgba(167,139,250,0.12)', color: '#a78bfa' }}>Admin Only</span>
       </div>
       <div style={{ fontFamily: C.sans, fontSize: '0.85rem', color: C.muted, lineHeight: 1.75 }}>
         Lets you set any status — useful for edge cases. For example, overriding a{' '}
         <StatusBadge status="failed" /> verification to <StatusBadge status="verified" /> when
         you've manually confirmed the person's identity through other means. A reason is required
-        for overrides.
+        for overrides. This action is only available to <strong>Organization Admins</strong> — regular
+        Reviewers can only approve or reject.
       </div>
     </div>
 

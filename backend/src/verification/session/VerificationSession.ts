@@ -47,6 +47,12 @@ export interface StepResult {
   user_message: string | null;
 }
 
+/** Age verification result — never exposes actual DOB */
+export interface AgeVerificationResult {
+  is_of_age: boolean;
+  age_threshold: number;
+}
+
 /** Dependencies injected into the session (for testability) */
 export interface SessionDeps {
   extractFront: (buffer: Buffer) => Promise<FrontExtractionResult>;
@@ -134,6 +140,81 @@ export class VerificationSession {
     this.state.front_extraction = frontResult;
     this.transition(VerificationStatus.AWAITING_BACK);
     return this.passResult();
+  }
+
+  /**
+   * Age-only mode — Submit front document, extract DOB, check age threshold.
+   * Runs Gate 1 for document quality, then auto-completes or rejects based on age.
+   * No back document, cross-validation, liveness, or face match.
+   */
+  async submitFrontAgeOnly(imageBuffer: Buffer, ageThreshold: number): Promise<StepResult & { age_verification?: AgeVerificationResult }> {
+    this.assertStep(VerificationStatus.AWAITING_FRONT);
+    this.transition(VerificationStatus.FRONT_PROCESSING);
+
+    const frontResult = await this.deps.extractFront(imageBuffer);
+    const gate = evaluateGate1(frontResult);
+
+    if (!gate.passed) {
+      return this.hardReject(gate);
+    }
+
+    this.state.front_extraction = frontResult;
+
+    // Extract and validate DOB
+    const dobStr = frontResult.ocr?.date_of_birth;
+    if (!dobStr) {
+      this.state.rejection_reason = 'DOB_NOT_FOUND' as any;
+      this.state.rejection_detail = 'Date of birth could not be extracted from document';
+      this.transition(VerificationStatus.HARD_REJECTED);
+      return {
+        passed: false,
+        rejection_reason: 'DOB_NOT_FOUND',
+        rejection_detail: 'Date of birth could not be extracted from document',
+        user_message: 'We could not read the date of birth on your document. Please try again with a clearer image.',
+      };
+    }
+
+    // Parse DOB — supports YYYY-MM-DD, MM/DD/YYYY, MM-DD-YYYY
+    const dob = this.parseDOB(dobStr);
+    if (!dob) {
+      this.state.rejection_reason = 'DOB_NOT_FOUND' as any;
+      this.state.rejection_detail = `Date of birth format unrecognized: ${dobStr}`;
+      this.transition(VerificationStatus.HARD_REJECTED);
+      return {
+        passed: false,
+        rejection_reason: 'DOB_NOT_FOUND',
+        rejection_detail: `Date of birth format unrecognized: ${dobStr}`,
+        user_message: 'We could not parse the date of birth on your document. Please try again with a clearer image.',
+      };
+    }
+
+    // Calculate age with proper birthday-aware comparison
+    const age = this.calculateAge(dob);
+    const isOfAge = age >= ageThreshold;
+    const ageVerification: AgeVerificationResult = { is_of_age: isOfAge, age_threshold: ageThreshold };
+
+    // Store age result in state metadata (via front_extraction — no DOB leaks in response)
+    (this.state as any).age_verification = ageVerification;
+
+    if (!isOfAge) {
+      this.state.rejection_reason = 'UNDERAGE' as any;
+      this.state.rejection_detail = `Subject does not meet the minimum age requirement of ${ageThreshold}`;
+      this.transition(VerificationStatus.HARD_REJECTED);
+      return {
+        passed: false,
+        rejection_reason: 'UNDERAGE',
+        rejection_detail: `Subject does not meet the minimum age requirement of ${ageThreshold}`,
+        user_message: `You must be at least ${ageThreshold} years old to proceed.`,
+        age_verification: ageVerification,
+      };
+    }
+
+    this.transition(VerificationStatus.COMPLETE);
+    this.state.completed_at = new Date().toISOString();
+    return {
+      ...this.passResult(),
+      age_verification: ageVerification,
+    };
   }
 
   /**
@@ -312,5 +393,33 @@ export class VerificationSession {
       rejection_detail: null,
       user_message: null,
     };
+  }
+
+  /** Parse a DOB string into a Date. Supports YYYY-MM-DD, MM/DD/YYYY, MM-DD-YYYY. */
+  private parseDOB(dobStr: string): Date | null {
+    // Try YYYY-MM-DD (ISO)
+    const isoMatch = dobStr.match(/^(\d{4})-(\d{1,2})-(\d{1,2})$/);
+    if (isoMatch) {
+      const d = new Date(Number(isoMatch[1]), Number(isoMatch[2]) - 1, Number(isoMatch[3]));
+      if (!isNaN(d.getTime())) return d;
+    }
+    // Try MM/DD/YYYY or MM-DD-YYYY
+    const usMatch = dobStr.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/);
+    if (usMatch) {
+      const d = new Date(Number(usMatch[3]), Number(usMatch[1]) - 1, Number(usMatch[2]));
+      if (!isNaN(d.getTime())) return d;
+    }
+    return null;
+  }
+
+  /** Calculate age in years from a DOB, accounting for whether the birthday has occurred this year. */
+  private calculateAge(dob: Date): number {
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const monthDiff = today.getMonth() - dob.getMonth();
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+      age--;
+    }
+    return age;
   }
 }

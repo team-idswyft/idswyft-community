@@ -348,6 +348,7 @@ export interface Reviewer {
   developer_id: string;
   email: string;
   name?: string;
+  role: 'reviewer' | 'admin';
   status: 'invited' | 'active' | 'revoked';
   invited_at: string;
   last_login_at?: string;

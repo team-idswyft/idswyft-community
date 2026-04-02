@@ -51,6 +51,9 @@ const DemoPage: React.FC = () => {
   // Demo form fields
   const [apiKey, setApiKey] = useState(urlApiKey || '');
   const [userId, setUserId] = useState('');
+  const [verificationMode, setVerificationMode] = useState<'full' | 'age_only'>('full');
+  const [ageThreshold, setAgeThreshold] = useState(18);
+  const isAgeOnly = verificationMode === 'age_only';
 
   // Live capture state
   const [showLiveCapture, setShowLiveCapture] = useState(false);
@@ -662,7 +665,8 @@ const DemoPage: React.FC = () => {
       const requestBody = {
         user_id: userId,
         source: 'demo' as const,
-        ...(useSandbox && { sandbox: true })
+        ...(useSandbox && { sandbox: true }),
+        ...(verificationMode === 'age_only' && { verification_mode: 'age_only', age_threshold: ageThreshold }),
       };
 
       console.log('Start Verification Debug:');
@@ -777,6 +781,14 @@ const DemoPage: React.FC = () => {
 
       if (data.rejection_reason) {
         toast.error(data.message || data.rejection_reason);
+        return;
+      }
+
+      // Age-only mode: front-document response includes final result directly
+      if (isAgeOnly && data.age_verification) {
+        setVerificationRequest(data);
+        setCurrentStep(5);
+        toast.success(data.age_verification.is_of_age ? 'Age verified!' : 'Age verification failed');
         return;
       }
 
@@ -1198,8 +1210,12 @@ const DemoPage: React.FC = () => {
             isMobile={isMobile}
             mobileHandoffDone={mobileHandoffDone}
             mobileResult={mobileResult}
+            verificationMode={verificationMode}
+            ageThreshold={ageThreshold}
             onApiKeyChange={setApiKey}
             onUserIdChange={setUserId}
+            onVerificationModeChange={setVerificationMode}
+            onAgeThresholdChange={setAgeThreshold}
             onStart={startVerification}
             onMobileHandoffDone={setMobileHandoffDone}
             onMobileResult={setMobileResult}
@@ -1304,7 +1320,11 @@ const DemoPage: React.FC = () => {
           </p>
         </div>
         <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: isMobile ? 16 : 32 }}>
-          <ProgressIndicator currentStep={currentStep} isMobile={isMobile} />
+          <ProgressIndicator
+            currentStep={isAgeOnly ? (currentStep >= 5 ? 3 : currentStep) : currentStep}
+            isMobile={isMobile}
+            stepLabels={isAgeOnly ? ['Start', 'Upload ID', 'Results'] : undefined}
+          />
           {renderStepContent()}
         </div>
       </div>

@@ -24,6 +24,8 @@ const UserVerificationPage: React.FC = () => {
   const theme = (searchParams.get('theme') as 'light' | 'dark') || 'dark';
   const showBackButton = searchParams.get('show_back') !== 'false';
   const addressVerifEnabled = searchParams.get('address_verif') === 'true';
+  const verificationMode = (searchParams.get('verification_mode') as 'full' | 'age_only') || undefined;
+  const ageThreshold = searchParams.get('age_threshold') ? parseInt(searchParams.get('age_threshold')!, 10) : undefined;
 
   const viewOnly = !apiKey || !userId;
 
@@ -211,7 +213,7 @@ const UserVerificationPage: React.FC = () => {
           background: C.bg, borderRadius: 6, padding: '6px 10px',
           wordBreak: 'break-all',
         }}>
-          /user-verification?api_key=<span style={{ color: C.cyan }}>ik_your_api_key</span>&user_id=<span style={{ color: C.cyan }}>user-uuid</span>
+          /user-verification?api_key=<span style={{ color: C.cyan }}>ik_your_api_key</span>&user_id=<span style={{ color: C.cyan }}>user-uuid</span>&verification_mode=<span style={{ color: C.cyan }}>age_only</span>&age_threshold=<span style={{ color: C.cyan }}>21</span>
         </div>
       </div>
     </div>
@@ -226,6 +228,8 @@ const UserVerificationPage: React.FC = () => {
           <ContinueOnPhone
             apiKey={apiKey}
             userId={userId}
+            verificationMode={verificationMode}
+            ageThreshold={ageThreshold}
             onComplete={(result) => {
               handleVerificationComplete({
                 verification_id: result.verification_id ?? 'mobile-handoff',
@@ -255,6 +259,8 @@ const UserVerificationPage: React.FC = () => {
           onComplete={handleVerificationComplete}
           onRedirect={handleRedirect}
           allowedDocumentTypes={['passport', 'drivers_license', 'national_id']}
+          verificationMode={verificationMode}
+          ageThreshold={ageThreshold}
         />
       </div>
     );
@@ -280,10 +286,16 @@ const UserVerificationPage: React.FC = () => {
             {isSuccess ? '✓' : isFailed ? '✗' : '⏳'}
           </div>
           <h1 style={{ fontFamily: C.sans, fontSize: '1.4rem', fontWeight: 600, color: C.text, margin: '0 0 8px' }}>
-            Verification {statusLabel}
+            {verificationMode === 'age_only'
+              ? isSuccess ? 'Age Verified' : 'Age Verification Failed'
+              : `Verification ${statusLabel}`}
           </h1>
           <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, margin: '0 0 24px' }}>
-            {isSuccess
+            {verificationMode === 'age_only'
+              ? isSuccess
+                ? `You meet the minimum age requirement of ${ageThreshold ?? 18}.`
+                : 'Age verification could not be completed.'
+              : isSuccess
               ? 'Your identity has been successfully verified.'
               : statusLabel === 'Failed'
                 ? 'Verification could not be completed. Please try again.'
@@ -474,10 +486,12 @@ const UserVerificationPage: React.FC = () => {
         {/* Heading */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <h1 style={{ fontFamily: C.sans, fontSize: '1.6rem', fontWeight: 600, color: C.text, margin: '0 0 8px' }}>
-            Verify Your Identity
+            {verificationMode === 'age_only' ? 'Verify Your Age' : 'Verify Your Identity'}
           </h1>
           <p style={{ fontFamily: C.sans, fontSize: '0.92rem', color: C.muted, margin: 0 }}>
-            Choose how you'd like to complete verification
+            {verificationMode === 'age_only'
+              ? `Upload your ID to confirm you are ${ageThreshold ?? 18}+`
+              : 'Choose how you\'d like to complete verification'}
           </p>
         </div>
 

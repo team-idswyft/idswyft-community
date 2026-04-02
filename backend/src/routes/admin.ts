@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
 import { body, query, param } from 'express-validator';
-import { authenticateJWT, requireAdminRole, authenticateAdminOrReviewer } from '@/middleware/auth.js';
+import { authenticateJWT, requireAdminRole, authenticateAdminOrReviewer, requireOrgAdminOrPlatformAdmin } from '@/middleware/auth.js';
 import { catchAsync, ValidationError, NotFoundError, AuthorizationError } from '@/middleware/errorHandler.js';
 import { validate } from '@/middleware/validate.js';
 import { VerificationService } from '@/services/verification.js';
@@ -318,9 +318,9 @@ router.put('/verification/:id/review',
       if (!check) throw new NotFoundError('Verification request');
     }
 
-    // Override is admin-only — reviewers can only approve/reject
-    if (decision === 'override' && req.reviewer) {
-      throw new AuthorizationError('Reviewers cannot override verification status');
+    // Override requires org admin or platform admin — regular reviewers can only approve/reject
+    if (decision === 'override' && req.reviewer && req.reviewer.role !== 'admin') {
+      throw new AuthorizationError('Only organization admins can override verification status');
     }
 
     // Override requires new_status
@@ -406,9 +406,10 @@ router.put('/verification/:id/review',
   })
 );
 
-// Get developers list
+// Get developers list (platform admin only)
 router.get('/developers',
-  authenticateAdminOrReviewer as any,
+  authenticateJWT as any,
+  requireAdminRole(['admin']) as any,
   [
     query('page')
       .optional()
@@ -465,10 +466,10 @@ router.get('/developers',
   })
 );
 
-// Get system analytics
+// Get system analytics (platform admin or org admin)
 router.get('/analytics',
-  authenticateJWT,
-  requireAdminRole(['admin']),
+  authenticateAdminOrReviewer,
+  requireOrgAdminOrPlatformAdmin,
   [
     query('period')
       .optional()
@@ -482,10 +483,11 @@ router.get('/analytics',
   validate,
   catchAsync(async (req: Request, res: Response) => {
     const period = req.query.period as string || '30d';
-    const developerId = req.query.developer_id as string;
-    
+    // Org admins are scoped to their developer; platform admins can optionally filter
+    const developerId = req.reviewer?.developer_id || req.query.developer_id as string;
+
     const analytics = await getAnalytics(period, developerId);
-    
+
     res.json(analytics);
   })
 );
@@ -645,8 +647,8 @@ function parsePeriodFilter(req: Request): PeriodFilter | undefined {
 
 // GET /api/admin/analytics/funnel — Conversion funnel metrics
 router.get('/analytics/funnel',
-  authenticateJWT,
-  requireAdminRole(['admin']),
+  authenticateAdminOrReviewer,
+  requireOrgAdminOrPlatformAdmin,
   [
     query('period').optional().isIn(['7d', '30d', '90d']).withMessage('Period must be 7d, 30d, or 90d'),
     query('developer_id').optional().isUUID().withMessage('Developer ID must be a valid UUID'),
@@ -654,7 +656,7 @@ router.get('/analytics/funnel',
   validate,
   catchAsync(async (req: Request, res: Response) => {
     const period = parsePeriodFilter(req);
-    const developerId = req.query.developer_id as string | undefined;
+    const developerId = req.reviewer?.developer_id || req.query.developer_id as string | undefined;
     const funnel = await getConversionFunnel(period, developerId);
     res.json({ funnel });
   })
@@ -662,8 +664,8 @@ router.get('/analytics/funnel',
 
 // GET /api/admin/analytics/rejections — Rejection breakdown by reason
 router.get('/analytics/rejections',
-  authenticateJWT,
-  requireAdminRole(['admin']),
+  authenticateAdminOrReviewer,
+  requireOrgAdminOrPlatformAdmin,
   [
     query('period').optional().isIn(['7d', '30d', '90d']).withMessage('Period must be 7d, 30d, or 90d'),
   ],
@@ -677,8 +679,8 @@ router.get('/analytics/rejections',
 
 // GET /api/admin/analytics/fraud-patterns — Fraud pattern indicators
 router.get('/analytics/fraud-patterns',
-  authenticateJWT,
-  requireAdminRole(['admin']),
+  authenticateAdminOrReviewer,
+  requireOrgAdminOrPlatformAdmin,
   [
     query('period').optional().isIn(['7d', '30d', '90d']).withMessage('Period must be 7d, 30d, or 90d'),
   ],
@@ -692,8 +694,8 @@ router.get('/analytics/fraud-patterns',
 
 // GET /api/admin/analytics/risk-distribution — Risk score distribution
 router.get('/analytics/risk-distribution',
-  authenticateJWT,
-  requireAdminRole(['admin']),
+  authenticateAdminOrReviewer,
+  requireOrgAdminOrPlatformAdmin,
   [
     query('period').optional().isIn(['7d', '30d', '90d']).withMessage('Period must be 7d, 30d, or 90d'),
   ],
@@ -938,13 +940,25 @@ router.get('/audit/export',
   })
 );
 
-// GDPR / Right-to-erasure endpoint
+// GDPR / Right-to-erasure endpoint (platform admin or org admin with ownership check)
 router.delete('/user/:userId/data',
-  authenticateJWT,
-  requireAdminRole(['admin']),
+  authenticateAdminOrReviewer,
+  requireOrgAdminOrPlatformAdmin,
   catchAsync(async (req: Request, res: Response) => {
     const { userId } = req.params;
     const { reason = 'admin-requested' } = req.body;
+
+    // Org admins can only delete users who have verifications under their developer
+    if (req.reviewer) {
+      const { data } = await supabase
+        .from('verification_requests')
+        .select('id')
+        .eq('user_id', userId)
+        .eq('developer_id', req.reviewer.developer_id)
+        .limit(1)
+        .maybeSingle();
+      if (!data) throw new NotFoundError('User not found in your verification data');
+    }
 
     const retentionService = new DataRetentionService();
     await retentionService.deleteUserData(userId, reason);

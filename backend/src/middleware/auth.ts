@@ -255,6 +255,15 @@ export const requireAdminRole = (allowedRoles: string[] = ['admin', 'reviewer'])
   });
 };
 
+// Require org admin (reviewer with role='admin') or platform admin (admin_users)
+export const requireOrgAdminOrPlatformAdmin = catchAsync(
+  async (req: Request, _res: Response, next: NextFunction) => {
+    if (req.user) return next();                        // platform admin
+    if (req.reviewer?.role === 'admin') return next();  // org admin
+    throw new AuthorizationError('Organization admin privileges required');
+  }
+);
+
 // Sandbox mode check
 export const checkSandboxMode = (req: Request, res: Response, next: NextFunction) => {
   const isSandboxRequest = req.body.sandbox === true || req.query.sandbox === 'true';
@@ -413,12 +422,13 @@ export const verifyRegistrationToken = (token: string): string => {
 };
 
 // Generate JWT token for reviewers (24h, scoped to developer)
-export const generateReviewerToken = (reviewer: { id: string; email: string; developer_id: string }): string => {
+export const generateReviewerToken = (reviewer: { id: string; email: string; developer_id: string; role?: string }): string => {
   return jwt.sign(
     {
       id: reviewer.id,
       email: reviewer.email,
       developer_id: reviewer.developer_id,
+      role: reviewer.role || 'reviewer',
       type: 'reviewer',
     },
     config.jwtSecret,
@@ -570,6 +580,7 @@ export default {
   authenticateAdminOrReviewer,
   authenticateUser,
   requireAdminRole,
+  requireOrgAdminOrPlatformAdmin,
   checkSandboxMode,
   checkPremiumAccess,
   generateAdminToken,

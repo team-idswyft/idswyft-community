@@ -14,6 +14,8 @@ export interface VerificationProps {
   theme?: 'light' | 'dark';
   allowedDocumentTypes?: ('passport' | 'drivers_license' | 'national_id')[];
   enableMobileHandoff?: boolean;
+  verificationMode?: 'full' | 'age_only';
+  ageThreshold?: number;
 }
 
 export interface VerificationResult {
@@ -32,13 +34,19 @@ export interface VerificationResult {
 // 1 Initialize  2 Front Doc  3 Front OCR  4 Back Doc  5 Cross-Check  6 Selfie  7 Done
 // ─────────────────────────────────────────────────────────────────────────────
 
-const STEPS = [
+const FULL_STEPS = [
   { step: 1, label: 'Start' },
   { step: 2, label: 'Front ID' },
   { step: 3, label: 'Scanning' },
   { step: 4, label: 'Back ID' },
   { step: 5, label: 'Checking' },
   { step: 6, label: 'Selfie' },
+  { step: 7, label: 'Done' },
+];
+
+const AGE_ONLY_STEPS = [
+  { step: 1, label: 'Start' },
+  { step: 2, label: 'Upload ID' },
   { step: 7, label: 'Done' },
 ];
 
@@ -60,7 +68,10 @@ const EndUserVerification: React.FC<VerificationProps> = ({
   theme = 'light',
   allowedDocumentTypes = ['passport', 'drivers_license', 'national_id'],
   enableMobileHandoff = false,
+  verificationMode,
+  ageThreshold,
 }) => {
+  const isAgeOnly = verificationMode === 'age_only';
   // Core state
   const [currentStep, setCurrentStep] = useState(1);
   const [verificationId, setVerificationId] = useState<string | null>(null);
@@ -133,7 +144,11 @@ const EndUserVerification: React.FC<VerificationProps> = ({
       const res = await fetch(`${API_BASE_URL}/api/v2/verify/initialize`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
-        body: JSON.stringify({ user_id: userId }),
+        body: JSON.stringify({
+          user_id: userId,
+          ...(verificationMode && { verification_mode: verificationMode }),
+          ...(ageThreshold && { age_threshold: ageThreshold }),
+        }),
       });
       if (!res.ok) {
         const err = await res.json();
@@ -175,6 +190,12 @@ const EndUserVerification: React.FC<VerificationProps> = ({
       if (!res.ok) {
         const err = await res.json();
         throw new Error(err.message || 'Failed to upload document');
+      }
+      const data = await res.json();
+      // Age-only mode: front-document response includes final_result directly
+      if (isAgeOnly && data.age_verification) {
+        showFinalResult(data);
+        return;
       }
       toast.success('Document uploaded successfully');
       setCurrentStep(3);
@@ -367,31 +388,35 @@ const EndUserVerification: React.FC<VerificationProps> = ({
   };
 
   // ── Progress bar ──────────────────────────────────────────────────────────
+  const steps = isAgeOnly ? AGE_ONLY_STEPS : FULL_STEPS;
+  const stepIdx = steps.findIndex(s => s.step === currentStep);
+  const activeStepIdx = stepIdx >= 0 ? stepIdx : steps.length - 1;
+
   const renderProgress = () => (
     <div className="mb-8">
       <div className="relative">
         <div className={`h-1.5 rounded-full ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`}>
           <div
             className={`h-1.5 bg-gradient-to-r ${isDark ? 'from-cyan-400 to-cyan-500' : 'from-blue-500 to-blue-600'} rounded-full transition-all duration-700 ease-out`}
-            style={{ width: `${((currentStep - 1) / (STEPS.length - 1)) * 100}%` }}
+            style={{ width: `${(activeStepIdx / (steps.length - 1)) * 100}%` }}
           />
         </div>
         <div className="flex justify-between absolute -top-1.5 w-full">
-          {STEPS.map(({ step }) => (
+          {steps.map(({ step }, i) => (
             <div key={step} className="relative">
               <div className={`w-4 h-4 rounded-full border-2 transition-all duration-300 ${
-                currentStep > step
+                activeStepIdx > i
                   ? isDark ? 'bg-cyan-500 border-cyan-500' : 'bg-blue-500 border-blue-500'
-                  : currentStep === step
+                  : activeStepIdx === i
                   ? isDark ? 'bg-cyan-500 border-cyan-500' : 'bg-blue-500 border-blue-500'
                   : isDark ? 'bg-[#0f1420] border-[rgba(255,255,255,0.13)]' : 'bg-white border-gray-300'
               }`}>
-                {currentStep > step && (
+                {activeStepIdx > i && (
                   <svg className="w-2.5 h-2.5 text-white absolute top-px left-px" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
                 )}
-                {currentStep === step && (
+                {activeStepIdx === i && (
                   <div className="w-1.5 h-1.5 bg-white rounded-full absolute top-px left-px animate-pulse" />
                 )}
               </div>
@@ -401,10 +426,10 @@ const EndUserVerification: React.FC<VerificationProps> = ({
       </div>
       <div className="text-center mt-8">
         <span className={`text-sm font-medium ${isDark ? 'text-cyan-400' : 'text-blue-600'}`}>
-          {STEPS.find(s => s.step === currentStep)?.label}
+          {steps[activeStepIdx]?.label}
         </span>
         <span className={`text-xs ml-2 ${styles.textSec}`}>
-          ({currentStep}/{STEPS.length})
+          ({activeStepIdx + 1}/{steps.length})
         </span>
       </div>
     </div>
@@ -485,8 +510,14 @@ const EndUserVerification: React.FC<VerificationProps> = ({
         return (
           <div className="space-y-5">
             <div className="text-center">
-              <h2 className={`text-xl font-semibold mb-1 ${styles.text}`}>Upload Front of ID</h2>
-              <p className={`text-sm ${styles.textSec}`}>Take a clear photo of the front of your government-issued ID</p>
+              <h2 className={`text-xl font-semibold mb-1 ${styles.text}`}>
+                {isAgeOnly ? 'Upload Your ID' : 'Upload Front of ID'}
+              </h2>
+              <p className={`text-sm ${styles.textSec}`}>
+                {isAgeOnly
+                  ? 'Upload your government-issued ID to verify your age'
+                  : 'Take a clear photo of the front of your government-issued ID'}
+              </p>
             </div>
 
             <div>
@@ -624,10 +655,16 @@ const EndUserVerification: React.FC<VerificationProps> = ({
 
             <div>
               <h2 className={`text-xl font-semibold ${styles.text}`}>
-                {isVerified ? 'Identity Verified!' : isFailed ? 'Verification Failed' : 'Under Review'}
+                {isAgeOnly
+                  ? isVerified ? 'Age Verified!' : 'Age Verification Failed'
+                  : isVerified ? 'Identity Verified!' : isFailed ? 'Verification Failed' : 'Under Review'}
               </h2>
               <p className={`text-sm mt-1 ${styles.textSec}`}>
-                {isVerified
+                {isAgeOnly
+                  ? isVerified
+                    ? `You meet the minimum age requirement of ${finalResult.age_verification?.age_threshold ?? ageThreshold ?? 18}.`
+                    : finalResult.message || finalResult.rejection_detail || 'Age verification could not be completed.'
+                  : isVerified
                   ? 'Your identity has been successfully verified.'
                   : isFailed
                   ? finalResult.failure_reason || 'Verification could not be completed. Please try again.'
@@ -641,6 +678,21 @@ const EndUserVerification: React.FC<VerificationProps> = ({
                 <span className={styles.textSec}>Status</span>
                 <span className={`font-semibold capitalize ${isVerified ? 'text-green-600' : isFailed ? 'text-red-600' : 'text-yellow-600'}`}>{status}</span>
               </div>
+              {/* Age verification */}
+              {finalResult.age_verification && (
+                <>
+                  <div className="flex justify-between">
+                    <span className={styles.textSec}>Age Check</span>
+                    <span className={`font-semibold ${finalResult.age_verification.is_of_age ? 'text-green-600' : 'text-red-500'}`}>
+                      {finalResult.age_verification.is_of_age ? 'Passed' : 'Failed'}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className={styles.textSec}>Minimum Age</span>
+                    <span className={`font-medium ${styles.text}`}>{finalResult.age_verification.age_threshold}+</span>
+                  </div>
+                </>
+              )}
               {/* Cross-validation: v2 uses overall_score, fall back to weighted_score / v1 flat field */}
               {(finalResult.cross_validation_results?.overall_score ?? finalResult.cross_validation_results?.weighted_score ?? finalResult.cross_validation_score) != null && (
                 <div className="flex justify-between">
@@ -766,6 +818,8 @@ const EndUserVerification: React.FC<VerificationProps> = ({
                   <ContinueOnPhone
                     apiKey={apiKey}
                     userId={userId}
+                    verificationMode={verificationMode}
+                    ageThreshold={ageThreshold}
                     onComplete={result => {
                       setShowMobileChoice(false);
                       if (onComplete) onComplete({

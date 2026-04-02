@@ -3,10 +3,10 @@ import express, { Request, Response } from 'express';
 import bcrypt from 'bcryptjs';
 import rateLimit from 'express-rate-limit';
 import { body } from 'express-validator';
-import validator from 'validator';
+
 import { supabase } from '@/config/database.js';
 import config from '@/config/index.js';
-import { generateAdminToken, generateDeveloperToken, generateRegistrationToken, verifyRegistrationToken, generateReviewerToken, generateAPIKey, authenticateJWT, authenticateDeveloperJWT } from '@/middleware/auth.js';
+import { generateAdminToken, generateDeveloperToken, generateRegistrationToken, verifyRegistrationToken, generateReviewerToken, generateAPIKey, authenticateJWT } from '@/middleware/auth.js';
 import { catchAsync, ValidationError, AuthenticationError } from '@/middleware/errorHandler.js';
 import { validate } from '@/middleware/validate.js';
 import { TotpService } from '@/services/totpService.js';
@@ -133,75 +133,12 @@ router.post('/admin/login',
   })
 );
 
-// Rate limiter for escalation: 5 attempts per 15 min per IP
-const escalateLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000,
-  max: 5,
-  message: { message: 'Too many escalation attempts. Please try again later.' },
+// Developer escalation removed — developers now invite org admins from Settings
+router.post('/admin/escalate', (_req: Request, res: Response) => {
+  res.status(410).json({
+    message: 'Developer escalation removed. Invite organization admins from Settings.',
+  });
 });
-
-// Developer → Admin token escalation
-// Developers are already authenticated; this exchanges their JWT for an admin JWT
-// so they don't need to log in again to access admin/verification management pages.
-router.post('/admin/escalate',
-  escalateLimiter,
-  authenticateDeveloperJWT as any,
-  catchAsync(async (req: Request, res: Response) => {
-    const developer = req.developer!;
-
-    // Look for existing admin_users record matching the developer's email
-    let { data: adminUser } = await supabase
-      .from('admin_users')
-      .select('*')
-      .eq('email', developer.email)
-      .single();
-
-    // Auto-provision with least-privilege role if no admin account exists
-    if (!adminUser) {
-      const bcryptHash = await bcrypt.hash(crypto.randomUUID(), 10); // placeholder — never used for direct login
-      const { data: created, error } = await supabase
-        .from('admin_users')
-        .insert({
-          email: developer.email,
-          password_hash: bcryptHash,
-          role: 'reviewer',
-        })
-        .select('*')
-        .single();
-
-      if (error || !created) {
-        logger.error('Failed to auto-provision admin account for developer', { email: developer.email, error });
-        throw new AuthenticationError('Failed to create admin session');
-      }
-      adminUser = created;
-    }
-
-    // Respect 2FA — if the admin account has TOTP enabled, refuse escalation
-    if (adminUser.totp_enabled) {
-      return res.status(403).json({
-        message: 'This account requires two-factor authentication. Please sign in manually.',
-        requires_manual_login: true,
-      });
-    }
-
-    const token = generateAdminToken(adminUser);
-    setAuthCookie(res, token, 24 * 60 * 60 * 1000);
-    logger.info('Developer escalated to admin session', {
-      developerId: developer.id,
-      adminId: adminUser.id,
-      email: developer.email,
-    });
-
-    res.json({
-      token,
-      user: {
-        id: adminUser.id,
-        email: adminUser.email,
-        role: adminUser.role,
-      },
-    });
-  })
-);
 
 // Shared email validation
 const emailValidation = [
@@ -462,10 +399,11 @@ router.post('/reviewer/otp/verify',
       id: reviewer.id,
       email: reviewer.email,
       developer_id: reviewer.developer_id,
+      role: reviewer.role,
     });
     setAuthCookie(res, token, 24 * 60 * 60 * 1000);
 
-    logger.info('Reviewer logged in via OTP', { reviewerId: reviewer.id, email });
+    logger.info('Reviewer logged in via OTP', { reviewerId: reviewer.id, email, role: reviewer.role });
 
     res.json({
       token,
@@ -474,6 +412,7 @@ router.post('/reviewer/otp/verify',
         email: reviewer.email,
         name: reviewer.name,
         developer_id: reviewer.developer_id,
+        role: reviewer.role || 'reviewer',
       },
     });
   })

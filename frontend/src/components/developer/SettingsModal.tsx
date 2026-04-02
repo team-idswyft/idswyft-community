@@ -42,9 +42,10 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
   const [showLlmKey, setShowLlmKey] = useState(false)
 
   // Reviewer management
-  const [reviewers, setReviewers] = useState<Array<{ id: string; email: string; name?: string; status: string; invited_at: string; last_login_at?: string }>>([])
+  const [reviewers, setReviewers] = useState<Array<{ id: string; email: string; name?: string; role?: string; status: string; invited_at: string; last_login_at?: string }>>([])
   const [reviewerEmail, setReviewerEmail] = useState('')
   const [reviewerName, setReviewerName] = useState('')
+  const [reviewerRole, setReviewerRole] = useState<'reviewer' | 'admin'>('reviewer')
   const [reviewerInviting, setReviewerInviting] = useState(false)
 
   // Danger zone
@@ -203,13 +204,14 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
       const res = await fetch(`${API_BASE_URL}/api/developer/reviewers/invite`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...authHeaders, ...csrfHeader() }, credentials: 'include' as RequestCredentials,
-        body: JSON.stringify({ email: reviewerEmail, name: reviewerName || undefined }),
+        body: JSON.stringify({ email: reviewerEmail, name: reviewerName || undefined, role: reviewerRole }),
       })
       const data = await res.json()
       if (res.ok) {
         setReviewers(prev => [data.reviewer, ...prev])
         setReviewerEmail('')
         setReviewerName('')
+        setReviewerRole('reviewer')
         toast.success('Reviewer invited')
       } else {
         toast.error(data.message || 'Failed to invite reviewer')
@@ -393,10 +395,12 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
               <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 20, marginBottom: 24 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                   <UsersIcon style={{ width: 16, height: 16, color: C.cyan }} />
-                  <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>Verification Reviewers</div>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>Team Management</div>
                 </div>
                 <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
-                  Invite people to review and manage your verifications. They sign in via email code — no passwords needed.
+                  Invite team members to review and manage your verifications. <strong style={{ color: C.text }}>Organization Admins</strong> can
+                  override decisions, access analytics, and manage GDPR requests. <strong style={{ color: C.text }}>Reviewers</strong> can approve or reject verifications.
+                  Everyone signs in via email code — no passwords needed.
                 </div>
 
                 {/* Invite form */}
@@ -415,6 +419,14 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                     placeholder="Name (optional)"
                     style={{ ...inputStyle, flex: '0 1 120px', marginBottom: 0 }}
                   />
+                  <select
+                    value={reviewerRole}
+                    onChange={e => setReviewerRole(e.target.value as 'reviewer' | 'admin')}
+                    style={{ ...inputStyle, flex: '0 0 130px', marginBottom: 0, cursor: 'pointer', appearance: 'auto' }}
+                  >
+                    <option value="reviewer">Reviewer</option>
+                    <option value="admin">Org Admin</option>
+                  </select>
                   <button
                     onClick={inviteReviewer}
                     disabled={reviewerInviting || !reviewerEmail.includes('@')}
@@ -450,6 +462,16 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                           </div>
                         </div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: 8 }}>
+                          {/* Role badge */}
+                          <span style={{
+                            fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em',
+                            padding: '2px 6px', borderRadius: 4,
+                            background: r.role === 'admin' ? 'rgba(167,139,250,0.12)' : 'rgba(136,150,170,0.1)',
+                            color: r.role === 'admin' ? '#a78bfa' : C.dim,
+                          }}>
+                            {r.role === 'admin' ? 'Admin' : 'Reviewer'}
+                          </span>
+                          {/* Status badge */}
                           <span style={{
                             fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em',
                             padding: '2px 6px', borderRadius: 4,

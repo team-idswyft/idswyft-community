@@ -1,9 +1,9 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { API_BASE_URL } from '../config/api'
-import { tryEscalateDeveloperToken } from '../lib/adminApiInstance'
 import { fetchCsrfToken, csrfHeader, clearCsrfToken } from '../lib/csrf'
 import { C, injectFonts } from '../theme'
+import '../styles/patterns.css'
 import {
   ShieldCheckIcon,
   XCircleIcon,
@@ -187,6 +187,7 @@ export function VerificationManagement() {
   const [overrideStatus, setOverrideStatus] = useState('verified')
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const [authReady, setAuthReady] = useState(false)
+  const [userRole, setUserRole] = useState<'admin' | 'reviewer' | 'platform'>('reviewer')
   const [isMobile, setIsMobile] = useState(false)
 
   const LIMIT = 25
@@ -200,18 +201,33 @@ export function VerificationManagement() {
     return () => mq.removeEventListener('change', handler)
   }, [])
 
-  // ── Auth guard (check cookie auth, then try developer escalation) ──
+  // ── Auth guard (cookie-only, no escalation) ──
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/admin/dashboard`, { credentials: 'include' })
       .then(res => {
         if (res.ok) { setAuthReady(true); fetchCsrfToken(); return }
-        return tryEscalateDeveloperToken().then(ok => {
-          if (ok) { setAuthReady(true); fetchCsrfToken(); }
-          else navigate('/admin/login')
-        })
+        navigate('/admin/login')
       })
       .catch(() => navigate('/admin/login'))
   }, [navigate])
+
+  // ── Detect user role (org admin vs reviewer vs platform admin) ──
+  useEffect(() => {
+    if (!authReady) return
+    // Probe analytics — org admins and platform admins get 200, regular reviewers get 403
+    fetch(`${API_BASE_URL}/api/admin/analytics?period=7d`, { credentials: 'include' })
+      .then(res => {
+        if (res.ok) {
+          // Could be org admin or platform admin — try developers list to distinguish
+          fetch(`${API_BASE_URL}/api/admin/developers?limit=1`, { credentials: 'include' })
+            .then(r => setUserRole(r.ok ? 'platform' : 'admin'))
+            .catch(() => setUserRole('admin'))
+        } else {
+          setUserRole('reviewer')
+        }
+      })
+      .catch(() => setUserRole('reviewer'))
+  }, [authReady])
 
   // ── Toast auto-dismiss ──
   useEffect(() => {
@@ -352,14 +368,8 @@ export function VerificationManagement() {
 
   // ── Render ──
   return (
-    <div style={{ background: C.bg, minHeight: '100vh', fontFamily: C.sans }}>
-      {/* Subtle scan-line overlay for depth */}
-      <div style={{
-        position: 'fixed', inset: 0, pointerEvents: 'none', zIndex: 0,
-        background: 'repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.03) 2px, rgba(0,0,0,0.03) 4px)',
-      }} />
-
-      <div style={{ position: 'relative', zIndex: 1, maxWidth: 1400, margin: '0 auto', padding: '32px 24px' }}>
+    <div className="pattern-crosshatch pattern-faint pattern-fade-edges pattern-full" style={{ background: C.bg, minHeight: '100vh', fontFamily: C.sans }}>
+      <div style={{ maxWidth: 1400, margin: '0 auto', padding: '32px 24px' }}>
 
         {/* ── Header ── */}
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
@@ -372,7 +382,10 @@ export function VerificationManagement() {
               <ArrowLeftIcon style={{ width: 20, height: 20 }} />
             </button>
             <div>
-              <h1 style={{ color: C.text, fontSize: 24, fontWeight: 600, margin: 0, letterSpacing: '-0.02em' }}>
+              <div style={{ fontFamily: C.mono, fontSize: 11, color: C.muted, letterSpacing: '0.08em', marginBottom: 8 }}>
+                idswyft / verification-management
+              </div>
+              <h1 style={{ fontFamily: C.mono, color: C.text, fontSize: 24, fontWeight: 600, margin: 0 }}>
                 Verification Management
               </h1>
               <p style={{ color: C.dim, fontSize: 13, margin: '4px 0 0', fontFamily: C.mono }}>
@@ -381,19 +394,31 @@ export function VerificationManagement() {
             </div>
           </div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-            <button
-              onClick={() => navigate('/admin/developers')}
-              style={{
-                background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8,
-                color: C.muted, padding: '8px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-                fontFamily: C.sans, fontSize: 13, transition: 'all 0.15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = C.cyanBorder; e.currentTarget.style.color = C.cyan }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.muted }}
-            >
-              <UsersIcon style={{ width: 14, height: 14 }} />
-              Developers
-            </button>
+            {userRole === 'platform' && (
+              <button
+                onClick={() => navigate('/admin/developers')}
+                style={{
+                  background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8,
+                  color: C.muted, padding: '8px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
+                  fontFamily: C.sans, fontSize: 13, transition: 'all 0.15s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.borderColor = C.cyanBorder; e.currentTarget.style.color = C.cyan }}
+                onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.muted }}
+              >
+                <UsersIcon style={{ width: 14, height: 14 }} />
+                Developers
+              </button>
+            )}
+            {/* Role badge */}
+            <span style={{
+              fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em',
+              padding: '4px 8px', borderRadius: 4,
+              background: userRole === 'platform' ? C.purpleDim : userRole === 'admin' ? C.cyanDim : C.surface,
+              color: userRole === 'platform' ? C.purple : userRole === 'admin' ? C.cyan : C.muted,
+              border: `1px solid ${userRole === 'platform' ? 'rgba(167,139,250,0.3)' : userRole === 'admin' ? C.cyanBorder : C.border}`,
+            }}>
+              {userRole === 'platform' ? 'Platform Admin' : userRole === 'admin' ? 'Org Admin' : 'Reviewer'}
+            </span>
             <button
               onClick={() => { fetchVerifications(); fetchStats() }}
               style={{
@@ -695,18 +720,20 @@ export function VerificationManagement() {
                         </button>
                       </>
                     )}
-                    <button
-                      onClick={() => setConfirmAction({ verificationId: v.id, decision: 'override' })}
-                      title="Override status"
-                      style={{
-                        background: C.amberDim, border: `1px solid rgba(251,191,36,0.2)`, borderRadius: 6,
-                        color: C.amber, padding: '4px 8px', cursor: 'pointer', fontSize: 11, fontWeight: 500,
-                        fontFamily: C.sans, transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 3,
-                      }}
-                    >
-                      <ArrowsUpDownIcon style={{ width: 11, height: 11 }} />
-                      Override
-                    </button>
+                    {userRole !== 'reviewer' && (
+                      <button
+                        onClick={() => setConfirmAction({ verificationId: v.id, decision: 'override' })}
+                        title="Override status"
+                        style={{
+                          background: C.amberDim, border: `1px solid rgba(251,191,36,0.2)`, borderRadius: 6,
+                          color: C.amber, padding: '4px 8px', cursor: 'pointer', fontSize: 11, fontWeight: 500,
+                          fontFamily: C.sans, transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 3,
+                        }}
+                      >
+                        <ArrowsUpDownIcon style={{ width: 11, height: 11 }} />
+                        Override
+                      </button>
+                    )}
                   </div>
                 </div>
 
@@ -866,17 +893,19 @@ export function VerificationManagement() {
                               <XCircleIcon style={{ width: 16, height: 16 }} />
                               Reject
                             </button>
-                            <button
-                              onClick={() => setConfirmAction({ verificationId: v.id, decision: 'override' })}
-                              style={{
-                                flex: 1, background: C.amberDim, border: `1px solid rgba(251,191,36,0.2)`, borderRadius: 8,
-                                color: C.amber, padding: '10px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                                fontFamily: C.sans, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
-                              }}
-                            >
-                              <ArrowsUpDownIcon style={{ width: 16, height: 16 }} />
-                              Override
-                            </button>
+                            {userRole !== 'reviewer' && (
+                              <button
+                                onClick={() => setConfirmAction({ verificationId: v.id, decision: 'override' })}
+                                style={{
+                                  flex: 1, background: C.amberDim, border: `1px solid rgba(251,191,36,0.2)`, borderRadius: 8,
+                                  color: C.amber, padding: '10px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                                  fontFamily: C.sans, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                                }}
+                              >
+                                <ArrowsUpDownIcon style={{ width: 16, height: 16 }} />
+                                Override
+                              </button>
+                            )}
                           </div>
                         </div>
                       </div>

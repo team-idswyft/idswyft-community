@@ -52,6 +52,10 @@ export function DeveloperPage() {
   const [stats, setStats] = useState<DeveloperStats | null>(null)
   const [newFullKey, setNewFullKey] = useState<string | null>(null)
   const [showSettings, setShowSettings] = useState(false)
+  const [hasOrgAdmin, setHasOrgAdmin] = useState<boolean | null>(null)
+  const [teamBannerDismissed, setTeamBannerDismissed] = useState(
+    () => localStorage.getItem('idswyft:team-banner-dismissed') === 'true'
+  )
 
   const authHeaders = (t: string) => t === 'session' ? {} as Record<string, string> : { Authorization: `Bearer ${t}` } as Record<string, string>
 
@@ -78,10 +82,26 @@ export function DeveloperPage() {
     } catch { /* network error */ }
   }
 
+  const checkOrgAdmin = async () => {
+    if (!token) return
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/reviewers`, {
+        headers: authHeaders(token),
+        credentials: 'include' as RequestCredentials,
+      })
+      if (res.ok) {
+        const data = await res.json()
+        const admins = (data.reviewers || []).filter((r: any) => r.role === 'admin' && r.status !== 'revoked')
+        setHasOrgAdmin(admins.length > 0)
+      }
+    } catch { /* network error */ }
+  }
+
   useEffect(() => {
     if (token) {
       fetchKeys()
       fetchStats()
+      checkOrgAdmin()
     }
   }, [token])
 
@@ -153,6 +173,38 @@ export function DeveloperPage() {
             </button>
           </div>
         </div>
+
+        {/* Team setup banner — shown when no org admin exists */}
+        {hasOrgAdmin === false && !teamBannerDismissed && (
+          <div style={{
+            background: C.cyanDim, border: `1px solid ${C.cyanBorder}`, borderRadius: 10,
+            padding: '16px 20px', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 16,
+          }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ color: C.text, fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Set up your team</div>
+              <div style={{ color: C.muted, fontSize: 13, lineHeight: 1.5 }}>
+                Invite an Organization Admin to manage verifications from the Review Dashboard.
+                They can approve, reject, override, and access analytics — without needing your developer credentials.
+              </div>
+            </div>
+            <button
+              onClick={() => setShowSettings(true)}
+              style={{
+                background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
+                padding: '8px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
+              }}
+            >
+              Invite Admin
+            </button>
+            <button
+              onClick={() => { setTeamBannerDismissed(true); localStorage.setItem('idswyft:team-banner-dismissed', 'true') }}
+              style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.dim, fontSize: 18, padding: '0 4px', lineHeight: 1 }}
+              title="Dismiss"
+            >
+              &times;
+            </button>
+          </div>
+        )}
 
         <ApiKeysSection
           token={token}

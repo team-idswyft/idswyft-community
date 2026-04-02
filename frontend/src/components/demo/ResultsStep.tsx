@@ -57,10 +57,14 @@ export const ResultsStep: React.FC<ResultsStepProps> = ({
   const status = verificationRequest?.final_result ?? verificationRequest?.status;
   const isVerified = status === 'verified';
   const isFailed = status === 'failed';
+  const ageVerif = (verificationRequest as any)?.age_verification;
+  const isAgeOnly = !!(ageVerif && !verificationRequest?.cross_validation_results);
   const statusTone = isVerified ? C.green : isFailed ? C.red : C.amber;
   const statusBg = isVerified ? C.greenDim : isFailed ? C.redDim : C.amberDim;
   const statusIcon = isVerified ? '\u2713' : isFailed ? '\u2717' : '\u26A0';
-  const statusLabel = isVerified ? 'Verification Complete' : isFailed ? 'Verification Failed' : 'Under Review';
+  const statusLabel = isAgeOnly
+    ? (isVerified ? 'Age Verified' : 'Age Verification Failed')
+    : (isVerified ? 'Verification Complete' : isFailed ? 'Verification Failed' : 'Under Review');
 
   const cv = verificationRequest?.cross_validation_results;
   const fm = verificationRequest?.face_match_results;
@@ -85,9 +89,15 @@ export const ResultsStep: React.FC<ResultsStepProps> = ({
         </div>
         <h2 style={{ fontSize: 20, fontWeight: 600, color: C.text, marginBottom: 4 }}>{statusLabel}</h2>
         <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>
-          {isVerified && 'All gates passed. Identity verified successfully.'}
-          {isFailed && (verificationRequest?.rejection_detail || 'Verification failed. Please try again with clearer documents.')}
-          {!isVerified && !isFailed && 'Your verification is under manual review.'}
+          {isAgeOnly
+            ? isVerified
+              ? `Age requirement (${ageVerif?.age_threshold}+) met successfully.`
+              : (verificationRequest?.rejection_detail || (verificationRequest as any)?.message || 'Age verification failed.')
+            : <>
+                {isVerified && 'All gates passed. Identity verified successfully.'}
+                {isFailed && (verificationRequest?.rejection_detail || 'Verification failed. Please try again with clearer documents.')}
+                {!isVerified && !isFailed && 'Your verification is under manual review.'}
+              </>}
         </p>
         {verificationRequest?.rejection_reason && (
           <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8, padding: '4px 12px', borderRadius: 6, background: C.redDim, border: `1px solid rgba(248,113,113,0.2)` }}>
@@ -119,7 +129,25 @@ export const ResultsStep: React.FC<ResultsStepProps> = ({
         </div>
       </div>
 
+      {/* Age Verification Card */}
+      {ageVerif && (
+        <div style={cardStyle}>
+          <div style={cardTitle}>Age Verification</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <span style={{ color: C.muted }}>Age Check</span>
+              <Badge passed={ageVerif.is_of_age} label={ageVerif.is_of_age ? 'Passed' : 'Failed'} />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+              <span style={{ color: C.muted }}>Minimum Age</span>
+              <span style={{ color: C.text, fontWeight: 600 }}>{ageVerif.age_threshold}+</span>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Result Cards Grid */}
+      {!isAgeOnly && (
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 12 }}>
         {/* Cross-Validation */}
         <div style={cardStyle}>
@@ -212,6 +240,7 @@ export const ResultsStep: React.FC<ResultsStepProps> = ({
           )}
         </div>
       </div>
+      )}
 
       {/* Risk Score — full width */}
       {risk && (

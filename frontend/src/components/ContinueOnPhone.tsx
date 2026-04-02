@@ -16,6 +16,8 @@ interface ContinueOnPhoneProps {
   apiKey: string;
   userId: string;
   source?: 'api' | 'vaas' | 'demo';
+  verificationMode?: 'full' | 'age_only';
+  ageThreshold?: number;
   onComplete: (result: VerificationResult) => void;
 }
 
@@ -23,6 +25,8 @@ export const ContinueOnPhone: React.FC<ContinueOnPhoneProps> = ({
   apiKey,
   userId,
   source,
+  verificationMode,
+  ageThreshold,
   onComplete,
 }) => {
   const [state, setState] = useState<HandoffState>('idle');
@@ -57,7 +61,13 @@ export const ContinueOnPhone: React.FC<ContinueOnPhoneProps> = ({
       const res = await fetch(`${API_BASE_URL}/api/verify/handoff/create`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ api_key: apiKey, user_id: userId, ...(source && { source }) }),
+        body: JSON.stringify({
+          api_key: apiKey,
+          user_id: userId,
+          ...(source && { source }),
+          ...(verificationMode && { verification_mode: verificationMode }),
+          ...(ageThreshold && { age_threshold: ageThreshold }),
+        }),
       });
       if (!res.ok) throw new Error('Failed to create handoff session');
       const data = await res.json();
@@ -74,7 +84,9 @@ export const ContinueOnPhone: React.FC<ContinueOnPhoneProps> = ({
       // Fix 1: bail if component unmounted while awaiting fetch
       if (!mountedRef.current) return;
 
-      const url = `${window.location.origin}/verify/mobile?token=${data.token}`;
+      let url = `${window.location.origin}/verify/mobile?token=${data.token}`;
+      if (verificationMode) url += `&verification_mode=${verificationMode}`;
+      if (ageThreshold) url += `&age_threshold=${ageThreshold}`;
 
       setMobileUrl(url);
       setTimeLeft(Math.floor((expiry.getTime() - Date.now()) / 1000));

@@ -8,8 +8,12 @@ interface DemoInitStepProps {
   isMobile: boolean;
   mobileHandoffDone: boolean;
   mobileResult: any;
+  verificationMode: 'full' | 'age_only';
+  ageThreshold: number;
   onApiKeyChange: (key: string) => void;
   onUserIdChange: (id: string) => void;
+  onVerificationModeChange: (mode: 'full' | 'age_only') => void;
+  onAgeThresholdChange: (threshold: number) => void;
   onStart: () => void;
   onMobileHandoffDone: (done: boolean) => void;
   onMobileResult: (result: any) => void;
@@ -23,8 +27,12 @@ export const DemoInitStep: React.FC<DemoInitStepProps> = ({
   isMobile,
   mobileHandoffDone,
   mobileResult,
+  verificationMode,
+  ageThreshold,
   onApiKeyChange,
   onUserIdChange,
+  onVerificationModeChange,
+  onAgeThresholdChange,
   onStart,
   onMobileHandoffDone,
   onMobileResult,
@@ -99,6 +107,51 @@ export const DemoInitStep: React.FC<DemoInitStepProps> = ({
                 style={{ background: '#0f1420', border: '1px solid rgba(255,255,255,0.07)', color: '#dde2ec', borderRadius: 6, padding: '10px 14px', width: '100%', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
               />
             </div>
+            <div>
+              <label style={{ display: 'block', fontSize: 12, color: '#8896aa', marginBottom: 6, fontWeight: 500 }}>
+                Verification Mode
+              </label>
+              <div style={{ display: 'flex', gap: 8 }}>
+                <button
+                  onClick={() => onVerificationModeChange('full')}
+                  style={{
+                    flex: 1, padding: '9px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                    background: verificationMode === 'full' ? 'rgba(34,211,238,0.12)' : '#0f1420',
+                    border: `1px solid ${verificationMode === 'full' ? '#22d3ee' : 'rgba(255,255,255,0.07)'}`,
+                    color: verificationMode === 'full' ? '#22d3ee' : '#8896aa',
+                  }}
+                >
+                  Full Verification
+                </button>
+                <button
+                  onClick={() => onVerificationModeChange('age_only')}
+                  style={{
+                    flex: 1, padding: '9px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer',
+                    background: verificationMode === 'age_only' ? 'rgba(34,211,238,0.12)' : '#0f1420',
+                    border: `1px solid ${verificationMode === 'age_only' ? '#22d3ee' : 'rgba(255,255,255,0.07)'}`,
+                    color: verificationMode === 'age_only' ? '#22d3ee' : '#8896aa',
+                  }}
+                >
+                  Age Check Only
+                </button>
+              </div>
+            </div>
+            {verificationMode === 'age_only' && (
+              <div>
+                <label style={{ display: 'block', fontSize: 12, color: '#8896aa', marginBottom: 6, fontWeight: 500 }}>
+                  Minimum Age
+                </label>
+                <select
+                  value={ageThreshold}
+                  onChange={(e) => onAgeThresholdChange(parseInt(e.target.value, 10))}
+                  style={{ background: '#0f1420', border: '1px solid rgba(255,255,255,0.07)', color: '#dde2ec', borderRadius: 6, padding: '10px 14px', width: '100%', fontSize: 14, outline: 'none', boxSizing: 'border-box' }}
+                >
+                  <option value={18}>18+</option>
+                  <option value={21}>21+</option>
+                  <option value={25}>25+</option>
+                </select>
+              </div>
+            )}
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, maxWidth: 600, margin: '0 auto' }}>
@@ -117,6 +170,8 @@ export const DemoInitStep: React.FC<DemoInitStepProps> = ({
               apiKey={apiKey}
               userId={userId}
               source="demo"
+              verificationMode={verificationMode}
+              ageThreshold={verificationMode === 'age_only' ? ageThreshold : undefined}
               onComplete={(result) => {
                 if (result.verification_id) {
                   onMobileVerificationComplete(result.verification_id);

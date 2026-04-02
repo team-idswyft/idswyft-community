@@ -2,7 +2,7 @@
 
 > Open-source identity verification platform. Verify government-issued IDs with OCR, liveness detection, and face matching.
 > Base URL: https://api.idswyft.app
-> Version: v1.7.2 — March 2026
+> Version: v1.7.3 — April 2026
 > Source of truth: backend/src/api-docs/apiDocsMarkdown.ts
 
 ## Links
@@ -62,6 +62,8 @@ Content-Type: application/json
 | sandbox | boolean | No | Use sandbox mode (default: false) |
 | addons | object | No | Optional add-on features |
 | addons.aml_screening | boolean | No | Override AML screening (default: auto-enabled when `AML_PROVIDER` is configured; set `false` to disable for this session) |
+| verification_mode | string | No | `'full'` (default) or `'age_only'` for lightweight age checks |
+| age_threshold | integer | No | Minimum age required (1-99, default: 18). Only used when `verification_mode` is `'age_only'` |
 
 **Response (201):**
 
@@ -117,6 +119,64 @@ Content-Type: application/json
 - Parent must belong to the same developer and user
 - Cannot chain re-verifications — parent must be a full (`verification_mode: "full"`) verification
 - After initialization, proceed to `POST /api/v2/verify/:id/live-capture` (liveness_only) or `POST /api/v2/verify/:id/front-document` (document_refresh)
+
+### Alternative: Age Verification (18+/21+ Check)
+
+For age-gated use cases (alcohol delivery, cannabis, gambling), use age-only mode to extract DOB from a document and check against an age threshold — no face match, no liveness, no back document.
+
+**Two-step flow:**
+
+1. Initialize with `verification_mode: 'age_only'`
+2. Upload front document — OCR extracts DOB, age is checked, session auto-completes
+
+```
+POST /api/v2/verify/initialize
+Content-Type: application/json
+
+{
+  "user_id": "550e8400-e29b-41d4-a716-446655440001",
+  "verification_mode": "age_only",
+  "age_threshold": 21
+}
+```
+
+**Response (201):**
+
+```json
+{
+  "success": true,
+  "verification_id": "770e8400-e29b-41d4-a716-446655440003",
+  "status": "AWAITING_FRONT",
+  "current_step": 1,
+  "total_steps": 1,
+  "verification_mode": "age_only",
+  "age_threshold": 21
+}
+```
+
+Then upload the front document as usual (`POST /api/v2/verify/:id/front-document`). The response includes:
+
+```json
+{
+  "success": true,
+  "verification_id": "770e8400-e29b-41d4-a716-446655440003",
+  "status": "COMPLETE",
+  "current_step": 1,
+  "age_verification": {
+    "is_of_age": true,
+    "age_threshold": 21
+  },
+  "final_result": "verified"
+}
+```
+
+**Privacy:** The response never includes the actual date of birth — only `is_of_age` (boolean) and `age_threshold` (integer).
+
+**Rejection reasons:**
+- `DOB_NOT_FOUND` — date of birth could not be extracted from the document
+- `UNDERAGE` — subject does not meet the minimum age requirement
+
+**Webhook:** Fires `verification.age_check` event on completion.
 
 ### Step 2: Upload Front Document
 
@@ -590,38 +650,47 @@ Webhook events: `document.expiry_warning`, `verification.reverification_due`.
 
 A web-based admin interface at `/admin/verifications` for reviewing, approving, and rejecting identity verifications. No code required — integrate the API, then use the dashboard for manual review decisions.
 
-### Access
+### Access & Roles
 
-Two ways to access the dashboard:
+Developers invite team members from the Developer Portal (Settings → Team Management). Team members access the dashboard at `/admin/login` via passwordless OTP. Developers themselves do not access the Review Dashboard — they manage API keys in the Developer Portal and delegate verification review to their team.
 
-1. **Developer login** — log in at `/developer`, then navigate to `/admin/verifications`. Your developer session grants automatic access.
-2. **Reviewer login** — invited reviewers log in at `/admin/login` with passwordless OTP (email code). No passwords, no shared credentials.
+Two roles exist for the Review Dashboard:
 
-### Reviewer Management
+| Role | Capabilities |
+|------|-------------|
+| **Organization Admin** | Approve, reject, **override** verifications. Access analytics, manage GDPR erasure, manage team. |
+| **Reviewer** | Approve or reject verifications only. Cannot override, access analytics, or manage GDPR. |
 
-Developers can invite team members as reviewers from the Developer Portal:
+Both roles are scoped to the developer's verifications and sign in via OTP. A role badge in the dashboard header shows the user's access level.
 
-| Method | Endpoint | Description |
-|--------|----------|-------------|
-| POST | `/api/developer/reviewers/invite` | Invite a reviewer by email |
-| GET | `/api/developer/reviewers` | List all reviewers |
-| DELETE | `/api/developer/reviewers/:id` | Revoke a reviewer's access |
+### Team Management
 
-Reviewer OTP authentication:
+Developers manage their team from the Developer Portal:
 
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/auth/reviewer/otp/send` | Send OTP to reviewer email (rate limited: 5/15min per IP) |
-| POST | `/api/auth/reviewer/otp/verify` | Verify OTP, receive developer-scoped reviewer JWT (24h expiry) |
+| POST | `/api/developer/reviewers/invite` | Invite a team member by email (body: `email`, `name?`, `role?`) |
+| GET | `/api/developer/reviewers` | List all team members |
+| DELETE | `/api/developer/reviewers/:id` | Revoke a team member's access |
 
-Reviewers can only see verifications belonging to the developer who invited them. They cannot access API keys, billing, or other developers' data.
+The `role` parameter accepts `'reviewer'` (default) or `'admin'`.
+
+Team member OTP authentication:
+
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| POST | `/api/auth/reviewer/otp/send` | Send OTP to team member email (rate limited: 5/15min per IP) |
+| POST | `/api/auth/reviewer/otp/verify` | Verify OTP, receive developer-scoped JWT with role claim (24h expiry) |
+
+Team members can only see verifications belonging to the developer who invited them. They cannot access API keys, billing, or other developers' data.
 
 ### Dashboard Features
 
-- **Stats bar** — real-time counts: total, pending review, verified, failed
-- **Filterable table** — columns: ID, User ID, Status (badge), Document Type, Created At, Actions
-- **Status filter tabs** — All, Manual Review, Verified, Failed, Pending
-- **Expandable detail panel** — document images (front/back), OCR data, cross-validation results, face match score, quality scores, thumbnails
+- **Stats bar** — real-time counts: total, review, pending, verified, failed (5 cards)
+- **Role badge** — shows Organization Admin, Reviewer, or Platform Admin in the header
+- **Filterable table** — columns: Preview, Verification ID, User ID, Status, Doc Type, Created, Actions
+- **Status filter tabs** — All, Manual Review, Pending, Verified, Failed
+- **Expandable detail panel** — document images, OCR data, cross-validation results, face match score, gate analysis with score bars, risk assessment with AML screening
 - **Search** — search by verification ID or user ID
 
 ### Review Actions
@@ -630,7 +699,7 @@ Reviewers can only see verifications belonging to the developer who invited them
 |--------|-------------|---------------|
 | **Approve** | Sets status to `verified`. Decision is final. | `verification.verified` |
 | **Reject** | Sets status to `failed`. Optional reason included in webhook. | `verification.failed` |
-| **Override** | Sets any status (admin-only, not available to reviewers). Reason required. | `verification.status_changed` |
+| **Override** | Sets any status (**Organization Admin only**). Reason required. | `verification.status_changed` |
 
 All actions require a confirmation dialog. All actions are logged in the audit trail. Webhook notifications fire immediately after a decision.
 
@@ -658,6 +727,7 @@ Register webhook URLs to receive real-time notifications when verification event
 | `verification.status_changed` | Status override from Review Dashboard |
 | `document.expiry_warning` | Document approaching or past expiry (alert_type: 90_day, 60_day, 30_day, expired) |
 | `verification.reverification_due` | Scheduled re-verification is due |
+| `verification.age_check` | Age-only verification completed (includes `age_verification` in payload data) |
 
 ### Webhook Security
 
@@ -755,6 +825,15 @@ On first boot, navigate to the frontend. If no developer account exists, a setup
 
 ## Changelog
 
+### v1.7.3 (2026-04-01)
+
+**Added:**
+- Age verification mode (`verification_mode: 'age_only'`) — lightweight 18+/21+ age check using front document OCR only
+- `age_threshold` parameter (1-99) on initialize endpoint
+- `age_verification` response object with `is_of_age` boolean (DOB never exposed)
+- `verification.age_check` webhook event
+- New rejection reasons: `DOB_NOT_FOUND`, `UNDERAGE`
+
 ### v1.7.2 (2026-03-30)
 
 **Added:**
@@ -773,13 +852,21 @@ On first boot, navigate to the frontend. If no developer account exists, a setup
 ### v1.7.0 (2026-03-27)
 
 **Added:**
-- Reviewer invitation system — developers can invite external reviewers with OTP-based access scoped to their verifications
-- Reviewer auth endpoints: `POST /api/auth/reviewer/otp/send`, `POST /api/auth/reviewer/otp/verify`
-- Reviewer management: `POST /api/developer/reviewers/invite`, `GET /api/developer/reviewers`, `DELETE /api/developer/reviewers/:id`
+- Team invitation system with role-based access: Organization Admin (`role: 'admin'`) and Reviewer (`role: 'reviewer'`)
+- Organization Admins can override verifications, access analytics, manage GDPR erasure, and manage team
+- Reviewers can approve/reject only — no override, analytics, or GDPR access
+- Role selector in Developer Portal Settings when inviting team members
+- Team setup banner in Developer Portal when no Organization Admin exists
+- Role badge in Review Dashboard header showing access level
+- OTP auth endpoints: `POST /api/auth/reviewer/otp/send`, `POST /api/auth/reviewer/otp/verify`
+- Team management: `POST /api/developer/reviewers/invite` (accepts `role` param), `GET /api/developer/reviewers`, `DELETE /api/developer/reviewers/:id`
 
 **Changed:**
-- Admin verification endpoints scope queries by developer_id for reviewer tokens
-- Reviewers cannot use the override decision (admin-only)
+- Developer escalation to admin removed (POST `/api/auth/admin/escalate` returns 410 Gone)
+- Admin verification endpoints scope queries by developer_id for org admin/reviewer tokens
+- Analytics endpoints opened to Organization Admins (scoped to their developer)
+- GDPR delete endpoint opened to Organization Admins with ownership verification
+- Override restricted to Organization Admins and Platform Admins
 
 ### v1.6.0 (2026-03-26)
 
@@ -835,4 +922,4 @@ On first boot, navigate to the frontend. If no developer account exists, a setup
 
 ---
 
-Generated from Idswyft API v1.7.2 — https://idswyft.app/docs
+Generated from Idswyft API v1.7.3 — https://idswyft.app/docs
