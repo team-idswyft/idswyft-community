@@ -1,16 +1,21 @@
 import React, { useState, useEffect } from 'react';
 import { C } from '../../theme';
-import { AmbientGlow } from './DemoShared';
+import { StepLabel, AmbientGlow, DemoPrimaryBtn } from './DemoShared';
 
 const MESSAGES = [
-  'Extracting document text\u2026',
-  'Reading document fields\u2026',
-  'Analyzing image quality\u2026',
+  'Verifying your document\u2026',
+  'Cross-checking details\u2026',
+  'Almost there\u2026',
 ];
 
-const TAGS = ['OCR scan', 'Field extraction', 'Quality check'];
+const TAGS = ['Document read', 'Details matched', 'Security checks'];
 
-export const ProcessingStep: React.FC = () => {
+interface CheckingStepProps {
+  stepError?: string | null;
+  onRetry?: () => void;
+}
+
+export const CheckingStep: React.FC<CheckingStepProps> = ({ stepError, onRetry }) => {
   const [msgIdx, setMsgIdx] = useState(0);
 
   useEffect(() => {
@@ -27,6 +32,8 @@ export const ProcessingStep: React.FC = () => {
       }}
     >
       <AmbientGlow />
+
+      <StepLabel step={4} total={6} label="Verification" />
 
       {/* Spinner */}
       <div style={{
@@ -64,6 +71,22 @@ export const ProcessingStep: React.FC = () => {
           }}>{tag}</span>
         ))}
       </div>
+
+      {stepError && (
+        <div style={{ marginTop: 16, textAlign: 'center' }}>
+          <p style={{
+            fontSize: 12, color: C.red,
+            fontFamily: C.mono, marginBottom: onRetry ? 12 : 0,
+          }}>
+            {stepError}
+          </p>
+          {onRetry && (
+            <DemoPrimaryBtn onClick={onRetry} style={{ maxWidth: 200, margin: '0 auto' }}>
+              Retry
+            </DemoPrimaryBtn>
+          )}
+        </div>
+      )}
     </div>
   );
 };

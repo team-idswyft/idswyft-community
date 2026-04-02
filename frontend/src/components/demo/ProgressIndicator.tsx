@@ -1,4 +1,5 @@
 import React from 'react';
+import { C } from '../../theme';
 
 interface ProgressIndicatorProps {
   currentStep: number;
@@ -7,42 +8,50 @@ interface ProgressIndicatorProps {
 }
 
 export const ProgressIndicator: React.FC<ProgressIndicatorProps> = ({ currentStep, isMobile, stepLabels }) => {
-  const steps = stepLabels || ['Start', 'Front ID', 'Back ID', 'Live Capture', 'Results', 'Address'];
-  const circleSize = isMobile ? 26 : 32;
+  const steps = stepLabels || ['Start', 'Front ID', 'Back ID', 'Checking', 'Live Photo', 'Results'];
+
   return (
-    <div style={{ marginBottom: isMobile ? 24 : 36 }}>
-      <div style={{ display: 'flex', alignItems: 'flex-start', overflowX: 'auto', WebkitOverflowScrolling: 'touch' }}>
+    <div style={{ marginBottom: isMobile ? 24 : 32 }}>
+      {/* Segment bars */}
+      <div style={{ display: 'flex', gap: 6 }}>
+        {steps.map((_, i) => {
+          const stepNum = i + 1;
+          const isDone = stepNum < currentStep;
+          const isActive = stepNum === currentStep;
+          return (
+            <div key={i} style={{
+              flex: 1, height: 3, borderRadius: 2, position: 'relative',
+              background: isDone ? C.cyan : 'rgba(255,255,255,0.06)',
+              boxShadow: isDone ? '0 0 6px rgba(34,211,238,0.4)' : 'none',
+              transition: 'all 0.3s',
+            }}>
+              {isActive && (
+                <div style={{
+                  position: 'absolute', inset: 0, borderRadius: 2,
+                  background: `linear-gradient(90deg, ${C.cyan}, transparent)`,
+                  animation: 'dSegPulse 1.8s ease-in-out infinite',
+                }} />
+              )}
+            </div>
+          );
+        })}
+      </div>
+      {/* Labels */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
         {steps.map((label, i) => {
           const stepNum = i + 1;
-          const isCompleted = stepNum < currentStep;
-          const isActive    = stepNum === currentStep;
+          const isDone = stepNum < currentStep;
+          const isActive = stepNum === currentStep;
           return (
-            <React.Fragment key={stepNum}>
-              <div style={{ flexShrink: 0, textAlign: 'center', minWidth: isMobile ? 48 : 72 }}>
-                <div style={{
-                  width: circleSize, height: circleSize, borderRadius: '50%',
-                  display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  margin: '0 auto 4px',
-                  fontFamily: '"IBM Plex Mono","Fira Code",monospace',
-                  fontSize: isMobile ? 10 : 12, fontWeight: 600,
-                  background: isCompleted ? '#34d399' : isActive ? 'rgba(34,211,238,0.15)' : 'transparent',
-                  border: isCompleted ? '1px solid #34d399' : isActive ? '1px solid #22d3ee' : '1px solid rgba(255,255,255,0.07)',
-                  color: isCompleted ? '#080c14' : isActive ? '#22d3ee' : '#4a5568',
-                  transition: 'all 0.2s',
-                }}>
-                  {isCompleted ? '\u2713' : stepNum}
-                </div>
-                <span style={{
-                  fontSize: isMobile ? 8 : 10, fontWeight: 500, whiteSpace: 'nowrap',
-                  color: isActive ? '#22d3ee' : isCompleted ? '#8896aa' : '#4a5568',
-                }}>
-                  {label}
-                </span>
-              </div>
-              {i < steps.length - 1 && (
-                <div style={{ flex: 1, height: 1, marginTop: circleSize / 2, background: stepNum < currentStep ? '#34d399' : 'rgba(255,255,255,0.07)', transition: 'background 0.3s' }} />
-              )}
-            </React.Fragment>
+            <span key={i} style={{
+              fontFamily: C.mono,
+              fontSize: isMobile ? 8 : 10,
+              fontWeight: 400,
+              textTransform: 'uppercase',
+              letterSpacing: '0.06em',
+              color: isDone ? C.cyan : isActive ? C.text : C.dim,
+              transition: 'color 0.3s',
+            }}>{label}</span>
           );
         })}
       </div>

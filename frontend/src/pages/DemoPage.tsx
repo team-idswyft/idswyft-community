@@ -18,12 +18,15 @@ import {
   DemoInitStep,
   FrontDocumentStep,
   ProcessingStep,
-  BackDocumentStep,
+  BackUploadStep,
+  CheckingStep,
+  LiveCaptureStep,
   ResultsStep,
   AddressStep,
   getErrorMessage,
 } from '../components/demo';
 import type { VerificationRequest, CaptureResult } from '../components/demo';
+import { injectDemoCSS } from '../components/demo/DemoShared';
 
 // OpenCV types
 declare global {
@@ -45,8 +48,10 @@ const DemoPage: React.FC = () => {
   const [_uploadProgress, setUploadProgress] = useState(0);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
-  const [backOfIdUploaded, setBackOfIdUploaded] = useState(false);
   const [documentType, setDocumentType] = useState<string>('');
+  const [backFile, setBackFile] = useState<File | null>(null);
+  const [backPreviewUrl, setBackPreviewUrl] = useState<string | null>(null);
+  const [checkingStepError, setCheckingStepError] = useState<string | null>(null);
 
   // Demo form fields
   const [apiKey, setApiKey] = useState(urlApiKey || '');
@@ -86,6 +91,8 @@ const DemoPage: React.FC = () => {
   const streamRef = useRef<MediaStream | null>(null);
   const animationRef = useRef<number | null>(null);
   const faceClassifierRef = useRef<any>(null);
+  const crossValPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const crossValTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   // ── Lifecycle Effects ──────────────────────────────────────
 
@@ -101,8 +108,8 @@ const DemoPage: React.FC = () => {
     }
   }, []); // Only run once on mount
 
-  // Inject brand fonts
-  useEffect(() => { injectFonts(); }, []);
+  // Inject brand fonts + demo CSS animations
+  useEffect(() => { injectFonts(); injectDemoCSS(); }, []);
 
   // Track viewport width for responsive grids
   useEffect(() => {
@@ -161,12 +168,13 @@ const DemoPage: React.FC = () => {
   useEffect(() => {
     return () => {
       cleanup();
+      stopCrossValPolling();
     };
   }, []);
 
   // Load verification results when coming from live capture
   useEffect(() => {
-    if (urlVerificationId && apiKey && currentStep === 5) {
+    if (urlVerificationId && apiKey && currentStep === 7) {
       loadVerificationResults(urlVerificationId);
     }
   }, [urlVerificationId, apiKey, currentStep]);
@@ -632,7 +640,6 @@ const DemoPage: React.FC = () => {
       if (previewUrl) URL.revokeObjectURL(previewUrl);
       setPreviewUrl(null);
       setVerificationRequest(null);
-      setBackOfIdUploaded(false);
       setShowLiveCapture(false);
       setUseFallbackCapture(false);
       setCaptureResult(null);
@@ -640,6 +647,10 @@ const DemoPage: React.FC = () => {
       setFaceDetected(false);
       setMobileHandoffDone(false);
       setMobileResult(null);
+      setBackFile(null);
+      if (backPreviewUrl) URL.revokeObjectURL(backPreviewUrl);
+      setBackPreviewUrl(null);
+      setCheckingStepError(null);
       setCurrentStep(2);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to restart verification');
@@ -787,7 +798,7 @@ const DemoPage: React.FC = () => {
       // Age-only mode: front-document response includes final result directly
       if (isAgeOnly && data.age_verification) {
         setVerificationRequest(data);
-        setCurrentStep(5);
+        setCurrentStep(7);
         toast.success(data.age_verification.is_of_age ? 'Age verified!' : 'Age verification failed');
         return;
       }
@@ -841,6 +852,115 @@ const DemoPage: React.FC = () => {
     }, 2000);
 
     setTimeout(() => clearInterval(pollInterval), 30000);
+  };
+
+  // ── Back document upload (new separate step) ────────────────
+  const handleBackFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    const allowedTypes = ['image/jpeg', 'image/png', 'image/webp'];
+    if (!allowedTypes.includes(file.type)) {
+      toast.error('Please upload a valid image file');
+      return;
+    }
+    if (file.size > 10 * 1024 * 1024) {
+      toast.error('File size must be less than 10MB');
+      return;
+    }
+    setBackFile(file);
+    if (file.type.startsWith('image/')) {
+      if (backPreviewUrl) URL.revokeObjectURL(backPreviewUrl);
+      setBackPreviewUrl(URL.createObjectURL(file));
+    }
+  };
+
+  const uploadBackDocument = async () => {
+    if (!backFile || !verificationId) {
+      toast.error('Please select a file first');
+      return;
+    }
+    setIsLoading(true);
+    try {
+      const formData = new FormData();
+      formData.append('document', backFile);
+      formData.append('document_type', documentType || 'national_id');
+
+      const url = new URL(`${API_BASE_URL}/api/v2/verify/${verificationId}/back-document`);
+      if (shouldUseSandbox()) url.searchParams.append('sandbox', 'true');
+
+      const response = await fetch(url.toString(), {
+        method: 'POST',
+        headers: { 'X-API-Key': apiKey },
+        body: formData,
+      });
+
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Failed to upload back document');
+      }
+
+      const data = await response.json();
+      if (data.rejection_reason || data.status === 'failed') {
+        toast.error(data.rejection_detail || data.rejection_reason || 'Cross-validation failed');
+        setVerificationRequest(data);
+        setCurrentStep(7); // Results (failed)
+        return;
+      }
+
+      setCurrentStep(5); // Checking step
+      pollCrossValidation();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Failed to upload back document');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const stopCrossValPolling = () => {
+    if (crossValPollRef.current) { clearInterval(crossValPollRef.current); crossValPollRef.current = null; }
+    if (crossValTimeoutRef.current) { clearTimeout(crossValTimeoutRef.current); crossValTimeoutRef.current = null; }
+  };
+
+  const pollCrossValidation = () => {
+    stopCrossValPolling();
+    setCheckingStepError(null);
+
+    crossValPollRef.current = setInterval(async () => {
+      try {
+        const url = new URL(`${API_BASE_URL}/api/v2/verify/${verificationId}/status`);
+        if (shouldUseSandbox()) url.searchParams.append('sandbox', 'true');
+
+        const response = await fetch(url.toString(), {
+          headers: { 'X-API-Key': apiKey },
+        });
+
+        if (response.ok) {
+          const data = await response.json();
+          setVerificationRequest(data);
+
+          const status = (data.status || '').toLowerCase();
+          if (status === 'failed' || status === 'hard_rejected') {
+            stopCrossValPolling();
+            setCurrentStep(7); // Results (failed)
+            return;
+          }
+
+          // Cross-validation done when results present or pipeline advanced past it
+          if (data.cross_validation_results || status === 'awaiting_live' || status === 'face_matching') {
+            stopCrossValPolling();
+            setCurrentStep(6); // Live capture
+          }
+        }
+      } catch (error) {
+        console.error('Cross-validation polling error:', error);
+      }
+    }, 2000);
+
+    // Timeout after 60s
+    crossValTimeoutRef.current = setTimeout(() => {
+      stopCrossValPolling();
+      setCheckingStepError('Validation timed out. Please try again.');
+    }, 60000);
   };
 
   const captureSelfie = async () => {
@@ -915,7 +1035,7 @@ const DemoPage: React.FC = () => {
 
       setTimeout(() => {
         loadVerificationResults(verificationId);
-        setCurrentStep(5);
+        setCurrentStep(7);
       }, 1000);
 
     } catch (error) {
@@ -961,7 +1081,7 @@ const DemoPage: React.FC = () => {
 
       const data = await response.json();
       setVerificationRequest(data);
-      setCurrentStep(5);
+      setCurrentStep(7);
       toast.success('Verification completed without live capture');
     } catch (error) {
       console.error('Failed to get verification results:', error);
@@ -995,7 +1115,7 @@ const DemoPage: React.FC = () => {
       setShowLiveCapture(false);
       setTimeout(() => {
         loadVerificationResults(verificationId);
-        setCurrentStep(5);
+        setCurrentStep(7);
       }, 1000);
     } catch (error) {
       console.error('Active liveness submission failed:', error);
@@ -1078,7 +1198,7 @@ const DemoPage: React.FC = () => {
   const handleMobileVerificationComplete = (verId: string) => {
     setVerificationId(verId);
     loadVerificationResults(verId);
-    setCurrentStep(5);
+    setCurrentStep(7);
   };
 
   // ── Render Live Capture (stays in parent — refs are tightly coupled) ──
@@ -1230,6 +1350,8 @@ const DemoPage: React.FC = () => {
             previewUrl={previewUrl}
             documentType={documentType}
             isLoading={isLoading}
+            isAgeOnly={isAgeOnly}
+            ageThreshold={ageThreshold}
             onFileSelect={handleFileSelect}
             onDocumentTypeChange={setDocumentType}
             onUpload={uploadDocument}
@@ -1241,21 +1363,42 @@ const DemoPage: React.FC = () => {
 
       case 4:
         return (
-          <BackDocumentStep
+          <BackUploadStep
             verificationRequest={verificationRequest}
-            verificationId={verificationId}
-            apiKey={apiKey}
-            documentType={documentType}
-            backOfIdUploaded={backOfIdUploaded}
-            showLiveCapture={showLiveCapture}
-            onBackUploaded={setBackOfIdUploaded}
-            onStartLiveCapture={handleLiveCapture}
-            onSkipLiveCapture={skipLiveCapture}
-            renderLiveCapture={renderLiveCapture}
+            backFile={backFile}
+            backPreviewUrl={backPreviewUrl}
+            isLoading={isLoading}
+            onBackFileSelect={handleBackFileSelect}
+            onUpload={uploadBackDocument}
           />
         );
 
       case 5:
+        return <CheckingStep stepError={checkingStepError} onRetry={pollCrossValidation} />;
+
+      case 6:
+        // If ActiveLiveness triggered fallback, render the legacy camera UI
+        if (showLiveCapture && useFallbackCapture) {
+          return renderLiveCapture();
+        }
+        return (
+          <LiveCaptureStep
+            isProcessing={isLoading}
+            showActiveLiveness={showLiveCapture}
+            onStartLiveness={handleLiveCapture}
+            onSkipLiveCapture={skipLiveCapture}
+            renderActiveLiveness={() => (
+              <ActiveLivenessCapture
+                onComplete={handleActiveLivenessComplete}
+                onCancel={() => { cleanup(); setShowLiveCapture(false); }}
+                onFallback={() => setUseFallbackCapture(true)}
+                isProcessing={isLoading}
+              />
+            )}
+          />
+        );
+
+      case 7:
         if (!verificationRequest) return null;
         return (
           <ResultsStep
@@ -1264,11 +1407,11 @@ const DemoPage: React.FC = () => {
             retryProcessing={retryProcessing}
             onRetry={handleRetry}
             onStartNew={handleStartNew}
-            onGoToAddress={() => setCurrentStep(6)}
+            onGoToAddress={() => setCurrentStep(8)}
           />
         );
 
-      case 6:
+      case 8:
         return (
           <AddressStep
             addressFile={addressFile}
@@ -1321,7 +1464,17 @@ const DemoPage: React.FC = () => {
         </div>
         <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: isMobile ? 16 : 32 }}>
           <ProgressIndicator
-            currentStep={isAgeOnly ? (currentStep >= 5 ? 3 : currentStep) : currentStep}
+            currentStep={(() => {
+              if (isAgeOnly) {
+                // Age-only: Init(1) → Front(2) → Processing(3) → Results(7)
+                if (currentStep >= 7) return 3;
+                if (currentStep >= 2) return 2;
+                return 1;
+              }
+              // Full flow: map internal steps (1-8) to 6 display positions
+              const map: Record<number, number> = { 1: 1, 2: 2, 3: 2, 4: 3, 5: 4, 6: 5, 7: 6, 8: 6 };
+              return map[currentStep] || 1;
+            })()}
             isMobile={isMobile}
             stepLabels={isAgeOnly ? ['Start', 'Upload ID', 'Results'] : undefined}
           />
