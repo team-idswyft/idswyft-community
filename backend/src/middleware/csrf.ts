@@ -25,6 +25,10 @@ export const { generateToken, doubleCsrfProtection } = doubleCsrf({
  */
 const CSRF_EXEMPT_PATHS = [
   '/api/auth/developer/github/callback', // protected by HMAC-signed OAuth state
+  '/api/auth/developer/otp/send',        // pre-auth flow, protected by rate limiting
+  '/api/auth/developer/otp/verify',      // pre-auth flow, protected by OTP + rate limiting
+  '/api/auth/reviewer/otp/send',         // pre-auth flow, protected by rate limiting
+  '/api/auth/reviewer/otp/verify',       // pre-auth flow, protected by OTP + rate limiting
 ];
 
 /**
