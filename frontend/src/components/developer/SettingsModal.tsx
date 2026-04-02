@@ -457,7 +457,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
         onClick={onClose}
       >
         <div
-          style={{ width: '100%', maxWidth: 1200, background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, maxHeight: '80vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+          style={{ width: '100%', maxWidth: 1200, height: '80vh', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
           onClick={e => e.stopPropagation()}
         >
           {/* Header */}
