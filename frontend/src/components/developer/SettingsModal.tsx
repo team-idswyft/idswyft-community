@@ -9,6 +9,7 @@ import {
   UsersIcon,
   XMarkIcon,
   CodeBracketIcon,
+  DevicePhoneMobileIcon,
   EyeIcon,
   EyeSlashIcon,
   ExclamationTriangleIcon,
@@ -41,6 +42,17 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
   const [llmLoading, setLlmLoading] = useState(false)
   const [showLlmKey, setShowLlmKey] = useState(false)
 
+  // SMS Provider settings
+  const [smsProvider, setSmsProvider] = useState<string>('')
+  const [smsApiKey, setSmsApiKey] = useState<string>('')
+  const [smsApiSecret, setSmsApiSecret] = useState<string>('')
+  const [smsPhoneNumber, setSmsPhoneNumber] = useState<string>('')
+  const [smsKeyPreview, setSmsKeyPreview] = useState<string>('')
+  const [smsConfigured, setSmsConfigured] = useState(false)
+  const [smsSaving, setSmsSaving] = useState(false)
+  const [smsLoading, setSmsLoading] = useState(false)
+  const [showSmsKey, setShowSmsKey] = useState(false)
+
   // Reviewer management
   const [reviewers, setReviewers] = useState<Array<{ id: string; email: string; name?: string; role?: string; status: string; invited_at: string; last_login_at?: string }>>([])
   const [reviewerEmail, setReviewerEmail] = useState('')
@@ -58,6 +70,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
     if (!token) return
     fetchProfile()
     fetchLLMSettings()
+    fetchSMSSettings()
     fetchReviewers()
   }, [token])
 
@@ -182,6 +195,73 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
       }
     } catch { toast.error('Network error') }
     setLlmSaving(false)
+  }
+
+  const fetchSMSSettings = async () => {
+    setSmsLoading(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/settings/sms`, {
+        headers: authHeaders,
+        credentials: 'include' as RequestCredentials,
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setSmsConfigured(data.configured)
+        setSmsProvider(data.provider || '')
+        setSmsKeyPreview(data.api_key_preview || '')
+        setSmsPhoneNumber(data.phone_number || '')
+        setSmsApiKey('')
+        setSmsApiSecret('')
+        setShowSmsKey(false)
+      }
+    } catch { /* network error */ }
+    setSmsLoading(false)
+  }
+
+  const saveSMSSettings = async () => {
+    if (!token) return
+    setSmsSaving(true)
+    try {
+      const body: Record<string, string | null> = { provider: smsProvider || null }
+      if (smsApiKey) body.api_key = smsApiKey
+      if (smsApiSecret) body.api_secret = smsApiSecret
+      if (smsPhoneNumber) body.phone_number = smsPhoneNumber
+      const res = await fetch(`${API_BASE_URL}/api/developer/settings/sms`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...authHeaders, ...csrfHeader() }, credentials: 'include' as RequestCredentials,
+        body: JSON.stringify(body),
+      })
+      if (res.ok) {
+        toast.success(smsProvider ? 'SMS settings saved' : 'SMS settings cleared')
+        fetchSMSSettings()
+      } else {
+        const err = await res.json().catch(() => ({ error: 'Failed to save' }))
+        toast.error(err.error || err.message || 'Failed to save SMS settings')
+      }
+    } catch { toast.error('Network error') }
+    setSmsSaving(false)
+  }
+
+  const clearSMSSettings = async () => {
+    if (!token) return
+    setSmsSaving(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/settings/sms`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...authHeaders, ...csrfHeader() }, credentials: 'include' as RequestCredentials,
+        body: JSON.stringify({ provider: null }),
+      })
+      if (res.ok) {
+        toast.success('SMS settings cleared')
+        setSmsProvider('')
+        setSmsApiKey('')
+        setSmsApiSecret('')
+        setSmsPhoneNumber('')
+        setSmsKeyPreview('')
+        setSmsConfigured(false)
+      }
+    } catch { toast.error('Network error') }
+    setSmsSaving(false)
   }
 
   const fetchReviewers = async () => {
@@ -635,6 +715,117 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                             <button
                               onClick={clearLLMSettings}
                               disabled={llmSaving}
+                              style={{
+                                background: 'none', border: `1px solid ${C.border}`, color: C.muted,
+                                borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13,
+                              }}
+                            >
+                              Remove
+                            </button>
+                          )}
+                        </div>
+                      </>
+                    )}
+                  </>
+                )}
+              </div>
+
+              {/* SMS Provider (Phone OTP) */}
+              <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 20, marginTop: 24 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <DevicePhoneMobileIcon style={{ width: 16, height: 16, color: C.cyan }} />
+                  <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>Phone OTP</div>
+                </div>
+                <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
+                  Optional. Add your own <strong style={{ color: C.text, fontWeight: 500 }}>Twilio</strong> or <strong style={{ color: C.text, fontWeight: 500 }}>Vonage</strong> credentials
+                  to enable phone number verification as an additional step in your verification flow.
+                  Credentials are encrypted at rest.
+                </div>
+
+                {smsLoading ? (
+                  <div style={{ color: C.muted, fontSize: 13 }}>Loading...</div>
+                ) : (
+                  <>
+                    {/* Provider select */}
+                    <label style={labelStyle}>Provider</label>
+                    <select
+                      value={smsProvider}
+                      onChange={e => { setSmsProvider(e.target.value); setSmsApiKey(''); setSmsApiSecret(''); setShowSmsKey(false) }}
+                      style={{ ...inputStyle, marginBottom: 12, cursor: 'pointer', appearance: 'auto' }}
+                    >
+                      <option value="">None (disabled)</option>
+                      <option value="twilio">Twilio</option>
+                      <option value="vonage">Vonage</option>
+                    </select>
+
+                    {smsProvider && (
+                      <>
+                        {/* API Key / Account SID */}
+                        <label style={labelStyle}>
+                          {smsProvider === 'twilio' ? 'Account SID' : 'API Key'}
+                          {smsConfigured && smsKeyPreview && !smsApiKey && (
+                            <span style={{ color: C.green, marginLeft: 8, fontWeight: 400 }}>
+                              configured: {smsKeyPreview}
+                            </span>
+                          )}
+                        </label>
+                        <div style={{ position: 'relative', marginBottom: 12 }}>
+                          <input
+                            type={showSmsKey ? 'text' : 'password'}
+                            style={{ ...inputStyle, paddingRight: 40 }}
+                            value={smsApiKey}
+                            onChange={e => setSmsApiKey(e.target.value)}
+                            placeholder={smsConfigured ? 'Enter new key to replace' : smsProvider === 'twilio' ? 'AC...' : 'API key'}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowSmsKey(!showSmsKey)}
+                            style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 4 }}
+                          >
+                            {showSmsKey
+                              ? <EyeSlashIcon style={{ width: 16, height: 16 }} />
+                              : <EyeIcon style={{ width: 16, height: 16 }} />
+                            }
+                          </button>
+                        </div>
+
+                        {/* API Secret / Auth Token */}
+                        <label style={labelStyle}>{smsProvider === 'twilio' ? 'Auth Token' : 'API Secret'}</label>
+                        <input
+                          type="password"
+                          style={{ ...inputStyle, marginBottom: 12 }}
+                          value={smsApiSecret}
+                          onChange={e => setSmsApiSecret(e.target.value)}
+                          placeholder={smsConfigured ? 'Enter new secret to replace' : smsProvider === 'twilio' ? 'Auth token' : 'API secret'}
+                        />
+
+                        {/* Phone Number */}
+                        <label style={labelStyle}>Sender Phone Number</label>
+                        <input
+                          type="tel"
+                          style={{ ...inputStyle, marginBottom: 12 }}
+                          value={smsPhoneNumber}
+                          onChange={e => setSmsPhoneNumber(e.target.value)}
+                          placeholder="+15551234567"
+                        />
+
+                        {/* Save / Clear buttons */}
+                        <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                          <button
+                            onClick={saveSMSSettings}
+                            disabled={smsSaving || (!smsConfigured && (!smsApiKey || !smsApiSecret || !smsPhoneNumber))}
+                            style={{
+                              background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
+                              padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                              opacity: (smsSaving || (!smsConfigured && (!smsApiKey || !smsApiSecret || !smsPhoneNumber))) ? 0.5 : 1,
+                            }}
+                          >
+                            {smsSaving ? 'Saving...' : 'Save'}
+                          </button>
+                          {smsConfigured && (
+                            <button
+                              onClick={clearSMSSettings}
+                              disabled={smsSaving}
                               style={{
                                 background: 'none', border: `1px solid ${C.border}`, color: C.muted,
                                 borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13,
