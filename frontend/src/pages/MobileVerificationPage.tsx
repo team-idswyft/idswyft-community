@@ -37,6 +37,8 @@ const css = `
 
 // ─── Step definitions ───────────────────────────────────────────────────────
 const FULL_STEP_LABELS = ['Front ID', 'Back ID', 'Checking', 'Live Photo', 'Complete'];
+const DOCUMENT_ONLY_STEP_LABELS = ['Front ID', 'Back ID', 'Checking', 'Complete'];
+const IDENTITY_STEP_LABELS = ['Front ID', 'Checking', 'Live Photo', 'Complete'];
 const AGE_ONLY_STEP_LABELS = ['Upload ID', 'Complete'];
 
 // ─── Types ──────────────────────────────────────────────────────────────────
@@ -375,9 +377,11 @@ const LivenessCues: React.FC<{ hidden?: boolean }> = ({ hidden }) => {
 const MobileVerificationPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const token = searchParams.get('token');
-  const verificationMode = searchParams.get('verification_mode') as 'full' | 'age_only' | null;
+  const verificationMode = searchParams.get('verification_mode') as 'full' | 'document_only' | 'identity' | 'age_only' | null;
   const ageThreshold = searchParams.get('age_threshold') ? parseInt(searchParams.get('age_threshold')!, 10) : undefined;
   const isAgeOnly = verificationMode === 'age_only';
+  const isDocumentOnly = verificationMode === 'document_only';
+  const isIdentity = verificationMode === 'identity';
 
   // Handoff state
   const [apiKey, setApiKey] = useState<string | null>(null);
@@ -618,7 +622,14 @@ const MobileVerificationPage: React.FC = () => {
         return;
       }
 
-      // Move to back ID and poll OCR in background
+      // Identity mode: skip back doc — go to checking, then live capture
+      if (isIdentity) {
+        setScreenIdx(2);
+        pollFrontOCRForIdentity(0);
+        return;
+      }
+
+      // Normal flow: move to back ID and poll OCR in background
       setScreenIdx(1);
       pollFrontOCR(0);
     } catch (err: any) {
@@ -639,10 +650,29 @@ const MobileVerificationPage: React.FC = () => {
         // OCR complete — user can now upload back
         return;
       }
-      if (data.final_result === 'failed') { showFinalResult(data); return; }
+      if (data.final_result === 'failed' || data.final_result === 'manual_review') { showFinalResult(data); return; }
       setTimeout(() => pollFrontOCR(attempt + 1), 2000);
     } catch {
       if (mountedRef.current) setTimeout(() => pollFrontOCR(attempt + 1), 2000);
+    }
+  };
+
+  // ── Poll front OCR for identity mode (skip back doc, go to live) ──────
+  const pollFrontOCRForIdentity = async (attempt: number) => {
+    if (!verificationId || !apiKey || !mountedRef.current) return;
+    if (attempt >= 60) { setStepError('OCR timed out. Please try again.'); return; }
+    try {
+      const data = await apiGet(`/api/v2/verify/${verificationId}/status`, apiKey);
+      if (!mountedRef.current) return;
+      if (data.ocr_data && Object.keys(data.ocr_data).length > 0) {
+        setScreenIdx(3); // OCR done — proceed to live capture
+      } else if (data.final_result === 'failed' || data.final_result === 'manual_review') {
+        showFinalResult(data);
+      } else {
+        setTimeout(() => pollFrontOCRForIdentity(attempt + 1), 2000);
+      }
+    } catch {
+      if (mountedRef.current) setTimeout(() => pollFrontOCRForIdentity(attempt + 1), 2000);
     }
   };
 
@@ -692,6 +722,15 @@ const MobileVerificationPage: React.FC = () => {
       const isComplete = !!data.cross_validation_results || data.final_result !== null;
       if (isComplete) {
         if (data.final_result === 'failed') { showFinalResult(data); }
+        else if (isDocumentOnly) {
+          // document_only: cross-validation is final gate, skip live capture
+          if (data.final_result !== null) {
+            showFinalResult(data);
+          } else {
+            setScreenIdx(4);
+            waitForFinalResult(0);
+          }
+        }
         else { setScreenIdx(3); } // Live photo
       } else {
         setTimeout(() => pollCrossValidation(attempt + 1), 2000);
@@ -965,7 +1004,20 @@ const MobileVerificationPage: React.FC = () => {
       </div>
 
       {/* Step progress */}
-      <StepTracker activeIdx={isAgeOnly ? (screenIdx >= 4 ? 1 : 0) : screenIdx} labels={isAgeOnly ? AGE_ONLY_STEP_LABELS : FULL_STEP_LABELS} />
+      <StepTracker
+        activeIdx={
+          isAgeOnly ? (screenIdx >= 4 ? 1 : 0)
+          : isDocumentOnly ? (screenIdx >= 4 ? 3 : screenIdx)
+          : isIdentity ? (screenIdx === 0 ? 0 : screenIdx === 2 ? 1 : screenIdx === 3 ? 2 : 3)
+          : screenIdx
+        }
+        labels={
+          isAgeOnly ? AGE_ONLY_STEP_LABELS
+          : isDocumentOnly ? DOCUMENT_ONLY_STEP_LABELS
+          : isIdentity ? IDENTITY_STEP_LABELS
+          : FULL_STEP_LABELS
+        }
+      />
 
       {/* Screen content */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', marginTop: 20 }}>
@@ -979,7 +1031,10 @@ const MobileVerificationPage: React.FC = () => {
               fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 400,
               textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--teal)',
               marginBottom: 8,
-            }}>{isAgeOnly ? 'Step 1 of 1 — Upload ID' : 'Step 1 of 5 — Front of ID'}</span>
+            }}>{isAgeOnly ? 'Step 1 of 1 — Upload ID'
+              : isIdentity ? 'Step 1 of 4 — Front of ID'
+              : isDocumentOnly ? 'Step 1 of 4 — Front of ID'
+              : 'Step 1 of 5 — Front of ID'}</span>
 
             <h1 style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.12, letterSpacing: '-0.025em', marginBottom: 8 }}>
               {isAgeOnly ? <>Upload your ID<br />to verify your age</> : <>Scan the front<br />of your ID</>}
@@ -1048,7 +1103,7 @@ const MobileVerificationPage: React.FC = () => {
               fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
               textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--teal)',
               marginBottom: 8,
-            }}>Step 2 of 5 — Back of ID</span>
+            }}>{isDocumentOnly ? 'Step 2 of 4 — Back of ID' : 'Step 2 of 5 — Back of ID'}</span>
 
             <h1 style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.12, letterSpacing: '-0.025em', marginBottom: 8 }}>
               Now flip it over<br />and scan the back
@@ -1099,7 +1154,9 @@ const MobileVerificationPage: React.FC = () => {
               fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
               textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--teal)',
               marginBottom: 24,
-            }}>Step 3 of 5 — Verification</span>
+            }}>{isDocumentOnly ? 'Step 3 of 4 — Verification'
+              : isIdentity ? 'Step 2 of 4 — Verification'
+              : 'Step 3 of 5 — Verification'}</span>
 
             <div style={{
               width: 80, height: 80, border: '2.5px solid rgba(0,212,180,0.12)',
@@ -1144,7 +1201,7 @@ const MobileVerificationPage: React.FC = () => {
               fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
               textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--teal)',
               marginBottom: 8,
-            }}>Step 4 of 5 — Live Photo</span>
+            }}>{isIdentity ? 'Step 3 of 4 — Live Photo' : 'Step 4 of 5 — Live Photo'}</span>
 
             {/* Active liveness (primary path) */}
             {!useFallbackSelfie && !selfieFile && !showSelfieCamera ? (
@@ -1262,7 +1319,7 @@ const MobileVerificationPage: React.FC = () => {
                 <p style={{
                   fontFamily: "'JetBrains Mono', monospace", fontSize: 11,
                   color: 'var(--muted)', letterSpacing: '0.08em',
-                }}>Analyzing your live photo</p>
+                }}>{isDocumentOnly ? 'Finalizing your verification' : 'Analyzing your live photo'}</p>
               </>
             ) : (() => {
               const status = finalResult.final_result ?? finalResult.status;
@@ -1275,6 +1332,17 @@ const MobileVerificationPage: React.FC = () => {
                   ? [
                       'Document scanned',
                       `Age requirement (${finalResult.age_verification?.age_threshold ?? ageThreshold ?? 18}+) met`,
+                    ]
+                  : isDocumentOnly
+                  ? [
+                      'Identity document verified',
+                      'Document details confirmed',
+                    ]
+                  : isIdentity
+                  ? [
+                      'Identity document verified',
+                      'Liveness check passed',
+                      'Face matched successfully',
                     ]
                   : [
                       'Identity document verified',
@@ -1297,7 +1365,7 @@ const MobileVerificationPage: React.FC = () => {
                       fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
                       textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--teal)',
                       marginBottom: 8,
-                    }}>{isAgeOnly ? 'Age verified' : 'Verification complete'}</span>
+                    }}>{isAgeOnly ? 'Age verified' : isDocumentOnly ? 'Document verified' : 'Verification complete'}</span>
 
                     <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.025em', marginBottom: 8 }}>
                       You're all set
@@ -1306,6 +1374,8 @@ const MobileVerificationPage: React.FC = () => {
                     <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.55, marginBottom: 24 }}>
                       {isAgeOnly
                         ? 'Your age has been verified. You can close this tab and return to your desktop.'
+                        : isDocumentOnly
+                        ? 'Your document has been verified. You can close this tab and return to your desktop.'
                         : 'Your identity has been verified. You can close this tab and return to your desktop.'}
                     </p>
 
@@ -1353,7 +1423,7 @@ const MobileVerificationPage: React.FC = () => {
 
                   <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.025em', marginBottom: 8 }}>
                     {isFailed
-                      ? isAgeOnly ? 'Age Verification Failed' : 'Verification Failed'
+                      ? isAgeOnly ? 'Age Verification Failed' : isDocumentOnly ? 'Document Verification Failed' : 'Verification Failed'
                       : 'Under Review'}
                   </h1>
 
