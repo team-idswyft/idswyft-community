@@ -5,6 +5,33 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.0] - 2026-04-02
+
+### Added
+- **Role-based access control** — `verification_reviewers` now has a `role` column (`'admin'` or `'reviewer'`), enabling Organization Admins with elevated privileges distinct from regular Reviewers
+- **Organization Admin role** — org admins can access analytics, GDPR data deletion (scoped to their developer), and override verification decisions; regular reviewers are limited to approve/reject
+- **Role-aware reviewer invitations** — `POST /api/developer/reviewers/invite` accepts optional `role` parameter (`'admin'` | `'reviewer'`, defaults to `'reviewer'`)
+- **Role in reviewer JWT** — `role` field included in reviewer token payload and OTP verify response
+- **`requireOrgAdminOrPlatformAdmin` middleware** — gates analytics, GDPR delete, and override endpoints to org admins and platform admins only
+- **Team setup banner** — Developer Portal shows a dismissible banner prompting developers to invite an Organization Admin when none exists
+- **Role badges in Settings** — reviewer list in Settings modal displays purple "Admin" or gray "Reviewer" badges, with role selector in the invite form
+
+### Changed
+- **Developer escalation removed** — `POST /api/auth/admin/escalate` now returns `410 Gone`; developers no longer auto-escalate to admin access
+- **Analytics endpoints opened to org admins** — all 5 analytics routes (`/analytics`, `/analytics/funnel`, `/analytics/rejections`, `/analytics/fraud-patterns`, `/analytics/risk-distribution`) now accept reviewer JWTs with `role: 'admin'`, scoped by `developer_id`
+- **GDPR delete opened to org admins** — `DELETE /api/admin/user/:userId/data` accessible to org admins with ownership verification (user must belong to their developer's verifications)
+- **Override restricted** — verification override decision requires org admin or platform admin role; regular reviewers get 403
+- **DevelopersList platform-admin only** — `GET /api/admin/developers` restricted to platform admins (`admin_users` table), no longer accessible to reviewer tokens
+- **Admin frontend aligned with design system** — AdminLogin, VerificationManagement, and DevelopersList pages now use CSS pattern backgrounds (`pattern-shield`, `pattern-crosshatch`), monospace breadcrumbs, and `C.mono` heading font consistent with the rest of the site
+- **Review Dashboard docs updated** — role hierarchy documented, override marked as admin-only, stats bar reflects 5-card layout, gate analysis and risk assessment in detail panel
+
+### Security
+- **Override guard fix** — platform admins were incorrectly blocked from override due to `req.reviewer?.role !== 'admin'` evaluating truthy when `req.reviewer` is undefined; fixed with explicit null check
+- Developer escalation path fully removed — no route exists to promote a developer session to admin access
+
+### Migration
+- `39_admin_restructure.sql` — adds `role` column to `verification_reviewers` (default `'reviewer'`), CHECK constraint, index, and TOTP columns on `admin_users`
+
 ## [1.7.2] - 2026-03-30
 
 ### Added
