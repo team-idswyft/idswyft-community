@@ -17,6 +17,16 @@ import {
 } from '@heroicons/react/24/outline'
 import { inputStyle, labelStyle } from './types'
 
+type SettingsTab = 'profile' | 'team' | 'integrations' | 'branding' | 'account'
+
+const tabs: Array<{ id: SettingsTab; label: string; icon: React.ComponentType<{ style?: React.CSSProperties }>; bottom?: boolean }> = [
+  { id: 'profile', label: 'Profile', icon: UserCircleIcon },
+  { id: 'team', label: 'Team', icon: UsersIcon },
+  { id: 'integrations', label: 'Integrations', icon: CodeBracketIcon },
+  { id: 'branding', label: 'Branding', icon: PaintBrushIcon },
+  { id: 'account', label: 'Account', icon: ExclamationTriangleIcon, bottom: true },
+]
+
 interface SettingsModalProps {
   token: string
   onClose: () => void
@@ -73,6 +83,9 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
   const [showDeleteAccount, setShowDeleteAccount] = useState(false)
   const [deleteAccountEmail, setDeleteAccountEmail] = useState('')
   const [deleteAccountLoading, setDeleteAccountLoading] = useState(false)
+
+  // Active settings tab
+  const [activeTab, setActiveTab] = useState<SettingsTab>('profile')
 
   // Fetch data on mount
   useEffect(() => {
@@ -444,11 +457,11 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
         onClick={onClose}
       >
         <div
-          style={{ width: '100%', maxWidth: 1040, background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 28, maxHeight: '100%', overflowY: 'auto' }}
+          style={{ width: '100%', maxWidth: 1200, background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, maxHeight: '80vh', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
           onClick={e => e.stopPropagation()}
         >
           {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px 28px 20px', flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Cog6ToothIcon style={{ width: 18, height: 18, color: C.text }} />
               <div style={{ fontWeight: 600, fontSize: 16, color: C.text }}>Settings</div>
@@ -461,643 +474,718 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
             </button>
           </div>
 
-          {/* Two-column layout */}
-          <div style={{ display: 'flex', gap: 0 }}>
+          {/* Sidebar + Content */}
+          <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
 
-            {/* Left column: Profile + Danger Zone */}
-            <div style={{ flex: 1, paddingRight: 28 }}>
-
-              {/* Profile */}
-              <div style={{ marginBottom: 24 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 12 }}>
-                  <UserCircleIcon style={{ width: 16, height: 16, color: C.cyan }} />
-                  <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>Profile</div>
-                </div>
-
-                {profileLoading ? (
-                  <div style={{ color: C.muted, fontSize: 13 }}>Loading...</div>
-                ) : (
-                  <>
-                    {/* Avatar */}
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
-                      <div
-                        style={{ position: 'relative', width: 48, height: 48, borderRadius: '50%', overflow: 'hidden', cursor: 'pointer', flexShrink: 0, border: `1px solid ${C.border}` }}
-                        onClick={() => document.getElementById('avatar-input')?.click()}
-                      >
-                        {profileAvatarUrl ? (
-                          <img src={profileAvatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
-                        ) : (
-                          <div style={{ width: '100%', height: '100%', background: C.surface, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                            <UserCircleIcon style={{ width: 28, height: 28, color: C.dim }} />
-                          </div>
-                        )}
-                        <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.15s' }}
-                          onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
-                          onMouseLeave={e => (e.currentTarget.style.opacity = '0')}
-                        >
-                          <span style={{ fontSize: 10, color: '#fff', fontWeight: 600 }}>Change</span>
-                        </div>
-                      </div>
-                      <input
-                        id="avatar-input"
-                        type="file"
-                        accept="image/jpeg,image/png"
-                        style={{ display: 'none' }}
-                        onChange={e => {
-                          const file = e.target.files?.[0]
-                          if (file && file.size > 2 * 1024 * 1024) {
-                            toast.error('File must be under 2 MB')
-                            e.target.value = ''
-                            return
-                          }
-                          if (file) uploadAvatar(file)
-                          e.target.value = ''
-                        }}
-                      />
-                      <div style={{ flex: 1 }}>
-                        <div style={{ fontSize: 12, color: C.muted, marginBottom: 2 }}>Click avatar to change</div>
-                        <div style={{ fontSize: 11, color: C.dim }}>JPEG or PNG, max 2 MB</div>
-                      </div>
-                    </div>
-
-                    {/* Email (read-only) */}
-                    <label style={labelStyle}>Email</label>
-                    <input
-                      type="email"
-                      value={profileEmail}
-                      readOnly
-                      style={{ ...inputStyle, marginBottom: 12, opacity: 0.5, cursor: 'not-allowed' }}
-                    />
-
-                    {/* Name */}
-                    <label style={labelStyle}>Name</label>
-                    <input
-                      type="text"
-                      value={profileName}
-                      onChange={e => setProfileName(e.target.value)}
-                      style={{ ...inputStyle, marginBottom: 12 }}
-                      placeholder="Your name"
-                    />
-
-                    {/* Company */}
-                    <label style={labelStyle}>Company <span style={{ color: C.dim, fontWeight: 400 }}>(optional)</span></label>
-                    <input
-                      type="text"
-                      value={profileCompany}
-                      onChange={e => setProfileCompany(e.target.value)}
-                      style={{ ...inputStyle, marginBottom: 12 }}
-                      placeholder="Your company"
-                    />
-
-                    {/* Save button */}
-                    <button
-                      onClick={saveProfile}
-                      disabled={profileSaving || !profileName.trim()}
-                      style={{
-                        background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
-                        padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                        opacity: (profileSaving || !profileName.trim()) ? 0.5 : 1,
-                      }}
-                    >
-                      {profileSaving ? 'Saving...' : 'Save Profile'}
-                    </button>
-                  </>
-                )}
-              </div>
-
-              {/* Verification Reviewers */}
-              <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 20, marginBottom: 24 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <UsersIcon style={{ width: 16, height: 16, color: C.cyan }} />
-                  <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>Team Management</div>
-                </div>
-                <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
-                  Invite team members to review and manage your verifications. <strong style={{ color: C.text }}>Organization Admins</strong> can
-                  override decisions, access analytics, and manage GDPR requests. <strong style={{ color: C.text }}>Reviewers</strong> can approve or reject verifications.
-                  Everyone signs in via email code — no passwords needed.
-                </div>
-
-                {/* Invite form */}
-                <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
-                  <input
-                    type="email"
-                    value={reviewerEmail}
-                    onChange={e => setReviewerEmail(e.target.value)}
-                    placeholder="reviewer@company.com"
-                    style={{ ...inputStyle, flex: '1 1 160px', marginBottom: 0 }}
-                  />
-                  <input
-                    type="text"
-                    value={reviewerName}
-                    onChange={e => setReviewerName(e.target.value)}
-                    placeholder="Name (optional)"
-                    style={{ ...inputStyle, flex: '0 1 120px', marginBottom: 0 }}
-                  />
-                  <select
-                    value={reviewerRole}
-                    onChange={e => setReviewerRole(e.target.value as 'reviewer' | 'admin')}
-                    style={{ ...inputStyle, flex: '0 0 130px', marginBottom: 0, cursor: 'pointer', appearance: 'auto' }}
-                  >
-                    <option value="reviewer">Reviewer</option>
-                    <option value="admin">Org Admin</option>
-                  </select>
+            {/* Sidebar */}
+            <nav style={{ width: 220, flexShrink: 0, background: C.surface, borderRight: `1px solid ${C.border}`, borderRadius: '0 0 0 12px', display: 'flex', flexDirection: 'column', paddingTop: 8 }}>
+              {/* Main tabs */}
+              {tabs.filter(t => !t.bottom).map(tab => {
+                const isActive = activeTab === tab.id
+                const Icon = tab.icon
+                return (
                   <button
-                    onClick={inviteReviewer}
-                    disabled={reviewerInviting || !reviewerEmail.includes('@')}
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
                     style={{
-                      background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
-                      padding: '8px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                      opacity: (reviewerInviting || !reviewerEmail.includes('@')) ? 0.5 : 1,
-                      whiteSpace: 'nowrap',
+                      display: 'flex', alignItems: 'center', gap: 10, height: 40,
+                      paddingLeft: isActive ? 13 : 16, paddingRight: 16,
+                      background: isActive ? C.surfaceHover : 'transparent',
+                      border: 'none', borderLeftStyle: 'solid', borderLeftWidth: 3,
+                      borderLeftColor: isActive ? C.cyan : 'transparent',
+                      color: isActive ? C.text : C.muted,
+                      fontSize: 13, fontWeight: 500, cursor: 'pointer', width: '100%',
+                      borderRadius: 0, textAlign: 'left',
+                      fontFamily: 'inherit',
                     }}
+                    onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = C.surfaceHover }}
+                    onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}
                   >
-                    {reviewerInviting ? 'Inviting...' : 'Invite'}
+                    <Icon style={{ width: 16, height: 16, flexShrink: 0 }} />
+                    {tab.label}
                   </button>
-                </div>
+                )
+              })}
 
-                {/* Reviewers list */}
-                {reviewers.length > 0 && (
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                    {reviewers.map(r => (
-                      <div key={r.id} style={{
-                        display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                        background: C.surface, border: `1px solid ${C.border}`, borderRadius: 6, padding: '8px 12px',
-                        opacity: r.status === 'revoked' ? 0.45 : 1,
-                      }}>
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                            {r.email}
-                            {r.name && <span style={{ color: C.dim, marginLeft: 6 }}>({r.name})</span>}
-                          </div>
-                          <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>
-                            {r.status === 'invited' && 'Invited'}
-                            {r.status === 'active' && `Active${r.last_login_at ? ` \u00b7 Last login ${new Date(r.last_login_at).toLocaleDateString()}` : ''}`}
-                            {r.status === 'revoked' && 'Revoked'}
+              {/* Spacer */}
+              <div style={{ flex: 1 }} />
+
+              {/* Divider */}
+              <div style={{ borderTop: `1px solid ${C.border}`, margin: '0 16px' }} />
+
+              {/* Bottom tabs (Account) */}
+              {tabs.filter(t => t.bottom).map(tab => {
+                const isActive = activeTab === tab.id
+                const Icon = tab.icon
+                return (
+                  <button
+                    key={tab.id}
+                    onClick={() => setActiveTab(tab.id)}
+                    style={{
+                      display: 'flex', alignItems: 'center', gap: 10, height: 40,
+                      paddingLeft: isActive ? 13 : 16, paddingRight: 16,
+                      background: isActive ? C.surfaceHover : 'transparent',
+                      border: 'none', borderLeftStyle: 'solid', borderLeftWidth: 3,
+                      borderLeftColor: isActive ? C.red : 'transparent',
+                      color: isActive ? C.text : C.muted,
+                      fontSize: 13, fontWeight: 500, cursor: 'pointer', width: '100%',
+                      borderRadius: 0, textAlign: 'left',
+                      fontFamily: 'inherit',
+                    }}
+                    onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = C.surfaceHover }}
+                    onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}
+                  >
+                    <Icon style={{ width: 16, height: 16, flexShrink: 0, color: C.red }} />
+                    {tab.label}
+                  </button>
+                )
+              })}
+              <div style={{ height: 8 }} />
+            </nav>
+
+            {/* Content panel */}
+            <div style={{ flex: 1, padding: 32, overflowY: 'auto' }}>
+
+              {/* ─── Profile ─── */}
+              {activeTab === 'profile' && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
+                    <UserCircleIcon style={{ width: 16, height: 16, color: C.cyan }} />
+                    <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>Profile</div>
+                  </div>
+
+                  {profileLoading ? (
+                    <div style={{ color: C.muted, fontSize: 13 }}>Loading...</div>
+                  ) : (
+                    <>
+                      {/* Avatar */}
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 16 }}>
+                        <div
+                          style={{ position: 'relative', width: 48, height: 48, borderRadius: '50%', overflow: 'hidden', cursor: 'pointer', flexShrink: 0, border: `1px solid ${C.border}` }}
+                          onClick={() => document.getElementById('avatar-input')?.click()}
+                        >
+                          {profileAvatarUrl ? (
+                            <img src={profileAvatarUrl} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+                          ) : (
+                            <div style={{ width: '100%', height: '100%', background: C.surface, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <UserCircleIcon style={{ width: 28, height: 28, color: C.dim }} />
+                            </div>
+                          )}
+                          <div style={{ position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.5)', display: 'flex', alignItems: 'center', justifyContent: 'center', opacity: 0, transition: 'opacity 0.15s' }}
+                            onMouseEnter={e => (e.currentTarget.style.opacity = '1')}
+                            onMouseLeave={e => (e.currentTarget.style.opacity = '0')}
+                          >
+                            <span style={{ fontSize: 10, color: '#fff', fontWeight: 600 }}>Change</span>
                           </div>
                         </div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: 8 }}>
-                          {/* Role badge */}
-                          <span style={{
-                            fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em',
-                            padding: '2px 6px', borderRadius: 4,
-                            background: r.role === 'admin' ? 'rgba(167,139,250,0.12)' : 'rgba(136,150,170,0.1)',
-                            color: r.role === 'admin' ? '#a78bfa' : C.dim,
-                          }}>
-                            {r.role === 'admin' ? 'Admin' : 'Reviewer'}
-                          </span>
-                          {/* Status badge */}
-                          <span style={{
-                            fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em',
-                            padding: '2px 6px', borderRadius: 4,
-                            background: r.status === 'active' ? 'rgba(34,197,94,0.12)' : r.status === 'invited' ? 'rgba(34,211,238,0.1)' : 'rgba(248,113,113,0.1)',
-                            color: r.status === 'active' ? '#22c55e' : r.status === 'invited' ? C.cyan : C.red,
-                          }}>
-                            {r.status}
-                          </span>
-                          {r.status !== 'revoked' && (
-                            <button
-                              onClick={() => revokeReviewer(r.id)}
-                              title="Revoke access"
-                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: C.dim, display: 'flex' }}
-                              onMouseEnter={e => (e.currentTarget.style.color = C.red)}
-                              onMouseLeave={e => (e.currentTarget.style.color = C.dim)}
-                            >
-                              <XMarkIcon style={{ width: 14, height: 14 }} />
-                            </button>
-                          )}
+                        <input
+                          id="avatar-input"
+                          type="file"
+                          accept="image/jpeg,image/png"
+                          style={{ display: 'none' }}
+                          onChange={e => {
+                            const file = e.target.files?.[0]
+                            if (file && file.size > 2 * 1024 * 1024) {
+                              toast.error('File must be under 2 MB')
+                              e.target.value = ''
+                              return
+                            }
+                            if (file) uploadAvatar(file)
+                            e.target.value = ''
+                          }}
+                        />
+                        <div style={{ flex: 1 }}>
+                          <div style={{ fontSize: 12, color: C.muted, marginBottom: 2 }}>Click avatar to change</div>
+                          <div style={{ fontSize: 11, color: C.dim }}>JPEG or PNG, max 2 MB</div>
                         </div>
                       </div>
-                    ))}
-                  </div>
-                )}
 
-                {reviewers.length === 0 && (
-                  <div style={{ color: C.dim, fontSize: 12, textAlign: 'center', padding: '8px 0' }}>
-                    No reviewers invited yet
-                  </div>
-                )}
-
-                {/* Copy login link */}
-                <button
-                  onClick={() => {
-                    const url = `${window.location.origin}/admin/login`
-                    navigator.clipboard.writeText(url).then(() => toast.success('Login link copied'))
-                  }}
-                  style={{
-                    marginTop: 12, background: 'none', border: `1px solid ${C.border}`,
-                    color: C.muted, borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontSize: 12,
-                  }}
-                >
-                  Copy reviewer login link
-                </button>
-              </div>
-
-              {/* Danger Zone */}
-              <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 20 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <ExclamationTriangleIcon style={{ width: 16, height: 16, color: C.red }} />
-                  <div style={{ fontWeight: 600, fontSize: 14, color: C.red }}>Danger Zone</div>
-                </div>
-                <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
-                  Permanently delete your developer account and all associated data including API keys, webhooks, and verification records. This action cannot be undone.
-                </div>
-                <button
-                  style={{ background: 'none', border: `1px solid ${C.red}`, color: C.red, borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}
-                  onClick={() => { onClose(); setShowDeleteAccount(true) }}
-                >
-                  Delete Account
-                </button>
-              </div>
-            </div>
-
-            {/* Vertical divider */}
-            <div style={{ width: 1, background: C.border, flexShrink: 0 }} />
-
-            {/* Right column: OCR Enhancement */}
-            <div style={{ flex: 1, paddingLeft: 28 }}>
-
-              {/* OCR Enhancement (LLM Fallback) */}
-              <div>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <CodeBracketIcon style={{ width: 16, height: 16, color: C.cyan }} />
-                  <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>OCR Enhancement</div>
-                </div>
-                <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
-                  This is completely optional. Our OCR pipeline extracts document fields using fast heuristics.
-                  When you provide an LLM key, it acts as a <strong style={{ color: C.text, fontWeight: 500 }}>second-pass fallback</strong> --
-                  only called for fields where heuristic confidence is below 60%.
-                  This can improve accuracy on unusual layouts or poor-quality scans, but most documents process fine without it.
-                  Your key is encrypted at rest and only used during your verifications.
-                </div>
-
-                {llmLoading ? (
-                  <div style={{ color: C.muted, fontSize: 13 }}>Loading...</div>
-                ) : (
-                  <>
-                    {/* Provider select */}
-                    <label style={labelStyle}>Provider</label>
-                    <select
-                      value={llmProvider}
-                      onChange={e => { setLlmProvider(e.target.value); setLlmApiKey(''); setShowLlmKey(false) }}
-                      style={{ ...inputStyle, marginBottom: 12, cursor: 'pointer', appearance: 'auto' }}
-                    >
-                      <option value="">None (disabled)</option>
-                      <option value="openai">OpenAI (GPT-4o Vision)</option>
-                      <option value="anthropic">Anthropic (Claude Vision)</option>
-                      <option value="custom">Custom (OpenAI-compatible endpoint)</option>
-                    </select>
-
-                    {llmProvider && (
-                      <>
-                        {/* API Key */}
-                        <label style={labelStyle}>
-                          API Key
-                          {llmConfigured && llmKeyPreview && !llmApiKey && (
-                            <span style={{ color: C.green, marginLeft: 8, fontWeight: 400 }}>
-                              configured: {llmKeyPreview}
-                            </span>
-                          )}
-                        </label>
-                        <div style={{ position: 'relative', marginBottom: 12 }}>
-                          <input
-                            type={showLlmKey ? 'text' : 'password'}
-                            style={{ ...inputStyle, paddingRight: 40 }}
-                            value={llmApiKey}
-                            onChange={e => setLlmApiKey(e.target.value)}
-                            placeholder={llmConfigured ? 'Enter new key to replace' : llmProvider === 'anthropic' ? 'sk-ant-...' : 'sk-...'}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowLlmKey(!showLlmKey)}
-                            style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 4 }}
-                          >
-                            {showLlmKey
-                              ? <EyeSlashIcon style={{ width: 16, height: 16 }} />
-                              : <EyeIcon style={{ width: 16, height: 16 }} />
-                            }
-                          </button>
-                        </div>
-
-                        {/* Custom endpoint URL */}
-                        {llmProvider === 'custom' && (
-                          <>
-                            <label style={labelStyle}>Endpoint URL</label>
-                            <input
-                              type="url"
-                              style={{ ...inputStyle, marginBottom: 12 }}
-                              value={llmEndpointUrl}
-                              onChange={e => setLlmEndpointUrl(e.target.value)}
-                              placeholder="https://your-server.com/v1/chat/completions"
-                            />
-                          </>
-                        )}
-
-                        {/* Save / Clear buttons */}
-                        <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-                          <button
-                            onClick={saveLLMSettings}
-                            disabled={llmSaving || (!llmApiKey && !llmConfigured)}
-                            style={{
-                              background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
-                              padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                              opacity: (llmSaving || (!llmApiKey && !llmConfigured)) ? 0.5 : 1,
-                            }}
-                          >
-                            {llmSaving ? 'Saving...' : 'Save'}
-                          </button>
-                          {llmConfigured && (
-                            <button
-                              onClick={clearLLMSettings}
-                              disabled={llmSaving}
-                              style={{
-                                background: 'none', border: `1px solid ${C.border}`, color: C.muted,
-                                borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13,
-                              }}
-                            >
-                              Remove
-                            </button>
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </>
-                )}
-              </div>
-
-              {/* SMS Provider (Phone OTP) */}
-              <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 20, marginTop: 24 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <DevicePhoneMobileIcon style={{ width: 16, height: 16, color: C.cyan }} />
-                  <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>Phone OTP</div>
-                </div>
-                <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
-                  Optional. Add your own <strong style={{ color: C.text, fontWeight: 500 }}>Twilio</strong> or <strong style={{ color: C.text, fontWeight: 500 }}>Vonage</strong> credentials
-                  to enable phone number verification as an additional step in your verification flow.
-                  Credentials are encrypted at rest.
-                </div>
-
-                {smsLoading ? (
-                  <div style={{ color: C.muted, fontSize: 13 }}>Loading...</div>
-                ) : (
-                  <>
-                    {/* Provider select */}
-                    <label style={labelStyle}>Provider</label>
-                    <select
-                      value={smsProvider}
-                      onChange={e => { setSmsProvider(e.target.value); setSmsApiKey(''); setSmsApiSecret(''); setShowSmsKey(false) }}
-                      style={{ ...inputStyle, marginBottom: 12, cursor: 'pointer', appearance: 'auto' }}
-                    >
-                      <option value="">None (disabled)</option>
-                      <option value="twilio">Twilio</option>
-                      <option value="vonage">Vonage</option>
-                    </select>
-
-                    {smsProvider && (
-                      <>
-                        {/* API Key / Account SID */}
-                        <label style={labelStyle}>
-                          {smsProvider === 'twilio' ? 'Account SID' : 'API Key'}
-                          {smsConfigured && smsKeyPreview && !smsApiKey && (
-                            <span style={{ color: C.green, marginLeft: 8, fontWeight: 400 }}>
-                              configured: {smsKeyPreview}
-                            </span>
-                          )}
-                        </label>
-                        <div style={{ position: 'relative', marginBottom: 12 }}>
-                          <input
-                            type={showSmsKey ? 'text' : 'password'}
-                            style={{ ...inputStyle, paddingRight: 40 }}
-                            value={smsApiKey}
-                            onChange={e => setSmsApiKey(e.target.value)}
-                            placeholder={smsConfigured ? 'Enter new key to replace' : smsProvider === 'twilio' ? 'AC...' : 'API key'}
-                          />
-                          <button
-                            type="button"
-                            onClick={() => setShowSmsKey(!showSmsKey)}
-                            style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 4 }}
-                          >
-                            {showSmsKey
-                              ? <EyeSlashIcon style={{ width: 16, height: 16 }} />
-                              : <EyeIcon style={{ width: 16, height: 16 }} />
-                            }
-                          </button>
-                        </div>
-
-                        {/* API Secret / Auth Token */}
-                        <label style={labelStyle}>{smsProvider === 'twilio' ? 'Auth Token' : 'API Secret'}</label>
-                        <input
-                          type="password"
-                          style={{ ...inputStyle, marginBottom: 12 }}
-                          value={smsApiSecret}
-                          onChange={e => setSmsApiSecret(e.target.value)}
-                          placeholder={smsConfigured ? 'Enter new secret to replace' : smsProvider === 'twilio' ? 'Auth token' : 'API secret'}
-                        />
-
-                        {/* Phone Number */}
-                        <label style={labelStyle}>Sender Phone Number</label>
-                        <input
-                          type="tel"
-                          style={{ ...inputStyle, marginBottom: 12 }}
-                          value={smsPhoneNumber}
-                          onChange={e => setSmsPhoneNumber(e.target.value)}
-                          placeholder="+15551234567"
-                        />
-
-                        {/* Save / Clear buttons */}
-                        <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
-                          <button
-                            onClick={saveSMSSettings}
-                            disabled={smsSaving || (!smsConfigured && (!smsApiKey || !smsApiSecret || !smsPhoneNumber))}
-                            style={{
-                              background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
-                              padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                              opacity: (smsSaving || (!smsConfigured && (!smsApiKey || !smsApiSecret || !smsPhoneNumber))) ? 0.5 : 1,
-                            }}
-                          >
-                            {smsSaving ? 'Saving...' : 'Save'}
-                          </button>
-                          {smsConfigured && (
-                            <button
-                              onClick={clearSMSSettings}
-                              disabled={smsSaving}
-                              style={{
-                                background: 'none', border: `1px solid ${C.border}`, color: C.muted,
-                                borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13,
-                              }}
-                            >
-                              Remove
-                            </button>
-                          )}
-                        </div>
-                      </>
-                    )}
-                  </>
-                )}
-              </div>
-
-              {/* Verification Page Branding */}
-              <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 20, marginTop: 24 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                  <PaintBrushIcon style={{ width: 16, height: 16, color: C.cyan }} />
-                  <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>Verification Page</div>
-                </div>
-                <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
-                  White-label the hosted verification page with your own branding. End users will see your logo,
-                  company name, and accent color instead of Idswyft defaults.
-                </div>
-
-                {brandLoading ? (
-                  <div style={{ color: C.muted, fontSize: 13 }}>Loading...</div>
-                ) : (
-                  <>
-                    {/* Company Name */}
-                    <label style={labelStyle}>Company Name</label>
-                    <input
-                      type="text"
-                      value={brandCompanyName}
-                      onChange={e => setBrandCompanyName(e.target.value)}
-                      style={{ ...inputStyle, marginBottom: 12 }}
-                      placeholder="Your Company"
-                      maxLength={100}
-                    />
-
-                    {/* Logo URL + upload */}
-                    <label style={labelStyle}>Logo URL</label>
-                    <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                      {/* Email (read-only) */}
+                      <label style={labelStyle}>Email</label>
                       <input
-                        type="url"
-                        value={brandLogoUrl}
-                        onChange={e => setBrandLogoUrl(e.target.value)}
-                        style={{ ...inputStyle, marginBottom: 0, flex: 1 }}
-                        placeholder="https://example.com/logo.png"
+                        type="email"
+                        value={profileEmail}
+                        readOnly
+                        style={{ ...inputStyle, marginBottom: 12, opacity: 0.5, cursor: 'not-allowed' }}
                       />
-                      <button
-                        type="button"
-                        onClick={() => document.getElementById('branding-logo-input')?.click()}
-                        style={{
-                          background: C.surface, border: `1px solid ${C.border}`, color: C.muted,
-                          borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontSize: 12,
-                          whiteSpace: 'nowrap',
-                        }}
-                      >
-                        Upload
-                      </button>
-                      <input
-                        id="branding-logo-input"
-                        type="file"
-                        accept="image/jpeg,image/png"
-                        style={{ display: 'none' }}
-                        onChange={e => {
-                          const file = e.target.files?.[0]
-                          if (file && file.size > 2 * 1024 * 1024) {
-                            toast.error('File must be under 2 MB')
-                            e.target.value = ''
-                            return
-                          }
-                          if (file) uploadBrandingLogo(file)
-                          e.target.value = ''
-                        }}
-                      />
-                    </div>
 
-                    {/* Accent Color */}
-                    <label style={labelStyle}>Accent Color</label>
-                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+                      {/* Name */}
+                      <label style={labelStyle}>Name</label>
                       <input
                         type="text"
-                        value={brandAccentColor}
-                        onChange={e => setBrandAccentColor(e.target.value)}
-                        style={{ ...inputStyle, marginBottom: 0, flex: 1 }}
-                        placeholder="#22d3ee"
-                        maxLength={7}
+                        value={profileName}
+                        onChange={e => setProfileName(e.target.value)}
+                        style={{ ...inputStyle, marginBottom: 12 }}
+                        placeholder="Your name"
                       />
-                      <div
-                        style={{
-                          width: 32, height: 32, borderRadius: 6, flexShrink: 0,
-                          background: /^#[0-9a-fA-F]{6}$/.test(brandAccentColor) ? brandAccentColor : C.cyan,
-                          border: `1px solid ${C.border}`,
-                        }}
-                      />
+
+                      {/* Company */}
+                      <label style={labelStyle}>Company <span style={{ color: C.dim, fontWeight: 400 }}>(optional)</span></label>
                       <input
-                        type="color"
-                        value={/^#[0-9a-fA-F]{6}$/.test(brandAccentColor) ? brandAccentColor : '#22d3ee'}
-                        onChange={e => setBrandAccentColor(e.target.value)}
-                        style={{ width: 32, height: 32, border: 'none', padding: 0, cursor: 'pointer', background: 'transparent' }}
+                        type="text"
+                        value={profileCompany}
+                        onChange={e => setProfileCompany(e.target.value)}
+                        style={{ ...inputStyle, marginBottom: 12 }}
+                        placeholder="Your company"
                       />
-                    </div>
 
-                    {/* Live Preview */}
-                    <div style={{
-                      background: '#080c14', border: `1px solid ${C.border}`, borderRadius: 10,
-                      padding: 16, marginBottom: 14,
-                    }}>
-                      <div style={{ fontSize: 10, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Preview</div>
-                      <div style={{ textAlign: 'center' }}>
-                        {brandLogoUrl ? (
-                          <img
-                            src={brandLogoUrl}
-                            alt="Logo preview"
-                            style={{ height: 28, margin: '0 auto 10px', display: 'block', objectFit: 'contain' }}
-                            onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
-                          />
-                        ) : (
-                          <img src="/idswyft-logo.png" alt="Idswyft" style={{ height: 28, margin: '0 auto 10px', display: 'block' }} />
-                        )}
-                        <div style={{ fontSize: 14, fontWeight: 600, color: '#dde2ec', marginBottom: 4 }}>
-                          {brandCompanyName ? `Verify with ${brandCompanyName}` : 'Verify Your Identity'}
-                        </div>
-                        <div style={{ fontSize: 11, color: '#8896aa', marginBottom: 12 }}>Choose how you'd like to complete verification</div>
-                        <button
-                          type="button"
-                          style={{
-                            background: /^#[0-9a-fA-F]{6}$/.test(brandAccentColor) ? brandAccentColor : C.cyan,
-                            color: '#080c14', border: 'none', borderRadius: 8,
-                            padding: '8px 24px', fontSize: 12, fontWeight: 600,
-                            cursor: 'default',
-                          }}
-                        >
-                          Scan QR Code
-                        </button>
-                        {(brandLogoUrl || brandCompanyName || brandAccentColor) && (
-                          <div style={{ fontSize: 9, color: C.dim, marginTop: 10 }}>
-                            Powered by Idswyft
-                          </div>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Save / Clear buttons */}
-                    <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                      {/* Save button */}
                       <button
-                        onClick={saveBrandingSettings}
-                        disabled={brandSaving}
+                        onClick={saveProfile}
+                        disabled={profileSaving || !profileName.trim()}
                         style={{
                           background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
                           padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                          opacity: brandSaving ? 0.5 : 1,
+                          opacity: (profileSaving || !profileName.trim()) ? 0.5 : 1,
                         }}
                       >
-                        {brandSaving ? 'Saving...' : 'Save'}
+                        {profileSaving ? 'Saving...' : 'Save Profile'}
                       </button>
-                      {brandConfigured && (
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* ─── Team ─── */}
+              {activeTab === 'team' && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <UsersIcon style={{ width: 16, height: 16, color: C.cyan }} />
+                    <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>Team Management</div>
+                  </div>
+                  <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
+                    Invite team members to review and manage your verifications. <strong style={{ color: C.text }}>Organization Admins</strong> can
+                    override decisions, access analytics, and manage GDPR requests. <strong style={{ color: C.text }}>Reviewers</strong> can approve or reject verifications.
+                    Everyone signs in via email code — no passwords needed.
+                  </div>
+
+                  {/* Invite form */}
+                  <div style={{ display: 'flex', gap: 8, marginBottom: 16, flexWrap: 'wrap' }}>
+                    <input
+                      type="email"
+                      value={reviewerEmail}
+                      onChange={e => setReviewerEmail(e.target.value)}
+                      placeholder="reviewer@company.com"
+                      style={{ ...inputStyle, flex: '1 1 160px', marginBottom: 0 }}
+                    />
+                    <input
+                      type="text"
+                      value={reviewerName}
+                      onChange={e => setReviewerName(e.target.value)}
+                      placeholder="Name (optional)"
+                      style={{ ...inputStyle, flex: '0 1 120px', marginBottom: 0 }}
+                    />
+                    <select
+                      value={reviewerRole}
+                      onChange={e => setReviewerRole(e.target.value as 'reviewer' | 'admin')}
+                      style={{ ...inputStyle, flex: '0 0 130px', marginBottom: 0, cursor: 'pointer', appearance: 'auto' }}
+                    >
+                      <option value="reviewer">Reviewer</option>
+                      <option value="admin">Org Admin</option>
+                    </select>
+                    <button
+                      onClick={inviteReviewer}
+                      disabled={reviewerInviting || !reviewerEmail.includes('@')}
+                      style={{
+                        background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
+                        padding: '8px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                        opacity: (reviewerInviting || !reviewerEmail.includes('@')) ? 0.5 : 1,
+                        whiteSpace: 'nowrap',
+                      }}
+                    >
+                      {reviewerInviting ? 'Inviting...' : 'Invite'}
+                    </button>
+                  </div>
+
+                  {/* Reviewers list */}
+                  {reviewers.length > 0 && (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {reviewers.map(r => (
+                        <div key={r.id} style={{
+                          display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                          background: C.surface, border: `1px solid ${C.border}`, borderRadius: 6, padding: '8px 12px',
+                          opacity: r.status === 'revoked' ? 0.45 : 1,
+                        }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 13, color: C.text, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                              {r.email}
+                              {r.name && <span style={{ color: C.dim, marginLeft: 6 }}>({r.name})</span>}
+                            </div>
+                            <div style={{ fontSize: 11, color: C.dim, marginTop: 2 }}>
+                              {r.status === 'invited' && 'Invited'}
+                              {r.status === 'active' && `Active${r.last_login_at ? ` \u00b7 Last login ${new Date(r.last_login_at).toLocaleDateString()}` : ''}`}
+                              {r.status === 'revoked' && 'Revoked'}
+                            </div>
+                          </div>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: 8 }}>
+                            {/* Role badge */}
+                            <span style={{
+                              fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em',
+                              padding: '2px 6px', borderRadius: 4,
+                              background: r.role === 'admin' ? 'rgba(167,139,250,0.12)' : 'rgba(136,150,170,0.1)',
+                              color: r.role === 'admin' ? '#a78bfa' : C.dim,
+                            }}>
+                              {r.role === 'admin' ? 'Admin' : 'Reviewer'}
+                            </span>
+                            {/* Status badge */}
+                            <span style={{
+                              fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em',
+                              padding: '2px 6px', borderRadius: 4,
+                              background: r.status === 'active' ? 'rgba(34,197,94,0.12)' : r.status === 'invited' ? 'rgba(34,211,238,0.1)' : 'rgba(248,113,113,0.1)',
+                              color: r.status === 'active' ? '#22c55e' : r.status === 'invited' ? C.cyan : C.red,
+                            }}>
+                              {r.status}
+                            </span>
+                            {r.status !== 'revoked' && (
+                              <button
+                                onClick={() => revokeReviewer(r.id)}
+                                title="Revoke access"
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', padding: 2, color: C.dim, display: 'flex' }}
+                                onMouseEnter={e => (e.currentTarget.style.color = C.red)}
+                                onMouseLeave={e => (e.currentTarget.style.color = C.dim)}
+                              >
+                                <XMarkIcon style={{ width: 14, height: 14 }} />
+                              </button>
+                            )}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+
+                  {reviewers.length === 0 && (
+                    <div style={{ color: C.dim, fontSize: 12, textAlign: 'center', padding: '8px 0' }}>
+                      No reviewers invited yet
+                    </div>
+                  )}
+
+                  {/* Copy login link */}
+                  <button
+                    onClick={() => {
+                      const url = `${window.location.origin}/admin/login`
+                      navigator.clipboard.writeText(url).then(() => toast.success('Login link copied'))
+                    }}
+                    style={{
+                      marginTop: 12, background: 'none', border: `1px solid ${C.border}`,
+                      color: C.muted, borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontSize: 12,
+                    }}
+                  >
+                    Copy reviewer login link
+                  </button>
+                </div>
+              )}
+
+              {/* ─── Integrations ─── */}
+              {activeTab === 'integrations' && (
+                <div>
+                  {/* OCR Enhancement (LLM Fallback) */}
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <CodeBracketIcon style={{ width: 16, height: 16, color: C.cyan }} />
+                      <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>OCR Enhancement</div>
+                    </div>
+                    <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
+                      This is completely optional. Our OCR pipeline extracts document fields using fast heuristics.
+                      When you provide an LLM key, it acts as a <strong style={{ color: C.text, fontWeight: 500 }}>second-pass fallback</strong> --
+                      only called for fields where heuristic confidence is below 60%.
+                      This can improve accuracy on unusual layouts or poor-quality scans, but most documents process fine without it.
+                      Your key is encrypted at rest and only used during your verifications.
+                    </div>
+
+                    {llmLoading ? (
+                      <div style={{ color: C.muted, fontSize: 13 }}>Loading...</div>
+                    ) : (
+                      <>
+                        {/* Provider select */}
+                        <label style={labelStyle}>Provider</label>
+                        <select
+                          value={llmProvider}
+                          onChange={e => { setLlmProvider(e.target.value); setLlmApiKey(''); setShowLlmKey(false) }}
+                          style={{ ...inputStyle, marginBottom: 12, cursor: 'pointer', appearance: 'auto' }}
+                        >
+                          <option value="">None (disabled)</option>
+                          <option value="openai">OpenAI (GPT-4o Vision)</option>
+                          <option value="anthropic">Anthropic (Claude Vision)</option>
+                          <option value="custom">Custom (OpenAI-compatible endpoint)</option>
+                        </select>
+
+                        {llmProvider && (
+                          <>
+                            {/* API Key */}
+                            <label style={labelStyle}>
+                              API Key
+                              {llmConfigured && llmKeyPreview && !llmApiKey && (
+                                <span style={{ color: C.green, marginLeft: 8, fontWeight: 400 }}>
+                                  configured: {llmKeyPreview}
+                                </span>
+                              )}
+                            </label>
+                            <div style={{ position: 'relative', marginBottom: 12 }}>
+                              <input
+                                type={showLlmKey ? 'text' : 'password'}
+                                style={{ ...inputStyle, paddingRight: 40 }}
+                                value={llmApiKey}
+                                onChange={e => setLlmApiKey(e.target.value)}
+                                placeholder={llmConfigured ? 'Enter new key to replace' : llmProvider === 'anthropic' ? 'sk-ant-...' : 'sk-...'}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowLlmKey(!showLlmKey)}
+                                style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 4 }}
+                              >
+                                {showLlmKey
+                                  ? <EyeSlashIcon style={{ width: 16, height: 16 }} />
+                                  : <EyeIcon style={{ width: 16, height: 16 }} />
+                                }
+                              </button>
+                            </div>
+
+                            {/* Custom endpoint URL */}
+                            {llmProvider === 'custom' && (
+                              <>
+                                <label style={labelStyle}>Endpoint URL</label>
+                                <input
+                                  type="url"
+                                  style={{ ...inputStyle, marginBottom: 12 }}
+                                  value={llmEndpointUrl}
+                                  onChange={e => setLlmEndpointUrl(e.target.value)}
+                                  placeholder="https://your-server.com/v1/chat/completions"
+                                />
+                              </>
+                            )}
+
+                            {/* Save / Clear buttons */}
+                            <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                              <button
+                                onClick={saveLLMSettings}
+                                disabled={llmSaving || (!llmApiKey && !llmConfigured)}
+                                style={{
+                                  background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
+                                  padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                                  opacity: (llmSaving || (!llmApiKey && !llmConfigured)) ? 0.5 : 1,
+                                }}
+                              >
+                                {llmSaving ? 'Saving...' : 'Save'}
+                              </button>
+                              {llmConfigured && (
+                                <button
+                                  onClick={clearLLMSettings}
+                                  disabled={llmSaving}
+                                  style={{
+                                    background: 'none', border: `1px solid ${C.border}`, color: C.muted,
+                                    borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13,
+                                  }}
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Divider between OCR and SMS */}
+                  <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 24, paddingTop: 20 }} />
+
+                  {/* SMS Provider (Phone OTP) */}
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <DevicePhoneMobileIcon style={{ width: 16, height: 16, color: C.cyan }} />
+                      <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>Phone OTP</div>
+                    </div>
+                    <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
+                      Optional. Add your own <strong style={{ color: C.text, fontWeight: 500 }}>Twilio</strong> or <strong style={{ color: C.text, fontWeight: 500 }}>Vonage</strong> credentials
+                      to enable phone number verification as an additional step in your verification flow.
+                      Credentials are encrypted at rest.
+                    </div>
+
+                    {smsLoading ? (
+                      <div style={{ color: C.muted, fontSize: 13 }}>Loading...</div>
+                    ) : (
+                      <>
+                        {/* Provider select */}
+                        <label style={labelStyle}>Provider</label>
+                        <select
+                          value={smsProvider}
+                          onChange={e => { setSmsProvider(e.target.value); setSmsApiKey(''); setSmsApiSecret(''); setShowSmsKey(false) }}
+                          style={{ ...inputStyle, marginBottom: 12, cursor: 'pointer', appearance: 'auto' }}
+                        >
+                          <option value="">None (disabled)</option>
+                          <option value="twilio">Twilio</option>
+                          <option value="vonage">Vonage</option>
+                        </select>
+
+                        {smsProvider && (
+                          <>
+                            {/* API Key / Account SID */}
+                            <label style={labelStyle}>
+                              {smsProvider === 'twilio' ? 'Account SID' : 'API Key'}
+                              {smsConfigured && smsKeyPreview && !smsApiKey && (
+                                <span style={{ color: C.green, marginLeft: 8, fontWeight: 400 }}>
+                                  configured: {smsKeyPreview}
+                                </span>
+                              )}
+                            </label>
+                            <div style={{ position: 'relative', marginBottom: 12 }}>
+                              <input
+                                type={showSmsKey ? 'text' : 'password'}
+                                style={{ ...inputStyle, paddingRight: 40 }}
+                                value={smsApiKey}
+                                onChange={e => setSmsApiKey(e.target.value)}
+                                placeholder={smsConfigured ? 'Enter new key to replace' : smsProvider === 'twilio' ? 'AC...' : 'API key'}
+                              />
+                              <button
+                                type="button"
+                                onClick={() => setShowSmsKey(!showSmsKey)}
+                                style={{ position: 'absolute', right: 8, top: '50%', transform: 'translateY(-50%)', background: 'none', border: 'none', color: C.muted, cursor: 'pointer', padding: 4 }}
+                              >
+                                {showSmsKey
+                                  ? <EyeSlashIcon style={{ width: 16, height: 16 }} />
+                                  : <EyeIcon style={{ width: 16, height: 16 }} />
+                                }
+                              </button>
+                            </div>
+
+                            {/* API Secret / Auth Token */}
+                            <label style={labelStyle}>{smsProvider === 'twilio' ? 'Auth Token' : 'API Secret'}</label>
+                            <input
+                              type="password"
+                              style={{ ...inputStyle, marginBottom: 12 }}
+                              value={smsApiSecret}
+                              onChange={e => setSmsApiSecret(e.target.value)}
+                              placeholder={smsConfigured ? 'Enter new secret to replace' : smsProvider === 'twilio' ? 'Auth token' : 'API secret'}
+                            />
+
+                            {/* Phone Number */}
+                            <label style={labelStyle}>Sender Phone Number</label>
+                            <input
+                              type="tel"
+                              style={{ ...inputStyle, marginBottom: 12 }}
+                              value={smsPhoneNumber}
+                              onChange={e => setSmsPhoneNumber(e.target.value)}
+                              placeholder="+15551234567"
+                            />
+
+                            {/* Save / Clear buttons */}
+                            <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                              <button
+                                onClick={saveSMSSettings}
+                                disabled={smsSaving || (!smsConfigured && (!smsApiKey || !smsApiSecret || !smsPhoneNumber))}
+                                style={{
+                                  background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
+                                  padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                                  opacity: (smsSaving || (!smsConfigured && (!smsApiKey || !smsApiSecret || !smsPhoneNumber))) ? 0.5 : 1,
+                                }}
+                              >
+                                {smsSaving ? 'Saving...' : 'Save'}
+                              </button>
+                              {smsConfigured && (
+                                <button
+                                  onClick={clearSMSSettings}
+                                  disabled={smsSaving}
+                                  style={{
+                                    background: 'none', border: `1px solid ${C.border}`, color: C.muted,
+                                    borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13,
+                                  }}
+                                >
+                                  Remove
+                                </button>
+                              )}
+                            </div>
+                          </>
+                        )}
+                      </>
+                    )}
+                  </div>
+                </div>
+              )}
+
+              {/* ─── Branding ─── */}
+              {activeTab === 'branding' && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <PaintBrushIcon style={{ width: 16, height: 16, color: C.cyan }} />
+                    <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>Verification Page</div>
+                  </div>
+                  <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
+                    White-label the hosted verification page with your own branding. End users will see your logo,
+                    company name, and accent color instead of Idswyft defaults.
+                  </div>
+
+                  {brandLoading ? (
+                    <div style={{ color: C.muted, fontSize: 13 }}>Loading...</div>
+                  ) : (
+                    <>
+                      {/* Company Name */}
+                      <label style={labelStyle}>Company Name</label>
+                      <input
+                        type="text"
+                        value={brandCompanyName}
+                        onChange={e => setBrandCompanyName(e.target.value)}
+                        style={{ ...inputStyle, marginBottom: 12 }}
+                        placeholder="Your Company"
+                        maxLength={100}
+                      />
+
+                      {/* Logo URL + upload */}
+                      <label style={labelStyle}>Logo URL</label>
+                      <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                        <input
+                          type="url"
+                          value={brandLogoUrl}
+                          onChange={e => setBrandLogoUrl(e.target.value)}
+                          style={{ ...inputStyle, marginBottom: 0, flex: 1 }}
+                          placeholder="https://example.com/logo.png"
+                        />
                         <button
-                          onClick={clearBrandingSettings}
-                          disabled={brandSaving}
+                          type="button"
+                          onClick={() => document.getElementById('branding-logo-input')?.click()}
                           style={{
-                            background: 'none', border: `1px solid ${C.border}`, color: C.muted,
-                            borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13,
+                            background: C.surface, border: `1px solid ${C.border}`, color: C.muted,
+                            borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontSize: 12,
+                            whiteSpace: 'nowrap',
                           }}
                         >
-                          Clear
+                          Upload
                         </button>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
-            </div>
+                        <input
+                          id="branding-logo-input"
+                          type="file"
+                          accept="image/jpeg,image/png"
+                          style={{ display: 'none' }}
+                          onChange={e => {
+                            const file = e.target.files?.[0]
+                            if (file && file.size > 2 * 1024 * 1024) {
+                              toast.error('File must be under 2 MB')
+                              e.target.value = ''
+                              return
+                            }
+                            if (file) uploadBrandingLogo(file)
+                            e.target.value = ''
+                          }}
+                        />
+                      </div>
 
-          </div>{/* end two-column layout */}
+                      {/* Accent Color */}
+                      <label style={labelStyle}>Accent Color</label>
+                      <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+                        <input
+                          type="text"
+                          value={brandAccentColor}
+                          onChange={e => setBrandAccentColor(e.target.value)}
+                          style={{ ...inputStyle, marginBottom: 0, flex: 1 }}
+                          placeholder="#22d3ee"
+                          maxLength={7}
+                        />
+                        <div
+                          style={{
+                            width: 32, height: 32, borderRadius: 6, flexShrink: 0,
+                            background: /^#[0-9a-fA-F]{6}$/.test(brandAccentColor) ? brandAccentColor : C.cyan,
+                            border: `1px solid ${C.border}`,
+                          }}
+                        />
+                        <input
+                          type="color"
+                          value={/^#[0-9a-fA-F]{6}$/.test(brandAccentColor) ? brandAccentColor : '#22d3ee'}
+                          onChange={e => setBrandAccentColor(e.target.value)}
+                          style={{ width: 32, height: 32, border: 'none', padding: 0, cursor: 'pointer', background: 'transparent' }}
+                        />
+                      </div>
+
+                      {/* Live Preview */}
+                      <div style={{
+                        background: '#080c14', border: `1px solid ${C.border}`, borderRadius: 10,
+                        padding: 16, marginBottom: 14,
+                      }}>
+                        <div style={{ fontSize: 10, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Preview</div>
+                        <div style={{ textAlign: 'center' }}>
+                          {brandLogoUrl ? (
+                            <img
+                              src={brandLogoUrl}
+                              alt="Logo preview"
+                              style={{ height: 28, margin: '0 auto 10px', display: 'block', objectFit: 'contain' }}
+                              onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                            />
+                          ) : (
+                            <img src="/idswyft-logo.png" alt="Idswyft" style={{ height: 28, margin: '0 auto 10px', display: 'block' }} />
+                          )}
+                          <div style={{ fontSize: 14, fontWeight: 600, color: '#dde2ec', marginBottom: 4 }}>
+                            {brandCompanyName ? `Verify with ${brandCompanyName}` : 'Verify Your Identity'}
+                          </div>
+                          <div style={{ fontSize: 11, color: '#8896aa', marginBottom: 12 }}>Choose how you'd like to complete verification</div>
+                          <button
+                            type="button"
+                            style={{
+                              background: /^#[0-9a-fA-F]{6}$/.test(brandAccentColor) ? brandAccentColor : C.cyan,
+                              color: '#080c14', border: 'none', borderRadius: 8,
+                              padding: '8px 24px', fontSize: 12, fontWeight: 600,
+                              cursor: 'default',
+                            }}
+                          >
+                            Scan QR Code
+                          </button>
+                          {(brandLogoUrl || brandCompanyName || brandAccentColor) && (
+                            <div style={{ fontSize: 9, color: C.dim, marginTop: 10 }}>
+                              Powered by Idswyft
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Save / Clear buttons */}
+                      <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                        <button
+                          onClick={saveBrandingSettings}
+                          disabled={brandSaving}
+                          style={{
+                            background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
+                            padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                            opacity: brandSaving ? 0.5 : 1,
+                          }}
+                        >
+                          {brandSaving ? 'Saving...' : 'Save'}
+                        </button>
+                        {brandConfigured && (
+                          <button
+                            onClick={clearBrandingSettings}
+                            disabled={brandSaving}
+                            style={{
+                              background: 'none', border: `1px solid ${C.border}`, color: C.muted,
+                              borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13,
+                            }}
+                          >
+                            Clear
+                          </button>
+                        )}
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* ─── Account (Danger Zone) ─── */}
+              {activeTab === 'account' && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <ExclamationTriangleIcon style={{ width: 16, height: 16, color: C.red }} />
+                    <div style={{ fontWeight: 600, fontSize: 14, color: C.red }}>Danger Zone</div>
+                  </div>
+                  <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
+                    Permanently delete your developer account and all associated data including API keys, webhooks, and verification records. This action cannot be undone.
+                  </div>
+                  <button
+                    style={{ background: 'none', border: `1px solid ${C.red}`, color: C.red, borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}
+                    onClick={() => { onClose(); setShowDeleteAccount(true) }}
+                  >
+                    Delete Account
+                  </button>
+                </div>
+              )}
+
+            </div>
+          </div>
         </div>
       </div>
 
