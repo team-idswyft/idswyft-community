@@ -19,6 +19,7 @@ export interface VerificationRequest {
   status: string;
   current_step?: string;
   total_steps?: number;
+  verification_mode?: 'full' | 'document_only' | 'identity' | 'age_only' | null;
   final_result?: 'verified' | 'failed' | 'manual_review' | null;
   documents: DemoDocument[];
   selfie_id?: string;

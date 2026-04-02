@@ -64,6 +64,7 @@ export {
   LiveCaptureResultSchema,
   FaceMatchResultSchema,
   GateResultSchema,
+  FLOW_PRESETS,
 } from './verification/models/schemas.js';
 export type {
   FrontExtractionResult,
@@ -76,6 +77,8 @@ export type {
   VerificationStatusType,
   RejectionReasonType,
   AMLScreeningSessionResult,
+  FlowConfig,
+  VerificationMode,
 } from './verification/models/schemas.js';
 
 export { HeadTurnLivenessMetadataSchema, AnalysisFrameSchema } from './verification/models/headTurnLivenessSchema.js';

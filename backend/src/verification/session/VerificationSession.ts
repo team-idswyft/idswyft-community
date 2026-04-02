@@ -12,7 +12,7 @@
 
 import { randomUUID } from 'crypto';
 import { SessionFlowError } from '../exceptions.js';
-import { VerificationStatus } from '@idswyft/shared';
+import { VerificationStatus, FLOW_PRESETS } from '@idswyft/shared';
 import type {
   VerificationStatusType,
   FrontExtractionResult,
@@ -22,6 +22,7 @@ import type {
   FaceMatchResult,
   GateResult,
   SessionState,
+  FlowConfig,
 } from '@idswyft/shared';
 
 /**
@@ -94,9 +95,11 @@ export interface SessionHydration {
 export class VerificationSession {
   private state: SessionState;
   private deps: SessionDeps;
+  readonly flow: FlowConfig;
 
-  constructor(deps: SessionDeps, hydration?: SessionHydration) {
+  constructor(deps: SessionDeps, hydration?: SessionHydration, flow?: FlowConfig) {
     this.deps = deps;
+    this.flow = flow ?? FLOW_PRESETS.full;
     const now = new Date().toISOString();
     this.state = {
       session_id: hydration?.session_id ?? randomUUID(),
@@ -138,7 +141,7 @@ export class VerificationSession {
     }
 
     this.state.front_extraction = frontResult;
-    this.transition(VerificationStatus.AWAITING_BACK);
+    this.transition(this.flow.afterFront as VerificationStatusType);
     return this.passResult();
   }
 
@@ -245,7 +248,14 @@ export class VerificationSession {
       return this.hardReject(gate3);
     }
 
-    this.transition(VerificationStatus.AWAITING_LIVE);
+    const afterCrossVal = this.flow.afterCrossVal as VerificationStatusType;
+    this.transition(afterCrossVal);
+
+    // document_only flow: cross-validation is the final gate — mark complete
+    if (afterCrossVal === VerificationStatus.COMPLETE) {
+      this.state.completed_at = new Date().toISOString();
+    }
+
     return this.passResult();
   }
 

@@ -16,7 +16,7 @@ interface ContinueOnPhoneProps {
   apiKey: string;
   userId: string;
   source?: 'api' | 'vaas' | 'demo';
-  verificationMode?: 'full' | 'age_only';
+  verificationMode?: 'full' | 'document_only' | 'identity' | 'age_only';
   ageThreshold?: number;
   onComplete: (result: VerificationResult) => void;
 }

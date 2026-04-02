@@ -13,9 +13,11 @@ const TAGS = ['Document read', 'Details matched', 'Security checks'];
 interface CheckingStepProps {
   stepError?: string | null;
   onRetry?: () => void;
+  step?: number;
+  totalSteps?: number;
 }
 
-export const CheckingStep: React.FC<CheckingStepProps> = ({ stepError, onRetry }) => {
+export const CheckingStep: React.FC<CheckingStepProps> = ({ stepError, onRetry, step, totalSteps }) => {
   const [msgIdx, setMsgIdx] = useState(0);
 
   useEffect(() => {
@@ -33,7 +35,7 @@ export const CheckingStep: React.FC<CheckingStepProps> = ({ stepError, onRetry }
     >
       <AmbientGlow />
 
-      <StepLabel step={4} total={6} label="Verification" />
+      <StepLabel step={step ?? 4} total={totalSteps ?? 6} label="Verification" />
 
       {/* Spinner */}
       <div style={{

@@ -56,9 +56,13 @@ const DemoPage: React.FC = () => {
   // Demo form fields
   const [apiKey, setApiKey] = useState(urlApiKey || '');
   const [userId, setUserId] = useState('');
-  const [verificationMode, setVerificationMode] = useState<'full' | 'age_only'>('full');
+  const [verificationMode, setVerificationMode] = useState<'full' | 'document_only' | 'identity' | 'age_only'>('full');
   const [ageThreshold, setAgeThreshold] = useState(18);
   const isAgeOnly = verificationMode === 'age_only';
+  const isDocumentOnly = verificationMode === 'document_only';
+  const isIdentity = verificationMode === 'identity';
+  // Display-step count (UI screens), not backend pipeline gate count
+  const totalSteps = isAgeOnly ? 3 : isDocumentOnly ? 5 : isIdentity ? 4 : 6;
 
   // Live capture state
   const [showLiveCapture, setShowLiveCapture] = useState(false);
@@ -91,6 +95,8 @@ const DemoPage: React.FC = () => {
   const streamRef = useRef<MediaStream | null>(null);
   const animationRef = useRef<number | null>(null);
   const faceClassifierRef = useRef<any>(null);
+  const ocrPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const ocrPollTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const crossValPollRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const crossValTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -168,6 +174,7 @@ const DemoPage: React.FC = () => {
   useEffect(() => {
     return () => {
       cleanup();
+      stopOCRPolling();
       stopCrossValPolling();
     };
   }, []);
@@ -677,7 +684,8 @@ const DemoPage: React.FC = () => {
         user_id: userId,
         source: 'demo' as const,
         ...(useSandbox && { sandbox: true }),
-        ...(verificationMode === 'age_only' && { verification_mode: 'age_only', age_threshold: ageThreshold }),
+        ...(verificationMode !== 'full' && { verification_mode: verificationMode }),
+        ...(verificationMode === 'age_only' && { age_threshold: ageThreshold }),
       };
 
       console.log('Start Verification Debug:');
@@ -816,8 +824,15 @@ const DemoPage: React.FC = () => {
     }
   };
 
+  const stopOCRPolling = () => {
+    if (ocrPollRef.current) { clearInterval(ocrPollRef.current); ocrPollRef.current = null; }
+    if (ocrPollTimeoutRef.current) { clearTimeout(ocrPollTimeoutRef.current); ocrPollTimeoutRef.current = null; }
+  };
+
   const pollForOCRResults = () => {
-    const pollInterval = setInterval(async () => {
+    stopOCRPolling();
+
+    ocrPollRef.current = setInterval(async () => {
       try {
         const url = new URL(`${API_BASE_URL}/api/v2/verify/${verificationId}/status`);
         if (shouldUseSandbox()) {
@@ -836,14 +851,19 @@ const DemoPage: React.FC = () => {
 
           const status = (data.status || '').toLowerCase();
           if (status === 'hard_rejected' || status === 'failed') {
-            clearInterval(pollInterval);
+            stopOCRPolling();
             toast.error(data.rejection_reason || data.failure_reason || 'Document verification failed');
             return;
           }
 
           if (data.ocr_data && Object.keys(data.ocr_data).length > 0) {
-            clearInterval(pollInterval);
-            setCurrentStep(4);
+            stopOCRPolling();
+            // identity flow: skip back doc → go straight to live capture
+            if (isIdentity) {
+              setCurrentStep(6);
+            } else {
+              setCurrentStep(4); // back upload (full and document_only)
+            }
           }
         }
       } catch (error) {
@@ -851,7 +871,7 @@ const DemoPage: React.FC = () => {
       }
     }, 2000);
 
-    setTimeout(() => clearInterval(pollInterval), 30000);
+    ocrPollTimeoutRef.current = setTimeout(() => stopOCRPolling(), 30000);
   };
 
   // ── Back document upload (new separate step) ────────────────
@@ -907,6 +927,14 @@ const DemoPage: React.FC = () => {
         return;
       }
 
+      // document_only: backend may return final result after crossval
+      if (data.final_result || data.status === 'verified' || data.status === 'manual_review') {
+        setVerificationRequest(data);
+        setCurrentStep(7);
+        toast.success('Document verification complete');
+        return;
+      }
+
       setCurrentStep(5); // Checking step
       pollCrossValidation();
     } catch (error) {
@@ -942,6 +970,14 @@ const DemoPage: React.FC = () => {
           if (status === 'failed' || status === 'hard_rejected') {
             stopCrossValPolling();
             setCurrentStep(7); // Results (failed)
+            return;
+          }
+
+          // document_only: crossval complete means verification done
+          if (isDocumentOnly && (status === 'verified' || status === 'manual_review' || status === 'complete')) {
+            stopCrossValPolling();
+            setVerificationRequest(data);
+            setCurrentStep(7);
             return;
           }
 
@@ -1352,6 +1388,7 @@ const DemoPage: React.FC = () => {
             isLoading={isLoading}
             isAgeOnly={isAgeOnly}
             ageThreshold={ageThreshold}
+            totalSteps={totalSteps}
             onFileSelect={handleFileSelect}
             onDocumentTypeChange={setDocumentType}
             onUpload={uploadDocument}
@@ -1368,13 +1405,14 @@ const DemoPage: React.FC = () => {
             backFile={backFile}
             backPreviewUrl={backPreviewUrl}
             isLoading={isLoading}
+            totalSteps={totalSteps}
             onBackFileSelect={handleBackFileSelect}
             onUpload={uploadBackDocument}
           />
         );
 
       case 5:
-        return <CheckingStep stepError={checkingStepError} onRetry={pollCrossValidation} />;
+        return <CheckingStep stepError={checkingStepError} onRetry={pollCrossValidation} step={4} totalSteps={totalSteps} />;
 
       case 6:
         // If ActiveLiveness triggered fallback, render the legacy camera UI
@@ -1387,6 +1425,8 @@ const DemoPage: React.FC = () => {
             showActiveLiveness={showLiveCapture}
             onStartLiveness={handleLiveCapture}
             onSkipLiveCapture={skipLiveCapture}
+            step={isIdentity ? 3 : 5}
+            totalSteps={totalSteps}
             renderActiveLiveness={() => (
               <ActiveLivenessCapture
                 onComplete={handleActiveLivenessComplete}
@@ -1466,17 +1506,31 @@ const DemoPage: React.FC = () => {
           <ProgressIndicator
             currentStep={(() => {
               if (isAgeOnly) {
-                // Age-only: Init(1) → Front(2) → Processing(3) → Results(7)
                 if (currentStep >= 7) return 3;
                 if (currentStep >= 2) return 2;
                 return 1;
               }
-              // Full flow: map internal steps (1-8) to 6 display positions
-              const map: Record<number, number> = { 1: 1, 2: 2, 3: 2, 4: 3, 5: 4, 6: 5, 7: 6, 8: 6 };
+              if (isDocumentOnly) {
+                // 5 display steps: Start(1), Front(2), Back(3), Checking(4), Results(5)
+                const map: Record<number, number> = { 1:1, 2:2, 3:2, 4:3, 5:4, 7:5, 8:5 };
+                return map[currentStep] || 1;
+              }
+              if (isIdentity) {
+                // 4 display steps: Start(1), Front(2), Live(3), Results(4)
+                const map: Record<number, number> = { 1:1, 2:2, 3:2, 6:3, 7:4, 8:4 };
+                return map[currentStep] || 1;
+              }
+              // Full flow: 6 display steps
+              const map: Record<number, number> = { 1:1, 2:2, 3:2, 4:3, 5:4, 6:5, 7:6, 8:6 };
               return map[currentStep] || 1;
             })()}
             isMobile={isMobile}
-            stepLabels={isAgeOnly ? ['Start', 'Upload ID', 'Results'] : undefined}
+            stepLabels={
+              isAgeOnly ? ['Start', 'Upload ID', 'Results']
+              : isDocumentOnly ? ['Start', 'Front ID', 'Back ID', 'Checking', 'Results']
+              : isIdentity ? ['Start', 'Front ID', 'Live Photo', 'Results']
+              : undefined
+            }
           />
           {renderStepContent()}
         </div>

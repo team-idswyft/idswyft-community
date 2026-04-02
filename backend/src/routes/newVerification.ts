@@ -24,6 +24,7 @@ import {
   DocumentZoneValidator,
   createDeepfakeDetector,
   decryptSecret,
+  FLOW_PRESETS,
 } from '@idswyft/shared';
 import type {
   HeadTurnLivenessMetadata,
@@ -32,6 +33,8 @@ import type {
   LiveCaptureResult,
   SessionState,
   LLMProviderConfig,
+  FlowConfig,
+  VerificationMode,
 } from '@idswyft/shared';
 import { createAMLProviders } from '@/providers/aml/index.js';
 import { screenAll } from '@/providers/aml/multiScreen.js';
@@ -76,7 +79,7 @@ interface VerificationAddons {
 }
 
 /** Create a VerificationSession with real service deps, optionally hydrated from DB */
-function createSession(isSandbox: boolean, hydration?: SessionHydration, addons?: VerificationAddons, developerAmlEnabled?: boolean): VerificationSession {
+function createSession(isSandbox: boolean, hydration?: SessionHydration, addons?: VerificationAddons, developerAmlEnabled?: boolean, flow?: FlowConfig): VerificationSession {
   // AML auto-triggers when: providers configured, not sandbox, developer hasn't disabled, addon not explicitly false
   const amlEnabled = amlProviders.length > 0
     && !isSandbox
@@ -102,7 +105,7 @@ function createSession(isSandbox: boolean, hydration?: SessionHydration, addons?
       : undefined,
   };
 
-  return new VerificationSession(deps, hydration);
+  return new VerificationSession(deps, hydration, flow);
 }
 
 /** Hydrate a session from DB for a given verification ID */
@@ -127,12 +130,12 @@ async function hydrateSession(verificationId: string, isSandbox: boolean, develo
     session_id: verificationId,
   };
 
-  // Read addons + developer_id from the verification_requests row
+  // Read addons + developer_id + verification_mode from the verification_requests row
   let addons: VerificationAddons | undefined;
   let resolvedDeveloperId = developerId;
   const { data: row } = await supabase
     .from('verification_requests')
-    .select('addons, developer_id')
+    .select('addons, developer_id, verification_mode')
     .eq('id', verificationId)
     .single();
   if (row?.addons && typeof row.addons === 'object') {
@@ -155,7 +158,11 @@ async function hydrateSession(verificationId: string, isSandbox: boolean, develo
     }
   }
 
-  return createSession(isSandbox, hydration, addons, developerAmlEnabled);
+  // Resolve flow config from verification_mode
+  const mode = (row?.verification_mode as VerificationMode) || 'full';
+  const flow = FLOW_PRESETS[mode] ?? FLOW_PRESETS.full;
+
+  return createSession(isSandbox, hydration, addons, developerAmlEnabled, flow);
 }
 
 // ─── Developer LLM config lookup ────────────────────────────────
@@ -487,33 +494,64 @@ async function extractLiveCapture(
 
 // ─── Status mapping for backward compatibility ──────────────────
 
+// ─── Step maps per flow ──────────────────────────────────────────
+const STEP_MAPS: Record<string, Record<string, number>> = {
+  full: {
+    AWAITING_FRONT: 1, FRONT_PROCESSING: 1,
+    AWAITING_BACK: 2, BACK_PROCESSING: 2,
+    CROSS_VALIDATING: 3,
+    AWAITING_LIVE: 4, LIVE_PROCESSING: 4,
+    FACE_MATCHING: 5,
+    COMPLETE: 5, HARD_REJECTED: 0,
+  },
+  document_only: {
+    AWAITING_FRONT: 1, FRONT_PROCESSING: 1,
+    AWAITING_BACK: 2, BACK_PROCESSING: 2,
+    CROSS_VALIDATING: 3,
+    COMPLETE: 3, HARD_REJECTED: 0,
+  },
+  identity: {
+    AWAITING_FRONT: 1, FRONT_PROCESSING: 1,
+    AWAITING_LIVE: 2, LIVE_PROCESSING: 2,
+    FACE_MATCHING: 3,
+    COMPLETE: 3, HARD_REJECTED: 0,
+  },
+  liveness_only: {
+    AWAITING_LIVE: 1, LIVE_PROCESSING: 1,
+    FACE_MATCHING: 1,
+    COMPLETE: 1, HARD_REJECTED: 0,
+  },
+  age_only: {
+    AWAITING_FRONT: 1, FRONT_PROCESSING: 1,
+    COMPLETE: 1, HARD_REJECTED: 0,
+  },
+};
+
 /** Map new 10-state VerificationStatus to old response format */
-function mapStatusForResponse(state: Readonly<SessionState>, isAgeOnly: boolean = false): {
+function mapStatusForResponse(state: Readonly<SessionState>, flow: FlowConfig = FLOW_PRESETS.full): {
   status: string;
   current_step: number;
   total_steps: number;
   final_result: string | null;
 } {
-  const totalSteps = isAgeOnly ? 1 : 5;
-
-  const stepMap: Record<string, number> = {
-    AWAITING_FRONT: 1,
-    FRONT_PROCESSING: 1,
-    AWAITING_BACK: 2,
-    BACK_PROCESSING: 2,
-    CROSS_VALIDATING: 3,
-    AWAITING_LIVE: 4,
-    LIVE_PROCESSING: 4,
-    FACE_MATCHING: 5,
-    COMPLETE: isAgeOnly ? 1 : 5,
-    HARD_REJECTED: 0,
-  };
+  const stepMap = STEP_MAPS[flow.preset] ?? STEP_MAPS.full;
 
   let finalResult: string | null = null;
   if (state.current_step === VerificationStatus.COMPLETE) {
-    if (isAgeOnly) {
+    if (flow.preset === 'age_only') {
       finalResult = 'verified';
+    } else if (flow.preset === 'document_only') {
+      // Document-only: final result based on cross-validation verdict alone
+      const crossValVerdict = state.cross_validation?.verdict;
+      finalResult = crossValVerdict === 'REVIEW' ? 'manual_review'
+        : crossValVerdict === 'REJECT' ? 'failed'
+        : 'verified';
+    } else if (flow.preset === 'identity') {
+      // Identity: no crossval, result based on face match only
+      const needsReview = !!state.face_match?.skipped_reason;
+      finalResult = needsReview ? 'manual_review' : 'verified';
     } else {
+      // full / liveness_only: standard logic
       const needsReview = state.cross_validation?.verdict === 'REVIEW'
         || !!state.face_match?.skipped_reason;
       finalResult = needsReview ? 'manual_review' : 'verified';
@@ -525,7 +563,7 @@ function mapStatusForResponse(state: Readonly<SessionState>, isAgeOnly: boolean 
   return {
     status: state.current_step,
     current_step: stepMap[state.current_step] ?? 0,
-    total_steps: totalSteps,
+    total_steps: flow.totalSteps,
     final_result: finalResult,
   };
 }
@@ -667,7 +705,7 @@ router.post('/initialize',
     body('addons').optional().isObject().withMessage('Addons must be an object'),
     body('addons.aml_screening').optional().isBoolean().withMessage('aml_screening must be a boolean'),
     body('addons.address_verification').optional().isBoolean().withMessage('address_verification must be a boolean'),
-    body('verification_mode').optional().isIn(['full', 'age_only']).withMessage('verification_mode must be "full" or "age_only"'),
+    body('verification_mode').optional().isIn(['full', 'document_only', 'identity', 'age_only']).withMessage('verification_mode must be "full", "document_only", "identity", or "age_only"'),
     body('age_threshold').optional().isInt({ min: 1, max: 99 }).withMessage('age_threshold must be an integer between 1 and 99'),
   ],
   validate,
@@ -707,9 +745,12 @@ router.post('/initialize',
       ...(ageThreshold !== null && { age_threshold: ageThreshold }),
     }).eq('id', verificationRecord.id);
 
+    // Resolve flow config from verification_mode
+    const flow = FLOW_PRESETS[verificationMode as VerificationMode] ?? FLOW_PRESETS.full;
+
     // Create session and save initial state
     const issuingCountryUpper = issuing_country?.toUpperCase() || null;
-    const session = createSession(isSandbox, { session_id: verificationRecord.id, issuing_country: issuingCountryUpper }, addons);
+    const session = createSession(isSandbox, { session_id: verificationRecord.id, issuing_country: issuingCountryUpper }, addons, undefined, flow);
     await saveSessionState(verificationRecord.id, session.getState());
 
     logVerificationEvent('verification_initialized', verificationRecord.id, {
@@ -720,18 +761,24 @@ router.post('/initialize',
     });
 
     const isAgeOnly = verificationMode === 'age_only';
-    const mapped = mapStatusForResponse(session.getState(), isAgeOnly);
+    const mapped = mapStatusForResponse(session.getState(), flow);
+
+    const modeMessages: Record<string, string> = {
+      full: 'Verification initialized successfully - ready to upload front document',
+      document_only: 'Document-only verification initialized — upload front document',
+      identity: 'Identity verification initialized — upload front document',
+      age_only: 'Age verification initialized — upload front document to check age',
+    };
 
     res.status(201).json({
       success: true,
       verification_id: verificationRecord.id,
+      verification_mode: verificationMode,
       status: mapped.status,
       current_step: mapped.current_step,
       total_steps: mapped.total_steps,
-      ...(isAgeOnly && { verification_mode: 'age_only', age_threshold: ageThreshold }),
-      message: isAgeOnly
-        ? 'Age verification initialized — upload front document to check age'
-        : 'Verification initialized successfully - ready to upload front document',
+      ...(isAgeOnly && { age_threshold: ageThreshold }),
+      message: modeMessages[verificationMode] || modeMessages.full,
     });
 
     // Fire verification.started webhook (after response is sent)
@@ -947,13 +994,15 @@ router.post('/:verification_id/front-document',
       verificationService.updateDocument(document.id, { file_path: null } as any).catch(() => {});
     }
 
-    // Check if this is an age_only verification
+    // Check verification mode and resolve flow
     const { data: vrRow } = await supabase
       .from('verification_requests')
       .select('verification_mode, age_threshold')
       .eq('id', verification_id)
       .single();
-    const isAgeOnly = vrRow?.verification_mode === 'age_only';
+    const vrMode = (vrRow?.verification_mode as VerificationMode) || 'full';
+    const flow = FLOW_PRESETS[vrMode] ?? FLOW_PRESETS.full;
+    const isAgeOnly = vrMode === 'age_only';
     const ageThreshold = vrRow?.age_threshold ?? 18;
 
     // Hydrate session and run Gate 1 via session
@@ -994,17 +1043,29 @@ router.post('/:verification_id/front-document',
       documentId: document.id,
       documentPath,
       status: state.current_step,
-      ...(isAgeOnly && { verification_mode: 'age_only' }),
+      verification_mode: vrMode,
     });
 
-    const mapped = mapStatusForResponse(state, isAgeOnly);
+    const mapped = mapStatusForResponse(state, flow);
 
     const ocrResult = state.front_extraction?.ocr;
+
+    // Build next-step message per flow
+    const nextStepMessage = !stepResult.passed
+      ? stepResult.user_message || 'Front document processing failed'
+      : isAgeOnly
+        ? (state.current_step === VerificationStatus.COMPLETE ? 'Age verification passed' : stepResult.user_message || 'Age verification failed')
+        : flow.afterFront === 'AWAITING_LIVE'
+          ? 'Front document processed successfully - ready for live capture'
+          : 'Front document processed successfully - ready to upload back document';
+
     res.json({
       success: true,
       verification_id,
+      verification_mode: vrMode,
       status: mapped.status,
       current_step: mapped.current_step,
+      total_steps: mapped.total_steps,
       document_id: document.id,
       ocr_data: isAgeOnly ? undefined : (ocrResult ?? null),
       detected_document_type: ocrResult?.detected_document_type || (document_type !== 'auto' ? document_type : undefined),
@@ -1012,14 +1073,8 @@ router.post('/:verification_id/front-document',
       rejection_reason: state.rejection_reason,
       rejection_detail: state.rejection_detail,
       ...(ageVerification && { age_verification: ageVerification }),
-      ...(isAgeOnly && { final_result: mapped.final_result }),
-      message: isAgeOnly
-        ? (state.current_step === VerificationStatus.COMPLETE
-          ? 'Age verification passed'
-          : stepResult.user_message || 'Age verification failed')
-        : (!stepResult.passed
-          ? stepResult.user_message || 'Front document processing failed'
-          : 'Front document processed successfully - ready to upload back document'),
+      ...(mapped.final_result && { final_result: mapped.final_result }),
+      message: nextStepMessage,
     });
 
     // Broadcast status change via Supabase Realtime (after response is sent)
@@ -1078,6 +1133,24 @@ router.post('/:verification_id/back-document',
     const isSandbox = (verification as any).is_sandbox || false;
     const source: VerificationSource = (verification as any).source || 'api';
 
+    // Guard: check flow allows back document
+    const { data: vrRow } = await supabase
+      .from('verification_requests')
+      .select('verification_mode')
+      .eq('id', verification_id)
+      .single();
+    const vrMode = (vrRow?.verification_mode as VerificationMode) || 'full';
+    const flow = FLOW_PRESETS[vrMode] ?? FLOW_PRESETS.full;
+
+    if (!flow.requiresBack) {
+      return res.status(400).json({
+        success: false,
+        verification_id,
+        verification_mode: vrMode,
+        message: `Back document is not required for "${vrMode}" verification mode. ${flow.requiresLiveness ? 'Proceed to live capture.' : 'Verification is complete.'}`,
+      });
+    }
+
     // Store document in the source-appropriate bucket
     const documentPath = await storageService.storeDocument(
       req.file.buffer,
@@ -1115,7 +1188,7 @@ router.post('/:verification_id/back-document',
     // Guard: if session was already rejected in a previous step, return early
     const preState = session.getState();
     if (preState.current_step === VerificationStatus.HARD_REJECTED) {
-      const mapped = mapStatusForResponse(preState);
+      const mapped = mapStatusForResponse(preState, flow);
       return res.status(409).json({
         success: false,
         verification_id,
@@ -1133,25 +1206,48 @@ router.post('/:verification_id/back-document',
     await saveSessionState(verification_id, session.getState());
 
     // Update main DB record
-    const dbStatus = stepResult.passed ? 'processing' : 'failed';
-    await verificationService.updateVerificationRequest(verification_id, {
-      status: dbStatus,
-    } as any);
+    const state = session.getState();
+    let dbStatus: string;
+    if (flow.preset === 'document_only' && state.current_step === VerificationStatus.COMPLETE) {
+      // document_only: crossval passed → determine final status
+      const crossValVerdict = state.cross_validation?.verdict;
+      dbStatus = crossValVerdict === 'REVIEW' ? 'manual_review'
+        : crossValVerdict === 'REJECT' ? 'failed'
+        : 'verified';
+      await verificationService.updateVerificationRequest(verification_id, {
+        status: dbStatus,
+        cross_validation_score: state.cross_validation?.overall_score ?? null,
+        processing_completed_at: new Date().toISOString(),
+      } as any);
+    } else {
+      dbStatus = stepResult.passed ? 'processing' : 'failed';
+      await verificationService.updateVerificationRequest(verification_id, {
+        status: dbStatus,
+      } as any);
+    }
 
     logVerificationEvent('back_document_processed', verification_id, {
       documentId: document.id,
       documentPath,
-      status: session.getState().current_step,
+      status: state.current_step,
+      verification_mode: vrMode,
     });
 
-    const mapped = mapStatusForResponse(session.getState());
-    const state = session.getState();
+    const mapped = mapStatusForResponse(state, flow);
+
+    const nextMsg = !stepResult.passed
+      ? stepResult.user_message || 'Back document processing failed'
+      : flow.afterCrossVal === 'COMPLETE'
+        ? 'Document verification complete'
+        : 'Back document processed and cross-validation passed - ready for live capture';
 
     res.json({
       success: true,
       verification_id,
+      verification_mode: vrMode,
       status: mapped.status,
       current_step: mapped.current_step,
+      total_steps: mapped.total_steps,
       document_id: document.id,
       barcode_data: state.back_extraction?.qr_payload ?? null,
       barcode_extraction_failed: !state.back_extraction?.qr_payload,
@@ -1160,9 +1256,8 @@ router.post('/:verification_id/back-document',
       rejection_reason: state.rejection_reason,
       rejection_detail: state.rejection_detail,
       failure_reason: state.rejection_detail,
-      message: !stepResult.passed
-        ? stepResult.user_message || 'Back document processing failed'
-        : 'Back document processed and cross-validation passed - ready for live capture',
+      ...(mapped.final_result && { final_result: mapped.final_result }),
+      message: nextMsg,
     });
 
     // Broadcast status change via Supabase Realtime
@@ -1245,6 +1340,24 @@ router.post('/:verification_id/live-capture',
     const isSandbox = (verification as any).is_sandbox || false;
     const source: VerificationSource = (verification as any).source || 'api';
 
+    // Guard: check flow allows live capture
+    const { data: vrRow } = await supabase
+      .from('verification_requests')
+      .select('verification_mode')
+      .eq('id', verification_id)
+      .single();
+    const vrMode = (vrRow?.verification_mode as VerificationMode) || 'full';
+    const flow = FLOW_PRESETS[vrMode] ?? FLOW_PRESETS.full;
+
+    if (!flow.requiresLiveness) {
+      return res.status(400).json({
+        success: false,
+        verification_id,
+        verification_mode: vrMode,
+        message: `Live capture is not required for "${vrMode}" verification mode.`,
+      });
+    }
+
     // Store selfie in the source-appropriate bucket
     const selfiePath = await storageService.storeSelfie(
       req.file.buffer,
@@ -1306,7 +1419,7 @@ router.post('/:verification_id/live-capture',
     // failed on the back document), return a clear error instead of crashing.
     const preState = session.getState();
     if (preState.current_step === VerificationStatus.HARD_REJECTED) {
-      const mapped = mapStatusForResponse(preState);
+      const mapped = mapStatusForResponse(preState, flow);
       return res.status(409).json({
         success: false,
         verification_id,
@@ -1386,13 +1499,15 @@ router.post('/:verification_id/live-capture',
       faceMatchPassed: state.face_match?.passed ?? null,
     });
 
-    const mapped = mapStatusForResponse(state);
+    const mapped = mapStatusForResponse(state, flow);
 
     res.json({
       success: true,
       verification_id,
+      verification_mode: vrMode,
       status: mapped.status,
       current_step: mapped.current_step,
+      total_steps: mapped.total_steps,
       selfie_id: selfie.id,
       face_match_results: state.face_match ?? null,
       liveness_results: {
@@ -1552,17 +1667,19 @@ router.get('/:verification_id/status',
     const verification = await requireOwnedVerification(req, verification_id);
     const isSandbox = (verification as any).is_sandbox || false;
 
-    // Check if this is an age_only verification
+    // Resolve verification mode and flow
     const { data: vrMeta } = await supabase
       .from('verification_requests')
       .select('verification_mode, age_threshold')
       .eq('id', verification_id)
       .single();
-    const isAgeOnly = vrMeta?.verification_mode === 'age_only';
+    const vrMode = (vrMeta?.verification_mode as VerificationMode) || 'full';
+    const flow = FLOW_PRESETS[vrMode] ?? FLOW_PRESETS.full;
+    const isAgeOnly = vrMode === 'age_only';
 
     const session = await hydrateSession(verification_id, isSandbox);
     const state = session.getState();
-    const mapped = mapStatusForResponse(state, isAgeOnly);
+    const mapped = mapStatusForResponse(state, flow);
 
     // Fetch risk score from DB (computed after live capture)
     let riskScore: { overall_score: number; risk_level: string; risk_factors: any[] } | null = null;
@@ -1587,10 +1704,10 @@ router.get('/:verification_id/status',
     res.json({
       success: true,
       verification_id,
+      verification_mode: vrMode,
       status: mapped.status,
       current_step: mapped.current_step,
       total_steps: mapped.total_steps,
-      ...(isAgeOnly && { verification_mode: 'age_only' }),
       ...(ageVerification && { age_verification: ageVerification }),
       front_document_uploaded: !!state.front_extraction,
       back_document_uploaded: !!state.back_extraction,

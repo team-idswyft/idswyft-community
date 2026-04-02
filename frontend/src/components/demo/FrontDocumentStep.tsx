@@ -9,6 +9,7 @@ interface FrontDocumentStepProps {
   isLoading: boolean;
   isAgeOnly?: boolean;
   ageThreshold?: number;
+  totalSteps?: number;
   onFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onDocumentTypeChange: (type: string) => void;
   onUpload: () => void;
@@ -21,6 +22,7 @@ export const FrontDocumentStep: React.FC<FrontDocumentStepProps> = ({
   isLoading,
   isAgeOnly,
   ageThreshold,
+  totalSteps,
   onFileSelect,
   onDocumentTypeChange,
   onUpload,
@@ -30,8 +32,8 @@ export const FrontDocumentStep: React.FC<FrontDocumentStepProps> = ({
       <AmbientGlow />
 
       <StepLabel
-        step={isAgeOnly ? 2 : 2}
-        total={isAgeOnly ? 3 : 6}
+        step={2}
+        total={totalSteps ?? 6}
         label={isAgeOnly ? 'Upload ID' : 'Front of ID'}
       />
 

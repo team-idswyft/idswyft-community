@@ -1,6 +1,8 @@
 import React from 'react';
 import { ContinueOnPhone } from '../ContinueOnPhone';
 
+type VerificationMode = 'full' | 'document_only' | 'identity' | 'age_only';
+
 interface DemoInitStepProps {
   apiKey: string;
   userId: string;
@@ -8,11 +10,11 @@ interface DemoInitStepProps {
   isMobile: boolean;
   mobileHandoffDone: boolean;
   mobileResult: any;
-  verificationMode: 'full' | 'age_only';
+  verificationMode: VerificationMode;
   ageThreshold: number;
   onApiKeyChange: (key: string) => void;
   onUserIdChange: (id: string) => void;
-  onVerificationModeChange: (mode: 'full' | 'age_only') => void;
+  onVerificationModeChange: (mode: VerificationMode) => void;
   onAgeThresholdChange: (threshold: number) => void;
   onStart: () => void;
   onMobileHandoffDone: (done: boolean) => void;
@@ -111,29 +113,27 @@ export const DemoInitStep: React.FC<DemoInitStepProps> = ({
               <label style={{ display: 'block', fontSize: 12, color: '#8896aa', marginBottom: 6, fontWeight: 500 }}>
                 Verification Mode
               </label>
-              <div style={{ display: 'flex', gap: 8 }}>
-                <button
-                  onClick={() => onVerificationModeChange('full')}
-                  style={{
-                    flex: 1, padding: '9px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                    background: verificationMode === 'full' ? 'rgba(34,211,238,0.12)' : '#0f1420',
-                    border: `1px solid ${verificationMode === 'full' ? '#22d3ee' : 'rgba(255,255,255,0.07)'}`,
-                    color: verificationMode === 'full' ? '#22d3ee' : '#8896aa',
-                  }}
-                >
-                  Full Verification
-                </button>
-                <button
-                  onClick={() => onVerificationModeChange('age_only')}
-                  style={{
-                    flex: 1, padding: '9px 12px', borderRadius: 6, fontSize: 13, fontWeight: 600, cursor: 'pointer',
-                    background: verificationMode === 'age_only' ? 'rgba(34,211,238,0.12)' : '#0f1420',
-                    border: `1px solid ${verificationMode === 'age_only' ? '#22d3ee' : 'rgba(255,255,255,0.07)'}`,
-                    color: verificationMode === 'age_only' ? '#22d3ee' : '#8896aa',
-                  }}
-                >
-                  Age Check Only
-                </button>
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                {([
+                  { mode: 'full' as VerificationMode, label: 'Full', desc: 'ID + liveness + face match' },
+                  { mode: 'document_only' as VerificationMode, label: 'Document Only', desc: 'ID front + back, no live capture' },
+                  { mode: 'identity' as VerificationMode, label: 'Identity', desc: 'ID front + liveness, no back doc' },
+                  { mode: 'age_only' as VerificationMode, label: 'Age Check', desc: 'DOB extraction only' },
+                ]).map(({ mode, label, desc }) => (
+                  <button
+                    key={mode}
+                    onClick={() => onVerificationModeChange(mode)}
+                    style={{
+                      padding: '10px 12px', borderRadius: 6, cursor: 'pointer', textAlign: 'left',
+                      background: verificationMode === mode ? 'rgba(34,211,238,0.12)' : '#0f1420',
+                      border: `1px solid ${verificationMode === mode ? '#22d3ee' : 'rgba(255,255,255,0.07)'}`,
+                      color: verificationMode === mode ? '#22d3ee' : '#8896aa',
+                    }}
+                  >
+                    <div style={{ fontSize: 13, fontWeight: 600 }}>{label}</div>
+                    <div style={{ fontSize: 10, marginTop: 2, opacity: 0.7 }}>{desc}</div>
+                  </button>
+                ))}
               </div>
             </div>
             {verificationMode === 'age_only' && (

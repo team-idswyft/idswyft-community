@@ -57,7 +57,7 @@ Content-Type: application/json
 | sandbox | boolean | No | Use sandbox mode (default: false) |
 | addons | object | No | Optional add-on features |
 | addons.aml_screening | boolean | No | Override AML screening (default: auto-enabled when \`AML_PROVIDER\` is configured; set \`false\` to disable for this session) |
-| verification_mode | string | No | \`'full'\` (default) or \`'age_only'\` for lightweight age checks |
+| verification_mode | string | No | Flow preset: \`'full'\` (default), \`'document_only'\`, \`'identity'\`, or \`'age_only'\`. See Verification Flows below |
 | age_threshold | integer | No | Minimum age required (1-99, default: 18). Only used when \`verification_mode\` is \`'age_only'\` |
 
 **Response (201):**
@@ -71,6 +71,53 @@ Content-Type: application/json
   "total_steps": 5
 }
 \`\`\`
+
+### Verification Flows (Custom Gate Pipeline)
+
+The \`verification_mode\` parameter controls which gates run per session. Choose a preset at initialization:
+
+| Preset | Gates Run | Steps | Use Case |
+|--------|----------|-------|----------|
+| \`full\` (default) | Front → Back → CrossVal → Liveness → FaceMatch [→ AML] | 5 | Full identity verification |
+| \`document_only\` | Front → Back → CrossVal | 3 | Compliance document checks, no biometric |
+| \`identity\` | Front → Liveness → FaceMatch | 3 | Quick identity check — no back doc, no crossval |
+| \`age_only\` | Front (DOB extraction + age check) | 1 | Age-gated content |
+
+**Endpoint guards per flow:**
+
+- \`document_only\` / \`age_only\`: Calling \`POST /:id/live-capture\` returns HTTP 400
+- \`identity\` / \`age_only\`: Calling \`POST /:id/back-document\` returns HTTP 400
+
+**Final result determination per flow:**
+
+| Flow | Result Based On |
+|------|----------------|
+| \`full\` | Cross-validation verdict + face match |
+| \`document_only\` | Cross-validation verdict only (PASS → verified, REVIEW → manual_review) |
+| \`identity\` | Face match only (no crossval data) |
+| \`age_only\` | DOB extraction + age threshold check |
+
+**Example: Document-only verification:**
+
+\`\`\`json
+{
+  "user_id": "...",
+  "verification_mode": "document_only"
+}
+\`\`\`
+
+Flow: Initialize → Front Doc → Back Doc (+ cross-validation) → Complete (3 steps, no liveness).
+
+**Example: Identity verification:**
+
+\`\`\`json
+{
+  "user_id": "...",
+  "verification_mode": "identity"
+}
+\`\`\`
+
+Flow: Initialize → Front Doc → Live Capture (+ face match) → Complete (3 steps, no back doc).
 
 ### Alternative: Re-verify a Returning User
 
@@ -890,6 +937,16 @@ On first boot, navigate to the frontend. If no developer account exists, a setup
 ---
 
 ## Changelog
+
+### v1.8.1 (2026-04-02)
+
+**Added:**
+- Custom verification flows — \`verification_mode\` parameter now supports \`'document_only'\` and \`'identity'\` presets
+- \`document_only\`: Front → Back → CrossVal (3 steps, no biometric)
+- \`identity\`: Front → Liveness → FaceMatch (3 steps, no back document or cross-validation)
+- Endpoint guards: back-document returns 400 for identity/age_only flows; live-capture returns 400 for document_only/age_only flows
+- \`verification_mode\` and \`total_steps\` included in all endpoint responses
+- Per-flow step maps in status responses for accurate progress tracking
 
 ### v1.7.3 (2026-04-01)
 

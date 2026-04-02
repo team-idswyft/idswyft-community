@@ -17,6 +17,8 @@ export interface IdswyftConfig {
 export type DocumentType = 'passport' | 'drivers_license' | 'national_id' | 'other' | 'auto'
   | 'utility_bill' | 'bank_statement' | 'tax_document';
 
+export type VerificationMode = 'full' | 'document_only' | 'identity' | 'age_only';
+
 export type VerificationStatus =
   | 'AWAITING_FRONT'
   | 'FRONT_PROCESSING'
@@ -65,6 +67,7 @@ export interface LivenessResults {
 export interface InitializeResponse {
   success: boolean;
   verification_id: string;
+  verification_mode: string;
   status: VerificationStatus;
   current_step: number;
   total_steps: number;
@@ -342,11 +345,16 @@ export class IdswyftSDK {
   /**
    * Step 1: Initialize a new verification session.
    * Returns a verification_id used in all subsequent steps.
+   *
+   * @param request.verification_mode - Flow preset: 'full' (default), 'document_only', 'identity', or 'age_only'
+   * @param request.age_threshold - Minimum age (1-99) for age_only mode (default: 18)
    */
   async startVerification(request: {
     user_id: string;
     document_type?: DocumentType;
     sandbox?: boolean;
+    verification_mode?: VerificationMode;
+    age_threshold?: number;
   }): Promise<InitializeResponse> {
     const response = await this.client.post('/api/v2/verify/initialize', request);
     return response.data;

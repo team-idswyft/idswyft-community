@@ -14,7 +14,7 @@ export interface VerificationProps {
   theme?: 'light' | 'dark';
   allowedDocumentTypes?: ('passport' | 'drivers_license' | 'national_id')[];
   enableMobileHandoff?: boolean;
-  verificationMode?: 'full' | 'age_only';
+  verificationMode?: 'full' | 'document_only' | 'identity' | 'age_only';
   ageThreshold?: number;
 }
 
@@ -40,6 +40,23 @@ const FULL_STEPS = [
   { step: 3, label: 'Scanning' },
   { step: 4, label: 'Back ID' },
   { step: 5, label: 'Checking' },
+  { step: 6, label: 'Selfie' },
+  { step: 7, label: 'Done' },
+];
+
+const DOCUMENT_ONLY_STEPS = [
+  { step: 1, label: 'Start' },
+  { step: 2, label: 'Front ID' },
+  { step: 3, label: 'Scanning' },
+  { step: 4, label: 'Back ID' },
+  { step: 5, label: 'Checking' },
+  { step: 7, label: 'Done' },
+];
+
+const IDENTITY_STEPS = [
+  { step: 1, label: 'Start' },
+  { step: 2, label: 'Front ID' },
+  { step: 3, label: 'Scanning' },
   { step: 6, label: 'Selfie' },
   { step: 7, label: 'Done' },
 ];
@@ -72,6 +89,8 @@ const EndUserVerification: React.FC<VerificationProps> = ({
   ageThreshold,
 }) => {
   const isAgeOnly = verificationMode === 'age_only';
+  const isDocumentOnly = verificationMode === 'document_only';
+  const isIdentity = verificationMode === 'identity';
   // Core state
   const [currentStep, setCurrentStep] = useState(1);
   const [verificationId, setVerificationId] = useState<string | null>(null);
@@ -198,8 +217,14 @@ const EndUserVerification: React.FC<VerificationProps> = ({
         return;
       }
       toast.success('Document uploaded successfully');
-      setCurrentStep(3);
-      pollFrontOCR();
+      if (isIdentity) {
+        // Identity flow: skip back doc, go to scanning then liveness
+        setCurrentStep(3);
+        pollFrontOCRForIdentity();
+      } else {
+        setCurrentStep(3);
+        pollFrontOCR();
+      }
     } catch (err: any) {
       toast.error(err.message || 'Failed to upload document');
     } finally {
@@ -229,6 +254,29 @@ const EndUserVerification: React.FC<VerificationProps> = ({
       }
     } catch {
       if (mountedRef.current) setTimeout(() => pollFrontOCR(attempt + 1), 2000);
+    }
+  };
+
+  // ── Step 3b: Poll for front OCR (identity mode — skip back doc) ──────────
+  const pollFrontOCRForIdentity = async (attempt = 0) => {
+    if (!verificationId || !mountedRef.current) return;
+    if (attempt >= MAX_POLL_ATTEMPTS) {
+      toast.error('Verification timed out. Please refresh and try again.');
+      return;
+    }
+    try {
+      const data = await apiGet(`/api/v2/verify/${verificationId}/status`);
+      if (!mountedRef.current) return;
+      if (data.ocr_data && Object.keys(data.ocr_data).length > 0) {
+        setFrontOCR(data.ocr_data);
+        setCurrentStep(6); // Skip back doc — go directly to selfie/liveness
+      } else if (data.final_result === 'failed' || data.final_result === 'manual_review') {
+        showFinalResult(data);
+      } else {
+        setTimeout(() => pollFrontOCRForIdentity(attempt + 1), 2000);
+      }
+    } catch {
+      if (mountedRef.current) setTimeout(() => pollFrontOCRForIdentity(attempt + 1), 2000);
     }
   };
 
@@ -286,6 +334,9 @@ const EndUserVerification: React.FC<VerificationProps> = ({
       if (isComplete) {
         if (data.final_result === 'failed') {
           // Hard fraud failure (data inconsistency) — skip live capture
+          showFinalResult(data);
+        } else if (isDocumentOnly || data.final_result !== null) {
+          // document_only: cross-validation is the final gate
           showFinalResult(data);
         } else {
           // Cross-validation passed or needs review — proceed to live capture.
@@ -388,7 +439,10 @@ const EndUserVerification: React.FC<VerificationProps> = ({
   };
 
   // ── Progress bar ──────────────────────────────────────────────────────────
-  const steps = isAgeOnly ? AGE_ONLY_STEPS : FULL_STEPS;
+  const steps = isAgeOnly ? AGE_ONLY_STEPS
+    : isDocumentOnly ? DOCUMENT_ONLY_STEPS
+    : isIdentity ? IDENTITY_STEPS
+    : FULL_STEPS;
   const stepIdx = steps.findIndex(s => s.step === currentStep);
   const activeStepIdx = stepIdx >= 0 ? stepIdx : steps.length - 1;
 
@@ -516,7 +570,9 @@ const EndUserVerification: React.FC<VerificationProps> = ({
               <p className={`text-sm ${styles.textSec}`}>
                 {isAgeOnly
                   ? 'Upload your government-issued ID to verify your age'
-                  : 'Take a clear photo of the front of your government-issued ID'}
+                  : isIdentity
+                    ? 'Take a clear photo of the front of your ID — no back scan needed'
+                    : 'Take a clear photo of the front of your government-issued ID'}
               </p>
             </div>
 

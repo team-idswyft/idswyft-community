@@ -205,6 +205,30 @@ export interface AMLScreeningSessionResult {
   screened_at: string;
 }
 
+// --- Verification Mode / Flow Config ---
+
+export type VerificationMode = 'full' | 'document_only' | 'identity' | 'liveness_only' | 'age_only';
+
+export interface FlowConfig {
+  preset: VerificationMode;
+  requiresBack: boolean;
+  requiresLiveness: boolean;
+  requiresFaceMatch: boolean;
+  totalSteps: number;
+  /** Step to transition to after Gate 1 passes */
+  afterFront: VerificationStatusType;
+  /** Step to transition to after Gate 3 passes (crossval) — only if requiresBack */
+  afterCrossVal: VerificationStatusType;
+}
+
+export const FLOW_PRESETS: Record<VerificationMode, FlowConfig> = {
+  full:          { preset: 'full',          requiresBack: true,  requiresLiveness: true,  requiresFaceMatch: true,  totalSteps: 5, afterFront: 'AWAITING_BACK',  afterCrossVal: 'AWAITING_LIVE' },
+  document_only: { preset: 'document_only', requiresBack: true,  requiresLiveness: false, requiresFaceMatch: false, totalSteps: 3, afterFront: 'AWAITING_BACK',  afterCrossVal: 'COMPLETE' },
+  identity:      { preset: 'identity',      requiresBack: false, requiresLiveness: true,  requiresFaceMatch: true,  totalSteps: 3, afterFront: 'AWAITING_LIVE',  afterCrossVal: 'AWAITING_LIVE' },
+  liveness_only: { preset: 'liveness_only', requiresBack: false, requiresLiveness: true,  requiresFaceMatch: true,  totalSteps: 1, afterFront: 'AWAITING_LIVE',  afterCrossVal: 'AWAITING_LIVE' },
+  age_only:      { preset: 'age_only',      requiresBack: false, requiresLiveness: false, requiresFaceMatch: false, totalSteps: 1, afterFront: 'COMPLETE',       afterCrossVal: 'COMPLETE' },
+};
+
 // --- Session State ---
 export interface SessionState {
   session_id: string;

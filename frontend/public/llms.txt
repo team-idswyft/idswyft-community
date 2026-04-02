@@ -2,7 +2,7 @@
 
 > Open-source identity verification platform. Verify government-issued IDs with OCR, liveness detection, and face matching.
 > Base URL: https://api.idswyft.app
-> Version: v1.7.3 — April 2026
+> Version: v1.8.1 — April 2026
 > Source of truth: backend/src/api-docs/apiDocsMarkdown.ts
 
 ## Links
@@ -62,7 +62,7 @@ Content-Type: application/json
 | sandbox | boolean | No | Use sandbox mode (default: false) |
 | addons | object | No | Optional add-on features |
 | addons.aml_screening | boolean | No | Override AML screening (default: auto-enabled when `AML_PROVIDER` is configured; set `false` to disable for this session) |
-| verification_mode | string | No | `'full'` (default) or `'age_only'` for lightweight age checks |
+| verification_mode | string | No | Flow preset: `'full'` (default), `'document_only'`, `'identity'`, or `'age_only'`. See Verification Flows below |
 | age_threshold | integer | No | Minimum age required (1-99, default: 18). Only used when `verification_mode` is `'age_only'` |
 
 **Response (201):**
@@ -76,6 +76,31 @@ Content-Type: application/json
   "total_steps": 5
 }
 ```
+
+### Verification Flows (Custom Gate Pipeline)
+
+The `verification_mode` parameter controls which gates run per session:
+
+| Preset | Gates Run | Steps | Use Case |
+|--------|----------|-------|----------|
+| `full` (default) | Front → Back → CrossVal → Liveness → FaceMatch [→ AML] | 5 | Full identity verification |
+| `document_only` | Front → Back → CrossVal | 3 | Compliance document checks, no biometric |
+| `identity` | Front → Liveness → FaceMatch | 3 | Quick identity check — no back doc, no crossval |
+| `age_only` | Front (DOB extraction + age check) | 1 | Age-gated content |
+
+**Endpoint guards per flow:**
+
+- `document_only` / `age_only`: Calling `POST /:id/live-capture` returns HTTP 400
+- `identity` / `age_only`: Calling `POST /:id/back-document` returns HTTP 400
+
+**Final result determination per flow:**
+
+| Flow | Result Based On |
+|------|----------------|
+| `full` | Cross-validation verdict + face match |
+| `document_only` | Cross-validation verdict only (PASS → verified, REVIEW → manual_review) |
+| `identity` | Face match only (no crossval data) |
+| `age_only` | DOB extraction + age threshold check |
 
 ### Alternative: Re-verify a Returning User
 

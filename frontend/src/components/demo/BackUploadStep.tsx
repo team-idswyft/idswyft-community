@@ -8,6 +8,7 @@ interface BackUploadStepProps {
   backFile: File | null;
   backPreviewUrl: string | null;
   isLoading: boolean;
+  totalSteps?: number;
   onBackFileSelect: (e: React.ChangeEvent<HTMLInputElement>) => void;
   onUpload: () => void;
 }
@@ -17,6 +18,7 @@ export const BackUploadStep: React.FC<BackUploadStepProps> = ({
   backFile,
   backPreviewUrl,
   isLoading,
+  totalSteps,
   onBackFileSelect,
   onUpload,
 }) => {
@@ -26,7 +28,7 @@ export const BackUploadStep: React.FC<BackUploadStepProps> = ({
     <div className="demo-fade-up" style={{ padding: '8px 0', position: 'relative' }}>
       <AmbientGlow />
 
-      <StepLabel step={3} total={6} label="Back of ID" />
+      <StepLabel step={3} total={totalSteps ?? 6} label="Back of ID" />
 
       <h2 style={{
         fontSize: 22, fontWeight: 700, color: C.text,

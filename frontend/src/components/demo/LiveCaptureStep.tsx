@@ -9,6 +9,8 @@ interface LiveCaptureStepProps {
   onSkipLiveCapture: () => void;
   renderActiveLiveness: () => React.ReactNode;
   stepError?: string | null;
+  step?: number;
+  totalSteps?: number;
 }
 
 export const LiveCaptureStep: React.FC<LiveCaptureStepProps> = ({
@@ -18,12 +20,14 @@ export const LiveCaptureStep: React.FC<LiveCaptureStepProps> = ({
   onSkipLiveCapture,
   renderActiveLiveness,
   stepError,
+  step,
+  totalSteps,
 }) => {
   return (
     <div className="demo-fade-up" style={{ padding: '8px 0', position: 'relative' }}>
       <AmbientGlow />
 
-      <StepLabel step={5} total={6} label="Live Photo" />
+      <StepLabel step={step ?? 5} total={totalSteps ?? 6} label="Live Photo" />
 
       {!showActiveLiveness ? (
         <>
