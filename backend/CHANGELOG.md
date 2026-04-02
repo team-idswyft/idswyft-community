@@ -5,6 +5,25 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.2] - 2026-04-02
+
+### Added
+- **Verification page branding** — developers can white-label the hosted verification page with a custom logo, accent color, and company name
+- `GET/PUT /api/developer/settings/branding` — configure branding settings (logo URL, hex accent color, company name)
+- `POST /api/developer/branding/logo` — upload branding logo (JPEG/PNG, max 2 MB, magic byte validated)
+- `GET /api/v2/verify/page-config?api_key=...` — public endpoint returning developer branding for the hosted page (cached 5 min, rate limited)
+- Live preview panel in Developer Portal Settings modal
+- Branding applied to desktop, mobile, and embedded verification flows
+- "Powered by Idswyft" attribution when custom branding is active
+
+## [1.8.1] - 2026-04-02
+
+### Added
+- **Custom verification flows** — `verification_mode` parameter now supports `'document_only'` and `'identity'` presets
+- `document_only`: Front → Back → CrossVal (3 steps, no biometric)
+- `identity`: Front → Liveness → FaceMatch (3 steps, no back document or cross-validation)
+- Endpoint guards: back-document returns 400 for identity/age_only flows; live-capture returns 400 for document_only/age_only flows
+
 ## [1.8.0] - 2026-04-02
 
 ### Added

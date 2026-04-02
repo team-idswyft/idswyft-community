@@ -16,6 +16,11 @@ export interface VerificationProps {
   enableMobileHandoff?: boolean;
   verificationMode?: 'full' | 'document_only' | 'identity' | 'age_only';
   ageThreshold?: number;
+  branding?: {
+    logo_url: string | null;
+    accent_color: string | null;
+    company_name: string | null;
+  };
 }
 
 export interface VerificationResult {
@@ -87,6 +92,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
   enableMobileHandoff = false,
   verificationMode,
   ageThreshold,
+  branding,
 }) => {
   const isAgeOnly = verificationMode === 'age_only';
   const isDocumentOnly = verificationMode === 'document_only';
@@ -134,6 +140,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
 
   // ── Theme ──────────────────────────────────────────────────────────────────
   const isDark = theme === 'dark';
+  const accentColor = branding?.accent_color || (isDark ? '#22d3ee' : '#3b82f6');
   const styles = {
     bg: isDark ? 'bg-[#080c14]' : 'bg-gray-50',
     cardBg: isDark ? 'bg-[#0b0f19]' : 'bg-white',
@@ -451,20 +458,18 @@ const EndUserVerification: React.FC<VerificationProps> = ({
       <div className="relative">
         <div className={`h-1.5 rounded-full ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`}>
           <div
-            className={`h-1.5 bg-gradient-to-r ${isDark ? 'from-cyan-400 to-cyan-500' : 'from-blue-500 to-blue-600'} rounded-full transition-all duration-700 ease-out`}
-            style={{ width: `${(activeStepIdx / (steps.length - 1)) * 100}%` }}
+            className="h-1.5 rounded-full transition-all duration-700 ease-out"
+            style={{ width: `${(activeStepIdx / (steps.length - 1)) * 100}%`, background: `linear-gradient(to right, ${accentColor}, ${accentColor})` }}
           />
         </div>
         <div className="flex justify-between absolute -top-1.5 w-full">
           {steps.map(({ step }, i) => (
             <div key={step} className="relative">
               <div className={`w-4 h-4 rounded-full border-2 transition-all duration-300 ${
-                activeStepIdx > i
-                  ? isDark ? 'bg-cyan-500 border-cyan-500' : 'bg-blue-500 border-blue-500'
-                  : activeStepIdx === i
-                  ? isDark ? 'bg-cyan-500 border-cyan-500' : 'bg-blue-500 border-blue-500'
+                activeStepIdx >= i
+                  ? ''
                   : isDark ? 'bg-[#0f1420] border-[rgba(255,255,255,0.13)]' : 'bg-white border-gray-300'
-              }`}>
+              }`} style={activeStepIdx >= i ? { backgroundColor: accentColor, borderColor: accentColor } : undefined}>
                 {activeStepIdx > i && (
                   <svg className="w-2.5 h-2.5 text-white absolute top-px left-px" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
@@ -479,7 +484,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
         </div>
       </div>
       <div className="text-center mt-8">
-        <span className={`text-sm font-medium ${isDark ? 'text-cyan-400' : 'text-blue-600'}`}>
+        <span className="text-sm font-medium" style={{ color: accentColor }}>
           {steps[activeStepIdx]?.label}
         </span>
         <span className={`text-xs ml-2 ${styles.textSec}`}>
@@ -595,7 +600,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
               <button
                 onClick={uploadFrontDocument}
                 disabled={isLoading}
-                className={`w-full py-3.5 px-6 bg-gradient-to-r ${isDark ? 'from-cyan-400 to-cyan-500 hover:from-cyan-500 hover:to-cyan-600' : 'from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700'} text-white font-medium rounded-xl disabled:opacity-50 transition-all`}
+                className="w-full py-3.5 px-6 text-white font-medium rounded-xl disabled:opacity-50 transition-all" style={{ backgroundColor: accentColor }}
               >
                 {isLoading ? (
                   <span className="flex items-center justify-center gap-2">
@@ -639,7 +644,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
               <button
                 onClick={uploadBackDocument}
                 disabled={isLoading}
-                className={`w-full py-3.5 px-6 bg-gradient-to-r ${isDark ? 'from-cyan-400 to-cyan-500 hover:from-cyan-500 hover:to-cyan-600' : 'from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700'} text-white font-medium rounded-xl disabled:opacity-50 transition-all`}
+                className="w-full py-3.5 px-6 text-white font-medium rounded-xl disabled:opacity-50 transition-all" style={{ backgroundColor: accentColor }}
               >
                 {isLoading ? (
                   <span className="flex items-center justify-center gap-2">

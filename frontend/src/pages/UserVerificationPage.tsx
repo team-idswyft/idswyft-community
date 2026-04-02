@@ -14,6 +14,12 @@ import { API_BASE_URL, shouldUseSandbox } from '../config/api';
 // ────────────────────────────────────────────────────────────────────
 type Phase = 'choice' | 'mobile-qr' | 'desktop' | 'address' | 'completed';
 
+interface PageBranding {
+  logo_url: string | null;
+  accent_color: string | null;
+  company_name: string | null;
+}
+
 const UserVerificationPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
@@ -41,7 +47,23 @@ const UserVerificationPage: React.FC = () => {
   const [addressResult, setAddressResult] = useState<any>(null);
   const [addressUploading, setAddressUploading] = useState(false);
 
+  // Page branding — fetched from developer config
+  const [branding, setBranding] = useState<PageBranding | null>(null);
+  const accent = branding?.accent_color || C.cyan;
+  const accentDim = branding?.accent_color ? `${branding.accent_color}1a` : C.cyanDim;
+  const accentBorder = branding?.accent_color ? `${branding.accent_color}40` : C.cyanBorder;
+  const hasCustomBranding = !!(branding?.logo_url || branding?.company_name || branding?.accent_color);
+
   useEffect(() => { injectFonts(); }, []);
+
+  // Fetch page branding config
+  useEffect(() => {
+    if (!apiKey) return;
+    fetch(`${API_BASE_URL}/api/v2/verify/page-config?api_key=${encodeURIComponent(apiKey)}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => { if (data?.branding) setBranding(data.branding); })
+      .catch(() => {});
+  }, [apiKey]);
 
   // Track viewport width for responsive layout
   useEffect(() => {
@@ -261,6 +283,7 @@ const UserVerificationPage: React.FC = () => {
           allowedDocumentTypes={['passport', 'drivers_license', 'national_id']}
           verificationMode={verificationMode}
           ageThreshold={ageThreshold}
+          branding={branding ?? undefined}
         />
       </div>
     );
@@ -275,7 +298,11 @@ const UserVerificationPage: React.FC = () => {
     return (
       <div style={{ background: C.bg, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
         <div style={{ maxWidth: 440, width: '100%', textAlign: 'center' }}>
-          <img src="/idswyft-logo.png" alt="Idswyft" style={{ height: 36, margin: '0 auto 32px' }} />
+          {branding?.logo_url ? (
+            <img src={branding.logo_url} alt={branding.company_name || 'Logo'} style={{ height: 36, margin: '0 auto 32px', objectFit: 'contain' }} />
+          ) : (
+            <img src="/idswyft-logo.png" alt="Idswyft" style={{ height: 36, margin: '0 auto 32px' }} />
+          )}
           <div style={{
             width: 56, height: 56, borderRadius: '50%', margin: '0 auto 16px',
             display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24,
@@ -330,6 +357,11 @@ const UserVerificationPage: React.FC = () => {
           <p style={{ fontFamily: C.sans, fontSize: '0.75rem', color: C.dim, marginTop: 24 }}>
             You can close this window.
           </p>
+          {hasCustomBranding && (
+            <p style={{ fontFamily: C.sans, fontSize: '0.68rem', color: C.dim, marginTop: 12 }}>
+              Powered by Idswyft
+            </p>
+          )}
         </div>
       </div>
     );
@@ -473,11 +505,11 @@ const UserVerificationPage: React.FC = () => {
       <div style={{ maxWidth: 560, width: '100%' }}>
         {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <img
-            src="/idswyft-logo.png"
-            alt="Idswyft"
-            style={{ height: 36, margin: '0 auto' }}
-          />
+          {branding?.logo_url ? (
+            <img src={branding.logo_url} alt={branding.company_name || 'Logo'} style={{ height: 36, margin: '0 auto', objectFit: 'contain' }} />
+          ) : (
+            <img src="/idswyft-logo.png" alt="Idswyft" style={{ height: 36, margin: '0 auto' }} />
+          )}
         </div>
 
         {/* View-only warning */}
@@ -486,7 +518,11 @@ const UserVerificationPage: React.FC = () => {
         {/* Heading */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
           <h1 style={{ fontFamily: C.sans, fontSize: '1.6rem', fontWeight: 600, color: C.text, margin: '0 0 8px' }}>
-            {verificationMode === 'age_only' ? 'Verify Your Age' : 'Verify Your Identity'}
+            {verificationMode === 'age_only'
+              ? 'Verify Your Age'
+              : branding?.company_name
+                ? `Verify with ${branding.company_name}`
+                : 'Verify Your Identity'}
           </h1>
           <p style={{ fontFamily: C.sans, fontSize: '0.92rem', color: C.muted, margin: 0 }}>
             {verificationMode === 'age_only'
@@ -499,7 +535,7 @@ const UserVerificationPage: React.FC = () => {
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
           {/* ── Mobile card (recommended) ── */}
           <div style={{
-            background: C.surface, border: `1.5px solid ${C.cyanBorder}`,
+            background: C.surface, border: `1.5px solid ${accentBorder}`,
             borderRadius: 14, padding: 24, display: 'flex', flexDirection: 'column', gap: 14,
             opacity: viewOnly ? 0.6 : 1,
           }}>
@@ -507,7 +543,7 @@ const UserVerificationPage: React.FC = () => {
               <span style={{
                 fontFamily: C.mono, fontSize: '0.6rem', fontWeight: 600,
                 letterSpacing: '0.08em', padding: '2px 8px', borderRadius: 4,
-                background: C.cyanDim, color: C.cyan, border: `1px solid ${C.cyanBorder}`,
+                background: accentDim, color: accent, border: `1px solid ${accentBorder}`,
               }}>
                 RECOMMENDED
               </span>
@@ -530,7 +566,7 @@ const UserVerificationPage: React.FC = () => {
               disabled={viewOnly}
               style={{
                 marginTop: 'auto', width: '100%', padding: '12px 0',
-                background: viewOnly ? C.dim : C.cyan,
+                background: viewOnly ? C.dim : accent,
                 color: viewOnly ? C.muted : '#080c14',
                 fontFamily: C.sans, fontSize: '0.88rem', fontWeight: 600,
                 border: 'none', borderRadius: 10,
@@ -576,6 +612,12 @@ const UserVerificationPage: React.FC = () => {
             </div>
           )}
         </div>
+
+        {hasCustomBranding && (
+          <p style={{ fontFamily: C.sans, fontSize: '0.68rem', color: C.dim, textAlign: 'center', marginTop: 20 }}>
+            Powered by Idswyft
+          </p>
+        )}
       </div>
     </div>
   );

@@ -419,6 +419,11 @@ const MobileVerificationPage: React.FC = () => {
   const [stepError, setStepError] = useState<string | null>(null);
   const [retryProcessing, setRetryProcessing] = useState(false);
 
+  // Page branding
+  const [brandingLogo, setBrandingLogo] = useState<string | null>(null);
+  const [brandingCompany, setBrandingCompany] = useState<string | null>(null);
+  const [brandingAccent, setBrandingAccent] = useState<string | null>(null);
+
   const mountedRef = useRef(true);
 
   const screen: Screen = SCREENS[screenIdx];
@@ -454,6 +459,17 @@ const MobileVerificationPage: React.FC = () => {
         if (!data.api_key || !data.user_id) throw new Error('Session response is incomplete. Please try scanning the QR code again.');
         setApiKey(data.api_key);
         setUserId(data.user_id);
+        // Fetch page branding (fire-and-forget)
+        fetch(`${API_BASE_URL}/api/v2/verify/page-config?api_key=${encodeURIComponent(data.api_key)}`)
+          .then(r => r.ok ? r.json() : null)
+          .then(cfg => {
+            if (cfg?.branding) {
+              setBrandingLogo(cfg.branding.logo_url);
+              setBrandingCompany(cfg.branding.company_name);
+              setBrandingAccent(cfg.branding.accent_color);
+            }
+          })
+          .catch(() => {});
         // Auto-start verification with source from handoff session
         initializeVerification(data.api_key, data.user_id, data.source);
       })
@@ -876,7 +892,7 @@ const MobileVerificationPage: React.FC = () => {
   if (loading) {
     return (
       <div style={shellStyle}>
-        <style>{css}</style>
+        <style>{css}{brandingAccent && /^#[0-9a-fA-F]{6}$/.test(brandingAccent) ? `:root { --teal: ${brandingAccent}; --teal2: ${brandingAccent}; }` : ''}</style>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
           <div style={{
             width: 56, height: 56, border: '2.5px solid rgba(0,212,180,0.12)',
@@ -919,7 +935,14 @@ const MobileVerificationPage: React.FC = () => {
   // ─── Verification flow ────────────────────────────────────────────────
   return (
     <div style={shellStyle}>
-      <style>{css}</style>
+      <style>{css}{brandingAccent && /^#[0-9a-fA-F]{6}$/.test(brandingAccent) ? `:root { --teal: ${brandingAccent}; --teal2: ${brandingAccent}; }` : ''}</style>
+
+      {/* Branding logo header */}
+      {brandingLogo && (
+        <div style={{ textAlign: 'center', padding: '12px 24px 0' }}>
+          <img src={brandingLogo} alt={brandingCompany || 'Logo'} style={{ height: 24, objectFit: 'contain' }} />
+        </div>
+      )}
 
       {/* Status bar */}
       <div style={{

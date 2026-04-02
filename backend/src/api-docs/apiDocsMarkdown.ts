@@ -5,7 +5,7 @@
 export const API_DOCS_MARKDOWN = `# Idswyft API Documentation
 
 > **Base URL:** \`https://api.idswyft.app\`
-> **Version:** v1.7.3 — April 2026
+> **Version:** v1.8.2 — April 2026
 
 ---
 
@@ -380,6 +380,80 @@ POST /api/v2/verify/:id/phone-otp/verify
 **Response:** \`{ "success": true, "phone_verified": true }\`
 
 Max 3 attempts per code. After exhaustion, request a new code.
+
+---
+
+## Verification Page Branding
+
+White-label the hosted verification page with your company's logo, accent color, and name.
+
+### Configure Branding
+
+\`\`\`
+GET /api/developer/settings/branding
+\`\`\`
+
+**Response (200):**
+
+\`\`\`json
+{
+  "configured": true,
+  "logo_url": "https://example.com/logo.png",
+  "accent_color": "#ff6600",
+  "company_name": "Acme Corp"
+}
+\`\`\`
+
+\`\`\`
+PUT /api/developer/settings/branding
+\`\`\`
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| logo_url | string \\| null | No | URL to your company logo (must be valid URL) |
+| accent_color | string \\| null | No | Primary accent color as 6-digit hex (e.g. \`#ff6600\`) |
+| company_name | string \\| null | No | Company name shown on the verification page (max 100 chars) |
+
+Send all fields as \`null\` to clear branding and revert to Idswyft defaults.
+
+### Upload Logo
+
+\`\`\`
+POST /api/developer/branding/logo
+Content-Type: multipart/form-data
+\`\`\`
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| file | File | Yes | JPEG or PNG image. Max 2 MB |
+
+**Response (200):** \`{ "success": true, "data": { "logo_url": "https://..." } }\`
+
+The uploaded logo URL is automatically saved to your branding settings.
+
+### Get Page Config (Public)
+
+\`\`\`
+GET /api/v2/verify/page-config?api_key=ik_...
+\`\`\`
+
+Public endpoint — no authentication header required. Returns the developer's branding configuration for the hosted verification page. Uses the API key in the query string to identify the developer.
+
+**Response (200):**
+
+\`\`\`json
+{
+  "branding": {
+    "logo_url": "https://example.com/logo.png",
+    "accent_color": "#ff6600",
+    "company_name": "Acme Corp"
+  }
+}
+\`\`\`
+
+- \`company_name\` falls back to the developer's profile company name if no branding name is set
+- Response includes \`Cache-Control: public, max-age=300\` for client-side caching
+- Rate limited
 
 ---
 
@@ -938,6 +1012,17 @@ On first boot, navigate to the frontend. If no developer account exists, a setup
 
 ## Changelog
 
+### v1.8.2 (2026-04-02)
+
+**Added:**
+- Verification page branding — white-label the hosted verification page with custom logo, accent color, and company name
+- \`GET/PUT /api/developer/settings/branding\` — configure branding settings
+- \`POST /api/developer/branding/logo\` — upload branding logo (JPEG/PNG, max 2 MB)
+- \`GET /api/v2/verify/page-config?api_key=...\` — public endpoint returning developer branding for the hosted page
+- Live preview panel in Developer Portal Settings modal
+- Branding applied to desktop, mobile, and embedded verification flows
+- "Powered by Idswyft" attribution when custom branding is active
+
 ### v1.8.1 (2026-04-02)
 
 **Added:**
@@ -1054,5 +1139,5 @@ On first boot, navigate to the frontend. If no developer account exists, a setup
 
 ---
 
-*Generated from Idswyft API v1.7.3 — https://idswyft.app/docs*
+*Generated from Idswyft API v1.8.2 — https://idswyft.app/docs*
 `;

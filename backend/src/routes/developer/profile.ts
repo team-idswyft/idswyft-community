@@ -198,6 +198,62 @@ router.post('/avatar',
   })
 );
 
+// ─── Branding Logo Upload ────────────────────────────────────────────────────
+
+// POST /api/developer/branding/logo — upload branding logo image
+router.post('/branding/logo',
+  authenticateDeveloperJWT,
+  (avatarUpload.single('file') as any),
+  catchAsync(async (req: Request, res: Response) => {
+    const developer = req.developer;
+    if (!developer) throw new AuthenticationError('Developer authentication required');
+
+    const file = (req as any).file;
+    if (!file) throw new ValidationError('No file uploaded', 'file', null);
+
+    // Validate magic bytes — prevent spoofed Content-Type
+    const buf = file.buffer;
+    const isJpeg = buf[0] === 0xFF && buf[1] === 0xD8;
+    const isPng = buf[0] === 0x89 && buf[1] === 0x50 && buf[2] === 0x4E && buf[3] === 0x47;
+    if (!isJpeg && !isPng) {
+      throw new ValidationError('File content does not match a valid JPEG or PNG image', 'file', null);
+    }
+
+    const storagePath = `branding/${developer.id}`;
+
+    // Upload to Supabase Storage (upsert — overwrite on re-upload)
+    const { error: uploadError } = await supabase.storage
+      .from(config.supabase.storageBucket)
+      .upload(storagePath, file.buffer, {
+        contentType: file.mimetype,
+        upsert: true,
+        duplex: 'half',
+      });
+
+    if (uploadError) {
+      logger.error('Branding logo upload failed:', uploadError);
+      throw new Error('Failed to upload logo');
+    }
+
+    // Get public URL
+    const { data: urlData } = supabase.storage
+      .from(config.supabase.storageBucket)
+      .getPublicUrl(storagePath);
+
+    const logoUrl = urlData.publicUrl;
+
+    // Update developer record
+    await supabase
+      .from('developers')
+      .update({ branding_logo_url: logoUrl })
+      .eq('id', developer.id);
+
+    logger.info('Developer branding logo updated', { developerId: developer.id });
+
+    res.json({ success: true, data: { logo_url: logoUrl } });
+  })
+);
+
 // ─── Reviewer Management ────────────────────────────────────────────────────
 
 // POST /api/developer/reviewers/invite — invite a reviewer or org admin

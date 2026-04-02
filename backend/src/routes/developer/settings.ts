@@ -186,4 +186,64 @@ router.put('/settings/sms',
   })
 );
 
+// ─── Page Branding Settings ────────────────────────────────────
+
+router.get('/settings/branding',
+  authenticateDeveloperJWT,
+  catchAsync(async (req: Request, res: Response) => {
+    const developerId = (req as any).developer.id;
+
+    const { data } = await supabase
+      .from('developers')
+      .select('branding_logo_url, branding_accent_color, branding_company_name')
+      .eq('id', developerId)
+      .single();
+
+    const hasAny = !!(data?.branding_logo_url || data?.branding_accent_color || data?.branding_company_name);
+
+    res.json({
+      configured: hasAny,
+      logo_url: data?.branding_logo_url || null,
+      accent_color: data?.branding_accent_color || null,
+      company_name: data?.branding_company_name || null,
+    });
+  })
+);
+
+const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
+
+router.put('/settings/branding',
+  authenticateDeveloperJWT,
+  [
+    body('logo_url').optional({ nullable: true }).isURL({ protocols: ['https', 'http'] }).withMessage('Logo URL must be a valid HTTP(S) URL'),
+    body('accent_color').optional({ nullable: true }).matches(HEX_COLOR_RE).withMessage('Accent color must be a 6-digit hex (e.g. #22d3ee)'),
+    body('company_name').optional({ nullable: true }).isString().trim().isLength({ max: 100 }).withMessage('Company name must be at most 100 characters'),
+  ],
+  validate,
+  catchAsync(async (req: Request, res: Response) => {
+    const developerId = (req as any).developer.id;
+    const { logo_url, accent_color, company_name } = req.body;
+
+    const { error } = await supabase
+      .from('developers')
+      .update({
+        branding_logo_url: logo_url ?? null,
+        branding_accent_color: accent_color ?? null,
+        branding_company_name: company_name ?? null,
+      })
+      .eq('id', developerId);
+
+    if (error) {
+      return res.status(500).json({ error: 'Failed to save branding settings' });
+    }
+
+    res.json({
+      success: true,
+      logo_url: logo_url ?? null,
+      accent_color: accent_color ?? null,
+      company_name: company_name ?? null,
+    });
+  })
+);
+
 export default router;

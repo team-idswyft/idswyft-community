@@ -10,6 +10,7 @@ import {
   XMarkIcon,
   CodeBracketIcon,
   DevicePhoneMobileIcon,
+  PaintBrushIcon,
   EyeIcon,
   EyeSlashIcon,
   ExclamationTriangleIcon,
@@ -53,6 +54,14 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
   const [smsLoading, setSmsLoading] = useState(false)
   const [showSmsKey, setShowSmsKey] = useState(false)
 
+  // Page branding settings
+  const [brandLogoUrl, setBrandLogoUrl] = useState<string>('')
+  const [brandAccentColor, setBrandAccentColor] = useState<string>('')
+  const [brandCompanyName, setBrandCompanyName] = useState<string>('')
+  const [brandConfigured, setBrandConfigured] = useState(false)
+  const [brandSaving, setBrandSaving] = useState(false)
+  const [brandLoading, setBrandLoading] = useState(false)
+
   // Reviewer management
   const [reviewers, setReviewers] = useState<Array<{ id: string; email: string; name?: string; role?: string; status: string; invited_at: string; last_login_at?: string }>>([])
   const [reviewerEmail, setReviewerEmail] = useState('')
@@ -71,6 +80,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
     fetchProfile()
     fetchLLMSettings()
     fetchSMSSettings()
+    fetchBrandingSettings()
     fetchReviewers()
   }, [token])
 
@@ -262,6 +272,90 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
       }
     } catch { toast.error('Network error') }
     setSmsSaving(false)
+  }
+
+  const fetchBrandingSettings = async () => {
+    setBrandLoading(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/settings/branding`, {
+        headers: authHeaders,
+        credentials: 'include' as RequestCredentials,
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setBrandConfigured(data.configured)
+        setBrandLogoUrl(data.logo_url || '')
+        setBrandAccentColor(data.accent_color || '')
+        setBrandCompanyName(data.company_name || '')
+      }
+    } catch { /* network error */ }
+    setBrandLoading(false)
+  }
+
+  const saveBrandingSettings = async () => {
+    if (!token) return
+    setBrandSaving(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/settings/branding`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...authHeaders, ...csrfHeader() }, credentials: 'include' as RequestCredentials,
+        body: JSON.stringify({
+          logo_url: brandLogoUrl || null,
+          accent_color: brandAccentColor || null,
+          company_name: brandCompanyName || null,
+        }),
+      })
+      if (res.ok) {
+        toast.success('Branding saved')
+        fetchBrandingSettings()
+      } else {
+        const err = await res.json().catch(() => ({ error: 'Failed to save' }))
+        toast.error(err.error || err.message || 'Failed to save branding')
+      }
+    } catch { toast.error('Network error') }
+    setBrandSaving(false)
+  }
+
+  const clearBrandingSettings = async () => {
+    if (!token) return
+    setBrandSaving(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/settings/branding`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...authHeaders, ...csrfHeader() }, credentials: 'include' as RequestCredentials,
+        body: JSON.stringify({ logo_url: null, accent_color: null, company_name: null }),
+      })
+      if (res.ok) {
+        toast.success('Branding cleared')
+        setBrandLogoUrl('')
+        setBrandAccentColor('')
+        setBrandCompanyName('')
+        setBrandConfigured(false)
+      }
+    } catch { toast.error('Network error') }
+    setBrandSaving(false)
+  }
+
+  const uploadBrandingLogo = async (file: File) => {
+    if (!token) return
+    const formData = new FormData()
+    formData.append('file', file)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/branding/logo`, {
+        method: 'POST',
+        headers: { ...authHeaders, ...csrfHeader() },
+        credentials: 'include' as RequestCredentials,
+        body: formData,
+      })
+      if (res.ok) {
+        const { data } = await res.json()
+        setBrandLogoUrl(data.logo_url)
+        toast.success('Logo uploaded')
+      } else {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.message || 'Failed to upload logo')
+      }
+    } catch { toast.error('Network error') }
   }
 
   const fetchReviewers = async () => {
@@ -837,6 +931,167 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                         </div>
                       </>
                     )}
+                  </>
+                )}
+              </div>
+
+              {/* Verification Page Branding */}
+              <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 20, marginTop: 24 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  <PaintBrushIcon style={{ width: 16, height: 16, color: C.cyan }} />
+                  <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>Verification Page</div>
+                </div>
+                <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
+                  White-label the hosted verification page with your own branding. End users will see your logo,
+                  company name, and accent color instead of Idswyft defaults.
+                </div>
+
+                {brandLoading ? (
+                  <div style={{ color: C.muted, fontSize: 13 }}>Loading...</div>
+                ) : (
+                  <>
+                    {/* Company Name */}
+                    <label style={labelStyle}>Company Name</label>
+                    <input
+                      type="text"
+                      value={brandCompanyName}
+                      onChange={e => setBrandCompanyName(e.target.value)}
+                      style={{ ...inputStyle, marginBottom: 12 }}
+                      placeholder="Your Company"
+                      maxLength={100}
+                    />
+
+                    {/* Logo URL + upload */}
+                    <label style={labelStyle}>Logo URL</label>
+                    <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+                      <input
+                        type="url"
+                        value={brandLogoUrl}
+                        onChange={e => setBrandLogoUrl(e.target.value)}
+                        style={{ ...inputStyle, marginBottom: 0, flex: 1 }}
+                        placeholder="https://example.com/logo.png"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => document.getElementById('branding-logo-input')?.click()}
+                        style={{
+                          background: C.surface, border: `1px solid ${C.border}`, color: C.muted,
+                          borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontSize: 12,
+                          whiteSpace: 'nowrap',
+                        }}
+                      >
+                        Upload
+                      </button>
+                      <input
+                        id="branding-logo-input"
+                        type="file"
+                        accept="image/jpeg,image/png"
+                        style={{ display: 'none' }}
+                        onChange={e => {
+                          const file = e.target.files?.[0]
+                          if (file && file.size > 2 * 1024 * 1024) {
+                            toast.error('File must be under 2 MB')
+                            e.target.value = ''
+                            return
+                          }
+                          if (file) uploadBrandingLogo(file)
+                          e.target.value = ''
+                        }}
+                      />
+                    </div>
+
+                    {/* Accent Color */}
+                    <label style={labelStyle}>Accent Color</label>
+                    <div style={{ display: 'flex', gap: 8, alignItems: 'center', marginBottom: 12 }}>
+                      <input
+                        type="text"
+                        value={brandAccentColor}
+                        onChange={e => setBrandAccentColor(e.target.value)}
+                        style={{ ...inputStyle, marginBottom: 0, flex: 1 }}
+                        placeholder="#22d3ee"
+                        maxLength={7}
+                      />
+                      <div
+                        style={{
+                          width: 32, height: 32, borderRadius: 6, flexShrink: 0,
+                          background: /^#[0-9a-fA-F]{6}$/.test(brandAccentColor) ? brandAccentColor : C.cyan,
+                          border: `1px solid ${C.border}`,
+                        }}
+                      />
+                      <input
+                        type="color"
+                        value={/^#[0-9a-fA-F]{6}$/.test(brandAccentColor) ? brandAccentColor : '#22d3ee'}
+                        onChange={e => setBrandAccentColor(e.target.value)}
+                        style={{ width: 32, height: 32, border: 'none', padding: 0, cursor: 'pointer', background: 'transparent' }}
+                      />
+                    </div>
+
+                    {/* Live Preview */}
+                    <div style={{
+                      background: '#080c14', border: `1px solid ${C.border}`, borderRadius: 10,
+                      padding: 16, marginBottom: 14,
+                    }}>
+                      <div style={{ fontSize: 10, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Preview</div>
+                      <div style={{ textAlign: 'center' }}>
+                        {brandLogoUrl ? (
+                          <img
+                            src={brandLogoUrl}
+                            alt="Logo preview"
+                            style={{ height: 28, margin: '0 auto 10px', display: 'block', objectFit: 'contain' }}
+                            onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
+                          />
+                        ) : (
+                          <img src="/idswyft-logo.png" alt="Idswyft" style={{ height: 28, margin: '0 auto 10px', display: 'block' }} />
+                        )}
+                        <div style={{ fontSize: 14, fontWeight: 600, color: '#dde2ec', marginBottom: 4 }}>
+                          {brandCompanyName ? `Verify with ${brandCompanyName}` : 'Verify Your Identity'}
+                        </div>
+                        <div style={{ fontSize: 11, color: '#8896aa', marginBottom: 12 }}>Choose how you'd like to complete verification</div>
+                        <button
+                          type="button"
+                          style={{
+                            background: /^#[0-9a-fA-F]{6}$/.test(brandAccentColor) ? brandAccentColor : C.cyan,
+                            color: '#080c14', border: 'none', borderRadius: 8,
+                            padding: '8px 24px', fontSize: 12, fontWeight: 600,
+                            cursor: 'default',
+                          }}
+                        >
+                          Scan QR Code
+                        </button>
+                        {(brandLogoUrl || brandCompanyName || brandAccentColor) && (
+                          <div style={{ fontSize: 9, color: C.dim, marginTop: 10 }}>
+                            Powered by Idswyft
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Save / Clear buttons */}
+                    <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
+                      <button
+                        onClick={saveBrandingSettings}
+                        disabled={brandSaving}
+                        style={{
+                          background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
+                          padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                          opacity: brandSaving ? 0.5 : 1,
+                        }}
+                      >
+                        {brandSaving ? 'Saving...' : 'Save'}
+                      </button>
+                      {brandConfigured && (
+                        <button
+                          onClick={clearBrandingSettings}
+                          disabled={brandSaving}
+                          style={{
+                            background: 'none', border: `1px solid ${C.border}`, color: C.muted,
+                            borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13,
+                          }}
+                        >
+                          Clear
+                        </button>
+                      )}
+                    </div>
                   </>
                 )}
               </div>

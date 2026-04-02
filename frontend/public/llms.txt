@@ -2,7 +2,7 @@
 
 > Open-source identity verification platform. Verify government-issued IDs with OCR, liveness detection, and face matching.
 > Base URL: https://api.idswyft.app
-> Version: v1.8.1 — April 2026
+> Version: v1.8.2 — April 2026
 > Source of truth: backend/src/api-docs/apiDocsMarkdown.ts
 
 ## Links
@@ -363,6 +363,36 @@ POST /api/v2/verify/:id/phone-otp/verify
 **Response:** `{ "success": true, "phone_verified": true }`
 
 Max 3 attempts per code. After exhaustion, request a new code.
+
+---
+
+## Verification Page Branding
+
+White-label the hosted verification page with your company's logo, accent color, and name.
+
+### Configure Branding
+
+```
+GET /api/developer/settings/branding          — Get current branding settings
+PUT /api/developer/settings/branding          — Save branding (logo_url, accent_color, company_name)
+POST /api/developer/branding/logo             — Upload logo (JPEG/PNG, max 2 MB)
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| logo_url | string | null | URL to your company logo |
+| accent_color | string | null | 6-digit hex color (e.g. `#ff6600`) |
+| company_name | string | null | Company name (max 100 chars) |
+
+Send all fields as `null` to clear branding and revert to defaults.
+
+### Get Page Config (Public)
+
+```
+GET /api/v2/verify/page-config?api_key=ik_...
+```
+
+Public endpoint — returns developer branding for the hosted verification page. No auth header required; uses API key in query string. Response cached for 5 minutes. `company_name` falls back to the developer's profile company name.
 
 ---
 
@@ -850,6 +880,15 @@ On first boot, navigate to the frontend. If no developer account exists, a setup
 
 ## Changelog
 
+### v1.8.2 (2026-04-02)
+
+**Added:**
+- Verification page branding — white-label with custom logo, accent color, and company name
+- Branding settings endpoints: `GET/PUT /api/developer/settings/branding`, `POST /api/developer/branding/logo`
+- Public page-config endpoint: `GET /api/v2/verify/page-config?api_key=...`
+- Live preview in Developer Portal Settings
+- Branding applied to desktop, mobile, and embedded verification flows
+
 ### v1.7.3 (2026-04-01)
 
 **Added:**
@@ -947,4 +986,4 @@ On first boot, navigate to the frontend. If no developer account exists, a setup
 
 ---
 
-Generated from Idswyft API v1.7.3 — https://idswyft.app/docs
+Generated from Idswyft API v1.8.2 — https://idswyft.app/docs
