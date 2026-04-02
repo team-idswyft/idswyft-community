@@ -14,7 +14,7 @@ export interface IdswyftConfig {
 
 // ─── Verification Types ─────────────────────────────────
 
-export type DocumentType = 'passport' | 'drivers_license' | 'national_id' | 'other'
+export type DocumentType = 'passport' | 'drivers_license' | 'national_id' | 'other' | 'auto'
   | 'utility_bill' | 'bank_statement' | 'tax_document';
 
 export type VerificationStatus =
@@ -359,7 +359,7 @@ export class IdswyftSDK {
   async uploadFrontDocument(
     verificationId: string,
     documentFile: File | Buffer,
-    documentType: DocumentType = 'drivers_license'
+    documentType: DocumentType = 'auto'
   ): Promise<VerificationResult> {
     const formData = new FormData();
     formData.append('document', documentFile);
@@ -380,7 +380,7 @@ export class IdswyftSDK {
   async uploadBackDocument(
     verificationId: string,
     documentFile: File | Buffer,
-    documentType: DocumentType = 'drivers_license'
+    documentType: DocumentType = 'auto'
   ): Promise<VerificationResult> {
     const formData = new FormData();
     formData.append('document', documentFile);

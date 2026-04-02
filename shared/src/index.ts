@@ -33,6 +33,10 @@ export { OnnxDeepfakeDetector } from './providers/deepfake/OnnxDeepfakeDetector.
 export type { DeepfakeDetectionResult } from './providers/deepfake/OnnxDeepfakeDetector.js';
 export { createDeepfakeDetector } from './providers/deepfake/index.js';
 
+// OCR — Document classification
+export { classifyDocument } from './providers/ocr/DocumentClassifier.js';
+export type { ClassificationResult } from './providers/ocr/DocumentClassifier.js';
+
 // OCR
 export { STATE_DL_FORMATS } from './providers/ocr/dlFormats.js';
 export {

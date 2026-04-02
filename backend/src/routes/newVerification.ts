@@ -660,7 +660,7 @@ router.post('/initialize',
   verificationRateLimit,
   [
     body('user_id').isUUID().withMessage('User ID must be a valid UUID'),
-    body('document_type').optional().isIn(['passport', 'drivers_license', 'national_id']).withMessage('Invalid document type'),
+    body('document_type').optional().isIn(['passport', 'drivers_license', 'national_id', 'auto']).withMessage('Invalid document type'),
     body('issuing_country').optional().isLength({ min: 2, max: 2 }).isAlpha().withMessage('Issuing country must be a 2-letter ISO code'),
     body('sandbox').optional().isBoolean().withMessage('Sandbox must be a boolean'),
     body('source').optional().isIn(['api', 'vaas', 'demo']).withMessage('Source must be api, vaas, or demo'),
@@ -672,7 +672,7 @@ router.post('/initialize',
   ],
   validate,
   catchAsync(async (req: Request, res: Response) => {
-    const { user_id, document_type = 'drivers_license', issuing_country } = req.body;
+    const { user_id, document_type = 'auto', issuing_country } = req.body;
     const addons: VerificationAddons = req.body.addons || {};
     const source: VerificationSource = req.body.source || 'api';
     const verificationMode: string = req.body.verification_mode || 'full';
@@ -873,7 +873,7 @@ router.post('/:verification_id/front-document',
   upload.single('document'),
   [
     param('verification_id').isUUID().withMessage('Invalid verification ID'),
-    body('document_type').optional().isIn(['passport', 'drivers_license', 'national_id', 'other']).withMessage('Invalid document type'),
+    body('document_type').optional().isIn(['passport', 'drivers_license', 'national_id', 'other', 'auto']).withMessage('Invalid document type'),
     body('issuing_country').optional().isLength({ min: 2, max: 2 }).isAlpha().withMessage('Issuing country must be a 2-letter ISO code'),
   ],
   validate,
@@ -888,7 +888,7 @@ router.post('/:verification_id/front-document',
     }
 
     const { verification_id } = req.params;
-    const { document_type = 'drivers_license', issuing_country } = req.body;
+    const { document_type = 'auto', issuing_country } = req.body;
     const verification = await requireOwnedVerification(req, verification_id);
     const isSandbox = (verification as any).is_sandbox || false;
     const source: VerificationSource = (verification as any).source || 'api';
@@ -932,6 +932,12 @@ router.post('/:verification_id/front-document',
           llmConfig,
         })
       : await extractFrontDocument(documentPath, document.id, document_type, resolvedCountry, verification_id, llmConfig, req.file.buffer);
+
+    // Update document record with resolved document type if auto-classified
+    const resolvedDocType = frontResult.ocr?.detected_document_type;
+    if (document_type === 'auto' && resolvedDocType) {
+      verificationService.updateDocument(document.id, { document_type: resolvedDocType } as any).catch(() => {});
+    }
 
     // Ephemeral cleanup: demo files are deleted immediately after extraction
     if (source === 'demo') {
@@ -993,13 +999,16 @@ router.post('/:verification_id/front-document',
 
     const mapped = mapStatusForResponse(state, isAgeOnly);
 
+    const ocrResult = state.front_extraction?.ocr;
     res.json({
       success: true,
       verification_id,
       status: mapped.status,
       current_step: mapped.current_step,
       document_id: document.id,
-      ocr_data: isAgeOnly ? undefined : (state.front_extraction?.ocr ?? null),
+      ocr_data: isAgeOnly ? undefined : (ocrResult ?? null),
+      detected_document_type: ocrResult?.detected_document_type || (document_type !== 'auto' ? document_type : undefined),
+      classification_confidence: ocrResult?.classification_confidence ?? (document_type !== 'auto' ? 1.0 : undefined),
       rejection_reason: state.rejection_reason,
       rejection_detail: state.rejection_detail,
       ...(ageVerification && { age_verification: ageVerification }),
@@ -1049,7 +1058,7 @@ router.post('/:verification_id/back-document',
   upload.single('document'),
   [
     param('verification_id').isUUID().withMessage('Invalid verification ID'),
-    body('document_type').optional().isIn(['passport', 'drivers_license', 'national_id', 'other']).withMessage('Invalid document type'),
+    body('document_type').optional().isIn(['passport', 'drivers_license', 'national_id', 'other', 'auto']).withMessage('Invalid document type'),
     body('issuing_country').optional().isLength({ min: 2, max: 2 }).isAlpha().withMessage('Issuing country must be a 2-letter ISO code'),
   ],
   validate,

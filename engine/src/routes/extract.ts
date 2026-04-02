@@ -57,7 +57,7 @@ router.post('/front', upload.single('file'), async (req: Request, res: Response)
     }
 
     const imageBuffer = req.file.buffer;
-    const documentType = req.body.document_type || 'drivers_license';
+    const documentType = req.body.document_type || 'auto';
     const issuingCountry = req.body.issuing_country || undefined;
     const documentId = req.body.document_id || 'unknown';
     const verificationId = req.body.verification_id || undefined;
@@ -117,6 +117,9 @@ router.post('/front', upload.single('file'), async (req: Request, res: Response)
       }
     }
 
+    // Resolve document type: use auto-classified type if available, otherwise raw input
+    const resolvedDocType = ocrData?.detected_document_type || documentType;
+
     // 4. Tamper detection + zone validation
     let authenticity: FrontExtractionResult['authenticity'] = undefined;
     try {
@@ -133,7 +136,7 @@ router.post('/front', upload.single('file'), async (req: Request, res: Response)
         if (meta.width && meta.height) {
           const zoneResult = new DocumentZoneValidator().validate(
             faceBoundingBox, meta.width, meta.height,
-            documentType, detectedCountry || 'US',
+            resolvedDocType, detectedCountry || 'US',
           );
           authenticity.zoneScore = zoneResult.score;
           if (zoneResult.violations.length > 0) {

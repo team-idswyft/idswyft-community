@@ -3,7 +3,7 @@
  * Superset of both backend/src/types/index.ts and engine/src/types/index.ts OCRData.
  */
 
-export type DocumentType = 'passport' | 'drivers_license' | 'national_id' | 'other';
+export type DocumentType = 'passport' | 'drivers_license' | 'national_id' | 'other' | 'auto';
 
 export interface OCRData {
   name?: string;
@@ -26,5 +26,7 @@ export interface OCRData {
   id_number?: string;
   expiry_date?: string;
   confidence_scores?: Record<string, number>;
+  detected_document_type?: 'passport' | 'drivers_license' | 'national_id';
+  classification_confidence?: number;
   [key: string]: any;
 }

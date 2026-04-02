@@ -64,7 +64,7 @@ export interface Document {
   created_at: Date;
 }
 
-export type DocumentType = 'passport' | 'drivers_license' | 'national_id' | 'other'
+export type DocumentType = 'passport' | 'drivers_license' | 'national_id' | 'other' | 'auto'
   | 'utility_bill' | 'bank_statement' | 'tax_document';
 
 export interface Selfie {
@@ -89,6 +89,8 @@ export interface OCRData {
   address?: string;
   raw_text?: string;
   confidence_scores?: Record<string, number>;
+  detected_document_type?: 'passport' | 'drivers_license' | 'national_id';
+  classification_confidence?: number;
   // Additional fields for comprehensive document processing
   id_number?: string;
   expiry_date?: string;

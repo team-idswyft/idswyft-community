@@ -3,10 +3,11 @@ import {
   type PaddleOcrResult,
   type RecognitionResult,
 } from 'ppu-paddle-ocr';
-import type { OCRProvider, OCRData, CountryDocFormat, LLMProviderConfig } from '@idswyft/shared';
+import type { OCRProvider, OCRData, CountryDocFormat, LLMProviderConfig, ClassificationResult } from '@idswyft/shared';
 import {
   getCountryFormat, INTERNATIONAL_HEADER_NOISE, STATE_DL_FORMATS,
   findLowConfidenceFields, extractFieldsWithLLM, mergeLLMResults,
+  classifyDocument,
 } from '@idswyft/shared';
 import { logger } from '@/utils/logger.js';
 
@@ -289,15 +290,28 @@ export class PaddleOCRProvider implements OCRProvider {
       confidence_scores: {},
     };
 
+    // Auto-classify document type if not specified
+    let resolvedDocType = documentType;
+    let classificationResult: ClassificationResult | undefined;
+    if (!documentType || documentType === 'auto') {
+      classificationResult = classifyDocument(result.text);
+      resolvedDocType = classificationResult.type;
+      logger.info('Document auto-classified', {
+        detected: classificationResult.type,
+        confidence: classificationResult.confidence,
+        signals: classificationResult.signals,
+      });
+    }
+
     // Country-aware routing: use international extraction for non-US countries
     const country = issuingCountry?.toUpperCase();
-    const countryFormat = country ? getCountryFormat(country, documentType) : null;
+    const countryFormat = country ? getCountryFormat(country, resolvedDocType) : null;
 
     if (country && country !== 'US' && countryFormat) {
       this.extractInternationalDocument(result.lines, ocrData, countryFormat, country);
     } else {
       // Default extraction (US or unknown country)
-      switch (documentType) {
+      switch (resolvedDocType) {
         case 'passport':
           this.extractPassportData(result.lines, ocrData);
           break;
@@ -322,7 +336,7 @@ export class PaddleOCRProvider implements OCRProvider {
         try {
           const llmResult = await extractFieldsWithLLM({
             imageBuffer: buffer,
-            documentType,
+            documentType: resolvedDocType,
             fieldsNeeded: lowFields,
             ocrContext: ocrData.raw_text,
             llmConfig,
@@ -342,8 +356,14 @@ export class PaddleOCRProvider implements OCRProvider {
       }
     }
 
+    // Store classification result on OCR data
+    if (classificationResult) {
+      ocrData.detected_document_type = classificationResult.type;
+      ocrData.classification_confidence = classificationResult.confidence;
+    }
+
     logger.info('PaddleOCRProvider: extraction result', {
-      documentType,
+      documentType: resolvedDocType,
       issuingCountry: country,
       fields: Object.keys(ocrData).filter(k => k !== 'raw_text' && k !== 'confidence_scores'),
       ocrData,

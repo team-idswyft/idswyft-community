@@ -187,11 +187,11 @@ Content-Type: multipart/form-data
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| document_type | string | Yes | 'passport' | 'drivers_license' | 'national_id' | 'other' |
+| document_type | string | No | 'passport' | 'drivers_license' | 'national_id' | 'other' | 'auto'. Defaults to 'auto' (auto-detect from OCR text). If provided explicitly, the given type is used with confidence 1.0 |
 | document | File | Yes | JPEG, PNG, WebP, or PDF. Max 10 MB |
 | country_code | string | No | ISO 3166-1 alpha-2 country code (e.g. 'US', 'GB'). Improves OCR accuracy for international documents |
 
-**Response (201):** Includes `ocr_data` with extracted fields (name, DOB, document number, expiry, address) and `confidence_scores` per field.
+**Response (201):** Includes `ocr_data` with extracted fields (name, DOB, document number, expiry, address) and `confidence_scores` per field. Also includes `detected_document_type` (the auto-detected or user-specified document type) and `classification_confidence` (0.50-1.0 indicating detection reliability). Auto-classification signals: MRZ patterns (TD1/TD2/TD3), keyword matching (PASSPORT, DRIVER LICENSE, NATIONAL ID), and field-pattern heuristics (AAMVA codes, DL tokens).
 
 ### Step 3: Upload Back Document
 
