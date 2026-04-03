@@ -56,6 +56,13 @@ import engineClient from '@/services/engineClient.js';
 
 const router = express.Router();
 
+// Defensive fallbacks for verification modes that may not be in an older shared package build.
+// These are only used if FLOW_PRESETS[mode] returns undefined (e.g., stale Docker cache).
+const INLINE_FLOW_FALLBACKS: Partial<Record<string, FlowConfig>> = {
+  document_only: { preset: 'document_only' as VerificationMode, requiresBack: true, requiresLiveness: false, requiresFaceMatch: false, totalSteps: 3, afterFront: 'AWAITING_BACK' as any, afterCrossVal: 'COMPLETE' as any },
+  identity:      { preset: 'identity' as VerificationMode,      requiresBack: false, requiresLiveness: true,  requiresFaceMatch: true,  totalSteps: 3, afterFront: 'AWAITING_LIVE' as any,  afterCrossVal: 'AWAITING_LIVE' as any },
+};
+
 const storageService = new StorageService();
 const verificationService = new VerificationService();
 const ocrService = new OCRService();
@@ -160,7 +167,7 @@ async function hydrateSession(verificationId: string, isSandbox: boolean, develo
 
   // Resolve flow config from verification_mode
   const mode = (row?.verification_mode as VerificationMode) || 'full';
-  const flow = FLOW_PRESETS[mode] ?? FLOW_PRESETS.full;
+  const flow = FLOW_PRESETS[mode] ?? INLINE_FLOW_FALLBACKS[mode] ?? FLOW_PRESETS.full;
 
   return createSession(isSandbox, hydration, addons, developerAmlEnabled, flow);
 }
@@ -749,7 +756,7 @@ router.post('/initialize',
     }
 
     // Resolve flow config from verification_mode
-    const flow = FLOW_PRESETS[verificationMode as VerificationMode] ?? FLOW_PRESETS.full;
+    const flow = FLOW_PRESETS[verificationMode as VerificationMode] ?? INLINE_FLOW_FALLBACKS[verificationMode] ?? FLOW_PRESETS.full;
 
     // Create session and save initial state
     const issuingCountryUpper = issuing_country?.toUpperCase() || null;
@@ -1004,7 +1011,7 @@ router.post('/:verification_id/front-document',
       .eq('id', verification_id)
       .single();
     const vrMode = (vrRow?.verification_mode as VerificationMode) || 'full';
-    const flow = FLOW_PRESETS[vrMode] ?? FLOW_PRESETS.full;
+    const flow = FLOW_PRESETS[vrMode] ?? INLINE_FLOW_FALLBACKS[vrMode] ?? FLOW_PRESETS.full;
     const isAgeOnly = vrMode === 'age_only';
     const ageThreshold = vrRow?.age_threshold ?? 18;
 
@@ -1160,7 +1167,7 @@ router.post('/:verification_id/back-document',
       .eq('id', verification_id)
       .single();
     const vrMode = (vrRow?.verification_mode as VerificationMode) || 'full';
-    const flow = FLOW_PRESETS[vrMode] ?? FLOW_PRESETS.full;
+    const flow = FLOW_PRESETS[vrMode] ?? INLINE_FLOW_FALLBACKS[vrMode] ?? FLOW_PRESETS.full;
 
     if (!flow.requiresBack) {
       return res.status(400).json({
@@ -1367,7 +1374,7 @@ router.post('/:verification_id/live-capture',
       .eq('id', verification_id)
       .single();
     const vrMode = (vrRow?.verification_mode as VerificationMode) || 'full';
-    const flow = FLOW_PRESETS[vrMode] ?? FLOW_PRESETS.full;
+    const flow = FLOW_PRESETS[vrMode] ?? INLINE_FLOW_FALLBACKS[vrMode] ?? FLOW_PRESETS.full;
 
     if (!flow.requiresLiveness) {
       return res.status(400).json({
@@ -1694,7 +1701,7 @@ router.get('/:verification_id/status',
       .eq('id', verification_id)
       .single();
     const vrMode = (vrMeta?.verification_mode as VerificationMode) || 'full';
-    const flow = FLOW_PRESETS[vrMode] ?? FLOW_PRESETS.full;
+    const flow = FLOW_PRESETS[vrMode] ?? INLINE_FLOW_FALLBACKS[vrMode] ?? FLOW_PRESETS.full;
     const isAgeOnly = vrMode === 'age_only';
 
     const session = await hydrateSession(verification_id, isSandbox);

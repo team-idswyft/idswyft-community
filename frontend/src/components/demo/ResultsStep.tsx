@@ -2,6 +2,64 @@ import React from 'react';
 import { C } from '../../theme';
 import type { VerificationRequest } from './types';
 
+// ─── JSON syntax highlighting ───────────────────────────────────
+const jsonTokenColors = {
+  key: C.cyan,
+  string: C.green,
+  number: C.amber,
+  boolean: C.purple,
+  null: C.red,
+  brace: C.dim,
+  comma: 'rgba(255,255,255,0.25)',
+} as const;
+
+function highlightJson(obj: unknown): React.ReactNode[] {
+  const raw = JSON.stringify(obj, null, 2);
+  if (!raw) return [];
+  // Tokenize JSON string into colored spans
+  const nodes: React.ReactNode[] = [];
+  // Regex matches: strings (including keys), numbers, booleans, null, braces/brackets, commas/colons
+  const tokenRe = /("(?:[^"\\]|\\.)*")\s*:|("(?:[^"\\]|\\.)*")|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\b|(true|false)|(null)|([{}\[\]])|([,:])|\n( *)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let i = 0;
+  while ((match = tokenRe.exec(raw)) !== null) {
+    // Any unmatched text between tokens
+    if (match.index > lastIndex) {
+      nodes.push(raw.slice(lastIndex, match.index));
+    }
+    lastIndex = match.index + match[0].length;
+    if (match[1]) {
+      // Key (quoted string followed by colon)
+      nodes.push(<span key={i++} style={{ color: jsonTokenColors.key }}>{match[1]}</span>);
+      nodes.push(<span key={i++} style={{ color: jsonTokenColors.comma }}>: </span>);
+    } else if (match[2]) {
+      // String value
+      nodes.push(<span key={i++} style={{ color: jsonTokenColors.string }}>{match[2]}</span>);
+    } else if (match[3]) {
+      // Number
+      nodes.push(<span key={i++} style={{ color: jsonTokenColors.number }}>{match[3]}</span>);
+    } else if (match[4]) {
+      // Boolean
+      nodes.push(<span key={i++} style={{ color: jsonTokenColors.boolean }}>{match[4]}</span>);
+    } else if (match[5]) {
+      // null
+      nodes.push(<span key={i++} style={{ color: jsonTokenColors.null }}>{match[5]}</span>);
+    } else if (match[6]) {
+      // Braces / brackets
+      nodes.push(<span key={i++} style={{ color: jsonTokenColors.brace }}>{match[6]}</span>);
+    } else if (match[7]) {
+      // Comma / colon
+      nodes.push(<span key={i++} style={{ color: jsonTokenColors.comma }}>{match[7]}</span>);
+    } else if (match[8] !== undefined) {
+      // Newline + indentation
+      nodes.push('\n' + match[8]);
+    }
+  }
+  if (lastIndex < raw.length) nodes.push(raw.slice(lastIndex));
+  return nodes;
+}
+
 interface ResultsStepProps {
   verificationRequest: VerificationRequest;
   isMobile: boolean;
@@ -285,7 +343,7 @@ export const ResultsStep: React.FC<ResultsStepProps> = ({
           This is the exact JSON your server receives from <code style={{ color: C.cyan, background: C.codeBg, padding: '1px 4px', borderRadius: 3, fontSize: 10 }}>GET /api/v2/verify/:id/status</code>
         </p>
         <pre style={{ background: C.codeBg, color: C.code, padding: 12, borderRadius: 6, fontSize: 10, fontFamily: C.mono, overflowX: 'auto', maxHeight: 300, overflowY: 'auto', lineHeight: 1.5, margin: 0 }}>
-          {JSON.stringify(verificationRequest, null, 2)}
+          {highlightJson(verificationRequest)}
         </pre>
       </div>
 
