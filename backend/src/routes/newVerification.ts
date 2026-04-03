@@ -137,21 +137,18 @@ async function hydrateSession(verificationId: string, isSandbox: boolean, develo
     session_id: verificationId,
   };
 
-  // Read addons + developer_id + verification_mode from the verification_requests row
+  // Read developer_id + verification_mode from the verification_requests row
   let addons: VerificationAddons | undefined;
   let resolvedDeveloperId = developerId;
   const { data: row, error: rowError } = await supabase
     .from('verification_requests')
-    .select('addons, developer_id, verification_mode')
+    .select('developer_id, verification_mode')
     .eq('id', verificationId)
     .single();
   if (rowError) {
     logger.error('hydrateSession: failed to read verification_requests', {
       verificationId, error: rowError.message, code: (rowError as any).code,
     });
-  }
-  if (row?.addons && typeof row.addons === 'object') {
-    addons = row.addons as VerificationAddons;
   }
   if (!resolvedDeveloperId && row?.developer_id) {
     resolvedDeveloperId = row.developer_id;
@@ -172,20 +169,13 @@ async function hydrateSession(verificationId: string, isSandbox: boolean, develo
 
   // Resolve flow config from verification_mode
   const mode = (row?.verification_mode as VerificationMode) || 'full';
-  const fromShared = FLOW_PRESETS[mode];
-  const fromInline = INLINE_FLOW_FALLBACKS[mode];
-  const flow = fromShared ?? fromInline ?? FLOW_PRESETS.full;
+  const flow = FLOW_PRESETS[mode] ?? INLINE_FLOW_FALLBACKS[mode] ?? FLOW_PRESETS.full;
 
-  logger.info('hydrateSession flow resolution', {
-    verificationId,
-    rowKeys: row ? Object.keys(row).join(',') : 'NO_ROW',
-    dbVerificationMode: row?.verification_mode ?? 'NULL',
-    rowError: rowError ? rowError.message : 'none',
-    mode,
-    flowSource: fromShared ? 'FLOW_PRESETS' : fromInline ? 'INLINE_FALLBACK' : 'FULL_DEFAULT',
-    preset: flow.preset,
-    afterFront: flow.afterFront,
-  });
+  if (mode !== 'full') {
+    logger.info('hydrateSession flow resolution', {
+      verificationId, mode, preset: flow.preset, afterFront: flow.afterFront,
+    });
+  }
 
   return createSession(isSandbox, hydration, addons, developerAmlEnabled, flow);
 }
