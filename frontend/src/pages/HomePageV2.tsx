@@ -395,10 +395,10 @@ export function HomePageV2() {
         {/* Gradient mesh background */}
         <div className="hero-gradient-mesh" />
 
-        {/* Security pattern overlays — guilloche + crosshatch */}
-        <div className="pattern-guilloche pattern-faint pattern-animate-slow"
+        {/* Security pattern overlays — multi-color guilloche + crosshatch */}
+        <div className="pattern-guilloche-rainbow pattern-faint pattern-animate-slow"
           style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }} />
-        <div className="pattern-crosshatch pattern-faint pattern-animate"
+        <div className="pattern-crosshatch-rainbow pattern-faint pattern-animate"
           style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }} />
 
         <div style={{ position: 'relative', zIndex: 1, maxWidth: 900, margin: '0 auto' }}>
