@@ -723,9 +723,21 @@ const MobileVerificationPage: React.FC = () => {
       if (isComplete) {
         if (data.final_result === 'failed') { showFinalResult(data); }
         else if (isDocumentOnly) {
-          // document_only: cross-validation is final gate, skip live capture
+          // document_only: cross-validation is final gate, skip live capture.
+          // If final_result is set, use it directly. Otherwise, infer from
+          // cross-validation results (defensive: covers stale backend builds).
           if (data.final_result !== null) {
             showFinalResult(data);
+          } else if (data.cross_validation_results) {
+            const hasCriticalFailure = data.cross_validation_results.has_critical_failure;
+            const verdict = data.cross_validation_results.verdict;
+            showFinalResult({
+              ...data,
+              final_result: hasCriticalFailure ? 'failed'
+                : verdict === 'REVIEW' ? 'manual_review'
+                : verdict === 'REJECT' ? 'failed'
+                : 'verified',
+            });
           } else {
             setScreenIdx(4);
             waitForFinalResult(0);

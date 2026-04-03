@@ -973,10 +973,26 @@ const DemoPage: React.FC = () => {
             return;
           }
 
-          // document_only: crossval complete means verification done
-          if (isDocumentOnly && (status === 'verified' || status === 'manual_review' || status === 'complete')) {
+          // document_only: crossval complete means verification done.
+          // Check final_result first; fallback to inferring from cross-validation results
+          // (defensive: covers stale backend builds where FLOW_PRESETS may be missing).
+          if (isDocumentOnly && (status === 'verified' || status === 'manual_review' || status === 'complete' || data.final_result !== null)) {
             stopCrossValPolling();
             setVerificationRequest(data);
+            setCurrentStep(7);
+            return;
+          }
+          if (isDocumentOnly && data.cross_validation_results) {
+            stopCrossValPolling();
+            const verdict = data.cross_validation_results.verdict;
+            const hasCriticalFailure = data.cross_validation_results.has_critical_failure;
+            setVerificationRequest({
+              ...data,
+              final_result: hasCriticalFailure ? 'failed'
+                : verdict === 'REVIEW' ? 'manual_review'
+                : verdict === 'REJECT' ? 'failed'
+                : 'verified',
+            });
             setCurrentStep(7);
             return;
           }
