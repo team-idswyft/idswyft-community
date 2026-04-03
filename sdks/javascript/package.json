@@ -1,5 +1,5 @@
 {
-  "name": "idswyft-sdk",
+  "name": "@idswyft/sdk",
   "version": "4.0.0",
   "description": "Official JavaScript/Node.js SDK for the Idswyft identity verification platform",
   "main": "dist/index.cjs",

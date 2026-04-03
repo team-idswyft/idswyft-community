@@ -611,6 +611,7 @@ export class IdswyftSDK {
       {
         interval: options?.interval ?? 2000,
         maxAttempts: options?.maxAttempts ?? 300,
+        transport: options?.transport ?? 'polling',
       },
     );
   }
