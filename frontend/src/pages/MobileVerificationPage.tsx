@@ -699,6 +699,17 @@ const MobileVerificationPage: React.FC = () => {
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'Upload failed'); }
       if (!mountedRef.current) return;
+
+      // For document_only, the back-doc response may already include final_result
+      // (cross-validation auto-triggers and completes synchronously).
+      if (isDocumentOnly) {
+        const data = await res.json().catch(() => null);
+        if (data?.final_result) {
+          showFinalResult(data);
+          return;
+        }
+      }
+
       setScreenIdx(2); // Checking screen
       pollCrossValidation(0);
     } catch (err: any) {
@@ -739,6 +750,8 @@ const MobileVerificationPage: React.FC = () => {
                 : 'verified',
             });
           } else {
+            // Shouldn't reach here — backend should return cross_validation_results
+            // or final_result. Poll briefly in case of timing.
             setScreenIdx(4);
             waitForFinalResult(0);
           }
@@ -788,8 +801,16 @@ const MobileVerificationPage: React.FC = () => {
       });
       if (!res.ok) { const e = await res.json().catch(() => ({ message: 'Liveness check failed' })); throw new Error(e.message || 'Liveness check failed'); }
       if (!mountedRef.current) return;
-      setScreenIdx(4);
-      waitForFinalResult(0);
+
+      // The live-capture response includes final_result — use it directly if available
+      // to avoid depending on the polling loop (which can fail if session state save is delayed).
+      const data = await res.json().catch(() => null);
+      if (data?.final_result) {
+        showFinalResult(data);
+      } else {
+        setScreenIdx(4);
+        waitForFinalResult(0);
+      }
     } catch (err: any) {
       if (mountedRef.current) {
         setShowActiveLiveness(false);
@@ -820,8 +841,15 @@ const MobileVerificationPage: React.FC = () => {
       });
       if (!res.ok) { const e = await res.json().catch(() => ({ message: 'Selfie upload failed' })); throw new Error(e.message || 'Selfie upload failed'); }
       if (!mountedRef.current) return;
-      setScreenIdx(4); // Done screen
-      waitForFinalResult(0);
+
+      // Use the response's final_result directly if available (avoids polling dependency)
+      const data = await res.json().catch(() => null);
+      if (data?.final_result) {
+        showFinalResult(data);
+      } else {
+        setScreenIdx(4); // Done screen
+        waitForFinalResult(0);
+      }
     } catch (err: any) {
       if (mountedRef.current) setStepError(err.message);
     } finally {
@@ -831,12 +859,27 @@ const MobileVerificationPage: React.FC = () => {
 
   const waitForFinalResult = async (attempt: number) => {
     if (!verificationId || !apiKey || !mountedRef.current) return;
-    if (attempt >= 60) return;
+    if (attempt >= 60) {
+      if (mountedRef.current) setStepError('Verification is taking too long. Please close and try again.');
+      return;
+    }
     try {
       const data = await apiGet(`/api/v2/verify/${verificationId}/status`, apiKey);
       if (!mountedRef.current) return;
-      if (data.final_result !== null) { showFinalResult(data); }
-      else { setTimeout(() => waitForFinalResult(attempt + 1), 3000); }
+      if (data.final_result !== null) { showFinalResult(data); return; }
+
+      // Defensive: infer final_result for identity mode from face match results
+      // (covers stale backend builds where FLOW_PRESETS['identity'] may be missing)
+      if (isIdentity && data.face_match_results) {
+        const skipped = !!data.face_match_results.skipped_reason;
+        showFinalResult({
+          ...data,
+          final_result: skipped ? 'manual_review' : 'verified',
+        });
+        return;
+      }
+
+      setTimeout(() => waitForFinalResult(attempt + 1), 3000);
     } catch {
       if (mountedRef.current) setTimeout(() => waitForFinalResult(attempt + 1), 3000);
     }
