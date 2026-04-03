@@ -622,6 +622,21 @@ const DemoPage: React.FC = () => {
 
       if (response.ok) {
         const data = await response.json();
+
+        // Infer final_result for mode-specific flows when the backend doesn't set it
+        // (defensive: covers stale backend builds missing FLOW_PRESETS for newer modes)
+        if (!data.final_result && data.verification_mode) {
+          if (data.verification_mode === 'document_only' && data.cross_validation_results) {
+            const cv = data.cross_validation_results;
+            data.final_result = cv.has_critical_failure ? 'failed'
+              : cv.verdict === 'REVIEW' ? 'manual_review'
+              : cv.verdict === 'REJECT' ? 'failed'
+              : 'verified';
+          } else if (data.verification_mode === 'identity' && data.face_match_results) {
+            data.final_result = data.face_match_results.skipped_reason ? 'manual_review' : 'verified';
+          }
+        }
+
         setVerificationRequest(data);
         setVerificationId(verId);
       }
