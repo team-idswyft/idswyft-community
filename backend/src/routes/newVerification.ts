@@ -140,11 +140,16 @@ async function hydrateSession(verificationId: string, isSandbox: boolean, develo
   // Read addons + developer_id + verification_mode from the verification_requests row
   let addons: VerificationAddons | undefined;
   let resolvedDeveloperId = developerId;
-  const { data: row } = await supabase
+  const { data: row, error: rowError } = await supabase
     .from('verification_requests')
     .select('addons, developer_id, verification_mode')
     .eq('id', verificationId)
     .single();
+  if (rowError) {
+    logger.error('hydrateSession: failed to read verification_requests', {
+      verificationId, error: rowError.message, code: (rowError as any).code,
+    });
+  }
   if (row?.addons && typeof row.addons === 'object') {
     addons = row.addons as VerificationAddons;
   }
@@ -173,14 +178,13 @@ async function hydrateSession(verificationId: string, isSandbox: boolean, develo
 
   logger.info('hydrateSession flow resolution', {
     verificationId,
+    rowKeys: row ? Object.keys(row).join(',') : 'NO_ROW',
     dbVerificationMode: row?.verification_mode ?? 'NULL',
+    rowError: rowError ? rowError.message : 'none',
     mode,
     flowSource: fromShared ? 'FLOW_PRESETS' : fromInline ? 'INLINE_FALLBACK' : 'FULL_DEFAULT',
-    sharedHasKey: !!fromShared,
-    inlineHasKey: !!fromInline,
     preset: flow.preset,
     afterFront: flow.afterFront,
-    requiresBack: flow.requiresBack,
   });
 
   return createSession(isSandbox, hydration, addons, developerAmlEnabled, flow);
