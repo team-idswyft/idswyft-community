@@ -167,7 +167,17 @@ async function hydrateSession(verificationId: string, isSandbox: boolean, develo
 
   // Resolve flow config from verification_mode
   const mode = (row?.verification_mode as VerificationMode) || 'full';
-  const flow = FLOW_PRESETS[mode] ?? INLINE_FLOW_FALLBACKS[mode] ?? FLOW_PRESETS.full;
+  const fromShared = FLOW_PRESETS[mode];
+  const fromInline = INLINE_FLOW_FALLBACKS[mode];
+  const flow = fromShared ?? fromInline ?? FLOW_PRESETS.full;
+
+  logger.info('hydrateSession flow resolution', {
+    mode,
+    flowSource: fromShared ? 'FLOW_PRESETS' : fromInline ? 'INLINE_FALLBACK' : 'FULL_DEFAULT',
+    preset: flow.preset,
+    afterFront: flow.afterFront,
+    requiresBack: flow.requiresBack,
+  });
 
   return createSession(isSandbox, hydration, addons, developerAmlEnabled, flow);
 }
