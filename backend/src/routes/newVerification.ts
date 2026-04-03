@@ -172,8 +172,12 @@ async function hydrateSession(verificationId: string, isSandbox: boolean, develo
   const flow = fromShared ?? fromInline ?? FLOW_PRESETS.full;
 
   logger.info('hydrateSession flow resolution', {
+    verificationId,
+    dbVerificationMode: row?.verification_mode ?? 'NULL',
     mode,
     flowSource: fromShared ? 'FLOW_PRESETS' : fromInline ? 'INLINE_FALLBACK' : 'FULL_DEFAULT',
+    sharedHasKey: !!fromShared,
+    inlineHasKey: !!fromInline,
     preset: flow.preset,
     afterFront: flow.afterFront,
     requiresBack: flow.requiresBack,
