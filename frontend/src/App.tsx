@@ -1,6 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { Layout } from './components/layout/Layout'
-import { HomePage } from './pages/HomePage'
+import { HomePageV2 } from './pages/HomePageV2'
 import { DeveloperPage } from './pages/DeveloperPage'
 import { DemoPage } from './pages/DemoPage'
 import UserVerificationPage from './pages/UserVerificationPage'
@@ -28,8 +28,8 @@ function App() {
   return (
     <Layout>
       <Routes>
-        {/* Root route: community → Dev Portal, cloud → Marketing homepage */}
-        <Route path="/" element={isCommunity ? <DeveloperPage /> : <HomePage />} />
+        {/* Root route: community → Dev Portal, cloud → Glassmorphic homepage */}
+        <Route path="/" element={isCommunity ? <DeveloperPage /> : <HomePageV2 />} />
 
         {/* Dev Portal — always available */}
         <Route path="/developer" element={<DeveloperPage />} />

@@ -1,9 +1,143 @@
-import React, { useEffect, useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { Player } from '@remotion/player'
 import { VerificationShowcase } from '../remotion/VerificationShowcase'
 import { C, injectFonts } from '../theme'
 import '../styles/patterns.css'
+
+/* ── Inline SVG icon maps ────────────────────────────────── */
+
+const ICON = C.cyan
+const SW = 1.5 // strokeWidth for feature icons
+
+const featureIcons: Record<string, React.ReactNode> = {
+  'OCR Extraction': (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={ICON} strokeWidth={SW} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="2" width="16" height="20" rx="2" /><line x1="8" y1="8" x2="16" y2="8" /><line x1="8" y1="12" x2="14" y2="12" /><line x1="8" y1="16" x2="12" y2="16" />
+    </svg>
+  ),
+  'Back-of-ID / Barcode': (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={ICON} strokeWidth={SW} strokeLinecap="round">
+      <rect x="2" y="4" width="20" height="16" rx="2" /><line x1="6" y1="8" x2="6" y2="16" /><line x1="9" y1="8" x2="9" y2="16" /><line x1="12" y1="8" x2="12" y2="14" /><line x1="15" y1="8" x2="15" y2="16" /><line x1="18" y1="8" x2="18" y2="13" />
+    </svg>
+  ),
+  'Liveness Detection': (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={ICON} strokeWidth={SW} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="3" /><path d="M2 12c2.5-5 6-8 10-8s7.5 3 10 8c-2.5 5-6 8-10 8s-7.5-3-10-8z" />
+    </svg>
+  ),
+  'Face Matching': (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={ICON} strokeWidth={SW} strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="9" cy="10" r="6" /><circle cx="15" cy="10" r="6" opacity="0.5" /><path d="M12 18v3" /><line x1="9" y1="21" x2="15" y2="21" />
+    </svg>
+  ),
+  'Webhooks': (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={ICON} strokeWidth={SW} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 3v6" /><path d="M12 9l6 4" /><path d="M12 9l-6 4" /><circle cx="12" cy="3" r="1.5" /><circle cx="18" cy="13" r="1.5" /><circle cx="6" cy="13" r="1.5" /><path d="M18 13l0 4" /><path d="M6 13l0 4" />
+    </svg>
+  ),
+  'GDPR Compliant': (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={ICON} strokeWidth={SW} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2l8 4v6c0 5.25-3.5 9.74-8 11-4.5-1.26-8-5.75-8-11V6l8-4z" /><polyline points="9 12 11 14 15 10" />
+    </svg>
+  ),
+  'JavaScript SDK': (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={ICON} strokeWidth={SW} strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" /><line x1="14" y1="4" x2="10" y2="20" />
+    </svg>
+  ),
+  'Batch API': (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={ICON} strokeWidth={SW} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="10" width="16" height="10" rx="2" /><rect x="6" y="6" width="12" height="4" rx="1" opacity="0.6" /><rect x="8" y="2" width="8" height="4" rx="1" opacity="0.35" />
+    </svg>
+  ),
+  'Monitoring': (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={ICON} strokeWidth={SW} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
+    </svg>
+  ),
+}
+
+const pipelineIcons: Record<string, React.ReactNode> = {
+  '01': (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={ICON} strokeWidth={2} strokeLinecap="round">
+      <line x1="12" y1="5" x2="12" y2="19" /><line x1="5" y1="12" x2="19" y2="12" />
+    </svg>
+  ),
+  '02': (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={ICON} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="4" y="4" width="16" height="16" rx="2" /><polyline points="8 12 11 15 16 9" />
+    </svg>
+  ),
+  '03': (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={ICON} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="17 1 21 5 17 9" /><path d="M3 11V9a4 4 0 0 1 4-4h14" /><polyline points="7 23 3 19 7 15" /><path d="M21 13v2a4 4 0 0 1-4 4H3" />
+    </svg>
+  ),
+  '04': (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={ICON} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z" /><circle cx="12" cy="13" r="4" />
+    </svg>
+  ),
+  '05': (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={ICON} strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  ),
+}
+
+/* ── useCountUp hook ─────────────────────────────────────── */
+
+function useCountUp(target: number, duration = 1000) {
+  const [value, setValue] = useState(0)
+  const ref = useRef<HTMLDivElement>(null)
+  const animated = useRef(false)
+
+  useEffect(() => {
+    const el = ref.current
+    if (!el) return
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !animated.current) {
+          animated.current = true
+          const start = performance.now()
+          const tick = (now: number) => {
+            const elapsed = now - start
+            const progress = Math.min(elapsed / duration, 1)
+            // ease-out cubic
+            const eased = 1 - Math.pow(1 - progress, 3)
+            setValue(Math.round(eased * target))
+            if (progress < 1) requestAnimationFrame(tick)
+          }
+          requestAnimationFrame(tick)
+        }
+      },
+      { threshold: 0.3 },
+    )
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [target, duration])
+
+  return { ref, value }
+}
+
+/* ── Stat card with count-up ─────────────────────────────── */
+
+function StatCard({ numericTarget, prefix, suffix, label }: {
+  numericTarget: number | null
+  prefix: string
+  suffix: string
+  label: string
+}) {
+  const { ref, value } = useCountUp(numericTarget ?? 0)
+  const display = numericTarget !== null ? `${prefix}${value}${suffix}` : `${prefix}${suffix}`
+  return (
+    <div ref={ref} className="landing-card" style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 20px', fontFamily: C.mono, fontSize: 13 }}>
+      <span style={{ color: C.cyan, fontWeight: 600 }}>{display}</span>
+      <span style={{ color: C.muted, marginLeft: 8 }}>{label}</span>
+    </div>
+  )
+}
 
 const JS_CODE = `const BASE = 'https://api.idswyft.app'
 const KEY  = 'your-api-key'
@@ -201,6 +335,14 @@ function CodeStrip() {
 
 function useScrollReveal() {
   useEffect(() => {
+    // Assign staggered delays to grid children
+    document.querySelectorAll('.landing-cards-grid').forEach(grid => {
+      Array.from(grid.children).forEach((child, i) => {
+        ;(child as HTMLElement).style.setProperty('--reveal-delay', `${i * 0.08}s`)
+        child.classList.add('scroll-reveal')
+      })
+    })
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach(entry => {
@@ -230,8 +372,30 @@ export function HomePage() {
         display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
         padding: '96px 24px 64px', textAlign: 'center',
+        position: 'relative', overflow: 'hidden',
       }}>
-        <div style={{ fontFamily: C.mono, fontSize: 12, color: C.muted, letterSpacing: '0.08em', marginBottom: 32 }}>
+        {/* Ambient glow */}
+        <div style={{
+          position: 'absolute', top: '18%', left: '50%', transform: 'translateX(-50%)',
+          width: 600, height: 400, borderRadius: '50%',
+          background: 'radial-gradient(ellipse, rgba(34,211,238,0.06) 0%, transparent 70%)',
+          pointerEvents: 'none',
+        }} />
+        {/* Floating particles */}
+        {[
+          { top: '22%', left: '18%', size: 4, anim: 'heroFloat1', dur: '6s' },
+          { top: '35%', left: '78%', size: 3, anim: 'heroFloat2', dur: '8s' },
+          { top: '60%', left: '30%', size: 3, anim: 'heroFloat3', dur: '7s' },
+          { top: '50%', left: '72%', size: 2, anim: 'heroFloat1', dur: '9s' },
+        ].map((p, i) => (
+          <div key={i} style={{
+            position: 'absolute', top: p.top, left: p.left,
+            width: p.size, height: p.size, borderRadius: '50%',
+            background: C.cyan, opacity: 0.4, pointerEvents: 'none',
+            animation: `${p.anim} ${p.dur} ease-in-out infinite`,
+          }} />
+        ))}
+        <div style={{ fontFamily: C.mono, fontSize: 12, color: C.muted, letterSpacing: '0.08em', marginBottom: 32, position: 'relative' }}>
           idswyft / identity-verification
         </div>
         <h1 style={{
@@ -256,18 +420,11 @@ export function HomePage() {
             View Docs →
           </Link>
         </div>
-        <div className="landing-cards-row" style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center' }}>
-          {[
-            { value: '>90%', label: 'Accuracy Target' },
-            { value: '<5s', label: 'OCR Latency (p95)' },
-            { value: '20', label: 'Countries' },
-            { value: 'MIT', label: 'License' },
-          ].map(({ value, label }) => (
-            <div className="landing-card" key={label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 20px', fontFamily: C.mono, fontSize: 13 }}>
-              <span style={{ color: C.cyan, fontWeight: 600 }}>{value}</span>
-              <span style={{ color: C.muted, marginLeft: 8 }}>{label}</span>
-            </div>
-          ))}
+        <div className="landing-cards-row" style={{ display: 'flex', gap: 16, flexWrap: 'wrap', justifyContent: 'center', position: 'relative' }}>
+          <StatCard numericTarget={90} prefix=">" suffix="%" label="Accuracy Target" />
+          <StatCard numericTarget={5}  prefix="<" suffix="s" label="OCR Latency (p95)" />
+          <StatCard numericTarget={20} prefix=""  suffix=""  label="Countries" />
+          <StatCard numericTarget={null} prefix="" suffix="MIT" label="License" />
         </div>
       </section>
 
@@ -290,23 +447,27 @@ export function HomePage() {
             { n: '05', title: 'Get Results',    desc: 'GET /status' },
           ].map((step, i, arr) => (
             <React.Fragment key={step.n}>
-              {/* Step node — fixed width, never shrinks */}
+              {/* Step node — icon in circle, number below */}
               <div style={{ flexShrink: 0, width: 140, textAlign: 'center' }}>
                 <div style={{
                   width: 44, height: 44, borderRadius: '50%',
                   background: C.cyanDim, border: `1px solid ${C.cyan}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  margin: '0 auto 12px',
-                  fontFamily: C.mono, fontSize: 13, color: C.cyan, fontWeight: 600,
+                  margin: '0 auto 4px',
                 }}>
-                  {step.n}
+                  {pipelineIcons[step.n]}
                 </div>
+                <div style={{ fontFamily: C.mono, fontSize: 10, color: C.dim, marginBottom: 8 }}>{step.n}</div>
                 <div style={{ fontWeight: 600, fontSize: 13, color: C.text, marginBottom: 6 }}>{step.title}</div>
                 <div style={{ fontFamily: C.mono, fontSize: 11, color: C.muted, lineHeight: 1.4 }}>{step.desc}</div>
               </div>
-              {/* Connector line — sits between steps, aligned to circle center */}
+              {/* Animated dashed connector */}
               {i < arr.length - 1 && (
-                <div className="pipeline-connector" style={{ flex: 1, minWidth: 16, height: 1, background: C.border, marginTop: 22, flexShrink: 1 }} />
+                <div style={{ flex: 1, minWidth: 16, marginTop: 22, flexShrink: 1, display: 'flex', alignItems: 'center' }}>
+                  <svg width="100%" height="2" style={{ overflow: 'visible' }}>
+                    <line x1="0" y1="1" x2="100%" y2="1" stroke={C.cyan} strokeWidth="1" strokeDasharray="6 4" strokeOpacity="0.4" style={{ animation: 'pipelineFlow 1.2s linear infinite' }} />
+                  </svg>
+                </div>
               )}
             </React.Fragment>
           ))}
@@ -411,6 +572,7 @@ export function HomePage() {
             { title: 'Monitoring',            desc: 'Document expiry alerts at 90/60/30 days and scheduled re-verification reminders via webhook.', tags: ['Expiry Alerts', 'Re-verify', 'Cron'] },
           ].map(({ title, desc, tags }) => (
             <div className="landing-card" key={title} style={{ background: C.panel, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.cyan}`, borderRadius: 8, padding: '24px 20px' }}>
+              <div style={{ marginBottom: 12, opacity: 0.85 }}>{featureIcons[title]}</div>
               <div style={{ fontFamily: C.mono, fontSize: 14, fontWeight: 600, color: C.text, marginBottom: 8 }}>{title}</div>
               <div style={{ fontSize: 14, color: C.muted, lineHeight: 1.6 }}>{desc}</div>
               {tags.length > 0 && (

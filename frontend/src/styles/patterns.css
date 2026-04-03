@@ -62,8 +62,8 @@
 /* ── 2. Crosshatch — diagonal fine-line grid ────────────── */
 
 .pattern-crosshatch::before {
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='60' height='60'%3E%3Cline x1='0' y1='0' x2='60' y2='60' stroke='%2322d3ee' stroke-width='0.4'/%3E%3Cline x1='60' y1='0' x2='0' y2='60' stroke='%2322d3ee' stroke-width='0.4'/%3E%3Cline x1='0' y1='30' x2='30' y2='60' stroke='%2322d3ee' stroke-width='0.25'/%3E%3Cline x1='30' y1='0' x2='60' y2='30' stroke='%2322d3ee' stroke-width='0.25'/%3E%3Cline x1='60' y1='30' x2='30' y2='60' stroke='%2322d3ee' stroke-width='0.25'/%3E%3Cline x1='30' y1='0' x2='0' y2='30' stroke='%2322d3ee' stroke-width='0.25'/%3E%3C/svg%3E");
-  background-size: 60px 60px;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='30' height='30'%3E%3Cline x1='0' y1='0' x2='30' y2='30' stroke='%2322d3ee' stroke-width='0.25'/%3E%3Cline x1='30' y1='0' x2='0' y2='30' stroke='%2322d3ee' stroke-width='0.25'/%3E%3Cline x1='0' y1='15' x2='15' y2='30' stroke='%2322d3ee' stroke-width='0.15'/%3E%3Cline x1='15' y1='0' x2='30' y2='15' stroke='%2322d3ee' stroke-width='0.15'/%3E%3Cline x1='30' y1='15' x2='15' y2='30' stroke='%2322d3ee' stroke-width='0.15'/%3E%3Cline x1='15' y1='0' x2='0' y2='15' stroke='%2322d3ee' stroke-width='0.15'/%3E%3C/svg%3E");
+  background-size: 30px 30px;
 }
 
 /* ── 3. Topographic — concentric contour lines ──────────── */
@@ -157,4 +157,54 @@
 /* White patterns for light-theme pages */
 .pattern-light::before {
   filter: hue-rotate(180deg) saturate(0) brightness(0.3);
+}
+
+/* ── Scroll-reveal fade-up ─────────────────────────────── */
+
+.scroll-reveal {
+  opacity: 0;
+  transform: translateY(24px);
+  transition: opacity 0.6s ease, transform 0.6s ease;
+  transition-delay: var(--reveal-delay, 0s);
+}
+
+.scroll-reveal.revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Card hover micro-interactions ─────────────────────── */
+
+.landing-card {
+  transition: transform 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+.landing-card:hover {
+  transform: translateY(-3px);
+  border-color: rgba(34,211,238,0.2);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.3);
+}
+
+/* ── Pipeline animated connector ───────────────────────── */
+
+@keyframes pipelineFlow {
+  0%   { stroke-dashoffset: 16; }
+  100% { stroke-dashoffset: 0; }
+}
+
+/* ── Hero floating particles ───────────────────────────── */
+
+@keyframes heroFloat1 {
+  0%, 100% { transform: translate(0, 0); opacity: 0.4; }
+  50%      { transform: translate(12px, -18px); opacity: 0.7; }
+}
+
+@keyframes heroFloat2 {
+  0%, 100% { transform: translate(0, 0); opacity: 0.3; }
+  50%      { transform: translate(-10px, -14px); opacity: 0.6; }
+}
+
+@keyframes heroFloat3 {
+  0%, 100% { transform: translate(0, 0); opacity: 0.5; }
+  50%      { transform: translate(8px, 12px); opacity: 0.3; }
 }

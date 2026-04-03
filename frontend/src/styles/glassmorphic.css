@@ -1,0 +1,158 @@
+/*
+ * Glassmorphic Design System — HomePageV2
+ *
+ * Frosted glass panels, gradient meshes, animated scan lines,
+ * and staggered reveal animations. All CSS-only (no JS).
+ */
+
+/* ── Glass card base ──────────────────────────────────────── */
+
+.glass-card {
+  background: rgba(255, 255, 255, 0.03);
+  border: 1px solid rgba(255, 255, 255, 0.07);
+  border-radius: 14px;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+}
+
+/* ── Bento card hover ─────────────────────────────────────── */
+
+.bento-card:hover {
+  transform: translateY(-4px);
+  border-color: rgba(34, 211, 238, 0.15);
+  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(34, 211, 238, 0.05);
+  background: rgba(255, 255, 255, 0.05);
+}
+
+/* ── Pipeline step hover ──────────────────────────────────── */
+
+.pipeline-glass-step:hover {
+  transform: translateY(-2px);
+  border-color: rgba(34, 211, 238, 0.2);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+}
+
+/* ── Pricing highlight card ───────────────────────────────── */
+
+.pricing-highlight {
+  border: 2px solid rgba(34, 211, 238, 0.3) !important;
+  background: rgba(34, 211, 238, 0.03) !important;
+}
+
+.pricing-badge {
+  position: absolute;
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #22d3ee;
+  color: #080c14;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  font-weight: 600;
+  padding: 4px 14px;
+  border-radius: 20px;
+  letter-spacing: 0.04em;
+}
+
+/* ── Hero gradient mesh ───────────────────────────────────── */
+
+.hero-gradient-mesh {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(ellipse 600px 400px at 30% 20%, rgba(34, 211, 238, 0.06), transparent),
+    radial-gradient(ellipse 500px 350px at 70% 60%, rgba(96, 165, 250, 0.04), transparent),
+    radial-gradient(ellipse 400px 300px at 50% 40%, rgba(167, 139, 250, 0.03), transparent);
+}
+
+/* ── Hero gradient text ───────────────────────────────────── */
+
+.hero-gradient-text {
+  background: linear-gradient(135deg, #22d3ee 0%, #60a5fa 50%, #a78bfa 100%);
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ── Scanning card ────────────────────────────────────────── */
+
+.scanning-card {
+  border-color: rgba(34, 211, 238, 0.2) !important;
+}
+
+/* Scan line animation */
+.scan-line {
+  animation: scanMove 2.5s ease-in-out infinite;
+}
+
+@keyframes scanMove {
+  0%   { top: 10%; }
+  50%  { top: 85%; }
+  100% { top: 10%; }
+}
+
+/* Hero arrow pulse */
+.hero-arrow {
+  animation: arrowPulse 2s ease-in-out infinite;
+}
+
+@keyframes arrowPulse {
+  0%, 100% { opacity: 0.4; transform: translateX(0); }
+  50%      { opacity: 1;   transform: translateX(4px); }
+}
+
+/* ── CTA button effects ───────────────────────────────────── */
+
+.cta-primary {
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.cta-primary:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 24px rgba(34, 211, 238, 0.2);
+}
+
+.cta-secondary {
+  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+}
+
+.cta-secondary:hover {
+  transform: translateY(-2px);
+  border-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.06);
+}
+
+/* ── V2 scroll reveal ─────────────────────────────────────── */
+
+.v2-reveal {
+  opacity: 0;
+  transform: translateY(20px);
+  transition: opacity 0.7s ease, transform 0.7s ease;
+  transition-delay: var(--reveal-delay, 0s);
+}
+
+.v2-revealed {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* ── Bento grid responsive ────────────────────────────────── */
+
+@media (max-width: 768px) {
+  .v2-stagger-grid {
+    grid-template-columns: 1fr !important;
+  }
+
+  .v2-stagger-grid > * {
+    grid-column: span 1 !important;
+  }
+
+}
+
+@media (max-width: 640px) {
+  .scanning-card {
+    width: 100% !important;
+  }
+}
