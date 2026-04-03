@@ -739,11 +739,14 @@ router.post('/initialize',
     });
 
     // Set session start timestamp, verification mode, and age threshold
-    await supabase.from('verification_requests').update({
+    const { error: updateError } = await supabase.from('verification_requests').update({
       session_started_at: new Date().toISOString(),
       verification_mode: verificationMode,
       ...(ageThreshold !== null && { age_threshold: ageThreshold }),
     }).eq('id', verificationRecord.id);
+    if (updateError) {
+      console.error('Failed to update verification_mode:', updateError.message);
+    }
 
     // Resolve flow config from verification_mode
     const flow = FLOW_PRESETS[verificationMode as VerificationMode] ?? FLOW_PRESETS.full;
@@ -1007,6 +1010,23 @@ router.post('/:verification_id/front-document',
 
     // Hydrate session and run Gate 1 via session
     const session = await hydrateSession(verification_id, isSandbox);
+
+    // Guard: if session was already rejected in a previous step, return early
+    const preState = session.getState();
+    if (preState.current_step === VerificationStatus.HARD_REJECTED) {
+      const mapped = mapStatusForResponse(preState, flow);
+      return res.status(409).json({
+        success: false,
+        verification_id,
+        status: mapped.status,
+        current_step: mapped.current_step,
+        final_result: mapped.final_result,
+        rejection_reason: preState.rejection_reason,
+        rejection_detail: preState.rejection_detail,
+        message: 'Verification was already rejected in a previous step. Please start a new verification.',
+      });
+    }
+
     // Override the extractFront dep to return our pre-computed result
     (session as any).deps.extractFront = async () => frontResult;
 
