@@ -766,7 +766,14 @@ router.post('/initialize',
       ...(ageThreshold !== null && { age_threshold: ageThreshold }),
     }).eq('id', verificationRecord.id);
     if (updateError) {
-      console.error('Failed to update verification_mode:', updateError.message);
+      logger.error('Failed to update verification_mode', {
+        verificationId: verificationRecord.id,
+        verification_mode: verificationMode,
+        error: updateError.message,
+        code: updateError.code,
+        details: updateError.details,
+        hint: updateError.hint,
+      });
     }
 
     // Resolve flow config from verification_mode
