@@ -59,7 +59,7 @@ interface GateDebug {
     address: { status: string | null; score: number | null }
   }
   risk: { overall_score: number; risk_level: string; factors: Array<{ factor?: string; name?: string; weight?: number; score?: number }>; computed_at: string } | null
-  aml: { risk_level: string; match_found: boolean; match_count: number; matches: any; lists_checked: string[]; screened_at: string } | null
+  aml: { risk_level: string; match_found: boolean; match_count: number; matches: Array<{ listed_name: string; list_source: string; score: number; match_type: string }>; lists_checked: string[]; screened_at: string } | null
   timing: { session_started_at: string | null; processing_completed_at: string | null }
   decision: { failure_reason: string | null; manual_review_reason: string | null; reviewed_by: string | null; reviewed_at: string | null }
   duplicates: { flags: DuplicateFlag[] | null; fingerprints: Array<{ fingerprint_type: string; hash_value: string; created_at: string }> } | null
@@ -1077,10 +1077,51 @@ export function VerificationManagement() {
                                     }}>
                                       {detail.debug.aml.match_found ? 'MATCH FOUND' : 'CLEAR'}
                                     </span>
+                                    <span style={{
+                                      fontSize: 10, fontWeight: 600, textTransform: 'uppercase', padding: '2px 6px', borderRadius: 4,
+                                      background: detail.debug.aml.risk_level === 'confirmed_match' ? C.redDim
+                                        : detail.debug.aml.risk_level === 'potential_match' ? C.amberDim : C.greenDim,
+                                      color: detail.debug.aml.risk_level === 'confirmed_match' ? C.red
+                                        : detail.debug.aml.risk_level === 'potential_match' ? C.amber : C.green,
+                                    }}>
+                                      {detail.debug.aml.risk_level?.replace(/_/g, ' ') || 'clear'}
+                                    </span>
                                   </div>
                                   <div style={{ color: C.dim, fontSize: 10, marginTop: 4 }}>
                                     Lists: {(detail.debug.aml.lists_checked || []).join(', ') || '—'}
+                                    {detail.debug.aml.screened_at && (
+                                      <span style={{ marginLeft: 8 }}>
+                                        Screened: {new Date(detail.debug.aml.screened_at).toLocaleString()}
+                                      </span>
+                                    )}
                                   </div>
+                                  {detail.debug.aml.match_found && detail.debug.aml.matches?.length > 0 && (
+                                    <div style={{ marginTop: 8 }}>
+                                      <div style={{ color: C.muted, fontSize: 10, fontWeight: 600, marginBottom: 4 }}>
+                                        {detail.debug.aml.match_count ?? detail.debug.aml.matches.length} match{(detail.debug.aml.match_count ?? detail.debug.aml.matches.length) !== 1 ? 'es' : ''}
+                                      </div>
+                                      {detail.debug.aml.matches.map((m, i) => (
+                                        <div key={i} style={{
+                                          display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                                          padding: '3px 0', borderBottom: i < detail.debug!.aml!.matches.length - 1 ? `1px solid ${C.border}` : undefined,
+                                        }}>
+                                          <div style={{ flex: 1, minWidth: 0 }}>
+                                            <span style={{ color: C.text, fontSize: 11 }}>{m.listed_name}</span>
+                                            <span style={{ color: C.dim, fontSize: 10, marginLeft: 6 }}>{m.list_source}</span>
+                                          </div>
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0 }}>
+                                            <span style={{ color: C.dim, fontSize: 9, textTransform: 'uppercase' }}>{m.match_type?.replace(/_/g, '+')}</span>
+                                            <span style={{
+                                              fontFamily: C.mono, fontSize: 11, fontWeight: 600,
+                                              color: m.score >= 0.95 ? C.red : m.score >= 0.85 ? C.amber : C.muted,
+                                            }}>
+                                              {(m.score * 100).toFixed(0)}%
+                                            </span>
+                                          </div>
+                                        </div>
+                                      ))}
+                                    </div>
+                                  )}
                                 </div>
                               )}
 

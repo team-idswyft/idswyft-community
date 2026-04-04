@@ -68,6 +68,15 @@ The engine (`engine/`) is a separate container (~1.5GB) that handles ML-heavy op
 - Three endpoints: `POST /extract/front`, `POST /extract/back`, `POST /extract/live`
 - Heavy deps (TensorFlow, ONNX, PaddleOCR, canvas) live only in the engine
 
+## AML / Sanctions Screening
+
+Gate 6 screens extracted names against sanctions lists. Configured via:
+
+- `AML_PROVIDER` — comma-separated: `opensanctions`, `offline`, or `none` (default: `none`)
+- `OFAC_SDN_PATH` — path to local OFAC SDN CSV file (used when `offline` provider is active)
+- `OFAC_AUTO_LOAD=true` — download OFAC SDN from US Treasury at startup (alternative to local file)
+- `developers.aml_enabled` — per-developer toggle (default: `true`), managed via Settings API
+
 ## Auth System
 
 6 auth mechanisms in `backend/src/middleware/auth.ts`:

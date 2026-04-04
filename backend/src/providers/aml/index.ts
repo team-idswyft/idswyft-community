@@ -1,6 +1,8 @@
 import type { AMLProvider } from './types.js';
 import { OpenSanctionsProvider } from './OpenSanctionsProvider.js';
 import { OfflineListProvider } from './OfflineListProvider.js';
+import { loadOFACFromFile, loadOFACFromURL } from './ofacLoader.js';
+import { logger } from '@/utils/logger.js';
 
 /** @deprecated Use createAMLProviders() for multi-provider support */
 export function createAMLProvider(): AMLProvider | null {
@@ -22,9 +24,24 @@ export function createAMLProviders(): AMLProvider[] {
       case 'opensanctions':
         providers.push(new OpenSanctionsProvider());
         break;
-      case 'offline':
-        providers.push(new OfflineListProvider());
+      case 'offline': {
+        const offlineProvider = new OfflineListProvider();
+        // Auto-load OFAC SDN if configured
+        const sdnPath = process.env.OFAC_SDN_PATH;
+        if (sdnPath) {
+          const entries = loadOFACFromFile(sdnPath);
+          offlineProvider.loadEntries(entries);
+        } else if (process.env.OFAC_AUTO_LOAD === 'true') {
+          // Async load — fire and forget at startup
+          loadOFACFromURL().then(entries => {
+            offlineProvider.loadEntries(entries);
+          }).catch(err => {
+            logger.error('OFAC auto-load failed:', err);
+          });
+        }
+        providers.push(offlineProvider);
         break;
+      }
       case 'none':
         // Explicit disable — return empty
         return [];

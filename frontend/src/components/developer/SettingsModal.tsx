@@ -16,6 +16,7 @@ import {
   EyeSlashIcon,
   ExclamationTriangleIcon,
   FingerPrintIcon,
+  ShieldExclamationIcon,
 } from '@heroicons/react/24/outline'
 import { inputStyle, labelStyle } from './types'
 
@@ -66,6 +67,11 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
   const [smsLoading, setSmsLoading] = useState(false)
   const [showSmsKey, setShowSmsKey] = useState(false)
 
+  // AML / Sanctions screening settings
+  const [amlEnabled, setAmlEnabled] = useState(true)
+  const [amlLoading, setAmlLoading] = useState(false)
+  const [amlSaving, setAmlSaving] = useState(false)
+
   // Duplicate detection settings
   const [dedupEnabled, setDedupEnabled] = useState(false)
   const [dedupAction, setDedupAction] = useState<string>('review')
@@ -101,6 +107,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
     fetchProfile()
     fetchLLMSettings()
     fetchSMSSettings()
+    fetchAmlSettings()
     fetchDedupSettings()
     fetchBrandingSettings()
     fetchReviewers()
@@ -294,6 +301,41 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
       }
     } catch { toast.error('Network error') }
     setSmsSaving(false)
+  }
+
+  const fetchAmlSettings = async () => {
+    setAmlLoading(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/settings/aml`, {
+        headers: authHeaders,
+        credentials: 'include' as RequestCredentials,
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setAmlEnabled(data.enabled ?? true)
+      }
+    } catch { /* network error */ }
+    setAmlLoading(false)
+  }
+
+  const saveAmlSettings = async () => {
+    if (!token) return
+    setAmlSaving(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/settings/aml`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...authHeaders, ...csrfHeader() },
+        credentials: 'include' as RequestCredentials,
+        body: JSON.stringify({ enabled: amlEnabled }),
+      })
+      if (res.ok) {
+        toast.success('AML screening settings saved')
+      } else {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'Failed to save settings')
+      }
+    } catch { toast.error('Network error') }
+    setAmlSaving(false)
   }
 
   const fetchDedupSettings = async () => {
@@ -1045,7 +1087,69 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                     )}
                   </div>
 
-                  {/* Divider between SMS and Duplicate Detection */}
+                  {/* Divider between SMS and AML */}
+                  <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 24, paddingTop: 20 }} />
+
+                  {/* AML / Sanctions Screening */}
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <ShieldExclamationIcon style={{ width: 16, height: 16, color: C.cyan }} />
+                      <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>AML / Sanctions Screening</div>
+                    </div>
+                    <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
+                      Screen extracted names against <strong style={{ color: C.text, fontWeight: 500 }}>OFAC, EU, UN</strong>, and other sanctions lists
+                      during verification. When enabled, names are automatically checked after document processing.
+                    </div>
+
+                    {amlLoading ? (
+                      <div style={{ color: C.muted, fontSize: 13 }}>Loading...</div>
+                    ) : (
+                      <>
+                        {/* Enable toggle */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                          <button
+                            type="button"
+                            onClick={() => setAmlEnabled(!amlEnabled)}
+                            style={{
+                              width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
+                              background: amlEnabled ? C.cyan : C.border,
+                              position: 'relative', transition: 'background 0.2s',
+                            }}
+                          >
+                            <div style={{
+                              width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                              position: 'absolute', top: 3,
+                              left: amlEnabled ? 23 : 3,
+                              transition: 'left 0.2s',
+                            }} />
+                          </button>
+                          <span style={{ color: C.text, fontSize: 13 }}>
+                            {amlEnabled ? 'Enabled' : 'Disabled'}
+                          </span>
+                        </div>
+
+                        {!amlEnabled && (
+                          <div style={{ color: C.dim, fontSize: 12, marginBottom: 12, fontStyle: 'italic' }}>
+                            AML screening is disabled. Verifications will skip sanctions list checks.
+                          </div>
+                        )}
+
+                        <button
+                          onClick={saveAmlSettings}
+                          disabled={amlSaving}
+                          style={{
+                            background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
+                            padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                            opacity: amlSaving ? 0.5 : 1,
+                          }}
+                        >
+                          {amlSaving ? 'Saving...' : 'Save'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Divider between AML and Duplicate Detection */}
                   <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 24, paddingTop: 20 }} />
 
                   {/* Duplicate Detection */}

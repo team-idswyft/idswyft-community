@@ -348,6 +348,48 @@ router.put('/settings/page-builder/slug',
   })
 );
 
+// ─── AML / Sanctions Screening Settings ─────────────────────
+
+router.get('/settings/aml',
+  authenticateDeveloperJWT,
+  catchAsync(async (req: Request, res: Response) => {
+    const developerId = (req as any).developer.id;
+
+    const { data } = await supabase
+      .from('developers')
+      .select('aml_enabled')
+      .eq('id', developerId)
+      .single();
+
+    res.json({
+      enabled: data?.aml_enabled ?? true,
+    });
+  })
+);
+
+router.put('/settings/aml',
+  authenticateDeveloperJWT,
+  [
+    body('enabled').isBoolean().withMessage('enabled must be a boolean'),
+  ],
+  validate,
+  catchAsync(async (req: Request, res: Response) => {
+    const developerId = (req as any).developer.id;
+    const { enabled } = req.body;
+
+    const { error } = await supabase
+      .from('developers')
+      .update({ aml_enabled: enabled })
+      .eq('id', developerId);
+
+    if (error) {
+      return res.status(500).json({ error: 'Failed to save AML settings' });
+    }
+
+    res.json({ success: true, enabled });
+  })
+);
+
 // ─── Duplicate Detection Settings ────────────────────────────
 
 const VALID_DEDUP_ACTIONS = ['block', 'review', 'allow'] as const;
