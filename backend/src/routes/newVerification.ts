@@ -50,6 +50,13 @@ import { WebhookService } from '@/services/webhook.js';
 import type { WebhookPayload, VerificationSource } from '@/types/index.js';
 import { config } from '@/config/index.js';
 import { createAndSendPhoneOtp, verifyPhoneOtp } from '@/services/phoneOtpService.js';
+import {
+  computeDocumentPHash,
+  computeFaceLSH,
+  runDedupCheck,
+  getDedupSettings,
+  type DuplicateFlag,
+} from '@/services/duplicateDetection.js';
 import { decryptSMSConfig } from '@/services/smsService.js';
 import sharp from 'sharp';
 import engineClient from '@/services/engineClient.js';
@@ -1066,26 +1073,73 @@ router.post('/:verification_id/front-document',
 
     await saveSessionState(verification_id, session.getState());
 
+    // ─── Duplicate Detection (front document + face) ─────────
+    let dedupFlags: DuplicateFlag[] = [];
+    let dedupBlocked = false;
+    let dedupAction: string | null = null;
+    if (stepResult.passed && !isSandbox) {
+      try {
+        const dedupSettings = await getDedupSettings(developerId);
+        dedupAction = dedupSettings.action;
+        if (dedupSettings.enabled) {
+          // Document perceptual hash
+          const docHash = await computeDocumentPHash(req.file.buffer);
+          const docFlags = await runDedupCheck(developerId, verification_id, 'document_phash', docHash);
+          dedupFlags.push(...docFlags);
+
+          // Face LSH (if face embedding available)
+          const faceEmbedding = session.getState().front_extraction?.face_embedding;
+          if (faceEmbedding && Array.isArray(faceEmbedding) && faceEmbedding.length === 128) {
+            const faceHash = computeFaceLSH(faceEmbedding);
+            const faceFlags = await runDedupCheck(developerId, verification_id, 'face_lsh', faceHash);
+            dedupFlags.push(...faceFlags);
+          }
+
+          // Apply action if duplicates found
+          if (dedupFlags.length > 0 && dedupSettings.action === 'block') {
+            dedupBlocked = true;
+          }
+        }
+      } catch (err) {
+        logger.warn('Duplicate detection failed (non-blocking)', {
+          verification_id, error: err instanceof Error ? err.message : 'Unknown',
+        });
+      }
+    }
+
     // Update main DB record
     const state = session.getState();
     let dbStatus: string;
-    if (isAgeOnly) {
+    if (dedupBlocked) {
+      dbStatus = 'failed';
+    } else if (isAgeOnly) {
       dbStatus = state.current_step === VerificationStatus.COMPLETE ? 'verified' : 'failed';
     } else {
       dbStatus = stepResult.passed ? 'processing' : 'failed';
     }
     await verificationService.updateVerificationRequest(verification_id, {
       status: dbStatus,
+      ...(dedupBlocked && {
+        failure_reason: 'Duplicate document or face detected',
+      }),
       ...(isAgeOnly && state.current_step === VerificationStatus.COMPLETE && {
         processing_completed_at: new Date().toISOString(),
       }),
     } as any);
+
+    // If dedup action is 'review' and duplicates found, set manual_review_reason
+    if (dedupFlags.length > 0 && !dedupBlocked && dedupAction === 'review') {
+      await supabase.from('verification_requests').update({
+        manual_review_reason: `Duplicate detected: ${dedupFlags.length} match(es) found`,
+      }).eq('id', verification_id);
+    }
 
     logVerificationEvent('front_document_processed', verification_id, {
       documentId: document.id,
       documentPath,
       status: state.current_step,
       verification_mode: vrMode,
+      duplicatesDetected: dedupFlags.length,
     });
 
     const mapped = mapStatusForResponse(state, flow);
@@ -1093,13 +1147,15 @@ router.post('/:verification_id/front-document',
     const ocrResult = state.front_extraction?.ocr;
 
     // Build next-step message per flow
-    const nextStepMessage = !stepResult.passed
-      ? stepResult.user_message || 'Front document processing failed'
-      : isAgeOnly
-        ? (state.current_step === VerificationStatus.COMPLETE ? 'Age verification passed' : stepResult.user_message || 'Age verification failed')
-        : flow.afterFront === 'AWAITING_LIVE'
-          ? 'Front document processed successfully - ready for live capture'
-          : 'Front document processed successfully - ready to upload back document';
+    const nextStepMessage = dedupBlocked
+      ? 'Verification blocked: duplicate document or face detected'
+      : !stepResult.passed
+        ? stepResult.user_message || 'Front document processing failed'
+        : isAgeOnly
+          ? (state.current_step === VerificationStatus.COMPLETE ? 'Age verification passed' : stepResult.user_message || 'Age verification failed')
+          : flow.afterFront === 'AWAITING_LIVE'
+            ? 'Front document processed successfully - ready for live capture'
+            : 'Front document processed successfully - ready to upload back document';
 
     res.json({
       success: true,
@@ -1116,6 +1172,8 @@ router.post('/:verification_id/front-document',
       rejection_detail: state.rejection_detail,
       ...(ageVerification && { age_verification: ageVerification }),
       ...(mapped.final_result && { final_result: mapped.final_result }),
+      ...(dedupBlocked && { final_result: 'failed' }),
+      ...(dedupFlags.length > 0 && { duplicate_flags: dedupFlags }),
       message: nextStepMessage,
     });
 
@@ -1478,12 +1536,41 @@ router.post('/:verification_id/live-capture',
     const stepResult = await session.submitLiveCapture(req.file.buffer);
     await saveSessionState(verification_id, session.getState());
 
+    // ─── Duplicate Detection (live capture face) ─────────────
+    // Only run dedup if the step passed — don't store fingerprints for failed verifications
+    let liveDedupFlags: DuplicateFlag[] = [];
+    let liveDedupBlocked = false;
+    if (stepResult.passed && !isSandbox) {
+      try {
+        const liveDeveloperId = (req as any).developer.id;
+        const dedupSettings = await getDedupSettings(liveDeveloperId);
+        if (dedupSettings.enabled && liveResult.face_embedding && Array.isArray(liveResult.face_embedding) && liveResult.face_embedding.length === 128) {
+          const faceHash = computeFaceLSH(liveResult.face_embedding);
+          liveDedupFlags = await runDedupCheck(liveDeveloperId, verification_id, 'face_lsh', faceHash);
+
+          if (liveDedupFlags.length > 0 && dedupSettings.action === 'block') {
+            liveDedupBlocked = true;
+          } else if (liveDedupFlags.length > 0 && dedupSettings.action === 'review') {
+            await supabase.from('verification_requests').update({
+              manual_review_reason: `Duplicate face detected: ${liveDedupFlags.length} match(es) found`,
+            }).eq('id', verification_id);
+          }
+        }
+      } catch (err) {
+        logger.warn('Live capture duplicate detection failed (non-blocking)', {
+          verification_id, error: err instanceof Error ? err.message : 'Unknown',
+        });
+      }
+    }
+
     // Update main DB record
     const state = session.getState();
     let dbStatus: string;
     const needsManualReview = state.cross_validation?.verdict === 'REVIEW'
       || !!state.face_match?.skipped_reason;
-    if (state.current_step === VerificationStatus.COMPLETE) {
+    if (liveDedupBlocked) {
+      dbStatus = 'failed';
+    } else if (state.current_step === VerificationStatus.COMPLETE) {
       dbStatus = needsManualReview ? 'manual_review' : 'verified';
     } else if (state.current_step === VerificationStatus.HARD_REJECTED) {
       dbStatus = 'failed';
@@ -1496,6 +1583,7 @@ router.post('/:verification_id/live-capture',
       liveness_score: state.liveness?.score ?? null,
       cross_validation_score: state.cross_validation?.overall_score ?? null,
       live_capture_completed: !!(state.face_match),
+      ...(liveDedupBlocked && { failure_reason: 'Duplicate face detected in live capture' }),
     } as any);
 
     // Compute and persist risk score on terminal states
@@ -1563,11 +1651,15 @@ router.post('/:verification_id/live-capture',
       rejection_detail: state.rejection_detail,
       failure_reason: state.rejection_detail,
       manual_review_reason: state.cross_validation?.verdict === 'REVIEW' ? 'Cross-validation requires review' : state.face_match?.skipped_reason ? `Face match skipped: ${state.face_match.skipped_reason}` : null,
-      message: state.current_step === VerificationStatus.COMPLETE
-        ? 'Verification completed successfully'
-        : state.current_step === VerificationStatus.HARD_REJECTED
-          ? stepResult.user_message || 'Verification failed'
-          : 'Live capture processed',
+      ...(liveDedupBlocked && { final_result: 'failed' }),
+      ...(liveDedupFlags.length > 0 && { duplicate_flags: liveDedupFlags }),
+      message: liveDedupBlocked
+        ? 'Verification blocked: duplicate face detected'
+        : state.current_step === VerificationStatus.COMPLETE
+          ? 'Verification completed successfully'
+          : state.current_step === VerificationStatus.HARD_REJECTED
+            ? stepResult.user_message || 'Verification failed'
+            : 'Live capture processed',
     });
 
     // Broadcast status change via Supabase Realtime
@@ -1660,6 +1752,7 @@ router.post('/:verification_id/restart',
       document_id: null,
       selfie_id: null,
       retry_count: currentRetryCount + 1,
+      duplicate_flags: null,
     }).eq('id', verification_id)
       .eq('retry_count', currentRetryCount)
       .select('id');
@@ -1671,12 +1764,13 @@ router.post('/:verification_id/restart',
       });
     }
 
-    // Delete related records — documents, selfies, risk scores, and session context
+    // Delete related records — documents, selfies, risk scores, session context, and dedup fingerprints
     await Promise.all([
       supabase.from('documents').delete().eq('verification_request_id', verification_id),
       supabase.from('selfies').delete().eq('verification_request_id', verification_id),
       supabase.from('verification_risk_scores').delete().eq('verification_request_id', verification_id),
       supabase.from('verification_contexts').delete().eq('verification_id', verification_id),
+      supabase.from('dedup_fingerprints').delete().eq('verification_request_id', verification_id),
     ]);
 
     logVerificationEvent('verification_restarted', verification_id, {
@@ -1762,6 +1856,7 @@ router.get('/:verification_id/status',
       deepfake_check: state.deepfake_check ?? null,
       aml_screening: state.aml_screening ?? null,
       risk_score: riskScore,
+      duplicate_flags: (verification as any).duplicate_flags ?? null,
       barcode_extraction_failed: state.back_extraction ? !state.back_extraction.qr_payload : null,
       documents_match: state.cross_validation ? !state.cross_validation.has_critical_failure : null,
       face_match_passed: state.face_match?.passed ?? null,

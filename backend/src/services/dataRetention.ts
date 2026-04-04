@@ -73,6 +73,11 @@ export class DataRetentionService {
         .delete()
         .in('verification_request_id', verificationIds);
 
+      // Delete duplicate detection fingerprints
+      await supabase.from('dedup_fingerprints')
+        .delete()
+        .in('verification_request_id', verificationIds);
+
       // Nullify webhook delivery payloads (preserve delivery audit trail, remove PII)
       await supabase.from('webhook_deliveries')
         .update({ payload: null })
@@ -161,6 +166,7 @@ export class DataRetentionService {
     await supabase.from('reverification_schedules').delete().in('verification_request_id', ids);
     await supabase.from('phone_otp_codes').delete().in('verification_request_id', ids);
     await supabase.from('phone_otp_rate_limits').delete().in('verification_request_id', ids);
+    await supabase.from('dedup_fingerprints').delete().in('verification_request_id', ids);
     await supabase.from('verification_requests').delete().in('id', ids);
 
     logger.info(`Demo cleanup: ${ids.length} verifications deleted`, {

@@ -190,16 +190,18 @@ router.get('/verification/:id',
     // Legacy single document_url for backward compat
     const documentUrl = documentUrls.length > 0 ? documentUrls[0].url : null;
 
-    // Fetch debug data: gate context, OCR, risk scores, AML
-    const [ctxRes, riskRes, amlRes] = await Promise.all([
+    // Fetch debug data: gate context, OCR, risk scores, AML, and duplicate fingerprints
+    const [ctxRes, riskRes, amlRes, dedupRes] = await Promise.all([
       supabase.from('verification_contexts').select('context').eq('verification_id', id).maybeSingle(),
       supabase.from('verification_risk_scores').select('overall_score, risk_level, risk_factors, computed_at').eq('verification_request_id', id).maybeSingle(),
       supabase.from('aml_screenings').select('risk_level, match_found, match_count, matches, lists_checked, screened_at').eq('verification_request_id', id).maybeSingle(),
+      supabase.from('dedup_fingerprints').select('fingerprint_type, hash_value, created_at').eq('verification_request_id', id),
     ]);
 
     if (ctxRes.error) logger.warn('Debug: verification_contexts query failed', { id, error: ctxRes.error.message });
     if (riskRes.error) logger.warn('Debug: risk_scores query failed', { id, error: riskRes.error.message });
     if (amlRes.error) logger.warn('Debug: aml_screenings query failed', { id, error: amlRes.error.message });
+    if (dedupRes.error) logger.warn('Debug: dedup_fingerprints query failed', { id, error: dedupRes.error.message });
 
     const ctx: any = ctxRes.data?.context || {};
     const frontDoc = (allDocuments || []).find((d: any) => !d.is_back_of_id);
@@ -266,6 +268,10 @@ router.get('/verification/:id',
         reviewed_by: verification.reviewed_by,
         reviewed_at: verification.reviewed_at,
       },
+      duplicates: {
+        flags: verification.duplicate_flags ?? null,
+        fingerprints: dedupRes.data ?? [],
+      },
     };
 
     res.json({
@@ -276,6 +282,55 @@ router.get('/verification/:id',
         documents: documentUrls,
         debug,
       }
+    });
+  })
+);
+
+// Get linked verifications (duplicates) for a specific verification
+router.get('/verification/:id/duplicates',
+  authenticateAdminOrReviewer,
+  [
+    param('id').isUUID().withMessage('Verification ID must be a valid UUID'),
+  ],
+  validate,
+  catchAsync(async (req: Request, res: Response) => {
+    const { id } = req.params;
+
+    // Fetch duplicate flags from the verification
+    let query = supabase
+      .from('verification_requests')
+      .select('duplicate_flags, developer_id')
+      .eq('id', id);
+
+    if (req.reviewer) {
+      query = query.eq('developer_id', req.reviewer.developer_id);
+    }
+
+    const { data: vr, error } = await query.single();
+    if (error || !vr) throw new NotFoundError('Verification request');
+
+    const flags = (vr.duplicate_flags as any[]) || [];
+    const linkedIds = [...new Set(flags.map((f: any) => f.matched_verification_id))];
+
+    if (linkedIds.length === 0) {
+      return res.json({ verification_id: id, linked_verifications: [] });
+    }
+
+    // Fetch basic info for each linked verification (scoped to same developer for defense-in-depth)
+    const { data: linked } = await supabase
+      .from('verification_requests')
+      .select('id, status, created_at, user_id')
+      .in('id', linkedIds)
+      .eq('developer_id', vr.developer_id);
+
+    res.json({
+      verification_id: id,
+      linked_verifications: (linked || []).map((v: any) => ({
+        id: v.id,
+        status: v.status,
+        created_at: v.created_at,
+        user_id: v.user_id,
+      })),
     });
   })
 );

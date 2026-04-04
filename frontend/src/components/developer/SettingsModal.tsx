@@ -15,6 +15,7 @@ import {
   EyeIcon,
   EyeSlashIcon,
   ExclamationTriangleIcon,
+  FingerPrintIcon,
 } from '@heroicons/react/24/outline'
 import { inputStyle, labelStyle } from './types'
 
@@ -65,6 +66,12 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
   const [smsLoading, setSmsLoading] = useState(false)
   const [showSmsKey, setShowSmsKey] = useState(false)
 
+  // Duplicate detection settings
+  const [dedupEnabled, setDedupEnabled] = useState(false)
+  const [dedupAction, setDedupAction] = useState<string>('review')
+  const [dedupLoading, setDedupLoading] = useState(false)
+  const [dedupSaving, setDedupSaving] = useState(false)
+
   // Page branding settings
   const [brandLogoUrl, setBrandLogoUrl] = useState<string>('')
   const [brandAccentColor, setBrandAccentColor] = useState<string>('')
@@ -94,6 +101,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
     fetchProfile()
     fetchLLMSettings()
     fetchSMSSettings()
+    fetchDedupSettings()
     fetchBrandingSettings()
     fetchReviewers()
   }, [token])
@@ -286,6 +294,42 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
       }
     } catch { toast.error('Network error') }
     setSmsSaving(false)
+  }
+
+  const fetchDedupSettings = async () => {
+    setDedupLoading(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/settings/duplicate-detection`, {
+        headers: authHeaders,
+        credentials: 'include' as RequestCredentials,
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setDedupEnabled(data.enabled ?? false)
+        setDedupAction(data.action ?? 'review')
+      }
+    } catch { /* network error */ }
+    setDedupLoading(false)
+  }
+
+  const saveDedupSettings = async () => {
+    if (!token) return
+    setDedupSaving(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/settings/duplicate-detection`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...authHeaders, ...csrfHeader() },
+        credentials: 'include' as RequestCredentials,
+        body: JSON.stringify({ enabled: dedupEnabled, action: dedupAction }),
+      })
+      if (res.ok) {
+        toast.success('Duplicate detection settings saved')
+      } else {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'Failed to save settings')
+      }
+    } catch { toast.error('Network error') }
+    setDedupSaving(false)
   }
 
   const fetchBrandingSettings = async () => {
@@ -997,6 +1041,78 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                             </div>
                           </>
                         )}
+                      </>
+                    )}
+                  </div>
+
+                  {/* Divider between SMS and Duplicate Detection */}
+                  <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 24, paddingTop: 20 }} />
+
+                  {/* Duplicate Detection */}
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <FingerPrintIcon style={{ width: 16, height: 16, color: C.cyan }} />
+                      <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>Duplicate Detection</div>
+                    </div>
+                    <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
+                      Detect when the same government ID or face appears in multiple verification sessions.
+                      Uses perceptual hashing for documents and locality-sensitive hashing for faces.
+                      All hashes are <strong style={{ color: C.text, fontWeight: 500 }}>one-way</strong> — they cannot reconstruct the original data.
+                    </div>
+
+                    {dedupLoading ? (
+                      <div style={{ color: C.muted, fontSize: 13 }}>Loading...</div>
+                    ) : (
+                      <>
+                        {/* Enable toggle */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                          <button
+                            type="button"
+                            onClick={() => setDedupEnabled(!dedupEnabled)}
+                            style={{
+                              width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
+                              background: dedupEnabled ? C.cyan : C.border,
+                              position: 'relative', transition: 'background 0.2s',
+                            }}
+                          >
+                            <div style={{
+                              width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                              position: 'absolute', top: 3,
+                              left: dedupEnabled ? 23 : 3,
+                              transition: 'left 0.2s',
+                            }} />
+                          </button>
+                          <span style={{ color: C.text, fontSize: 13 }}>
+                            {dedupEnabled ? 'Enabled' : 'Disabled'}
+                          </span>
+                        </div>
+
+                        {dedupEnabled && (
+                          <>
+                            <label style={labelStyle}>Action on Duplicate</label>
+                            <select
+                              value={dedupAction}
+                              onChange={e => setDedupAction(e.target.value)}
+                              style={{ ...inputStyle, marginBottom: 16, cursor: 'pointer', appearance: 'auto' }}
+                            >
+                              <option value="review">Flag for manual review</option>
+                              <option value="block">Block (auto-reject)</option>
+                              <option value="allow">Allow (flag only)</option>
+                            </select>
+                          </>
+                        )}
+
+                        <button
+                          onClick={saveDedupSettings}
+                          disabled={dedupSaving}
+                          style={{
+                            background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
+                            padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                            opacity: dedupSaving ? 0.5 : 1,
+                          }}
+                        >
+                          {dedupSaving ? 'Saving...' : 'Save'}
+                        </button>
                       </>
                     )}
                   </div>

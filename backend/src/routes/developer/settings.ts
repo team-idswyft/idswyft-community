@@ -348,4 +348,53 @@ router.put('/settings/page-builder/slug',
   })
 );
 
+// ─── Duplicate Detection Settings ────────────────────────────
+
+const VALID_DEDUP_ACTIONS = ['block', 'review', 'allow'] as const;
+
+router.get('/settings/duplicate-detection',
+  authenticateDeveloperJWT,
+  catchAsync(async (req: Request, res: Response) => {
+    const developerId = (req as any).developer.id;
+
+    const { data } = await supabase
+      .from('developers')
+      .select('duplicate_detection_enabled, duplicate_detection_action')
+      .eq('id', developerId)
+      .single();
+
+    res.json({
+      enabled: data?.duplicate_detection_enabled ?? false,
+      action: data?.duplicate_detection_action ?? 'review',
+    });
+  })
+);
+
+router.put('/settings/duplicate-detection',
+  authenticateDeveloperJWT,
+  [
+    body('enabled').isBoolean().withMessage('enabled must be a boolean'),
+    body('action').isIn([...VALID_DEDUP_ACTIONS]).withMessage(`action must be one of: ${VALID_DEDUP_ACTIONS.join(', ')}`),
+  ],
+  validate,
+  catchAsync(async (req: Request, res: Response) => {
+    const developerId = (req as any).developer.id;
+    const { enabled, action } = req.body;
+
+    const { error } = await supabase
+      .from('developers')
+      .update({
+        duplicate_detection_enabled: enabled,
+        duplicate_detection_action: action,
+      })
+      .eq('id', developerId);
+
+    if (error) {
+      return res.status(500).json({ error: 'Failed to save duplicate detection settings' });
+    }
+
+    res.json({ success: true, enabled, action });
+  })
+);
+
 export default router;

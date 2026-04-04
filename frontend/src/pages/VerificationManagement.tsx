@@ -62,6 +62,13 @@ interface GateDebug {
   aml: { risk_level: string; match_found: boolean; match_count: number; matches: any; lists_checked: string[]; screened_at: string } | null
   timing: { session_started_at: string | null; processing_completed_at: string | null }
   decision: { failure_reason: string | null; manual_review_reason: string | null; reviewed_by: string | null; reviewed_at: string | null }
+  duplicates: { flags: DuplicateFlag[] | null; fingerprints: Array<{ fingerprint_type: string; hash_value: string; created_at: string }> } | null
+}
+
+interface DuplicateFlag {
+  type: string
+  matched_verification_id: string
+  hamming_distance: number
 }
 
 interface VerificationDetail {
@@ -79,6 +86,7 @@ interface VerificationDetail {
   user?: { id: string; full_name?: string; email?: string } | null
   developer?: { id: string; company_name?: string; email?: string } | null
   debug?: GateDebug
+  duplicate_flags?: DuplicateFlag[] | null
 }
 
 interface Stats {
@@ -909,6 +917,62 @@ export function VerificationManagement() {
                           </div>
                         </div>
                       </div>
+
+                      {/* ── Duplicate Detection Warning ── */}
+                      {detail.duplicate_flags && detail.duplicate_flags.length > 0 && (
+                        <div style={{
+                          marginTop: 16, padding: 14, borderRadius: 8,
+                          background: C.amberDim, border: `1px solid rgba(251,191,36,0.3)`,
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                            <ExclamationTriangleIcon style={{ width: 18, height: 18, color: C.amber }} />
+                            <span style={{ color: C.amber, fontSize: 13, fontWeight: 600 }}>
+                              Duplicate Detected ({detail.duplicate_flags.length} match{detail.duplicate_flags.length !== 1 ? 'es' : ''})
+                            </span>
+                          </div>
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {detail.duplicate_flags.map((flag, i) => (
+                              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                                <span style={{
+                                  padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600,
+                                  background: flag.type === 'document_phash' ? C.cyanDim : C.purpleDim,
+                                  color: flag.type === 'document_phash' ? C.cyan : C.purple,
+                                }}>
+                                  {flag.type === 'document_phash' ? 'Document' : 'Face'}
+                                </span>
+                                <span style={{ color: C.muted }}>matches</span>
+                                <button
+                                  onClick={() => toggleExpand(flag.matched_verification_id)}
+                                  style={{
+                                    background: 'none', border: 'none', color: C.cyan, cursor: 'pointer',
+                                    fontFamily: C.mono, fontSize: 11, textDecoration: 'underline', padding: 0,
+                                  }}
+                                >
+                                  {truncateId(flag.matched_verification_id)}
+                                </button>
+                                <span style={{ color: C.dim, fontSize: 10 }}>
+                                  (distance: {flag.hamming_distance})
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+
+                      {/* Also show duplicate flags from debug.duplicates if available */}
+                      {detail.debug?.duplicates?.flags && detail.debug.duplicates.flags.length > 0 && !detail.duplicate_flags?.length && (
+                        <div style={{
+                          marginTop: 16, padding: 14, borderRadius: 8,
+                          background: C.amberDim, border: `1px solid rgba(251,191,36,0.3)`,
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            <ExclamationTriangleIcon style={{ width: 18, height: 18, color: C.amber }} />
+                            <span style={{ color: C.amber, fontSize: 13, fontWeight: 600 }}>
+                              Duplicate Detected ({detail.debug.duplicates.flags.length} match{detail.debug.duplicates.flags.length !== 1 ? 'es' : ''})
+                            </span>
+                          </div>
+                        </div>
+                      )}
 
                       {/* ── Debug: Verification Gate Analysis ── */}
                       {detail.debug && (
