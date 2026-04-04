@@ -42,7 +42,7 @@ router.get('/page-config',
 
     const { data: developer, error } = await supabase
       .from('developers')
-      .select('branding_logo_url, branding_accent_color, branding_company_name, company')
+      .select('branding_logo_url, branding_accent_color, branding_company_name, company, page_builder_config')
       .eq('id', keyRecord.developer_id)
       .single();
 
@@ -64,6 +64,41 @@ router.get('/page-config',
         accent_color: developer?.branding_accent_color || null,
         company_name: companyName,
       },
+      page_builder_config: (developer as any)?.page_builder_config || null,
+    });
+  })
+);
+
+// GET /api/v2/verify/page-config/slug/:slug
+// Public endpoint — resolve a custom slug to branding + page builder config.
+router.get('/page-config/slug/:slug',
+  basicRateLimit,
+  catchAsync(async (req: Request, res: Response) => {
+    const { slug } = req.params;
+
+    const { data: developer } = await supabase
+      .from('developers')
+      .select('branding_logo_url, branding_accent_color, branding_company_name, company, page_builder_config')
+      .eq('verification_slug', slug)
+      .maybeSingle();
+
+    res.setHeader('Cache-Control', 'public, max-age=300');
+
+    if (!developer) {
+      return res.json({
+        branding: { logo_url: null, accent_color: null, company_name: null },
+        page_builder_config: null,
+      });
+    }
+
+    const companyName = developer.branding_company_name || developer.company || null;
+    res.json({
+      branding: {
+        logo_url: developer.branding_logo_url || null,
+        accent_color: developer.branding_accent_color || null,
+        company_name: companyName,
+      },
+      page_builder_config: (developer as any).page_builder_config || null,
     });
   })
 );

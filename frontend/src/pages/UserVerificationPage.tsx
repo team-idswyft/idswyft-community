@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { useSearchParams, useNavigate } from 'react-router-dom';
+import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import EndUserVerification from '../components/verification/EndUserVerification';
 import { ContinueOnPhone } from '../components/ContinueOnPhone';
@@ -20,9 +20,35 @@ interface PageBranding {
   company_name: string | null;
 }
 
+interface PageBuilderConfig {
+  headerTitle?: string;
+  headerSubtitle?: string;
+  showPoweredBy?: boolean;
+  theme?: 'dark' | 'light';
+  backgroundColor?: string;
+  cardBackgroundColor?: string;
+  textColor?: string;
+  fontFamily?: 'dm-sans' | 'inter' | 'system';
+  steps?: {
+    front?: { enabled?: boolean; label?: string };
+    back?: { enabled?: boolean; label?: string };
+    liveness?: { enabled?: boolean; label?: string };
+  };
+  completionTitle?: string;
+  completionMessage?: string;
+  showConfetti?: boolean;
+}
+
+const PB_FONT_MAP: Record<string, string> = {
+  'dm-sans': '"DM Sans", system-ui, sans-serif',
+  'inter': '"Inter", system-ui, sans-serif',
+  'system': 'system-ui, -apple-system, sans-serif',
+};
+
 const UserVerificationPage: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
+  const { slug } = useParams<{ slug?: string }>();
 
   const apiKey = searchParams.get('api_key') || process.env.REACT_APP_IDSWYFT_API_KEY || '';
   const userId = searchParams.get('user_id') || '';
@@ -49,21 +75,35 @@ const UserVerificationPage: React.FC = () => {
 
   // Page branding — fetched from developer config
   const [branding, setBranding] = useState<PageBranding | null>(null);
+  const [pageConfig, setPageConfig] = useState<PageBuilderConfig | null>(null);
   const accent = branding?.accent_color || C.cyan;
   const accentDim = branding?.accent_color ? `${branding.accent_color}1a` : C.cyanDim;
   const accentBorder = branding?.accent_color ? `${branding.accent_color}40` : C.cyanBorder;
   const hasCustomBranding = !!(branding?.logo_url || branding?.company_name || branding?.accent_color);
 
+  // Page builder derived values
+  const pbFont = pageConfig?.fontFamily ? PB_FONT_MAP[pageConfig.fontFamily] : undefined;
+  const pbText = pageConfig?.textColor || undefined;
+  const showPoweredBy = pageConfig?.showPoweredBy ?? true;
+
   useEffect(() => { injectFonts(); }, []);
 
-  // Fetch page branding config
+  // Fetch page branding config (supports both api_key and slug-based lookup)
   useEffect(() => {
-    if (!apiKey) return;
-    fetch(`${API_BASE_URL}/api/v2/verify/page-config?api_key=${encodeURIComponent(apiKey)}`)
+    const url = slug
+      ? `${API_BASE_URL}/api/v2/verify/page-config/slug/${encodeURIComponent(slug)}`
+      : apiKey
+        ? `${API_BASE_URL}/api/v2/verify/page-config?api_key=${encodeURIComponent(apiKey)}`
+        : null;
+    if (!url) return;
+    fetch(url)
       .then(r => r.ok ? r.json() : null)
-      .then(data => { if (data?.branding) setBranding(data.branding); })
+      .then(data => {
+        if (data?.branding) setBranding(data.branding);
+        if (data?.page_builder_config) setPageConfig(data.page_builder_config);
+      })
       .catch(() => {});
-  }, [apiKey]);
+  }, [apiKey, slug]);
 
   // Track viewport width for responsive layout
   useEffect(() => {
@@ -357,7 +397,7 @@ const UserVerificationPage: React.FC = () => {
           <p style={{ fontFamily: C.sans, fontSize: '0.75rem', color: C.dim, marginTop: 24 }}>
             You can close this window.
           </p>
-          {hasCustomBranding && (
+          {hasCustomBranding && showPoweredBy && (
             <p style={{ fontFamily: C.sans, fontSize: '0.68rem', color: C.dim, marginTop: 12 }}>
               Powered by Idswyft
             </p>
@@ -517,17 +557,19 @@ const UserVerificationPage: React.FC = () => {
 
         {/* Heading */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <h1 style={{ fontFamily: C.sans, fontSize: '1.6rem', fontWeight: 600, color: C.text, margin: '0 0 8px' }}>
+          <h1 style={{ fontFamily: pbFont || C.sans, fontSize: '1.6rem', fontWeight: 600, color: pbText || C.text, margin: '0 0 8px' }}>
             {verificationMode === 'age_only'
               ? 'Verify Your Age'
-              : branding?.company_name
-                ? `Verify with ${branding.company_name}`
-                : 'Verify Your Identity'}
+              : pageConfig?.headerTitle
+                ? pageConfig.headerTitle
+                : branding?.company_name
+                  ? `Verify with ${branding.company_name}`
+                  : 'Verify Your Identity'}
           </h1>
-          <p style={{ fontFamily: C.sans, fontSize: '0.92rem', color: C.muted, margin: 0 }}>
+          <p style={{ fontFamily: pbFont || C.sans, fontSize: '0.92rem', color: C.muted, margin: 0 }}>
             {verificationMode === 'age_only'
               ? `Upload your ID to confirm you are ${ageThreshold ?? 18}+`
-              : 'Choose how you\'d like to complete verification'}
+              : pageConfig?.headerSubtitle || 'Choose how you\'d like to complete verification'}
           </p>
         </div>
 
@@ -613,7 +655,7 @@ const UserVerificationPage: React.FC = () => {
           )}
         </div>
 
-        {hasCustomBranding && (
+        {hasCustomBranding && showPoweredBy && (
           <p style={{ fontFamily: C.sans, fontSize: '0.68rem', color: C.dim, textAlign: 'center', marginTop: 20 }}>
             Powered by Idswyft
           </p>

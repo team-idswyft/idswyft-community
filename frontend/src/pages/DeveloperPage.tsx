@@ -6,7 +6,7 @@ import { fetchCsrfToken, csrfHeader, clearCsrfToken } from '../lib/csrf'
 import { C, injectFonts } from '../theme'
 import '../styles/patterns.css'
 import { AnalyticsCharts } from '../components/developer/AnalyticsCharts'
-import { Cog6ToothIcon } from '@heroicons/react/24/outline'
+import { Cog6ToothIcon, PaintBrushIcon } from '@heroicons/react/24/outline'
 
 import type { ApiKey, DeveloperStats } from '../components/developer/types'
 import { AuthGate } from '../components/developer/AuthGate'
@@ -218,6 +218,33 @@ export function DeveloperPage() {
         />
 
         <WebhooksSection token={token} apiKeys={apiKeys} />
+
+        {/* Page Builder card */}
+        <div style={{
+          background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10,
+          padding: '20px 24px', marginTop: 24, display: 'flex', alignItems: 'center',
+          justifyContent: 'space-between',
+        }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+            <PaintBrushIcon style={{ width: 20, height: 20, color: C.cyan }} />
+            <div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Page Builder</div>
+              <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
+                Customize your hosted verification page — colors, text, steps, and more
+              </div>
+            </div>
+          </div>
+          <button
+            onClick={() => navigate('/developer/page-builder')}
+            style={{
+              background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
+              padding: '8px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Open Builder
+          </button>
+        </div>
 
       </div>
 

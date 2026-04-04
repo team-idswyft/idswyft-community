@@ -1,4 +1,5 @@
 import { useState, useEffect } from 'react'
+import { Link } from 'react-router-dom'
 import toast from 'react-hot-toast'
 import { API_BASE_URL } from '../../config/api'
 import { csrfHeader, clearCsrfToken } from '../../lib/csrf'
@@ -1159,6 +1160,13 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                             Clear
                           </button>
                         )}
+                      </div>
+
+                      <div style={{ marginTop: 16, padding: '12px 14px', background: C.cyanDim, borderRadius: 8, border: `1px solid ${C.cyanBorder}` }}>
+                        <Link to="/developer/page-builder" onClick={onClose}
+                          style={{ color: C.cyan, fontSize: 13, fontWeight: 500, textDecoration: 'none' }}>
+                          Want more control? Try the Page Builder &rarr;
+                        </Link>
                       </div>
                     </>
                   )}

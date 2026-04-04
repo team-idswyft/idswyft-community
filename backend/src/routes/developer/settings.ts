@@ -246,4 +246,106 @@ router.put('/settings/branding',
   })
 );
 
+// ─── Page Builder Config ──────────────────────────────────────
+
+const ALLOWED_PB_KEYS = new Set([
+  'headerTitle', 'headerSubtitle', 'showPoweredBy',
+  'theme', 'backgroundColor', 'cardBackgroundColor', 'textColor',
+  'fontFamily', 'steps', 'completionTitle', 'completionMessage', 'showConfetti',
+]);
+
+function validatePageBuilderConfig(cfg: any): string | null {
+  if (!cfg || typeof cfg !== 'object') return 'Config must be an object';
+  for (const k of Object.keys(cfg)) {
+    if (!ALLOWED_PB_KEYS.has(k)) return `Unknown config key: ${k}`;
+  }
+  if (cfg.headerTitle && (typeof cfg.headerTitle !== 'string' || cfg.headerTitle.length > 200))
+    return 'headerTitle must be a string (max 200 chars)';
+  if (cfg.headerSubtitle && (typeof cfg.headerSubtitle !== 'string' || cfg.headerSubtitle.length > 300))
+    return 'headerSubtitle must be a string (max 300 chars)';
+  if (cfg.theme && !['dark', 'light'].includes(cfg.theme))
+    return 'theme must be "dark" or "light"';
+  if (cfg.fontFamily && !['dm-sans', 'inter', 'system'].includes(cfg.fontFamily))
+    return 'fontFamily must be "dm-sans", "inter", or "system"';
+  for (const colorKey of ['backgroundColor', 'cardBackgroundColor', 'textColor']) {
+    if (cfg[colorKey] && !HEX_COLOR_RE.test(cfg[colorKey]))
+      return `${colorKey} must be a 6-digit hex color`;
+  }
+  if (cfg.completionTitle && (typeof cfg.completionTitle !== 'string' || cfg.completionTitle.length > 200))
+    return 'completionTitle must be a string (max 200 chars)';
+  if (cfg.completionMessage && (typeof cfg.completionMessage !== 'string' || cfg.completionMessage.length > 500))
+    return 'completionMessage must be a string (max 500 chars)';
+  return null;
+}
+
+router.get('/settings/page-builder',
+  authenticateDeveloperJWT,
+  catchAsync(async (req: Request, res: Response) => {
+    const developerId = (req as any).developer.id;
+    const { data } = await supabase
+      .from('developers')
+      .select('page_builder_config, verification_slug')
+      .eq('id', developerId)
+      .single();
+
+    res.json({
+      configured: !!data?.page_builder_config,
+      config: data?.page_builder_config || null,
+      slug: data?.verification_slug || null,
+    });
+  })
+);
+
+router.put('/settings/page-builder',
+  authenticateDeveloperJWT,
+  catchAsync(async (req: Request, res: Response) => {
+    const developerId = (req as any).developer.id;
+    const { config: pbConfig } = req.body;
+
+    const err = validatePageBuilderConfig(pbConfig);
+    if (err) return res.status(400).json({ error: err });
+
+    const { error } = await supabase
+      .from('developers')
+      .update({ page_builder_config: pbConfig })
+      .eq('id', developerId);
+
+    if (error) return res.status(500).json({ error: 'Failed to save page builder config' });
+    res.json({ success: true });
+  })
+);
+
+router.put('/settings/page-builder/slug',
+  authenticateDeveloperJWT,
+  [
+    body('slug').optional({ nullable: true }).isString().matches(/^[a-z0-9][a-z0-9-]{2,48}[a-z0-9]$/)
+      .withMessage('Slug must be 4-50 chars: lowercase letters, numbers, and hyphens'),
+  ],
+  validate,
+  catchAsync(async (req: Request, res: Response) => {
+    const developerId = (req as any).developer.id;
+    const { slug } = req.body;
+
+    if (slug) {
+      // Check uniqueness
+      const { data: existing } = await supabase
+        .from('developers')
+        .select('id')
+        .eq('verification_slug', slug)
+        .neq('id', developerId)
+        .maybeSingle();
+
+      if (existing) return res.status(409).json({ error: 'Slug is already taken' });
+    }
+
+    const { error } = await supabase
+      .from('developers')
+      .update({ verification_slug: slug || null })
+      .eq('id', developerId);
+
+    if (error) return res.status(500).json({ error: 'Failed to save slug' });
+    res.json({ success: true, slug: slug || null });
+  })
+);
+
 export default router;

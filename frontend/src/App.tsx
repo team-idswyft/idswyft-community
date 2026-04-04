@@ -4,6 +4,7 @@ import { HomePageV2 } from './pages/HomePageV2'
 import { DeveloperPage } from './pages/DeveloperPage'
 import { DemoPage } from './pages/DemoPage'
 import UserVerificationPage from './pages/UserVerificationPage'
+import PageBuilderPage from './pages/PageBuilderPage'
 import { LiveCapturePage } from './pages/LiveCapturePage'
 import MobileVerificationPage from './pages/MobileVerificationPage'
 import { AdminLogin } from './pages/AdminLogin'
@@ -44,6 +45,8 @@ function App() {
 
         {/* Shared routes — both editions */}
         <Route path="/user-verification" element={<UserVerificationPage />} />
+        <Route path="/v/:slug" element={<UserVerificationPage />} />
+        <Route path="/developer/page-builder" element={<PageBuilderPage />} />
         <Route path="/live-capture" element={<LiveCapturePage />} />
         <Route path="/verify/mobile" element={<MobileVerificationPage />} />
         <Route path="/docs/markdown" element={<MarkdownDocsPage />} />

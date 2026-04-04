@@ -32,7 +32,9 @@ export function Layout({ children }: LayoutProps) {
   const isAdminRoute = location.pathname.startsWith('/admin')
   const isStandaloneRoute =
     location.pathname.startsWith('/user-verification') ||
-    location.pathname.startsWith('/verify/mobile')
+    location.pathname.startsWith('/verify/mobile') ||
+    location.pathname.startsWith('/v/') ||
+    location.pathname === '/developer/page-builder'
   const isDarkRoute =
     location.pathname === '/' ||
     location.pathname.startsWith('/docs') ||
