@@ -784,6 +784,137 @@ Items that fail quality gates are marked as \`failed\` with a rejection reason. 
 
 ---
 
+## Verifiable Credentials (W3C JWT-VC)
+
+Issue W3C Verifiable Credentials for completed verifications. Credentials are Ed25519-signed JWTs that can be independently verified by any third party using the issuer's DID document — no Idswyft API key needed for the crypto check.
+
+**Prerequisites:**
+- Verification must be completed with \`final_result: "verified"\`
+- Developer must have \`vc_enabled: true\` (configured in Settings → Integrations)
+- Server must have \`VC_ISSUER_PRIVATE_KEY\` configured (32-byte Ed25519 seed as 64 hex chars)
+
+### Issue Credential
+
+\`\`\`
+GET /api/v2/verify/:id/credential
+\`\`\`
+
+**Response (200):**
+
+\`\`\`json
+{
+  "success": true,
+  "credential": "eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9...",
+  "jti": "urn:uuid:550e8400-e29b-41d4-a716-446655440001",
+  "expires_at": "2028-04-04T00:00:00.000Z"
+}
+\`\`\`
+
+The \`credential\` field is a JWT-VC containing:
+- **Header:** \`alg: "EdDSA"\`, \`typ: "JWT"\`
+- **Payload:** \`iss\` (issuer DID), \`vc.credentialSubject\` (name, dateOfBirth, nationality, documentType, faceMatchScore, verifiedAt), \`exp\`, \`jti\`
+
+Credential TTL defaults to 730 days (configurable via \`VC_CREDENTIAL_TTL_DAYS\`).
+
+If a credential was already issued for this verification, returns \`already_issued: true\` with the existing JTI. Revoke the existing credential first to re-issue.
+
+### Check Credential Status (Public)
+
+\`\`\`
+GET /api/v2/credentials/:jti/status
+\`\`\`
+
+**No authentication required.** Any relying party can check if a credential is still active.
+
+**Response (200):**
+
+\`\`\`json
+{
+  "active": true
+}
+\`\`\`
+
+| \`active\` | \`reason\` | Meaning |
+|-----------|----------|---------|
+| true | — | Credential is valid and not revoked |
+| false | \`revoked\` | Credential was revoked by the issuer |
+| false | \`expired\` | Credential has passed its expiration date |
+| false | \`not_found\` | No credential found with this JTI |
+
+### Revoke Credential
+
+\`\`\`
+POST /api/v2/credentials/:jti/revoke
+Content-Type: application/json
+\`\`\`
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| reason | string | No | Human-readable revocation reason |
+
+**Response (200):** \`{ "success": true, "message": "Credential revoked" }\`
+
+Revocation is permanent. Revoked credentials will return \`active: false, reason: "revoked"\` from the status endpoint.
+
+### DID Document (Public)
+
+\`\`\`
+GET /.well-known/did.json
+\`\`\`
+
+Returns the issuer's DID document per the W3C DID:web specification. Contains the Ed25519 public key used to verify credential signatures.
+
+**Response (200, Content-Type: application/did+json):**
+
+\`\`\`json
+{
+  "@context": ["https://www.w3.org/ns/did/v1", "https://w3id.org/security/suites/jws-2020/v1"],
+  "id": "did:web:api.idswyft.app",
+  "verificationMethod": [{
+    "id": "did:web:api.idswyft.app#key-1",
+    "type": "JsonWebKey2020",
+    "controller": "did:web:api.idswyft.app",
+    "publicKeyJwk": { "kty": "OKP", "crv": "Ed25519", "x": "..." }
+  }],
+  "authentication": ["did:web:api.idswyft.app#key-1"],
+  "assertionMethod": ["did:web:api.idswyft.app#key-1"]
+}
+\`\`\`
+
+### Client-Side Verification
+
+Any relying party can verify a credential without an Idswyft API key:
+
+1. Decode JWT header — confirm \`alg: "EdDSA"\`
+2. Extract \`iss\` from payload (e.g. \`did:web:api.idswyft.app\`)
+3. Resolve DID: \`did:web:api.idswyft.app\` → \`https://api.idswyft.app/.well-known/did.json\`
+4. Extract Ed25519 public key from \`verificationMethod[0].publicKeyJwk.x\`
+5. Verify signature over \`header.payload\` using Ed25519
+6. Check \`exp\` claim for expiration
+
+**JavaScript (~15KB):**
+
+\`\`\`javascript
+import { verifyAsync, hashes } from '@noble/ed25519';
+import { sha512 } from '@noble/hashes/sha2.js';
+hashes.sha512 = sha512;
+
+// Decode base64url, fetch DID doc, verify signature...
+const isValid = await verifyAsync(signature, message, publicKey);
+\`\`\`
+
+### Environment Variables
+
+| Variable | Required | Description |
+|----------|----------|-------------|
+| \`VC_ISSUER_PRIVATE_KEY\` | Yes | 32-byte Ed25519 seed as 64 hex chars |
+| \`VC_ISSUER_DID\` | No | Issuer DID (default: \`did:web:api.idswyft.app\`) |
+| \`VC_CREDENTIAL_TTL_DAYS\` | No | Credential lifetime in days (default: 730) |
+
+Generate a key pair: \`node -e "import('@noble/ed25519').then(e => { const s = e.utils.randomSecretKey(); console.log(Buffer.from(s).toString('hex')); })"\`
+
+---
+
 ## Address Verification
 
 Verify proof-of-address documents (utility bills, bank statements). Requires a completed identity verification session.
