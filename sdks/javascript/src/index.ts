@@ -762,6 +762,55 @@ export class IdswyftSDK {
     return response.data;
   }
 
+  // ─── Verifiable Credentials ──────────────────────────────
+
+  /**
+   * Fetch a W3C Verifiable Credential (JWT-VC) for a completed verification.
+   * Requires `vc_enabled` in developer settings. The credential is issued once;
+   * subsequent calls return a reference to the already-issued credential.
+   *
+   * @param verificationId - The verification session ID
+   * @returns The signed JWT-VC string
+   */
+  async getCredential(verificationId: string): Promise<{
+    credential: string;
+    jti: string;
+    expires_at: string;
+    already_issued?: boolean;
+  }> {
+    const response = await this.client.get(
+      `/api/v2/verify/${verificationId}/credential`
+    );
+    return response.data;
+  }
+
+  /**
+   * Revoke a previously issued Verifiable Credential.
+   *
+   * @param jti - The credential JTI (unique identifier from getCredential)
+   * @param reason - Optional revocation reason
+   */
+  async revokeCredential(jti: string, reason?: string): Promise<{ success: boolean; message: string }> {
+    const response = await this.client.post(
+      `/api/v2/credentials/${jti}/revoke`,
+      reason ? { reason } : {}
+    );
+    return response.data;
+  }
+
+  /**
+   * Check if a credential is still active (not revoked or expired).
+   * This endpoint is public — no API key required.
+   *
+   * @param jti - The credential JTI
+   */
+  async checkCredentialStatus(jti: string): Promise<{ active: boolean; reason?: string }> {
+    const response = await this.client.get(
+      `/api/v2/credentials/${jti}/status`
+    );
+    return response.data;
+  }
+
   // ─── Utilities ─────────────────────────────────────────
 
   /**

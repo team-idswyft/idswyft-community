@@ -7,5 +7,7 @@ export { CheckingStep } from './CheckingStep';
 export { LiveCaptureStep } from './LiveCaptureStep';
 export { ResultsStep } from './ResultsStep';
 export { AddressStep } from './AddressStep';
+export { CredentialStep } from './CredentialStep';
+export { VerifyCredentialStep } from './VerifyCredentialStep';
 export type { VerificationRequest, LiveCaptureSession, CaptureResult, DemoDocument } from './types';
 export { getErrorMessage } from './types';

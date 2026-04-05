@@ -23,6 +23,8 @@ import {
   LiveCaptureStep,
   ResultsStep,
   AddressStep,
+  CredentialStep,
+  VerifyCredentialStep,
   getErrorMessage,
 } from '../components/demo';
 import type { VerificationRequest, CaptureResult } from '../components/demo';
@@ -81,6 +83,9 @@ const DemoPage: React.FC = () => {
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' && window.innerWidth < 768
   );
+
+  // Credential verification state
+  const [credentialJwt, setCredentialJwt] = useState<string>('');
 
   // Address verification state
   const [addressFile, setAddressFile] = useState<File | null>(null);
@@ -1479,6 +1484,7 @@ const DemoPage: React.FC = () => {
             onRetry={handleRetry}
             onStartNew={handleStartNew}
             onGoToAddress={() => setCurrentStep(8)}
+            onGoToCredential={() => setCurrentStep(9)}
           />
         );
 
@@ -1494,6 +1500,26 @@ const DemoPage: React.FC = () => {
             onAddressDocTypeChange={setAddressDocType}
             onUploadAddress={uploadAddressDocument}
             onStartNew={handleStartNew}
+          />
+        );
+
+      case 9:
+        return (
+          <CredentialStep
+            verificationId={verificationId!}
+            apiKey={apiKey}
+            onStartNew={handleStartNew}
+            onBack={() => setCurrentStep(7)}
+            onGoToVerify={(jwt) => { setCredentialJwt(jwt); setCurrentStep(10); }}
+          />
+        );
+
+      case 10:
+        return (
+          <VerifyCredentialStep
+            initialJwt={credentialJwt}
+            onStartNew={handleStartNew}
+            onBack={() => setCurrentStep(9)}
           />
         );
 

@@ -67,6 +67,7 @@ interface ResultsStepProps {
   onRetry: () => void;
   onStartNew: () => void;
   onGoToAddress: () => void;
+  onGoToCredential?: () => void;
 }
 
 // Helper: score bar for 0-1 or 0-100 values
@@ -110,6 +111,7 @@ export const ResultsStep: React.FC<ResultsStepProps> = ({
   onRetry,
   onStartNew,
   onGoToAddress,
+  onGoToCredential,
 }) => {
   // v2: final_result has user-facing status, status has internal machine state
   const status = verificationRequest?.final_result ?? verificationRequest?.status;
@@ -373,6 +375,22 @@ export const ResultsStep: React.FC<ResultsStepProps> = ({
 
       {/* Action Buttons */}
       <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+        {isVerified && onGoToCredential && (
+          <button
+            onClick={onGoToCredential}
+            style={{
+              background: C.cyan, color: C.bg, border: 'none', borderRadius: 8,
+              padding: '10px 24px', fontWeight: 600, fontSize: 14, cursor: 'pointer',
+              display: 'flex', alignItems: 'center', gap: 8,
+            }}
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+              <path d="M9 12l2 2 4-4" />
+            </svg>
+            Get Verifiable Credential
+          </button>
+        )}
         <button
           onClick={onGoToAddress}
           style={{ background: C.purple, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 24px', fontWeight: 600, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
@@ -387,7 +405,7 @@ export const ResultsStep: React.FC<ResultsStepProps> = ({
         </button>
       </div>
       <p style={{ color: C.dim, fontSize: 11, marginTop: 12, textAlign: 'center' }}>
-        Address verification is optional — it verifies proof-of-address documents separately from identity.
+        Address verification and verifiable credentials are optional post-verification features.
       </p>
     </div>
   );

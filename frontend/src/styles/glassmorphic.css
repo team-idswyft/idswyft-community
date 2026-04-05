@@ -150,6 +150,121 @@
   background-size: 30px 30px;
 }
 
+/* ── Verifiable Credentials section ──────────────────────── */
+
+/* Credential card with emerald trust accent */
+.vc-card {
+  position: relative;
+  background:
+    linear-gradient(135deg, rgba(34, 211, 238, 0.04) 0%, rgba(34, 211, 238, 0.02) 100%);
+  border: 1px solid rgba(34, 211, 238, 0.15);
+  border-radius: 16px;
+  overflow: hidden;
+}
+
+.vc-card::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background:
+    repeating-linear-gradient(
+      90deg,
+      transparent,
+      transparent 19px,
+      rgba(34, 211, 238, 0.02) 19px,
+      rgba(34, 211, 238, 0.02) 20px
+    ),
+    repeating-linear-gradient(
+      0deg,
+      transparent,
+      transparent 19px,
+      rgba(34, 211, 238, 0.02) 19px,
+      rgba(34, 211, 238, 0.02) 20px
+    );
+  pointer-events: none;
+}
+
+/* Signing seal pulse */
+.vc-seal {
+  animation: sealPulse 3s ease-in-out infinite;
+}
+
+@keyframes sealPulse {
+  0%, 100% {
+    box-shadow:
+      0 0 0 0 rgba(34, 211, 238, 0.3),
+      0 0 20px rgba(34, 211, 238, 0.1);
+  }
+  50% {
+    box-shadow:
+      0 0 0 8px rgba(34, 211, 238, 0),
+      0 0 40px rgba(34, 211, 238, 0.2);
+  }
+}
+
+/* JWT token scroll */
+.vc-jwt-scroll {
+  animation: jwtScroll 20s linear infinite;
+}
+
+@keyframes jwtScroll {
+  0%   { transform: translateX(0); }
+  100% { transform: translateX(-50%); }
+}
+
+/* Claim row stagger reveal */
+.vc-claim-row {
+  opacity: 0;
+  transform: translateX(-8px);
+  animation: claimReveal 0.5s ease forwards;
+}
+
+@keyframes claimReveal {
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+/* DID resolution line animation */
+.vc-resolve-line {
+  stroke-dasharray: 200;
+  stroke-dashoffset: 200;
+  animation: resolveDraw 2s ease forwards;
+}
+
+@keyframes resolveDraw {
+  to { stroke-dashoffset: 0; }
+}
+
+/* Credential shimmer on hover */
+.vc-card:hover {
+  border-color: rgba(34, 211, 238, 0.3);
+  box-shadow:
+    0 16px 48px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(34, 211, 238, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  transform: translateY(-4px);
+  transition: all 0.35s ease;
+}
+
+/* Flow step connector animation */
+.vc-flow-connector {
+  animation: vcFlowPulse 2.5s ease-in-out infinite;
+}
+
+@keyframes vcFlowPulse {
+  0%, 100% { opacity: 0.3; }
+  50%      { opacity: 0.7; }
+}
+
+/* Responsive: VC section grid */
+@media (max-width: 768px) {
+  .vc-grid {
+    grid-template-columns: 1fr !important;
+  }
+}
+
 /* ── Bento grid responsive ────────────────────────────────── */
 
 @media (max-width: 768px) {

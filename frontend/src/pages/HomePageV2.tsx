@@ -89,7 +89,7 @@ const PHASES = [
   { label: 'Scanning back...',   color: '#22d3ee', card: 'back'  as const },
   { label: 'Cross-validating...', color: '#60a5fa', card: 'back'  as const },
   { label: 'Face matching...',   color: '#a78bfa', card: 'front' as const },
-  { label: 'Verified',          color: '#34d399', card: 'front' as const },
+  { label: 'Verified',          color: C.cyan, card: 'front' as const },
 ] as const
 
 const FRONT_FIELDS = [
@@ -613,7 +613,190 @@ export function HomePageV2() {
         </div>
       </section>
 
-      {/* ── 7. PRICING ───────────────────────────────────── */}
+      {/* ── 7. VERIFIABLE CREDENTIALS ──────────────────── */}
+      <section style={{ padding: '100px 24px', maxWidth: 1100, margin: '0 auto', position: 'relative' }}>
+        {/* Section header */}
+        <div className="v2-reveal" style={{ textAlign: 'center', marginBottom: 56 }}>
+          <div style={{ fontFamily: C.mono, fontSize: 11, color: C.cyan, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 12 }}>
+            Verifiable Credentials
+          </div>
+          <h2 style={{ fontFamily: C.mono, fontSize: 32, fontWeight: 600, color: C.text, marginBottom: 12 }}>
+            Verify once. <span style={{ color: C.cyan }}>Reuse everywhere.</span>
+          </h2>
+          <p style={{ color: C.muted, fontSize: 15, maxWidth: 560, margin: '0 auto' }}>
+            After verification, issue W3C Verifiable Credentials your users can re-present —
+            eliminating repeat KYC across supporting apps.
+          </p>
+        </div>
+
+        {/* Two-column: Credential card (left) + Flow steps (right) */}
+        <div className="vc-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, alignItems: 'start' }}>
+
+          {/* Left: Animated credential card */}
+          <div className="v2-reveal vc-card" style={{ padding: 32 }}>
+            {/* Credential header */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+              <div>
+                <div style={{ fontFamily: C.mono, fontSize: 11, color: C.cyan, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 4 }}>
+                  Identity Credential
+                </div>
+                <div style={{ fontFamily: C.mono, fontSize: 10, color: C.dim }}>
+                  W3C Verifiable Credential &middot; JWT-VC
+                </div>
+              </div>
+              {/* Animated seal */}
+              <div className="vc-seal" style={{
+                width: 40, height: 40, borderRadius: '50%',
+                background: 'rgba(34, 211, 238, 0.1)',
+                border: '2px solid rgba(34, 211, 238, 0.3)',
+                display: 'flex', alignItems: 'center', justifyContent: 'center',
+              }}>
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke={C.cyan} strokeWidth="2">
+                  <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
+                  <polyline points="9 12 11 14 15 10" />
+                </svg>
+              </div>
+            </div>
+
+            {/* Claims */}
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 10, marginBottom: 24 }}>
+              {[
+                { label: 'name', value: 'Jane Doe' },
+                { label: 'dateOfBirth', value: '1990-01-15' },
+                { label: 'nationality', value: 'US' },
+                { label: 'documentType', value: 'drivers_license' },
+                { label: 'faceMatchScore', value: '0.94' },
+                { label: 'verifiedAt', value: '2026-04-04T14:32Z' },
+              ].map((claim, i) => (
+                <div key={claim.label} className="vc-claim-row" style={{
+                  display: 'flex', justifyContent: 'space-between', alignItems: 'center',
+                  padding: '8px 12px', borderRadius: 8,
+                  background: 'rgba(34, 211, 238, 0.03)',
+                  border: '1px solid rgba(34, 211, 238, 0.06)',
+                  animationDelay: `${i * 0.12}s`,
+                }}>
+                  <span style={{ fontFamily: C.mono, fontSize: 11, color: C.dim }}>{claim.label}</span>
+                  <span style={{ fontFamily: C.mono, fontSize: 12, color: C.cyan }}>{claim.value}</span>
+                </div>
+              ))}
+            </div>
+
+            {/* JWT scroll */}
+            <div style={{
+              overflow: 'hidden', borderRadius: 8,
+              background: 'rgba(0, 0, 0, 0.3)',
+              padding: '8px 0',
+              border: '1px solid rgba(34, 211, 238, 0.08)',
+            }}>
+              <div className="vc-jwt-scroll" style={{
+                fontFamily: C.mono, fontSize: 9, color: C.dim, whiteSpace: 'nowrap',
+                display: 'inline-block', paddingLeft: 12,
+              }}>
+                eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJ2YyI6eyJAY29udGV4dCI6WyJodHRwczovL3d3dy53My5vcmcvMjAxOC9jcmVkZW50aWFscy92MSJdLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIiwiSWRlbnRpdHlDcmVkZW50aWFsIl19fQ.
+                <span style={{ opacity: 0.4 }}>
+                  Tl1jCvHe5d5D3k2YJlQzBNqR8X9fZwVHkJGKse4zXyM
+                </span>
+                &nbsp;&nbsp;&nbsp;&nbsp;
+                eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJ2YyI6eyJAY29udGV4dCI6WyJodHRwczovL3d3dy53My5vcmcvMjAxOC9jcmVkZW50aWFscy92MSJdLCJ0eXBlIjpbIlZlcmlmaWFibGVDcmVkZW50aWFsIiwiSWRlbnRpdHlDcmVkZW50aWFsIl19fQ.
+                <span style={{ opacity: 0.4 }}>
+                  Tl1jCvHe5d5D3k2YJlQzBNqR8X9fZwVHkJGKse4zXyM
+                </span>
+              </div>
+            </div>
+
+            {/* Issuer info */}
+            <div style={{ marginTop: 16, display: 'flex', alignItems: 'center', gap: 8 }}>
+              <div style={{ width: 6, height: 6, borderRadius: '50%', background: C.cyan }} />
+              <span style={{ fontFamily: C.mono, fontSize: 10, color: C.dim }}>
+                Signed by did:web:api.idswyft.app &middot; Ed25519
+              </span>
+            </div>
+          </div>
+
+          {/* Right: Flow steps */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {[
+              {
+                step: '01',
+                title: 'Verify identity',
+                desc: 'User completes standard verification — document OCR, cross-validation, liveness, face match.',
+                icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={C.cyan} strokeWidth="1.5"><rect x="3" y="4" width="18" height="16" rx="2" /><circle cx="9" cy="12" r="2" /><path d="M15 10h2M15 14h2" /></svg>,
+              },
+              {
+                step: '02',
+                title: 'Issue credential',
+                desc: 'Idswyft signs a JWT-VC with your issuer DID. Claims include name, DOB, nationality, and face match score.',
+                icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={C.cyan} strokeWidth="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" /><path d="M9 12l2 2 4-4" /></svg>,
+              },
+              {
+                step: '03',
+                title: 'Re-present anywhere',
+                desc: 'User shares the credential with other apps. They verify the signature against your public DID document — no API call needed.',
+                icon: <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke={C.cyan} strokeWidth="1.5"><circle cx="12" cy="12" r="10" /><path d="M2 12h20M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" /></svg>,
+              },
+            ].map((item, i) => (
+              <div key={item.step} className="v2-reveal glass-card" style={{
+                padding: 24, display: 'flex', gap: 16, alignItems: 'flex-start',
+                ...({ '--reveal-delay': `${i * 0.15}s` } as React.CSSProperties),
+              }}>
+                <div style={{
+                  minWidth: 44, height: 44, borderRadius: 12,
+                  background: 'rgba(34, 211, 238, 0.06)',
+                  border: '1px solid rgba(34, 211, 238, 0.12)',
+                  display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  flexShrink: 0,
+                }}>
+                  {item.icon}
+                </div>
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                    <span style={{ fontFamily: C.mono, fontSize: 10, color: C.cyan, letterSpacing: '0.06em' }}>{item.step}</span>
+                    <span style={{ fontWeight: 600, fontSize: 15, color: C.text }}>{item.title}</span>
+                  </div>
+                  <p style={{ fontSize: 13, color: C.muted, lineHeight: 1.65, margin: 0 }}>{item.desc}</p>
+                </div>
+              </div>
+            ))}
+
+            {/* DID resolution note */}
+            <div className="v2-reveal" style={{
+              padding: '16px 20px', borderRadius: 10,
+              background: 'rgba(34, 211, 238, 0.02)',
+              border: '1px solid rgba(34, 211, 238, 0.08)',
+              display: 'flex', alignItems: 'center', gap: 12,
+              ...({ '--reveal-delay': '0.45s' } as React.CSSProperties),
+            }}>
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke={C.cyan} strokeWidth="1.5" style={{ flexShrink: 0 }}>
+                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71" />
+                <path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71" />
+              </svg>
+              <div>
+                <div style={{ fontFamily: C.mono, fontSize: 11, color: C.cyan, marginBottom: 2 }}>did:web resolution</div>
+                <div style={{ fontSize: 12, color: C.dim }}>
+                  Public key auto-served at <code style={{ fontFamily: C.mono, fontSize: 11, color: C.muted }}>/.well-known/did.json</code> — no blockchain, no registration.
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Bottom tech specs */}
+        <div className="v2-reveal" style={{ display: 'flex', gap: 32, justifyContent: 'center', flexWrap: 'wrap', marginTop: 56 }}>
+          {[
+            { label: 'Format', value: 'JWT-VC' },
+            { label: 'Signing', value: 'Ed25519 (EdDSA)' },
+            { label: 'DID Method', value: 'did:web' },
+            { label: 'Validity', value: '2 years' },
+          ].map(({ label, value }) => (
+            <div key={label} style={{ textAlign: 'center' }}>
+              <div style={{ fontFamily: C.mono, fontSize: 14, fontWeight: 600, color: C.cyan }}>{value}</div>
+              <div style={{ color: C.dim, fontSize: 11, marginTop: 4, fontFamily: C.mono }}>{label}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── 8. PRICING ───────────────────────────────────── */}
       <section style={{ padding: '100px 24px', maxWidth: 1100, margin: '0 auto' }}>
         <div className="v2-reveal" style={{ textAlign: 'center', marginBottom: 56 }}>
           <div style={{ fontFamily: C.mono, fontSize: 11, color: C.cyan, letterSpacing: '0.12em', textTransform: 'uppercase', marginBottom: 12 }}>
@@ -718,7 +901,7 @@ export function HomePageV2() {
         </div>
       </section>
 
-      {/* ── 8. CTA ───────────────────────────────────────── */}
+      {/* ── 9. CTA ───────────────────────────────────────── */}
       <section className="v2-reveal" style={{
         padding: '100px 24px', textAlign: 'center', position: 'relative',
         borderTop: '1px solid rgba(255,255,255,0.05)',
