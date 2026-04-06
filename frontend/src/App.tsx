@@ -23,6 +23,7 @@ import { PricingPage } from './pages/PricingPage'
 import { Status } from './pages/Status'
 import { SetupPage } from './pages/SetupPage'
 import { PatternShowcase } from './components/PatternShowcase'
+import { VerifyCredentialPage } from './pages/VerifyCredentialPage'
 import { isCommunity, isCloud } from './config/edition'
 
 function App() {
@@ -38,6 +39,7 @@ function App() {
         {/* Demo — available in both editions */}
         <Route path="/demo" element={<DemoPage />} />
         <Route path="/verify" element={<Navigate to="/demo" replace />} />
+        <Route path="/verify-credential" element={<VerifyCredentialPage />} />
 
         {/* Cloud-only marketing routes — redirect to portal in community */}
         <Route path="/pricing" element={isCloud ? <PricingPage /> : <Navigate to="/" replace />} />

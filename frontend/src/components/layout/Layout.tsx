@@ -41,6 +41,7 @@ export function Layout({ children }: LayoutProps) {
     location.pathname.startsWith('/developer') ||
     location.pathname.startsWith('/demo') ||
     location.pathname.startsWith('/pricing') ||
+    location.pathname.startsWith('/verify-credential') ||
     location.pathname.startsWith('/status') ||
     location.pathname.startsWith('/legal')
 
@@ -75,6 +76,8 @@ export function Layout({ children }: LayoutProps) {
                   className="hover:text-white transition-colors">Docs</Link>
                 <Link to="/demo" style={{ color: '#8896aa', fontSize: 13 }}
                   className="hover:text-white transition-colors">Demo</Link>
+                <Link to="/verify-credential" style={{ color: '#8896aa', fontSize: 13 }}
+                  className="hover:text-white transition-colors">Verify Credential</Link>
                 <a href={getGitHubUrl()} target="_blank" rel="noopener noreferrer"
                   style={{ color: '#8896aa', fontSize: 13 }}
                   className="hover:text-white transition-colors">GitHub</a>
@@ -257,6 +260,7 @@ export function Layout({ children }: LayoutProps) {
                 {[
                   { label: 'API Documentation', href: '/docs' },
                   { label: 'Get API Key', href: '/developer' },
+                  { label: 'Verify Credential', href: '/verify-credential' },
                   { label: 'System Status', href: 'https://status.idswyft.app' },
                   { label: 'GitHub', href: getGitHubUrl() },
                 ].map(({ label, href }) => (
