@@ -98,11 +98,12 @@ export async function issueIdentityCredential(
 
   const jwt = await createVerifiableCredentialJwt(credentialPayload, issuer);
 
-  // Persist credential reference
+  // Persist credential reference (including JWT for re-send support)
   await supabase.from('verifiable_credentials').insert({
     verification_request_id: verificationId,
     developer_id: developerId,
     credential_jti: jti,
+    credential_jwt: jwt,
     issued_at: issuedAt.toISOString(),
     expires_at: expiresAt.toISOString(),
   });

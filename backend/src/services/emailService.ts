@@ -139,6 +139,71 @@ class EmailService {
 
     return this.sendEmail({ to: email, subject, html, text });
   }
+
+  async sendCredentialEmail(
+    email: string,
+    recipientName: string,
+    verifyUrl: string,
+    qrDataUri: string,
+    expiresAt: Date,
+  ): Promise<boolean> {
+    const subject = 'Your Verified Identity Credential';
+    const guilloche = guillocheDataUri();
+    const expiryStr = expiresAt.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const safeName = recipientName.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    const FONT = "'DM Sans',-apple-system,BlinkMacSystemFont,'Segoe UI',Helvetica,sans-serif";
+
+    const html = `<!DOCTYPE html>
+<html lang="en"><head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1.0">
+<meta name="color-scheme" content="dark">
+<meta name="supported-color-schemes" content="dark">
+<title>Idswyft</title>
+<style>
+  @media only screen and (max-width:520px) {
+    .vc-outer { padding: 8px !important; }
+    .vc-card { border-radius: 10px !important; }
+    .vc-body { padding: 28px 20px !important; }
+    .vc-header { padding: 28px 20px 22px !important; }
+    .vc-qr img { width: 200px !important; height: 200px !important; }
+  }
+</style>
+</head>
+<body style="margin:0;padding:0;background:${BG};-webkit-text-size-adjust:100%;">
+<div class="vc-outer" style="padding:24px 16px;background:${BG};background-image:url('${guilloche}');background-size:240px 240px;">
+<!--[if mso]><table role="presentation" cellpadding="0" cellspacing="0" border="0" width="480" align="center"><tr><td><![endif]-->
+<div class="vc-card" style="max-width:480px;margin:0 auto;background:${CARD};border-radius:14px;overflow:hidden;border:1px solid ${BORDER_S};box-shadow:0 8px 32px rgba(0,0,0,0.4);">
+  <div class="vc-header" style="background:${PANEL};background-image:url('${guilloche}');background-size:120px 120px;padding:36px 28px 28px;text-align:center;border-bottom:1px solid ${BORDER};">
+    <h1 style="margin:0;color:${TEXT};font-size:20px;font-weight:700;font-family:${FONT};letter-spacing:-0.01em;">Your Verified Identity Credential</h1>
+    <p style="margin:8px 0 0;color:${MUTED};font-size:13px;font-family:${FONT};">idswyft / verifiable-credentials</p>
+    <div style="width:40px;height:2px;background:${ACCENT};margin:14px auto 0;border-radius:1px;"></div>
+  </div>
+  <div class="vc-body" style="padding:32px 28px;text-align:center;">
+    <p style="color:${MUTED};font-size:15px;margin:0 0 8px;line-height:1.6;font-family:${FONT};">Hi <strong style="color:${TEXT};">${safeName}</strong>,</p>
+    <p style="color:${MUTED};font-size:15px;margin:0 0 24px;line-height:1.6;font-family:${FONT};">Your identity has been verified. Scan the QR code below to present your verified credential.</p>
+    <div class="vc-qr" style="background:rgba(34,211,238,0.04);border:1px solid rgba(34,211,238,0.18);border-radius:10px;padding:24px 16px;margin:0 auto;max-width:320px;">
+      <img src="${qrDataUri}" alt="Credential QR Code" width="280" height="280" style="display:block;margin:0 auto;border-radius:6px;" />
+    </div>
+    <p style="color:${MUTED};font-size:13px;margin:20px 0 0;font-family:${FONT};">Or verify online:</p>
+    <div style="margin:12px 0 0;">
+      <a href="${verifyUrl}" style="display:inline-block;background:${ACCENT};color:${BG};font-size:14px;font-weight:700;font-family:${FONT};padding:12px 28px;border-radius:8px;text-decoration:none;">Verify Online</a>
+    </div>
+    <p style="color:${MUTED};font-size:13px;margin:24px 0 0;font-family:${FONT};">This credential is valid until <strong style="color:${TEXT};">${expiryStr}</strong>.</p>
+  </div>
+  <div style="padding:20px 24px 24px;text-align:center;border-top:1px solid ${BORDER};background:${PANEL};">
+    <span style="display:inline-block;width:14px;height:14px;border:1.5px solid ${DIM};border-radius:3px;vertical-align:middle;margin-right:6px;text-align:center;line-height:14px;font-size:9px;color:${DIM};">&#9919;</span>
+    <span style="color:${DIM};font-size:12px;vertical-align:middle;font-family:${FONT};">Secured by Idswyft</span>
+  </div>
+</div>
+<!--[if mso]></td></tr></table><![endif]-->
+</div>
+</body></html>`;
+
+    const text = `Hi ${recipientName},\n\nYour identity has been verified. Use the link below to present your verified credential:\n\n${verifyUrl}\n\nThis credential is valid until ${expiryStr}.\n\nSecured by Idswyft`;
+
+    return this.sendEmail({ to: email, subject, html, text });
+  }
 }
 
 export const emailService = new EmailService();

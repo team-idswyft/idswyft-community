@@ -818,6 +818,32 @@ Credential TTL defaults to 730 days (configurable via \`VC_CREDENTIAL_TTL_DAYS\`
 
 If a credential was already issued for this verification, returns \`already_issued: true\` with the existing JTI. Revoke the existing credential first to re-issue.
 
+### Send Credential Email
+
+\`\`\`
+POST /api/v2/verify/:id/credential/send
+Content-Type: application/json
+\`\`\`
+
+Send the credential to a user via email with an embedded QR code. Issues the credential if not already issued; reuses the stored JWT if already issued. The QR code encodes a link to \`https://idswyft.app/verify-credential?jwt=...\` for instant client-side verification.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| email | string | Yes | Recipient email address |
+
+**Response (200):**
+
+\`\`\`json
+{
+  "success": true,
+  "jti": "urn:uuid:550e8400-e29b-41d4-a716-446655440001",
+  "expires_at": "2028-04-04T00:00:00.000Z",
+  "email_sent": true
+}
+\`\`\`
+
+Re-sending to the same or different email reuses the existing credential JWT — it does not re-issue. Requires Resend email transport (cloud edition). In development, the email content is logged to the console.
+
 ### Check Credential Status (Public)
 
 \`\`\`

@@ -48,6 +48,7 @@ Issue W3C Verifiable Credentials for completed verifications. Credentials are si
 
 ```
 GET  /api/v2/verify/:id/credential       → Issue JWT-VC (requires API key, vc_enabled)
+POST /api/v2/verify/:id/credential/send  → Email credential with QR code (requires API key, vc_enabled)
 GET  /api/v2/credentials/:jti/status     → Check revocation status (public, no auth)
 POST /api/v2/credentials/:jti/revoke     → Revoke credential (requires API key)
 GET  /.well-known/did.json               → Issuer DID document (public)
