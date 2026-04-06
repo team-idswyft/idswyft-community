@@ -85,6 +85,10 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
   const [revoked, setRevoked] = useState(false);
   const [copied, setCopied] = useState(false);
   const [checkingStatus, setCheckingStatus] = useState(false);
+  const [emailOpen, setEmailOpen] = useState(false);
+  const [sendEmail, setSendEmail] = useState('');
+  const [sending, setSending] = useState(false);
+  const [sendResult, setSendResult] = useState<{ success: boolean; email_sent: boolean } | null>(null);
 
   const fetchCredential = async () => {
     setLoading(true);
@@ -154,6 +158,35 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
       setCopied(true);
       setTimeout(() => setCopied(false), 2000);
     });
+  };
+
+  const sendCredentialEmail = async () => {
+    setSending(true);
+    setSendResult(null);
+    setError(null);
+    try {
+      const url = new URL(`${API_BASE_URL}/api/v2/verify/${verificationId}/credential/send`);
+      if (shouldUseSandbox()) url.searchParams.append('sandbox', 'true');
+
+      const res = await fetch(url.toString(), {
+        method: 'POST',
+        headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: sendEmail }),
+      });
+
+      if (!res.ok) {
+        const errData = await res.json().catch(() => ({ message: 'Request failed' }));
+        throw new Error(errData.message || errData.error || `HTTP ${res.status}`);
+      }
+
+      const data = await res.json();
+      setSendResult({ success: true, email_sent: data.email_sent ?? true });
+    } catch (err) {
+      setSendResult({ success: false, email_sent: false });
+      setError(err instanceof Error ? err.message : 'Failed to send credential');
+    } finally {
+      setSending(false);
+    }
   };
 
   // Decode JWT parts
@@ -468,7 +501,73 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
             {revoking ? 'Revoking...' : 'Revoke Credential'}
           </button>
         )}
+        <button
+          onClick={() => { setEmailOpen(!emailOpen); setSendResult(null); }}
+          style={{
+            background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.15)',
+            color: '#a855f7', borderRadius: 8, padding: '10px 20px',
+            fontWeight: 600, fontSize: 13, cursor: 'pointer',
+            display: 'flex', alignItems: 'center', gap: 6,
+          }}
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <rect x="2" y="4" width="20" height="16" rx="2" />
+            <path d="M22 4l-10 8L2 4" />
+          </svg>
+          Send via Email
+        </button>
       </div>
+
+      {/* Send via Email inline form */}
+      {emailOpen && (
+        <div style={{ ...cardStyle, borderColor: 'rgba(168,85,247,0.2)' }}>
+          <div style={cardTitle}>Send Credential via Email</div>
+          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              type="email"
+              value={sendEmail}
+              onChange={e => setSendEmail(e.target.value)}
+              placeholder="recipient@example.com"
+              style={{
+                flex: 1, padding: '8px 12px', borderRadius: 6,
+                background: C.codeBg, border: `1px solid ${C.border}`,
+                color: C.text, fontFamily: C.mono, fontSize: 12,
+                outline: 'none',
+              }}
+              onKeyDown={e => { if (e.key === 'Enter' && sendEmail.trim()) sendCredentialEmail(); }}
+            />
+            <button
+              onClick={sendCredentialEmail}
+              disabled={sending || !sendEmail.trim()}
+              style={{
+                background: C.cyan, color: C.bg, border: 'none',
+                borderRadius: 6, padding: '8px 16px', fontWeight: 700,
+                fontSize: 12, cursor: sending || !sendEmail.trim() ? 'not-allowed' : 'pointer',
+                opacity: sending || !sendEmail.trim() ? 0.5 : 1,
+                whiteSpace: 'nowrap',
+              }}
+            >
+              {sending ? 'Sending...' : 'Send'}
+            </button>
+          </div>
+          {sendResult?.success && (
+            <div style={{
+              marginTop: 8, fontSize: 12, color: C.green, fontFamily: C.mono,
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              <span>{'\u2713'}</span> Credential sent to {sendEmail}
+            </div>
+          )}
+          {sendResult && !sendResult.success && (
+            <div style={{
+              marginTop: 8, fontSize: 12, color: C.red, fontFamily: C.mono,
+              display: 'flex', alignItems: 'center', gap: 6,
+            }}>
+              <span>{'\u2717'}</span> Failed to send — check the email address and try again
+            </div>
+          )}
+        </div>
+      )}
 
       <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
         <button onClick={onBack} style={{
