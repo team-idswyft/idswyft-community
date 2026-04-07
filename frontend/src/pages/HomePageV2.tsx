@@ -345,6 +345,11 @@ const bentoFeatures = [
       <polyline points="16 18 22 12 16 6" /><polyline points="8 6 2 12 8 18" /><line x1="14" y1="4" x2="10" y2="20" />
     </svg>
   )},
+  { title: 'Compliance Rules', desc: 'Define rules for country restrictions, age gates, and transaction thresholds. Idswyft enforces them automatically on every verification.', span: 2, icon: (
+    <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke={C.cyan} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M12 2l8 4v6c0 5.25-3.5 9.74-8 11-4.5-1.26-8-5.75-8-11V6l8-4z" /><path d="M9 12h6" /><path d="M12 9v6" />
+    </svg>
+  )},
 ]
 
 /* ── Code Snippet ────────────────────────────────────────── */

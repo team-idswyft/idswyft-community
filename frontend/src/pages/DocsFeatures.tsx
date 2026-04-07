@@ -14,6 +14,7 @@ const NAV: NavItem[] = [
   { id: 'batch', label: 'Batch API', depth: 0 },
   { id: 'address', label: 'Address Verification', depth: 0 },
   { id: 'aml', label: 'AML / Sanctions', depth: 0 },
+  { id: 'compliance', label: 'Compliance Rules', depth: 0 },
   { id: 'monitoring', label: 'Monitoring', depth: 0 },
 ];
 
@@ -374,6 +375,293 @@ if (status.aml_screening?.risk_level === 'clear') {
 } else if (status.aml_screening?.risk_level === 'confirmed_match') {
   console.log('Verification failed — confirmed sanctions match');
 }`} />
+
+      <Divider />
+
+      {/* ══ COMPLIANCE ORCHESTRATION ═══════════════════════════════════ */}
+      <SectionAnchor id="compliance" />
+      <H2>Compliance Rules</H2>
+      <Lead>
+        Ship your compliance policy as code. Define rules that automatically adjust verification requirements
+        based on country, document type, user age, risk score, and custom metadata. The engine evaluates
+        them at session initialization — zero code changes needed.
+      </Lead>
+
+      <Callout type="tip">
+        Rules are evaluated server-side during <code style={{ fontFamily: C.mono }}>POST /api/v2/verify/initialize</code>.
+        Your existing API integration works unchanged — the engine transparently adjusts the verification configuration
+        based on matching rules.
+      </Callout>
+
+      {/* How it works */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
+        <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>How it works</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 16px' }}>
+          {[
+            ['1', 'Create rulesets with conditions and actions via API or the Developer Portal'],
+            ['2', 'User starts verification — engine loads active rules for the developer'],
+            ['3', 'Each rule\'s condition is tested against the session context (country, age, metadata)'],
+            ['4', 'Matching actions merge (most restrictive wins) and adjust the verification pipeline'],
+          ].map(([n, text]) => (
+            <React.Fragment key={n}>
+              <span style={{ fontFamily: C.mono, fontSize: '0.75rem', color: C.cyan, fontWeight: 600 }}>{n}.</span>
+              <span style={{ fontFamily: C.sans, fontSize: '0.82rem', color: C.muted, lineHeight: 1.6 }}>{text}</span>
+            </React.Fragment>
+          ))}
+        </div>
+      </div>
+
+      {/* Condition operators & action fields */}
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 16 }}>
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '18px 20px' }}>
+          <div style={{ fontFamily: C.mono, fontSize: '0.8rem', fontWeight: 600, color: C.cyan, marginBottom: 12 }}>Condition Fields</div>
+          {[
+            { field: 'country', desc: 'ISO country code' },
+            { field: 'document_type', desc: 'passport, drivers_license, national_id' },
+            { field: 'user_age', desc: 'Calculated from DOB' },
+            { field: 'risk_score', desc: 'Composite score (0.0 – 1.0)' },
+            { field: 'aml_risk_level', desc: 'clear, potential_match, confirmed_match' },
+            { field: 'metadata.*', desc: 'Developer-supplied key-value data' },
+          ].map(f => (
+            <div key={f.field} style={{ fontFamily: C.sans, fontSize: '0.78rem', color: C.muted, padding: '3px 0', display: 'flex', gap: 8 }}>
+              <code style={{ fontFamily: C.mono, color: C.text, fontSize: '0.75rem', minWidth: 120 }}>{f.field}</code>
+              <span>{f.desc}</span>
+            </div>
+          ))}
+        </div>
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '18px 20px' }}>
+          <div style={{ fontFamily: C.mono, fontSize: '0.8rem', fontWeight: 600, color: C.green, marginBottom: 12 }}>Action Fields</div>
+          {[
+            { field: 'set_mode', desc: 'Override to age_only / document_only / identity / full' },
+            { field: 'require_address', desc: 'Enable address verification step' },
+            { field: 'require_liveness', desc: 'Set to passive or head_turn' },
+            { field: 'require_aml', desc: 'Force AML/sanctions screening' },
+            { field: 'force_manual_review', desc: 'Route to manual review' },
+            { field: 'set_flag', desc: 'Attach a custom flag (e.g. high_risk)' },
+          ].map(f => (
+            <div key={f.field} style={{ fontFamily: C.sans, fontSize: '0.78rem', color: C.muted, padding: '3px 0', display: 'flex', gap: 8 }}>
+              <code style={{ fontFamily: C.mono, color: C.text, fontSize: '0.75rem', minWidth: 120 }}>{f.field}</code>
+              <span>{f.desc}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <Callout type="note">
+        When multiple rules match, actions merge additively. Verification mode escalates (never downgrades):
+        {' '}<code style={{ fontFamily: C.mono }}>age_only &lt; document_only &lt; identity &lt; full</code>.
+        Boolean flags like <code style={{ fontFamily: C.mono }}>force_manual_review</code> stick once set.
+        Custom flags from all matching rules are collected and deduplicated.
+      </Callout>
+
+      <EndpointCard method="POST" path="/api/v2/compliance/rulesets" title="Create Ruleset">
+        <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
+          Create a named group of compliance rules. Rulesets are evaluated in priority order (lower numbers first).
+        </p>
+        <div style={{ marginBottom: 12 }}>
+          <FieldRow name="name" type="string" req={true} desc="Human-readable ruleset name (max 200 chars)." />
+          <FieldRow name="description" type="string" req={false} desc="Optional description." />
+          <FieldRow name="is_active" type="boolean" req={false} desc="Only active rulesets are evaluated (default: true)." />
+          <FieldRow name="priority" type="integer" req={false} desc="Evaluation order — lower = first (default: 100)." />
+        </div>
+        <Pre label="Request" code={`curl -X POST ${apiUrl}/api/v2/compliance/rulesets \\
+  -H "X-API-Key: your-key" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "name": "EU Compliance",
+    "description": "Enhanced verification for EU member states",
+    "priority": 10
+  }'`} />
+        <Pre label="Response  —  HTTP 201" code={`{
+  "success": true,
+  "ruleset": {
+    "id": "550e8400-e29b-41d4-a716-446655440001",
+    "name": "EU Compliance",
+    "description": "Enhanced verification for EU member states",
+    "is_active": true,
+    "priority": 10,
+    "created_at": "2026-04-07T12:00:00Z"
+  }
+}`} />
+      </EndpointCard>
+
+      <EndpointCard method="POST" path="/api/v2/compliance/rulesets/:id/rules" title="Add Rule to Ruleset">
+        <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
+          Add a rule with a structured condition and action. The engine validates both server-side —
+          invalid conditions or actions return HTTP 400 with a descriptive error.
+        </p>
+        <div style={{ marginBottom: 12 }}>
+          <FieldRow name="condition" type="object" req={true} desc="Structured condition — leaf { field, op, value } or combinator { all, any, not }." />
+          <FieldRow name="action" type="object" req={true} desc="Action to enforce when condition matches." />
+          <FieldRow name="description" type="string" req={false} desc="Human-readable rule description." />
+        </div>
+        <Pre label="Request — country + age rule" code={`curl -X POST ${apiUrl}/api/v2/compliance/rulesets/RULESET_ID/rules \\
+  -H "X-API-Key: your-key" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "condition": {
+      "all": [
+        { "field": "country", "op": "in", "value": ["DE", "FR", "IT", "ES"] },
+        { "field": "user_age", "op": "lt", "value": 18 }
+      ]
+    },
+    "action": {
+      "set_mode": "full",
+      "require_aml": true,
+      "force_manual_review": true,
+      "set_flag": "eu_minor"
+    },
+    "description": "Full verification + manual review for EU minors"
+  }'`} />
+        <Pre label="Response  —  HTTP 201" code={`{
+  "success": true,
+  "rule": {
+    "id": "660e8400-e29b-41d4-a716-446655440002",
+    "condition": { "all": [{ "field": "country", "op": "in", "value": ["DE", "FR", "IT", "ES"] }, { "field": "user_age", "op": "lt", "value": 18 }] },
+    "action": { "set_mode": "full", "require_aml": true, "force_manual_review": true, "set_flag": "eu_minor" },
+    "description": "Full verification + manual review for EU minors",
+    "created_at": "2026-04-07T12:01:00Z"
+  }
+}`} />
+      </EndpointCard>
+
+      <EndpointCard method="POST" path="/api/v2/compliance/evaluate" title="Dry-Run Evaluate">
+        <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
+          Test your rules against a synthetic context without creating a verification session. Returns which
+          rules match and the resolved action after merging.
+        </p>
+        <div style={{ marginBottom: 12 }}>
+          <FieldRow name="context" type="object" req={true} desc="Test context with any combination of fields: country, document_type, user_age, verification_mode, risk_score, aml_risk_level, metadata." />
+        </div>
+        <Pre label="Request" code={`curl -X POST ${apiUrl}/api/v2/compliance/evaluate \\
+  -H "X-API-Key: your-key" \\
+  -H "Content-Type: application/json" \\
+  -d '{
+    "context": {
+      "country": "DE",
+      "user_age": 16,
+      "document_type": "passport"
+    }
+  }'`} />
+        <Pre label="Response" code={`{
+  "success": true,
+  "matched_rules": 1,
+  "matches": [
+    {
+      "ruleset": "EU Compliance",
+      "rule": "Full verification + manual review for EU minors",
+      "action": { "set_mode": "full", "require_aml": true, "force_manual_review": true, "set_flag": "eu_minor" }
+    }
+  ],
+  "resolved_action": {
+    "set_mode": "full",
+    "require_aml": true,
+    "force_manual_review": true,
+    "flags": ["eu_minor"]
+  }
+}`} />
+      </EndpointCard>
+
+      {/* Operators reference */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
+        <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>Operators</div>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '4px 24px' }}>
+          {[
+            ['eq / neq', 'Equals / not equals'],
+            ['in / not_in', 'Value in / not in array'],
+            ['gt / gte / lt / lte', 'Numeric comparisons'],
+            ['exists', 'Field present (true) or absent (false)'],
+            ['contains', 'String contains substring'],
+            ['all / any / not', 'Combinators — nest conditions'],
+          ].map(([op, desc]) => (
+            <div key={op} style={{ display: 'flex', gap: 8, padding: '4px 0' }}>
+              <code style={{ fontFamily: C.mono, fontSize: '0.75rem', color: C.cyan, minWidth: 130, flexShrink: 0 }}>{op}</code>
+              <span style={{ fontFamily: C.sans, fontSize: '0.78rem', color: C.muted }}>{desc}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Common rule patterns */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
+        <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>Common patterns</div>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 12 }}>
+          {[
+            { title: 'Country restriction', color: C.cyan, cond: '{ "field": "country", "op": "in", "value": ["DE", "FR"] }', action: '{ "set_mode": "full", "require_aml": true }' },
+            { title: 'Age gate', color: C.amber, cond: '{ "field": "user_age", "op": "lt", "value": 18 }', action: '{ "force_manual_review": true }' },
+            { title: 'Risk escalation', color: C.red, cond: '{ "field": "risk_score", "op": "gte", "value": 0.7 }', action: '{ "require_aml": true, "set_flag": "high_risk" }' },
+          ].map(p => (
+            <div key={p.title} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 6, padding: 12, borderLeft: `3px solid ${p.color}` }}>
+              <div style={{ fontFamily: C.mono, fontSize: '0.75rem', color: p.color, fontWeight: 600, marginBottom: 6 }}>{p.title}</div>
+              <div style={{ fontFamily: C.mono, fontSize: '0.65rem', color: C.dim, marginBottom: 4 }}>condition:</div>
+              <pre style={{ fontFamily: C.mono, fontSize: '0.65rem', color: C.muted, margin: '0 0 6px', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{p.cond}</pre>
+              <div style={{ fontFamily: C.mono, fontSize: '0.65rem', color: C.dim, marginBottom: 4 }}>action:</div>
+              <pre style={{ fontFamily: C.mono, fontSize: '0.65rem', color: C.muted, margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{p.action}</pre>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Other CRUD endpoints summary */}
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
+        <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>All compliance endpoints</div>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {[
+            { method: 'POST', path: '/api/v2/compliance/rulesets', desc: 'Create ruleset' },
+            { method: 'GET', path: '/api/v2/compliance/rulesets', desc: 'List rulesets (includes rule_count)' },
+            { method: 'GET', path: '/api/v2/compliance/rulesets/:id', desc: 'Get ruleset with all rules' },
+            { method: 'PUT', path: '/api/v2/compliance/rulesets/:id', desc: 'Update ruleset metadata' },
+            { method: 'DELETE', path: '/api/v2/compliance/rulesets/:id', desc: 'Delete ruleset + all rules (CASCADE)' },
+            { method: 'POST', path: '/api/v2/compliance/rulesets/:id/rules', desc: 'Add rule to ruleset' },
+            { method: 'PUT', path: '/api/v2/compliance/rules/:id', desc: 'Update rule condition/action' },
+            { method: 'DELETE', path: '/api/v2/compliance/rules/:id', desc: 'Delete rule' },
+            { method: 'POST', path: '/api/v2/compliance/evaluate', desc: 'Dry-run evaluation' },
+          ].map(ep => {
+            const methodColor: Record<string, string> = { GET: C.green, POST: C.blue, PUT: C.amber, DELETE: C.red };
+            return (
+              <div key={`${ep.method}-${ep.path}`} style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <span style={{ fontFamily: C.mono, fontSize: '0.7rem', fontWeight: 600, color: methodColor[ep.method] ?? C.muted, width: 48, textAlign: 'right', flexShrink: 0 }}>{ep.method}</span>
+                <code style={{ fontFamily: C.mono, fontSize: '0.72rem', color: C.text, flex: 1 }}>{ep.path}</code>
+                <span style={{ fontFamily: C.sans, fontSize: '0.75rem', color: C.dim }}>{ep.desc}</span>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+
+      <Pre label="SDK usage" code={`// Create a ruleset
+const { ruleset } = await fetch('/api/v2/compliance/rulesets', {
+  method: 'POST',
+  headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ name: 'EU Compliance', priority: 10 }),
+}).then(r => r.json());
+
+// Add a rule
+await fetch(\`/api/v2/compliance/rulesets/\${ruleset.id}/rules\`, {
+  method: 'POST',
+  headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' },
+  body: JSON.stringify({
+    condition: { "field": "country", "op": "in", "value": ["DE", "FR", "IT"] },
+    action: { "set_mode": "full", "require_aml": true },
+    description: "Full verification for EU countries",
+  }),
+}).then(r => r.json());
+
+// Dry-run test
+const result = await fetch('/api/v2/compliance/evaluate', {
+  method: 'POST',
+  headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' },
+  body: JSON.stringify({ context: { country: 'DE', user_age: 25 } }),
+}).then(r => r.json());
+
+console.log(result.matched_rules, 'rules matched');
+console.log(result.resolved_action);  // { set_mode: 'full', require_aml: true }`} />
+
+      <Callout type="note">
+        The Developer Portal (cloud edition) includes a visual drag-and-drop rule builder — create conditions,
+        pick actions, and dry-run test without writing any code. Navigate to the <strong>Compliance Rules</strong> section
+        in your Developer Portal.
+      </Callout>
 
       <Divider />
 

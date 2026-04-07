@@ -1,5 +1,5 @@
-import express, { Request, Response } from 'express';
-import { authenticateAPIKey } from '@/middleware/auth.js';
+import express, { Request, Response, NextFunction } from 'express';
+import { authenticateAPIKey, authenticateDeveloperJWT } from '@/middleware/auth.js';
 import { catchAsync } from '@/middleware/errorHandler.js';
 import { supabase } from '@/config/database.js';
 import {
@@ -12,13 +12,21 @@ import type { ComplianceContext } from '@/services/complianceEngine.js';
 
 const router = express.Router();
 
+// Dual-auth: accept X-API-Key (machine) or developer JWT session (portal UI)
+const authenticateComplianceRequest = (req: Request, res: Response, next: NextFunction) => {
+  if (req.headers['x-api-key']) {
+    return (authenticateComplianceRequest as any)(req, res, next);
+  }
+  return (authenticateDeveloperJWT as any)(req, res, next);
+};
+
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 // ─── Rulesets ───────────────────────────────────────────────────
 
 // POST /api/v2/compliance/rulesets — Create a new compliance ruleset
 router.post('/rulesets',
-  authenticateAPIKey as any,
+  authenticateComplianceRequest as any,
   catchAsync(async (req: Request, res: Response) => {
     const developerId = (req as any).developer.id;
     const { name, description, is_active, priority } = req.body || {};
@@ -47,7 +55,7 @@ router.post('/rulesets',
 
 // GET /api/v2/compliance/rulesets — List all rulesets for this developer
 router.get('/rulesets',
-  authenticateAPIKey as any,
+  authenticateComplianceRequest as any,
   catchAsync(async (req: Request, res: Response) => {
     const developerId = (req as any).developer.id;
 
@@ -83,7 +91,7 @@ router.get('/rulesets',
 
 // GET /api/v2/compliance/rulesets/:id — Get a single ruleset with all its rules
 router.get('/rulesets/:id',
-  authenticateAPIKey as any,
+  authenticateComplianceRequest as any,
   catchAsync(async (req: Request, res: Response) => {
     const developerId = (req as any).developer.id;
     const { id } = req.params;
@@ -111,7 +119,7 @@ router.get('/rulesets/:id',
 
 // PUT /api/v2/compliance/rulesets/:id — Update ruleset metadata
 router.put('/rulesets/:id',
-  authenticateAPIKey as any,
+  authenticateComplianceRequest as any,
   catchAsync(async (req: Request, res: Response) => {
     const developerId = (req as any).developer.id;
     const { id } = req.params;
@@ -156,7 +164,7 @@ router.put('/rulesets/:id',
 
 // DELETE /api/v2/compliance/rulesets/:id — Delete a ruleset and all its rules (CASCADE)
 router.delete('/rulesets/:id',
-  authenticateAPIKey as any,
+  authenticateComplianceRequest as any,
   catchAsync(async (req: Request, res: Response) => {
     const developerId = (req as any).developer.id;
     const { id } = req.params;
@@ -181,7 +189,7 @@ router.delete('/rulesets/:id',
 
 // POST /api/v2/compliance/rulesets/:id/rules — Add a rule to a ruleset
 router.post('/rulesets/:id/rules',
-  authenticateAPIKey as any,
+  authenticateComplianceRequest as any,
   catchAsync(async (req: Request, res: Response) => {
     const developerId = (req as any).developer.id;
     const { id: rulesetId } = req.params;
@@ -224,7 +232,7 @@ router.post('/rulesets/:id/rules',
 
 // PUT /api/v2/compliance/rules/:id — Update a rule's condition, action, or description
 router.put('/rules/:id',
-  authenticateAPIKey as any,
+  authenticateComplianceRequest as any,
   catchAsync(async (req: Request, res: Response) => {
     const developerId = (req as any).developer.id;
     const { id } = req.params;
@@ -283,7 +291,7 @@ router.put('/rules/:id',
 
 // DELETE /api/v2/compliance/rules/:id — Delete a single rule
 router.delete('/rules/:id',
-  authenticateAPIKey as any,
+  authenticateComplianceRequest as any,
   catchAsync(async (req: Request, res: Response) => {
     const developerId = (req as any).developer.id;
     const { id } = req.params;
@@ -323,7 +331,7 @@ router.delete('/rules/:id',
 
 // POST /api/v2/compliance/evaluate — Dry-run: test a context against active rulesets
 router.post('/evaluate',
-  authenticateAPIKey as any,
+  authenticateComplianceRequest as any,
   catchAsync(async (req: Request, res: Response) => {
     const developerId = (req as any).developer.id;
     const { context } = req.body || {};

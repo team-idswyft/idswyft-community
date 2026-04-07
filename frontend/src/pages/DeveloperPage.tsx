@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { API_BASE_URL } from '../config/api'
-import { isCommunity } from '../config/edition'
+import { isCommunity, isCloud } from '../config/edition'
 import { fetchCsrfToken, csrfHeader, clearCsrfToken } from '../lib/csrf'
 import { C, injectFonts } from '../theme'
 import '../styles/patterns.css'
@@ -12,6 +12,7 @@ import type { ApiKey, DeveloperStats } from '../components/developer/types'
 import { AuthGate } from '../components/developer/AuthGate'
 import { ApiKeysSection } from '../components/developer/ApiKeysSection'
 import { WebhooksSection } from '../components/developer/WebhooksSection'
+import { ComplianceSection } from '../components/developer/ComplianceSection'
 import { SettingsModal } from '../components/developer/SettingsModal'
 
 // --- Main portal ---
@@ -218,6 +219,8 @@ export function DeveloperPage() {
         />
 
         <WebhooksSection token={token} apiKeys={apiKeys} />
+
+        {isCloud && <ComplianceSection token={token} apiKeys={apiKeys} />}
 
         {/* Page Builder card */}
         <div style={{
