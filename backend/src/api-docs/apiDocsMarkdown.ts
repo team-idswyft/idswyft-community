@@ -1092,6 +1092,87 @@ Lists checked: OFAC SDN, EU Sanctions, UN Sanctions (depends on configured provi
 
 ---
 
+## Identity Vault
+
+Tokenized identity storage. Store verified identity data encrypted at rest, reference it via opaque tokens. No PII leaves Idswyft.
+
+### Store Identity
+
+\`\`\`
+POST /api/v2/vault/store
+Content-Type: application/json
+\`\`\`
+
+Store a verified identity in the vault. Returns an opaque vault token.
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| verification_id | string | Yes | ID of a completed (verified) verification |
+
+**Response (201):**
+
+\`\`\`json
+{
+  "success": true,
+  "vault_token": "ivt_a1b2c3d4e5f6..."
+}
+\`\`\`
+
+### Retrieve Identity
+
+\`\`\`
+GET /api/v2/vault/:token
+\`\`\`
+
+Returns the full decrypted identity data for the given vault token.
+
+### Get Attribute
+
+\`\`\`
+GET /api/v2/vault/:token/attributes/:attr
+\`\`\`
+
+Returns a single attribute assertion. Supported: \`full_name\`, \`date_of_birth\`, \`nationality\`, \`age_over_N\` (e.g. \`age_over_21\`), \`identity_verified\`, \`face_match_score\`, \`document_type\`, \`address\`.
+
+### Delete (GDPR Erasure)
+
+\`\`\`
+DELETE /api/v2/vault/:token
+\`\`\`
+
+Permanently deletes the vault entry and all encrypted data. Cannot be undone.
+
+### List Vault Tokens
+
+\`\`\`
+GET /api/v2/vault?page=1&limit=20
+\`\`\`
+
+Returns paginated list of vault tokens (no PII in response).
+
+### Create Share Link
+
+\`\`\`
+POST /api/v2/vault/:token/share
+Content-Type: application/json
+\`\`\`
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| attributes | string[] | Yes | Which attributes the recipient can see |
+| expires_in | number | No | Seconds until expiry (default: 86400, max: 604800) |
+| recipient_label | string | No | Human-readable label for audit |
+
+### Access Share Link (Public)
+
+\`\`\`
+GET /api/v2/vault/share/:shareToken
+\`\`\`
+
+No authentication required. Returns only the attributes specified when the link was created.
+
+---
+
 ## Monitoring & Re-verification
 
 Schedule automatic re-verification for expiring documents.

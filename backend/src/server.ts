@@ -35,6 +35,7 @@ import pageConfigRoutes from './routes/pageConfig.js';
 import credentialRoutes from './routes/credentials.js';
 import complianceRoutes from './routes/compliance.js';
 import wellKnownRoutes from './routes/well-known.js';
+import vaultRoutes from './routes/vault.js';
 import { API_DOCS_MARKDOWN } from './api-docs/apiDocsMarkdown.js';
 
 const app = express();
@@ -125,6 +126,7 @@ app.use('/api/setup', setupRoutes);
 app.use('/api/v2/verify', credentialRoutes);
 app.use('/api/v2', credentialRoutes);
 app.use('/api/v2/compliance', complianceRoutes);
+app.use('/api/v2/vault', vaultRoutes);
 app.use('/.well-known', wellKnownRoutes);
 
 // Local file serving — authenticated with API key, path traversal blocked in serveLocalFile

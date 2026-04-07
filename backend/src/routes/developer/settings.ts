@@ -481,4 +481,55 @@ router.put('/settings/duplicate-detection',
   })
 );
 
+// ─── Vault Settings ────────────────────────────────────────────
+
+router.get('/settings/vault',
+  authenticateDeveloperJWT,
+  catchAsync(async (req: Request, res: Response) => {
+    const developerId = (req as any).developer.id;
+
+    const { data } = await supabase
+      .from('developers')
+      .select('vault_enabled, vault_auto_store')
+      .eq('id', developerId)
+      .single();
+
+    res.json({
+      enabled: data?.vault_enabled ?? false,
+      auto_store: data?.vault_auto_store ?? false,
+    });
+  })
+);
+
+router.put('/settings/vault',
+  authenticateDeveloperJWT,
+  [
+    body('enabled').optional().isBoolean().withMessage('enabled must be a boolean'),
+    body('auto_store').optional().isBoolean().withMessage('auto_store must be a boolean'),
+  ],
+  validate,
+  catchAsync(async (req: Request, res: Response) => {
+    const developerId = (req as any).developer.id;
+    const updates: Record<string, boolean> = {};
+
+    if (req.body.enabled !== undefined) updates.vault_enabled = req.body.enabled;
+    if (req.body.auto_store !== undefined) updates.vault_auto_store = req.body.auto_store;
+
+    if (Object.keys(updates).length === 0) {
+      return res.status(400).json({ error: 'At least one field (enabled, auto_store) is required' });
+    }
+
+    const { error } = await supabase
+      .from('developers')
+      .update(updates)
+      .eq('id', developerId);
+
+    if (error) {
+      return res.status(500).json({ error: 'Failed to save vault settings' });
+    }
+
+    res.json({ success: true, ...updates });
+  })
+);
+
 export default router;
