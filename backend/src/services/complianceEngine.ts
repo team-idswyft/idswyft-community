@@ -227,24 +227,27 @@ export async function loadActiveRulesForDeveloper(
 
   if (error || !rulesets?.length) return [];
 
-  const rulesetIds = rulesets.map(r => r.id);
+  type RulesetRow = { id: string; name: string; priority: number };
+  type RuleRow = { id: string; ruleset_id: string; condition: unknown; action: unknown; description: string | null };
+
+  const rulesetIds = (rulesets as RulesetRow[]).map((r: RulesetRow) => r.id);
   const { data: rules } = await supabase
     .from('compliance_rules')
     .select('id, ruleset_id, condition, action, description')
     .in('ruleset_id', rulesetIds);
 
-  const rulesByRuleset = new Map<string, typeof rules>();
-  for (const rule of rules ?? []) {
+  const rulesByRuleset = new Map<string, RuleRow[]>();
+  for (const rule of (rules ?? []) as RuleRow[]) {
     const list = rulesByRuleset.get(rule.ruleset_id) ?? [];
     list.push(rule);
     rulesByRuleset.set(rule.ruleset_id, list);
   }
 
-  return rulesets.map(rs => ({
+  return (rulesets as RulesetRow[]).map((rs: RulesetRow) => ({
     ruleset_id: rs.id,
     ruleset_name: rs.name,
     priority: rs.priority,
-    rules: (rulesByRuleset.get(rs.id) ?? []).map(r => ({
+    rules: (rulesByRuleset.get(rs.id) ?? []).map((r: RuleRow) => ({
       id: r.id,
       condition: r.condition as Condition,
       action: r.action as ComplianceAction,
