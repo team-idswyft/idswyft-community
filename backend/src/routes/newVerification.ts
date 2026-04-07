@@ -60,6 +60,8 @@ import {
 import { decryptSMSConfig } from '@/services/smsService.js';
 import sharp from 'sharp';
 import engineClient from '@/services/engineClient.js';
+import { loadActiveRulesForDeveloper, evaluateRules } from '@/services/complianceEngine.js';
+import type { ComplianceContext } from '@/services/complianceEngine.js';
 
 const router = express.Router();
 
@@ -736,9 +738,6 @@ router.post('/initialize',
     const addons: VerificationAddons = req.body.addons || {};
     const source: VerificationSource = req.body.source || 'api';
     const verificationMode: string = req.body.verification_mode || 'full';
-    const ageThreshold: number | null = verificationMode === 'age_only'
-      ? (req.body.age_threshold ?? 18)
-      : null;
 
     req.body.user_id = user_id;
     await new Promise((resolve, reject) => {
@@ -751,25 +750,70 @@ router.post('/initialize',
     const isSandbox = req.isSandbox || false;
     const developerId = (req as any).developer.id;
 
+    // ─── Compliance Orchestration ──────────────────────────────
+    let complianceApplied: { ruleset: string; rule: string; action: unknown }[] = [];
+    let resolvedMode = verificationMode;
+    let resolvedAddons = { ...addons };
+
+    try {
+      const rulesets = await loadActiveRulesForDeveloper(developerId);
+      if (rulesets.length > 0) {
+        const complianceCtx: ComplianceContext = {
+          country: issuing_country?.toUpperCase(),
+          document_type,
+          verification_mode: verificationMode,
+          metadata: req.body.metadata || {},
+        };
+
+        const { matches, merged } = evaluateRules(rulesets, complianceCtx);
+
+        if (matches.length > 0) {
+          complianceApplied = matches.map(m => ({
+            ruleset: m.ruleset_name,
+            rule: m.rule_description || m.rule_id,
+            action: m.action,
+          }));
+
+          // Apply resolved mode (more restrictive wins)
+          if (merged.set_mode) resolvedMode = merged.set_mode;
+
+          // Apply addons
+          if (merged.require_address) resolvedAddons.address_verification = true;
+          if (merged.require_aml) resolvedAddons.aml_screening = true;
+        }
+      }
+    } catch (err) {
+      // Compliance evaluation is non-blocking — log and continue
+      logger.error('Compliance evaluation failed:', {
+        developerId,
+        error: err instanceof Error ? err.message : String(err),
+      });
+    }
+
+    // Recompute ageThreshold using resolvedMode in case compliance changed the mode
+    const resolvedAgeThreshold: number | null = resolvedMode === 'age_only'
+      ? (req.body.age_threshold ?? 18)
+      : null;
+
     // Create DB record with source tag
     const verificationRecord = await verificationService.createVerificationRequest({
       user_id,
       developer_id: developerId,
       is_sandbox: isSandbox,
       source,
-      addons: Object.keys(addons).length > 0 ? addons as Record<string, unknown> : undefined,
+      addons: Object.keys(resolvedAddons).length > 0 ? resolvedAddons as Record<string, unknown> : undefined,
     });
 
     // Set session start timestamp, verification mode, and age threshold
     const { error: updateError } = await supabase.from('verification_requests').update({
       session_started_at: new Date().toISOString(),
-      verification_mode: verificationMode,
-      ...(ageThreshold !== null && { age_threshold: ageThreshold }),
+      verification_mode: resolvedMode,
+      ...(resolvedAgeThreshold !== null && { age_threshold: resolvedAgeThreshold }),
     }).eq('id', verificationRecord.id);
     if (updateError) {
       logger.error('Failed to update verification_mode', {
         verificationId: verificationRecord.id,
-        verification_mode: verificationMode,
+        verification_mode: resolvedMode,
         error: updateError.message,
         code: updateError.code,
         details: updateError.details,
@@ -778,11 +822,11 @@ router.post('/initialize',
     }
 
     // Resolve flow config from verification_mode
-    const flow = FLOW_PRESETS[verificationMode as VerificationMode] ?? INLINE_FLOW_FALLBACKS[verificationMode] ?? FLOW_PRESETS.full;
+    const flow = FLOW_PRESETS[resolvedMode as VerificationMode] ?? INLINE_FLOW_FALLBACKS[resolvedMode] ?? FLOW_PRESETS.full;
 
     // Create session and save initial state
     const issuingCountryUpper = issuing_country?.toUpperCase() || null;
-    const session = createSession(isSandbox, { session_id: verificationRecord.id, issuing_country: issuingCountryUpper }, addons, undefined, flow);
+    const session = createSession(isSandbox, { session_id: verificationRecord.id, issuing_country: issuingCountryUpper }, resolvedAddons, undefined, flow);
     await saveSessionState(verificationRecord.id, session.getState());
 
     logVerificationEvent('verification_initialized', verificationRecord.id, {
@@ -792,7 +836,7 @@ router.post('/initialize',
       sandbox: isSandbox,
     });
 
-    const isAgeOnly = verificationMode === 'age_only';
+    const isAgeOnly = resolvedMode === 'age_only';
     const mapped = mapStatusForResponse(session.getState(), flow);
 
     const modeMessages: Record<string, string> = {
@@ -805,12 +849,13 @@ router.post('/initialize',
     res.status(201).json({
       success: true,
       verification_id: verificationRecord.id,
-      verification_mode: verificationMode,
+      verification_mode: resolvedMode,
       status: mapped.status,
       current_step: mapped.current_step,
       total_steps: mapped.total_steps,
-      ...(isAgeOnly && { age_threshold: ageThreshold }),
-      message: modeMessages[verificationMode] || modeMessages.full,
+      ...(isAgeOnly && { age_threshold: resolvedAgeThreshold }),
+      ...(complianceApplied.length > 0 && { compliance_applied: complianceApplied }),
+      message: modeMessages[resolvedMode] || modeMessages.full,
     });
 
     // Fire verification.started webhook (after response is sent)
