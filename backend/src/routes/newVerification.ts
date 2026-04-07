@@ -47,6 +47,7 @@ import type { SessionDeps, SessionHydration, AgeVerificationResult } from '@/ver
 import { computeFaceMatch } from '@/verification/face/faceMatchService.js';
 import { SessionFlowError } from '@/verification/exceptions.js';
 import { WebhookService } from '@/services/webhook.js';
+import { storeVaultEntry, extractIdentityData } from '@/services/vaultService.js';
 import type { WebhookPayload, VerificationSource } from '@/types/index.js';
 import { config } from '@/config/index.js';
 import { createAndSendPhoneOtp, verifyPhoneOtp } from '@/services/phoneOtpService.js';
@@ -591,6 +592,50 @@ function mapStatusForResponse(state: Readonly<SessionState>, flow: FlowConfig = 
 }
 
 // ─── Webhook trigger helper ──────────────────────────────
+
+/**
+ * Auto-store verified identity in vault if developer has vault_auto_store enabled.
+ * Called AFTER res.json() — fire-and-forget, never throws.
+ */
+async function autoVaultIfEnabled(
+  verificationId: string,
+  developerId: string,
+  state: SessionState,
+  finalResult: string | null,
+): Promise<void> {
+  if (finalResult !== 'verified') return;
+
+  try {
+    const { data: dev } = await supabase
+      .from('developers')
+      .select('vault_auto_store')
+      .eq('id', developerId)
+      .single();
+
+    if (!dev?.vault_auto_store) return;
+
+    // Check not already stored
+    const { data: existing } = await supabase
+      .from('identity_vault')
+      .select('vault_token')
+      .eq('verification_id', verificationId)
+      .eq('developer_id', developerId)
+      .eq('status', 'active')
+      .maybeSingle();
+
+    if (existing) return;
+
+    const identityData = extractIdentityData(state);
+    if (!identityData) return;
+
+    await storeVaultEntry(developerId, verificationId, identityData);
+  } catch (err) {
+    logger.error('autoVaultIfEnabled failed:', {
+      verificationId,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+}
 
 /**
  * Fire webhooks if the verification has reached a terminal state.
@@ -1199,6 +1244,9 @@ router.post('/:verification_id/front-document',
       state, isSandbox, (req as any).apiKey?.id
     );
 
+    // Auto-vault (fire-and-forget, after response)
+    autoVaultIfEnabled(verification_id, (req as any).developer.id, state, mapped.final_result);
+
     // Fire webhooks if terminal (Gate 1 rejection or age_only completion)
     fireWebhooksIfTerminal(
       verification_id, (req as any).developer.id, verification.user_id,
@@ -1372,6 +1420,9 @@ router.post('/:verification_id/back-document',
       verification_id, (req as any).developer.id, verification.user_id,
       state, isSandbox, (req as any).apiKey?.id
     );
+
+    // Auto-vault (fire-and-forget, after response)
+    autoVaultIfEnabled(verification_id, (req as any).developer.id, state, mapped.final_result);
 
     // Fire webhooks if cross-validation hard-rejected (after response is sent)
     fireWebhooksIfTerminal(
@@ -1667,6 +1718,9 @@ router.post('/:verification_id/live-capture',
       verification_id, mapped.status, mapped.current_step,
       mapped.final_result, state.rejection_reason,
     ).catch(() => {});
+
+    // Auto-vault (fire-and-forget, after response)
+    autoVaultIfEnabled(verification_id, (req as any).developer.id, state, mapped.final_result);
 
     // Fire webhooks on COMPLETE or HARD_REJECTED (after response is sent)
     fireWebhooksIfTerminal(

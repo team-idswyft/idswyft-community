@@ -56,6 +56,20 @@ GET  /.well-known/did.json               → Issuer DID document (public)
 
 **Client-side verification:** Resolve `did:web:api.idswyft.app` → fetch `/.well-known/did.json` → extract Ed25519 public key → verify JWT signature. ~15KB with `@noble/ed25519`.
 
+## Identity Vault
+
+Tokenized identity storage. Store verified identity data encrypted at rest (AES-256-GCM), reference it via opaque tokens.
+
+```
+POST /api/v2/vault/store             → Store verified identity, get vault token (requires API key, vault_enabled)
+GET  /api/v2/vault/:token            → Retrieve full identity data (requires API key)
+GET  /api/v2/vault/:token/attributes/:attr → Get single attribute e.g. age_over_21 (requires API key)
+DELETE /api/v2/vault/:token          → GDPR hard delete (requires API key)
+GET  /api/v2/vault                   → List vault tokens, paginated (requires API key)
+POST /api/v2/vault/:token/share      → Create time-limited share link (requires API key)
+GET  /api/v2/vault/share/:shareToken → Access shared attributes (public, no auth)
+```
+
 ## Integration Options
 
 1. **Redirect** — send users to `idswyft.app/user-verification?api_key=...&user_id=...`
