@@ -780,6 +780,11 @@ router.post('/initialize',
           // Apply addons
           if (merged.require_address) resolvedAddons.address_verification = true;
           if (merged.require_aml) resolvedAddons.aml_screening = true;
+
+          // Store compliance decisions in addons for downstream pipeline steps
+          if (merged.force_manual_review) (resolvedAddons as any).compliance_force_manual_review = true;
+          if (merged.require_liveness) (resolvedAddons as any).compliance_require_liveness = merged.require_liveness;
+          if (merged.flags?.length) (resolvedAddons as any).compliance_flags = merged.flags;
         }
       }
     } catch (err) {
@@ -804,11 +809,14 @@ router.post('/initialize',
       addons: Object.keys(resolvedAddons).length > 0 ? resolvedAddons as Record<string, unknown> : undefined,
     });
 
-    // Set session start timestamp, verification mode, and age threshold
+    // Set session start timestamp, verification mode, age threshold, and compliance overrides
     const { error: updateError } = await supabase.from('verification_requests').update({
       session_started_at: new Date().toISOString(),
       verification_mode: resolvedMode,
       ...(resolvedAgeThreshold !== null && { age_threshold: resolvedAgeThreshold }),
+      ...((resolvedAddons as any).compliance_force_manual_review && {
+        manual_review_reason: 'Compliance rule: force_manual_review',
+      }),
     }).eq('id', verificationRecord.id);
     if (updateError) {
       logger.error('Failed to update verification_mode', {
@@ -854,7 +862,15 @@ router.post('/initialize',
       current_step: mapped.current_step,
       total_steps: mapped.total_steps,
       ...(isAgeOnly && { age_threshold: resolvedAgeThreshold }),
-      ...(complianceApplied.length > 0 && { compliance_applied: complianceApplied }),
+      ...(complianceApplied.length > 0 && {
+        compliance_applied: complianceApplied,
+        ...((resolvedAddons as any).compliance_require_liveness && {
+          require_liveness: (resolvedAddons as any).compliance_require_liveness,
+        }),
+        ...((resolvedAddons as any).compliance_flags && {
+          compliance_flags: (resolvedAddons as any).compliance_flags,
+        }),
+      }),
       message: modeMessages[resolvedMode] || modeMessages.full,
     });
 
@@ -1074,13 +1090,14 @@ router.post('/:verification_id/front-document',
     // Check verification mode and resolve flow
     const { data: vrRow } = await supabase
       .from('verification_requests')
-      .select('verification_mode, age_threshold')
+      .select('verification_mode, age_threshold, addons')
       .eq('id', verification_id)
       .single();
     const vrMode = (vrRow?.verification_mode as VerificationMode) || 'full';
     const flow = FLOW_PRESETS[vrMode] ?? INLINE_FLOW_FALLBACKS[vrMode] ?? FLOW_PRESETS.full;
     const isAgeOnly = vrMode === 'age_only';
     const ageThreshold = vrRow?.age_threshold ?? 18;
+    const complianceForceReview = (vrRow?.addons as any)?.compliance_force_manual_review === true;
 
     // Hydrate session and run Gate 1 via session
     const session = await hydrateSession(verification_id, isSandbox);
@@ -1158,7 +1175,8 @@ router.post('/:verification_id/front-document',
     if (dedupBlocked) {
       dbStatus = 'failed';
     } else if (isAgeOnly) {
-      dbStatus = state.current_step === VerificationStatus.COMPLETE ? 'verified' : 'failed';
+      const ageResult = state.current_step === VerificationStatus.COMPLETE ? 'verified' : 'failed';
+      dbStatus = (ageResult === 'verified' && complianceForceReview) ? 'manual_review' : ageResult;
     } else {
       dbStatus = stepResult.passed ? 'processing' : 'failed';
     }
@@ -1281,11 +1299,12 @@ router.post('/:verification_id/back-document',
     // Guard: check flow allows back document
     const { data: vrRow } = await supabase
       .from('verification_requests')
-      .select('verification_mode')
+      .select('verification_mode, addons')
       .eq('id', verification_id)
       .single();
     const vrMode = (vrRow?.verification_mode as VerificationMode) || 'full';
     const flow = FLOW_PRESETS[vrMode] ?? INLINE_FLOW_FALLBACKS[vrMode] ?? FLOW_PRESETS.full;
+    const complianceForceReview = (vrRow?.addons as any)?.compliance_force_manual_review === true;
 
     if (!flow.requiresBack) {
       return res.status(400).json({
@@ -1356,9 +1375,10 @@ router.post('/:verification_id/back-document',
     if (flow.preset === 'document_only' && state.current_step === VerificationStatus.COMPLETE) {
       // document_only: crossval passed → determine final status
       const crossValVerdict = state.cross_validation?.verdict;
-      dbStatus = crossValVerdict === 'REVIEW' ? 'manual_review'
+      const docOnlyResult = crossValVerdict === 'REVIEW' ? 'manual_review'
         : crossValVerdict === 'REJECT' ? 'failed'
         : 'verified';
+      dbStatus = (docOnlyResult === 'verified' && complianceForceReview) ? 'manual_review' : docOnlyResult;
       await verificationService.updateVerificationRequest(verification_id, {
         status: dbStatus,
         cross_validation_score: state.cross_validation?.overall_score ?? null,
@@ -1488,11 +1508,12 @@ router.post('/:verification_id/live-capture',
     // Guard: check flow allows live capture
     const { data: vrRow } = await supabase
       .from('verification_requests')
-      .select('verification_mode')
+      .select('verification_mode, addons')
       .eq('id', verification_id)
       .single();
     const vrMode = (vrRow?.verification_mode as VerificationMode) || 'full';
     const flow = FLOW_PRESETS[vrMode] ?? INLINE_FLOW_FALLBACKS[vrMode] ?? FLOW_PRESETS.full;
+    const complianceForceReview = (vrRow?.addons as any)?.compliance_force_manual_review === true;
 
     if (!flow.requiresLiveness) {
       return res.status(400).json({
@@ -1612,7 +1633,8 @@ router.post('/:verification_id/live-capture',
     const state = session.getState();
     let dbStatus: string;
     const needsManualReview = state.cross_validation?.verdict === 'REVIEW'
-      || !!state.face_match?.skipped_reason;
+      || !!state.face_match?.skipped_reason
+      || complianceForceReview;
     if (liveDedupBlocked) {
       dbStatus = 'failed';
     } else if (state.current_step === VerificationStatus.COMPLETE) {
@@ -1851,7 +1873,7 @@ router.get('/:verification_id/status',
     // Resolve verification mode and flow
     const { data: vrMeta } = await supabase
       .from('verification_requests')
-      .select('verification_mode, age_threshold')
+      .select('verification_mode, age_threshold, addons')
       .eq('id', verification_id)
       .single();
     const vrMode = (vrMeta?.verification_mode as VerificationMode) || 'full';
@@ -1901,16 +1923,21 @@ router.get('/:verification_id/status',
       deepfake_check: state.deepfake_check ?? null,
       aml_screening: state.aml_screening ?? null,
       risk_score: riskScore,
+      compliance_flags: (vrMeta?.addons as any)?.compliance_flags ?? null,
       duplicate_flags: (verification as any).duplicate_flags ?? null,
       barcode_extraction_failed: state.back_extraction ? !state.back_extraction.qr_payload : null,
       documents_match: state.cross_validation ? !state.cross_validation.has_critical_failure : null,
       face_match_passed: state.face_match?.passed ?? null,
       liveness_passed: state.liveness?.passed ?? null,
-      final_result: mapped.final_result,
+      final_result: ['verified', 'failed', 'manual_review'].includes((verification as any).status)
+        ? (verification as any).status   // DB status is authoritative (includes compliance overrides)
+        : mapped.final_result,
       rejection_reason: state.rejection_reason,
       rejection_detail: state.rejection_detail,
       failure_reason: state.rejection_detail,
-      manual_review_reason: state.cross_validation?.verdict === 'REVIEW' ? 'Cross-validation requires review' : state.face_match?.skipped_reason ? `Face match skipped: ${state.face_match.skipped_reason}` : null,
+      manual_review_reason: (verification as any).manual_review_reason
+        || (state.cross_validation?.verdict === 'REVIEW' ? 'Cross-validation requires review' : null)
+        || (state.face_match?.skipped_reason ? `Face match skipped: ${state.face_match.skipped_reason}` : null),
       ...(mapped.final_result === 'failed' && {
         retry_available: ((verification as any).retry_count ?? 0) < 3,
         retry_count: (verification as any).retry_count ?? 0,

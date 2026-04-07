@@ -127,8 +127,18 @@ router.put('/rulesets/:id',
       updates.name = name;
     }
     if (description !== undefined) updates.description = description;
-    if (is_active !== undefined) updates.is_active = is_active;
-    if (priority !== undefined) updates.priority = priority;
+    if (is_active !== undefined) {
+      if (typeof is_active !== 'boolean') {
+        return res.status(400).json({ error: 'is_active must be a boolean' });
+      }
+      updates.is_active = is_active;
+    }
+    if (priority !== undefined) {
+      if (typeof priority !== 'number' || !Number.isInteger(priority)) {
+        return res.status(400).json({ error: 'priority must be an integer' });
+      }
+      updates.priority = priority;
+    }
 
     const { data, error } = await supabase
       .from('compliance_rulesets')
@@ -153,13 +163,15 @@ router.delete('/rulesets/:id',
 
     if (!UUID_RE.test(id)) return res.status(400).json({ error: 'Invalid ruleset ID' });
 
-    const { error } = await supabase
+    const { data, error } = await supabase
       .from('compliance_rulesets')
       .delete()
       .eq('id', id)
-      .eq('developer_id', developerId);
+      .eq('developer_id', developerId)
+      .select('id');
 
     if (error) throw new Error(`Failed to delete ruleset: ${error.message}`);
+    if (!data?.length) return res.status(404).json({ error: 'Ruleset not found' });
 
     res.json({ success: true, message: 'Ruleset and all rules deleted' });
   })
