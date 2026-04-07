@@ -941,6 +941,121 @@ Generate a key pair: \`node -e "import('@noble/ed25519').then(e => { const s = e
 
 ---
 
+## Compliance Orchestration Engine
+
+Developer-configurable rule engine. Define compliance rules, Idswyft enforces them automatically during verification initialization.
+
+### Create Ruleset
+
+\`\`\`
+POST /api/v2/compliance/rulesets
+Content-Type: application/json
+\`\`\`
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| name | string | Yes | Human-readable ruleset name (max 200 chars) |
+| description | string | No | Description |
+| is_active | boolean | No | Default: true |
+| priority | number | No | Evaluation order, lower = first (default: 100) |
+
+### List Rulesets
+
+\`\`\`
+GET /api/v2/compliance/rulesets
+\`\`\`
+
+### Get Ruleset (with Rules)
+
+\`\`\`
+GET /api/v2/compliance/rulesets/:id
+\`\`\`
+
+### Update Ruleset
+
+\`\`\`
+PUT /api/v2/compliance/rulesets/:id
+\`\`\`
+
+### Delete Ruleset
+
+\`\`\`
+DELETE /api/v2/compliance/rulesets/:id
+\`\`\`
+
+Deletes the ruleset and all its rules (CASCADE).
+
+### Add Rule to Ruleset
+
+\`\`\`
+POST /api/v2/compliance/rulesets/:id/rules
+Content-Type: application/json
+\`\`\`
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| condition | object | Yes | Structured condition (see below) |
+| action | object | Yes | Action to take when condition matches |
+| description | string | No | Human-readable explanation |
+
+**Condition format:**
+
+\`\`\`json
+{
+  "all": [
+    { "field": "country", "op": "in", "value": ["US", "GB"] },
+    { "field": "metadata.transaction_amount", "op": "gt", "value": 10000 }
+  ]
+}
+\`\`\`
+
+**Operators:** \`eq\`, \`neq\`, \`in\`, \`not_in\`, \`gt\`, \`gte\`, \`lt\`, \`lte\`, \`exists\`, \`contains\`
+
+**Combinators:** \`all\` (AND), \`any\` (OR), \`not\`
+
+**Fields:** \`country\`, \`document_type\`, \`user_age\`, \`verification_mode\`, \`risk_score\`, \`aml_risk_level\`, \`metadata.*\` (developer-supplied)
+
+**Action format:**
+
+\`\`\`json
+{
+  "set_mode": "full",
+  "require_address": true,
+  "require_aml": true,
+  "set_flag": "enhanced_due_diligence",
+  "force_manual_review": true
+}
+\`\`\`
+
+Actions are additive across matching rules. More restrictive mode wins.
+
+### Update Rule
+
+\`\`\`
+PUT /api/v2/compliance/rules/:id
+\`\`\`
+
+### Delete Rule
+
+\`\`\`
+DELETE /api/v2/compliance/rules/:id
+\`\`\`
+
+### Dry-Run Evaluate
+
+\`\`\`
+POST /api/v2/compliance/evaluate
+Content-Type: application/json
+\`\`\`
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| context | object | Yes | Test context (country, document_type, metadata, etc.) |
+
+Returns which rules would match and the resolved action — without creating a verification.
+
+---
+
 ## Address Verification
 
 Verify proof-of-address documents (utility bills, bank statements). Requires a completed identity verification session.

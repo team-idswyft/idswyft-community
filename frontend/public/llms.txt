@@ -56,6 +56,24 @@ GET  /.well-known/did.json               → Issuer DID document (public)
 
 **Client-side verification:** Resolve `did:web:api.idswyft.app` → fetch `/.well-known/did.json` → extract Ed25519 public key → verify JWT signature. ~15KB with `@noble/ed25519`.
 
+## Compliance Orchestration Engine
+
+Developer-configurable rule engine. Rules auto-select verification mode, gates, and post-verification actions.
+
+```
+POST /api/v2/compliance/rulesets           → Create ruleset (requires API key)
+GET  /api/v2/compliance/rulesets           → List rulesets (requires API key)
+GET  /api/v2/compliance/rulesets/:id       → Get ruleset with rules (requires API key)
+PUT  /api/v2/compliance/rulesets/:id       → Update ruleset (requires API key)
+DELETE /api/v2/compliance/rulesets/:id     → Delete ruleset + rules (requires API key)
+POST /api/v2/compliance/rulesets/:id/rules → Add rule to ruleset (requires API key)
+PUT  /api/v2/compliance/rules/:id          → Update rule (requires API key)
+DELETE /api/v2/compliance/rules/:id        → Delete rule (requires API key)
+POST /api/v2/compliance/evaluate           → Dry-run: test context against rules (requires API key)
+```
+
+Rules auto-apply at `POST /api/v2/verify/initialize`. Response includes `compliance_applied` when rules match.
+
 ## Integration Options
 
 1. **Redirect** — send users to `idswyft.app/user-verification?api_key=...&user_id=...`
