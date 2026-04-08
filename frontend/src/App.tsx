@@ -1,4 +1,5 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
+import { ErrorBoundary } from './components/ErrorBoundary'
 import { Layout } from './components/layout/Layout'
 import { HomePageV2 } from './pages/HomePageV2'
 import { DeveloperPage } from './pages/DeveloperPage'
@@ -28,6 +29,7 @@ import { isCommunity, isCloud } from './config/edition'
 
 function App() {
   return (
+    <ErrorBoundary>
     <Layout>
       <Routes>
         {/* Root route: community → Dev Portal, cloud → Glassmorphic homepage */}
@@ -69,6 +71,7 @@ function App() {
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </Layout>
+    </ErrorBoundary>
   )
 }
 

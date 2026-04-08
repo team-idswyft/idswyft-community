@@ -186,7 +186,7 @@ export const IDViewfinder: React.FC<{
       {processing && (
         <div style={{
           position: 'absolute', inset: 0, background: 'rgba(8,12,20,0.88)',
-          backdropFilter: 'blur(3px)', borderRadius: 14,
+          backdropFilter: 'blur(3px)', WebkitBackdropFilter: 'blur(3px)', borderRadius: 14,
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12,
         }}>
           <div style={{
@@ -264,7 +264,7 @@ export const OvalFaceViewfinder: React.FC<{
       {processing && (
         <div style={{
           position: 'absolute', inset: 0, background: 'rgba(8,12,20,0.88)',
-          backdropFilter: 'blur(3px)', borderRadius: ovalRadius,
+          backdropFilter: 'blur(3px)', WebkitBackdropFilter: 'blur(3px)', borderRadius: ovalRadius,
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10,
         }}>
           <div style={{

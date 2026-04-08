@@ -408,7 +408,7 @@
 }
 
 .text-balance {
-  text-wrap: balance;
+  text-wrap: balance; /* Safari 17.5+, Chrome 114+ — degrades gracefully */
 }
 
 /* ===== GLASS SHIMMER EFFECT ===== */

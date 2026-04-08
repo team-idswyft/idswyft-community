@@ -36,6 +36,7 @@ export default defineConfig({
     sourcemap: true,
     minify: 'terser',
     chunkSizeWarningLimit: 1000,
+    target: ['es2020', 'chrome87', 'firefox78', 'safari14', 'edge88'],
   },
   define: {
     'process.env': {},
