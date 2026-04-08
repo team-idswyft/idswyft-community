@@ -6,10 +6,11 @@ export const config: AppConfig = {
   corsOrigins: [
     ...new Set([
       ...(process.env.CORS_ORIGINS?.split(',').map(s => s.trim()) || ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176', 'http://localhost:3000']),
-      // Always allow production + Docker self-hosted origins
+      // Always allow production, staging, and Docker self-hosted origins
       'http://localhost',
       'https://idswyft.app',
       'https://www.idswyft.app',
+      'https://staging.idswyft.app',
     ]),
   ],
   railwayAllowedOrigins: process.env.RAILWAY_ALLOWED_ORIGINS?.split(',').map(s => s.trim()).filter(Boolean) ?? [],
