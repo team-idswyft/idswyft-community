@@ -61,7 +61,7 @@ describe('getConversionFunnel', () => {
     ];
     // Second call: verification_contexts (session states)
     const contexts = [
-      { verification_id: 'v1', context: JSON.stringify({ front_extraction: {}, back_extraction: {}, face_match: {}, current_step: 5 }) },
+      { verification_id: 'v1', context: JSON.stringify({ front_extraction: {}, back_extraction: {}, face_match: {}, current_step: 'COMPLETE' }) },
       { verification_id: 'v2', context: JSON.stringify({ front_extraction: {}, back_extraction: {} }) },
       { verification_id: 'v3', context: JSON.stringify({ front_extraction: {} }) },
       { verification_id: 'v4', context: JSON.stringify({}) }, // only initialized

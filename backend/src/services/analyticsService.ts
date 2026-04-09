@@ -6,6 +6,7 @@
  */
 
 import { supabase } from '@/config/database.js';
+import { VerificationStatus } from '@idswyft/shared';
 
 // PostgREST defaults to 1000 rows max. We raise this for analytics
 // aggregations that need the full dataset. For true scale, these should
@@ -140,9 +141,12 @@ export async function getConversionFunnel(
     if (ctx?.front_extraction) stageCounts.front_uploaded++;
     if (ctx?.back_extraction) stageCounts.back_uploaded++;
     if (ctx?.face_match || ctx?.live_capture) stageCounts.live_captured++;
-    if (ctx?.current_step === 5 /* COMPLETE */ || ctx?.current_step === 6 /* HARD_REJECTED but completed pipeline */) {
-      // Only count truly completed verifications (verified or manual_review)
-      if (ctx?.current_step === 5) stageCounts.completed++;
+    // `current_step` in verification_contexts is the internal session
+    // state string (e.g. 'COMPLETE'), NOT the numeric step index used
+    // in HTTP responses. Only sessions that reached COMPLETE count as
+    // completed; HARD_REJECTED sessions did not finish the pipeline.
+    if (ctx?.current_step === VerificationStatus.COMPLETE) {
+      stageCounts.completed++;
     }
   }
 

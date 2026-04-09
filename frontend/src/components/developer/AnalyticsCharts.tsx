@@ -15,6 +15,7 @@ import {
   Tooltip,
   Legend,
   Cell,
+  LabelList,
 } from 'recharts'
 import { C } from '../../theme'
 import { API_BASE_URL } from '../../config/api'
@@ -88,6 +89,17 @@ const STEP_LABELS: Record<string, string> = {
   back_uploaded: 'Back uploaded',
   live_captured: 'Live captured',
   completed: 'Completed',
+}
+
+// Distinct color per funnel step — progression from neutral (cyan)
+// through cool tones to success (green). Indexed by position in the
+// backend stageCounts object, so all five entries must be defined.
+const FUNNEL_PALETTE: Record<string, string> = {
+  initialized: C.cyan,
+  front_uploaded: C.blue,
+  back_uploaded: C.purple,
+  live_captured: C.amber,
+  completed: C.green,
 }
 
 // ─── Chart Card Wrapper ─────────────────────────────────────
@@ -345,15 +357,29 @@ function QuotaChart({ data }: { data: { used: number; limit: number } }) {
 }
 
 function FunnelChart({ data }: { data: FunnelStep[] }) {
+  // Preserve the raw step key so we can look up per-step colors; the
+  // `step` field gets replaced with the human-readable label for the axis.
   const formatted = data.map((d) => ({
     ...d,
+    stepKey: d.step,
     step: STEP_LABELS[d.step] || d.step,
   }))
+  // Pad X-axis domain so the count label isn't clipped at the right edge
+  // and so 0-value bars still have room to show their label.
+  const maxCount = formatted.reduce((m, d) => Math.max(m, d.count), 0)
+  const domainMax = Math.max(maxCount * 1.15, 1)
   return (
     <ResponsiveContainer width="100%" height={220}>
-      <BarChart data={formatted} layout="vertical" margin={{ left: 10 }}>
+      <BarChart data={formatted} layout="vertical" margin={{ left: 10, right: 24 }}>
         <CartesianGrid {...CHART_THEME.grid} horizontal={false} />
-        <XAxis type="number" tick={CHART_THEME.axis} axisLine={false} tickLine={false} />
+        <XAxis
+          type="number"
+          domain={[0, domainMax]}
+          allowDecimals={false}
+          tick={CHART_THEME.axis}
+          axisLine={false}
+          tickLine={false}
+        />
         <YAxis
           type="category"
           dataKey="step"
@@ -364,13 +390,14 @@ function FunnelChart({ data }: { data: FunnelStep[] }) {
         />
         <Tooltip {...CHART_THEME.tooltip} />
         <Bar dataKey="count" name="Count" radius={[0, 4, 4, 0]}>
-          {formatted.map((_, i) => (
-            <Cell
-              key={i}
-              fill={C.cyan}
-              fillOpacity={1 - i * (0.6 / Math.max(formatted.length - 1, 1))}
-            />
+          {formatted.map((d, i) => (
+            <Cell key={i} fill={FUNNEL_PALETTE[d.stepKey] || C.cyan} />
           ))}
+          <LabelList
+            dataKey="count"
+            position="right"
+            style={{ fill: C.text, fontFamily: C.mono, fontSize: 11 }}
+          />
         </Bar>
       </BarChart>
     </ResponsiveContainer>
