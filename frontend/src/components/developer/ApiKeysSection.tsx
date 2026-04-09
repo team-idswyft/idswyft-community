@@ -15,6 +15,29 @@ import {
 import type { ApiKey, ApiActivity, VerificationDetail, DeveloperStats } from './types'
 import { inputStyle, labelStyle, copyToClipboard } from './types'
 
+// Render an OCR field value. Most fields are primitives, but some
+// (e.g. confidence_scores: Record<string, number>) are nested objects
+// that need to render as a readable key/value list instead of being
+// flattened to "[object Object]" via String() coercion.
+const renderOcrFieldValue = (value: unknown): React.ReactNode => {
+  if (value == null) return '-'
+  if (typeof value === 'object') {
+    const entries = Object.entries(value as Record<string, unknown>)
+    if (entries.length === 0) return '-'
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+        {entries.map(([k, v]) => (
+          <div key={k} style={{ fontSize: 11, lineHeight: 1.4 }}>
+            <span style={{ color: C.muted }}>{k.replace(/_/g, ' ')}:</span>{' '}
+            <span style={{ color: C.text }}>{typeof v === 'number' ? v.toFixed(2) : String(v)}</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+  return String(value)
+}
+
 // --- CreateKeyModal ---
 
 function CreateKeyModal({ onClose, onCreated, token }: {
@@ -881,7 +904,7 @@ export function ApiKeysSection({ token, apiKeys, setApiKeys, stats, newFullKey, 
                           {Object.entries(verificationDetail.ocr_data as Record<string, unknown>).map(([field, value]) => (
                             <div key={field}>
                               <div style={{ color: C.muted, fontSize: 10, textTransform: 'uppercase', letterSpacing: '0.06em' }}>{field.replace(/_/g, ' ')}</div>
-                              <div style={{ fontFamily: C.mono, fontSize: 12, color: C.text, marginTop: 2 }}>{value != null ? String(value) : '-'}</div>
+                              <div style={{ fontFamily: C.mono, fontSize: 12, color: C.text, marginTop: 2 }}>{renderOcrFieldValue(value)}</div>
                             </div>
                           ))}
                         </div>
