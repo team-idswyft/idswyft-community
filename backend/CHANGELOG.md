@@ -5,6 +5,19 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.3] - 2026-04-09
+
+### Fixed
+- **Compliance auth recursion bug** — `authenticateComplianceRequest` self-recursed on the `X-API-Key` branch instead of calling `authenticateAPIKey`, which would have stack-overflowed any request actually sending an API key. The bug was latent because the previous UI only ever hit the JWT branch.
+
+### Changed
+- **Compliance ruleset auth model** — `/api/v2/compliance/*` now accepts exactly two paths: `X-API-Key` (developer SDK/automation) **or** an organization-admin reviewer session cookie (Admin Dashboard UI). Regular reviewers and platform admins are rejected — compliance is a per-dev-organization concern owned by the org admin, not by individual developers or Idswyft platform operators.
+- **Developer-portal JWT path removed** from compliance endpoints — compliance management has moved out of the Developer Portal entirely.
+- **`getComplianceDeveloperId` helper** consolidates developer-scope resolution across the two auth paths (formerly 9 inline `(req as any).developer.id` casts).
+
+### Security
+- **CSRF enforced on compliance routes** — `/api/v2/compliance` is now mounted with `conditionalCsrf`, matching the pattern used by `/api/developer`, `/api/admin`, and `/api/auth`. The middleware no-ops for `X-API-Key` callers (no `idswyft_token` cookie present) and enforces `x-csrf-token` for the reviewer cookie path.
+
 ## [1.8.2] - 2026-04-02
 
 ### Added

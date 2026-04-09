@@ -60,16 +60,18 @@ GET  /.well-known/did.json               → Issuer DID document (public)
 
 Developer-configurable rule engine. Rules auto-select verification mode, gates, and post-verification actions.
 
+All endpoints accept **either** `X-API-Key` (developer automation/SDK) **or** an organization-admin reviewer session cookie (Admin Dashboard UI at `/admin/verifications`). Regular reviewers and platform admins are rejected.
+
 ```
-POST /api/v2/compliance/rulesets           → Create ruleset (requires API key)
-GET  /api/v2/compliance/rulesets           → List rulesets (requires API key)
-GET  /api/v2/compliance/rulesets/:id       → Get ruleset with rules (requires API key)
-PUT  /api/v2/compliance/rulesets/:id       → Update ruleset (requires API key)
-DELETE /api/v2/compliance/rulesets/:id     → Delete ruleset + rules (requires API key)
-POST /api/v2/compliance/rulesets/:id/rules → Add rule to ruleset (requires API key)
-PUT  /api/v2/compliance/rules/:id          → Update rule (requires API key)
-DELETE /api/v2/compliance/rules/:id        → Delete rule (requires API key)
-POST /api/v2/compliance/evaluate           → Dry-run: test context against rules (requires API key)
+POST   /api/v2/compliance/rulesets           → Create ruleset
+GET    /api/v2/compliance/rulesets           → List rulesets
+GET    /api/v2/compliance/rulesets/:id       → Get ruleset with rules
+PUT    /api/v2/compliance/rulesets/:id       → Update ruleset
+DELETE /api/v2/compliance/rulesets/:id       → Delete ruleset + rules (CASCADE)
+POST   /api/v2/compliance/rulesets/:id/rules → Add rule to ruleset
+PUT    /api/v2/compliance/rules/:id          → Update rule
+DELETE /api/v2/compliance/rules/:id          → Delete rule
+POST   /api/v2/compliance/evaluate           → Dry-run: test context against rules
 ```
 
 Rules auto-apply at `POST /api/v2/verify/initialize`. Response includes `compliance_applied` when rules match.

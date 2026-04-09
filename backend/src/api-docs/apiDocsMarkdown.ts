@@ -945,6 +945,8 @@ Generate a key pair: \`node -e "import('@noble/ed25519').then(e => { const s = e
 
 Developer-configurable rule engine. Define compliance rules, Idswyft enforces them automatically during verification initialization.
 
+**Authentication:** all compliance endpoints accept **either** \`X-API-Key\` (developer automation/SDK) **or** an organization-admin reviewer session cookie (Admin Dashboard UI at \`/admin/verifications\`). Regular reviewers and platform admins are rejected — compliance is a per-dev-organization concern owned by the org admin.
+
 ### Create Ruleset
 
 \`\`\`

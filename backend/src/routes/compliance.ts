@@ -1,6 +1,6 @@
 import express, { Request, Response, NextFunction } from 'express';
-import { authenticateAPIKey, authenticateDeveloperJWT } from '@/middleware/auth.js';
-import { catchAsync } from '@/middleware/errorHandler.js';
+import { authenticateAPIKey, authenticateReviewerJWT } from '@/middleware/auth.js';
+import { AuthorizationError, catchAsync } from '@/middleware/errorHandler.js';
 import { supabase } from '@/config/database.js';
 import {
   validateCondition,
@@ -12,13 +12,59 @@ import type { ComplianceContext } from '@/services/complianceEngine.js';
 
 const router = express.Router();
 
-// Dual-auth: accept X-API-Key (machine) or developer JWT session (portal UI)
+/**
+ * Compliance auth — exactly two paths:
+ *
+ *  1. X-API-Key header          → developer automation/SDK usage. Authenticated
+ *                                 via authenticateAPIKey (sets req.developer).
+ *  2. Reviewer JWT cookie       → admin dashboard UI. Authenticated via
+ *                                 authenticateReviewerJWT (audience: idswyft-reviewer).
+ *                                 The follow-up inline role check rejects
+ *                                 regular reviewers (role !== 'admin').
+ *
+ * Platform admin cookies use audience 'idswyft-admin' and are REJECTED by
+ * authenticateReviewerJWT — this is intentional. Compliance is a per-dev-org
+ * concern owned by the org admin, not by Idswyft platform operators. Platform
+ * admins overseeing Idswyft itself do not manage tenant compliance rules.
+ *
+ * Developer portal JWT is also REJECTED — compliance has moved out of the
+ * developer portal, so there is no legitimate caller from that audience.
+ */
 const authenticateComplianceRequest = (req: Request, res: Response, next: NextFunction) => {
   if (req.headers['x-api-key']) {
-    return (authenticateComplianceRequest as any)(req, res, next);
+    return (authenticateAPIKey as any)(req, res, next);
   }
-  return (authenticateDeveloperJWT as any)(req, res, next);
+  return (authenticateReviewerJWT as any)(req, res, (err: any) => {
+    if (err) return next(err);
+    if ((req as any).reviewer?.role !== 'admin') {
+      return next(
+        new AuthorizationError('Organization admin privileges required to manage compliance rulesets')
+      );
+    }
+    return next();
+  });
 };
+
+/**
+ * Resolve the developer scope for a compliance request across the two
+ * supported auth paths. No platform-admin fallback — platform admins are
+ * rejected at the middleware layer and never reach handler code.
+ *
+ *  - X-API-Key path → req.developer.id         (set by authenticateAPIKey)
+ *  - Org admin path → req.reviewer.developer_id (reviewer JWT, role='admin')
+ */
+function getComplianceDeveloperId(req: Request): string {
+  const fromApiKey = (req as any).developer?.id as string | undefined;
+  if (fromApiKey) return fromApiKey;
+
+  const fromReviewer = (req as any).reviewer?.developer_id as string | undefined;
+  if (fromReviewer) return fromReviewer;
+
+  // Should be unreachable — authenticateComplianceRequest guarantees one
+  // of the two above is populated before any handler runs. Throwing here
+  // is a defensive belt-and-suspenders check against future middleware drift.
+  throw new AuthorizationError('No developer scope resolved from compliance request');
+}
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
@@ -28,7 +74,7 @@ const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/
 router.post('/rulesets',
   authenticateComplianceRequest as any,
   catchAsync(async (req: Request, res: Response) => {
-    const developerId = (req as any).developer.id;
+    const developerId = getComplianceDeveloperId(req);
     const { name, description, is_active, priority } = req.body || {};
 
     if (!name || typeof name !== 'string' || name.length > 200) {
@@ -57,7 +103,7 @@ router.post('/rulesets',
 router.get('/rulesets',
   authenticateComplianceRequest as any,
   catchAsync(async (req: Request, res: Response) => {
-    const developerId = (req as any).developer.id;
+    const developerId = getComplianceDeveloperId(req);
 
     const { data: rulesets, error } = await supabase
       .from('compliance_rulesets')
@@ -93,7 +139,7 @@ router.get('/rulesets',
 router.get('/rulesets/:id',
   authenticateComplianceRequest as any,
   catchAsync(async (req: Request, res: Response) => {
-    const developerId = (req as any).developer.id;
+    const developerId = getComplianceDeveloperId(req);
     const { id } = req.params;
 
     if (!UUID_RE.test(id)) return res.status(400).json({ error: 'Invalid ruleset ID' });
@@ -121,7 +167,7 @@ router.get('/rulesets/:id',
 router.put('/rulesets/:id',
   authenticateComplianceRequest as any,
   catchAsync(async (req: Request, res: Response) => {
-    const developerId = (req as any).developer.id;
+    const developerId = getComplianceDeveloperId(req);
     const { id } = req.params;
     const { name, description, is_active, priority } = req.body || {};
 
@@ -166,7 +212,7 @@ router.put('/rulesets/:id',
 router.delete('/rulesets/:id',
   authenticateComplianceRequest as any,
   catchAsync(async (req: Request, res: Response) => {
-    const developerId = (req as any).developer.id;
+    const developerId = getComplianceDeveloperId(req);
     const { id } = req.params;
 
     if (!UUID_RE.test(id)) return res.status(400).json({ error: 'Invalid ruleset ID' });
@@ -191,7 +237,7 @@ router.delete('/rulesets/:id',
 router.post('/rulesets/:id/rules',
   authenticateComplianceRequest as any,
   catchAsync(async (req: Request, res: Response) => {
-    const developerId = (req as any).developer.id;
+    const developerId = getComplianceDeveloperId(req);
     const { id: rulesetId } = req.params;
     const { condition, action, description } = req.body || {};
 
@@ -234,7 +280,7 @@ router.post('/rulesets/:id/rules',
 router.put('/rules/:id',
   authenticateComplianceRequest as any,
   catchAsync(async (req: Request, res: Response) => {
-    const developerId = (req as any).developer.id;
+    const developerId = getComplianceDeveloperId(req);
     const { id } = req.params;
     const { condition, action, description } = req.body || {};
 
@@ -293,7 +339,7 @@ router.put('/rules/:id',
 router.delete('/rules/:id',
   authenticateComplianceRequest as any,
   catchAsync(async (req: Request, res: Response) => {
-    const developerId = (req as any).developer.id;
+    const developerId = getComplianceDeveloperId(req);
     const { id } = req.params;
 
     if (!UUID_RE.test(id)) return res.status(400).json({ error: 'Invalid rule ID' });
@@ -333,7 +379,7 @@ router.delete('/rules/:id',
 router.post('/evaluate',
   authenticateComplianceRequest as any,
   catchAsync(async (req: Request, res: Response) => {
-    const developerId = (req as any).developer.id;
+    const developerId = getComplianceDeveloperId(req);
     const { context } = req.body || {};
 
     if (!context || typeof context !== 'object') {
