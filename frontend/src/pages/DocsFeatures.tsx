@@ -398,7 +398,7 @@ if (status.aml_screening?.risk_level === 'clear') {
         <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>How it works</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 16px' }}>
           {[
-            ['1', 'Create rulesets with conditions and actions via API or the Developer Portal'],
+            ['1', 'Create rulesets with conditions and actions via API or the Admin Dashboard'],
             ['2', 'User starts verification — engine loads active rules for the developer'],
             ['3', 'Each rule\'s condition is tested against the session context (country, age, metadata)'],
             ['4', 'Matching actions merge (most restrictive wins) and adjust the verification pipeline'],
@@ -658,9 +658,10 @@ console.log(result.matched_rules, 'rules matched');
 console.log(result.resolved_action);  // { set_mode: 'full', require_aml: true }`} />
 
       <Callout type="note">
-        The Developer Portal (cloud edition) includes a visual drag-and-drop rule builder — create conditions,
-        pick actions, and dry-run test without writing any code. Navigate to the <strong>Compliance Rules</strong> section
-        in your Developer Portal.
+        The Admin Dashboard (cloud edition) includes a visual drag-and-drop rule builder — create conditions,
+        pick actions, and dry-run test without writing any code. Organization admins can open the{' '}
+        <strong>Compliance Rules</strong> tab on the Verification Management page at{' '}
+        <code style={{ fontFamily: C.mono }}>/admin/verifications</code>.
       </Callout>
 
       <Divider />

@@ -12,8 +12,7 @@ import {
   PlayIcon,
   ShieldCheckIcon,
 } from '@heroicons/react/24/outline'
-import type { ApiKey } from './types'
-import { inputStyle, labelStyle, highlightJson } from './types'
+import { inputStyle, labelStyle, highlightJson } from '../developer/types'
 
 // ─── Types ──────────────────────────────────────────────────────
 
@@ -319,7 +318,6 @@ function ActionPicker({ form, setForm }: { form: ActionForm; setForm: (f: Action
 
 interface ComplianceSectionProps {
   token: string
-  apiKeys: ApiKey[]
 }
 
 export function ComplianceSection({ token }: ComplianceSectionProps) {
