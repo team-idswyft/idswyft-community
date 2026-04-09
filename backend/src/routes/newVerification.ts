@@ -351,6 +351,7 @@ async function extractBackDocument(
     id_number: barcodeData.pdf417_data.parsed_data.licenseNumber || barcodeData.parsed_data?.id_number || '',
     expiry_date: barcodeData.pdf417_data.parsed_data.expirationDate || '',
     nationality: '',
+    sex: barcodeData.pdf417_data.parsed_data.gender || '',
     address: [
       barcodeData.pdf417_data.parsed_data.address,
       barcodeData.pdf417_data.parsed_data.city,

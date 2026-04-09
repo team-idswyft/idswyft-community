@@ -1324,12 +1324,14 @@ export class DriversLicenseExtractor extends BaseExtractor {
       }
     }
 
-    // Second pass: cross-line sex
+    // Second pass: cross-line sex — label on one line, M/F value on next
+    // US DLs: "Date of birth  Sex  Eyes" / "09/29/1979 M BLK" — M is mid-line
     if (!ocrData.sex) {
       for (let i = 0; i < lines.length - 1; i++) {
         if (/\b(?:SEX|GENDER)\b/i.test(lines[i].text)) {
           const nextText = lines[i + 1].text;
-          const m = nextText.match(/^\s*([MF])\b/i);
+          const m = nextText.match(/^\s*([MF])\b/i)
+            ?? nextText.match(/\b([MF])\s+[A-Z]{2,4}\b/);
           if (m) {
             ocrData.sex = m[1].toUpperCase();
             ocrData.confidence_scores!.sex = lines[i + 1].confidence;
