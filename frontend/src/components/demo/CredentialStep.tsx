@@ -1,13 +1,79 @@
 import React, { useState } from 'react';
 import { C } from '../../theme';
-import { API_BASE_URL, shouldUseSandbox } from '../../config/api';
 
 interface CredentialStepProps {
   verificationId: string;
-  apiKey: string;
   onStartNew: () => void;
   onBack: () => void;
-  onGoToVerify?: (jwt: string) => void;
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Demo credential generation — runs entirely client-side.
+// No backend API is called, no credential is persisted, and no real
+// Ed25519 signing occurs. This exists purely to show what a W3C JWT-VC
+// looks like. In production, use POST /api/v2/verify/:id/credential instead.
+// ─────────────────────────────────────────────────────────────────────────────
+function base64UrlEncode(obj: unknown): string {
+  const bytes = new TextEncoder().encode(JSON.stringify(obj));
+  let binary = '';
+  for (let i = 0; i < bytes.length; i++) binary += String.fromCharCode(bytes[i]);
+  return btoa(binary)
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+    .replace(/=+$/, '');
+}
+
+export function buildDemoCredential(verificationId: string): { jwt: string; jti: string; expires_at: string } {
+  const issuedAt = new Date();
+  const expiresAt = new Date(issuedAt.getTime() + 365 * 24 * 60 * 60 * 1000);
+  const iat = Math.floor(issuedAt.getTime() / 1000);
+  const exp = Math.floor(expiresAt.getTime() / 1000);
+  const jti = `urn:uuid:${crypto.randomUUID()}`;
+  // did:example: is the W3C-reserved DID method for documentation and demos.
+  const subjectId = `did:example:demo-${crypto.randomUUID()}`;
+
+  const header = {
+    alg: 'EdDSA',
+    typ: 'JWT',
+    kid: 'did:web:idswyft.app#demo-key',
+  };
+
+  const payload = {
+    iss: 'did:web:idswyft.app',
+    sub: subjectId,
+    nbf: iat,
+    iat,
+    exp,
+    jti,
+    vc: {
+      '@context': [
+        'https://www.w3.org/2018/credentials/v1',
+        'https://idswyft.app/contexts/identity/v1',
+      ],
+      type: ['VerifiableCredential', 'IdentityCredential'],
+      issuer: 'did:web:idswyft.app',
+      issuanceDate: issuedAt.toISOString(),
+      credentialSubject: {
+        id: subjectId,
+        verified: true,
+        verificationId,
+        documentType: 'drivers_license',
+        fullName: 'DEMO HOLDER',
+        dateOfBirth: '1990-01-01',
+        issuingCountry: 'USA',
+        demo: true,
+      },
+    },
+  };
+
+  // Intentionally human-readable so anyone inspecting the token sees it's a demo.
+  const fakeSignature = 'DEMO_SIGNATURE_NOT_VALID_FOR_REAL_VERIFICATION';
+
+  return {
+    jwt: `${base64UrlEncode(header)}.${base64UrlEncode(payload)}.${fakeSignature}`,
+    jti,
+    expires_at: expiresAt.toISOString(),
+  };
 }
 
 // Reuse JSON syntax highlighting from ResultsStep
@@ -72,10 +138,8 @@ const cardTitle: React.CSSProperties = {
 
 export const CredentialStep: React.FC<CredentialStepProps> = ({
   verificationId,
-  apiKey,
   onStartNew,
   onBack,
-  onGoToVerify,
 }) => {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -90,66 +154,39 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
   const [sending, setSending] = useState(false);
   const [sendResult, setSendResult] = useState<{ success: boolean; email_sent: boolean } | null>(null);
 
+  // Demo-only: generate a mock JWT-VC client-side. No backend call is made.
   const fetchCredential = async () => {
     setLoading(true);
     setError(null);
+    // Small simulated delay so the "BUILDING CREDENTIAL..." spinner is visible.
+    await new Promise(resolve => setTimeout(resolve, 700));
     try {
-      const url = new URL(`${API_BASE_URL}/api/v2/verify/${verificationId}/credential`);
-      if (shouldUseSandbox()) url.searchParams.append('sandbox', 'true');
-
-      const res = await fetch(url.toString(), {
-        headers: { 'X-API-Key': apiKey },
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({ message: 'Request failed' }));
-        throw new Error(errData.message || errData.error || `HTTP ${res.status}`);
-      }
-
-      const data = await res.json();
-      setCredential({ jwt: data.credential, jti: data.jti, expires_at: data.expires_at });
+      setCredential(buildDemoCredential(verificationId));
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to fetch credential');
+      setError(err instanceof Error ? err.message : 'Failed to generate demo credential');
     } finally {
       setLoading(false);
     }
   };
 
+  // Demo-only: there is no real credential to look up, so just reflect
+  // the current local state (active unless already revoked in this session).
   const checkStatus = async () => {
     if (!credential) return;
     setCheckingStatus(true);
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/v2/credentials/${encodeURIComponent(credential.jti)}/status`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      setStatusResult(data);
-    } catch {
-      setStatusResult({ active: false, reason: 'error' });
-    } finally {
-      setCheckingStatus(false);
-    }
+    await new Promise(resolve => setTimeout(resolve, 300));
+    setStatusResult(revoked ? { active: false, reason: 'revoked' } : { active: true });
+    setCheckingStatus(false);
   };
 
+  // Demo-only: flip local state; nothing is persisted server-side.
   const revokeCredential = async () => {
     if (!credential) return;
     setRevoking(true);
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/v2/credentials/${encodeURIComponent(credential.jti)}/revoke`, {
-        method: 'POST',
-        headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ reason: 'Revoked via demo' }),
-      });
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({ message: 'Revocation failed' }));
-        throw new Error(errData.message || errData.error || `HTTP ${res.status}`);
-      }
-      setRevoked(true);
-      setStatusResult({ active: false, reason: 'revoked' });
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to revoke credential');
-    } finally {
-      setRevoking(false);
-    }
+    await new Promise(resolve => setTimeout(resolve, 300));
+    setRevoked(true);
+    setStatusResult({ active: false, reason: 'revoked' });
+    setRevoking(false);
   };
 
   const copyJwt = () => {
@@ -160,33 +197,14 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
     });
   };
 
+  // Demo-only: no email is actually sent. Simulate a successful delivery.
   const sendCredentialEmail = async () => {
     setSending(true);
     setSendResult(null);
     setError(null);
-    try {
-      const url = new URL(`${API_BASE_URL}/api/v2/verify/${verificationId}/credential/send`);
-      if (shouldUseSandbox()) url.searchParams.append('sandbox', 'true');
-
-      const res = await fetch(url.toString(), {
-        method: 'POST',
-        headers: { 'X-API-Key': apiKey, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: sendEmail }),
-      });
-
-      if (!res.ok) {
-        const errData = await res.json().catch(() => ({ message: 'Request failed' }));
-        throw new Error(errData.message || errData.error || `HTTP ${res.status}`);
-      }
-
-      const data = await res.json();
-      setSendResult({ success: true, email_sent: data.email_sent ?? true });
-    } catch (err) {
-      setSendResult({ success: false, email_sent: false });
-      setError(err instanceof Error ? err.message : 'Failed to send credential');
-    } finally {
-      setSending(false);
-    }
+    await new Promise(resolve => setTimeout(resolve, 500));
+    setSendResult({ success: true, email_sent: true });
+    setSending(false);
   };
 
   // Decode JWT parts
@@ -216,10 +234,10 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
             Verifiable Credential
           </h2>
           <p style={{ color: C.muted, fontSize: 13, margin: '0 0 4px' }}>
-            Issue a W3C Verifiable Credential (JWT-VC) for this completed verification.
+            Preview a W3C Verifiable Credential (JWT-VC) for this verification.
           </p>
           <p style={{ color: C.dim, fontSize: 11, margin: 0 }}>
-            The credential is signed with Ed25519 and can be independently verified via the issuer's DID document.
+            Demo mode: the JWT is generated locally for illustration. In production, Idswyft signs it with Ed25519 via <code style={{ fontFamily: C.mono, color: C.cyan }}>POST /verify/:id/credential</code>.
           </p>
         </div>
 
@@ -228,7 +246,7 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
           <div style={cardTitle}>How it works</div>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {[
-              { step: '1', label: 'Issue', desc: 'Idswyft signs a JWT-VC containing the verified identity claims.' },
+              { step: '1', label: 'Issue', desc: 'In production, Idswyft signs a JWT-VC containing the verified identity claims.' },
               { step: '2', label: 'Store', desc: 'Your app stores the JWT. The user can share it with other services.' },
               { step: '3', label: 'Verify', desc: 'Any relying party resolves the issuer DID and verifies the signature offline.' },
             ].map(item => (
@@ -267,7 +285,7 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
             cursor: 'pointer', marginBottom: 12,
           }}
         >
-          Issue Credential
+          Preview Demo Credential
         </button>
 
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
@@ -299,10 +317,10 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
           margin: '0 auto 16px',
         }} />
         <div style={{ fontFamily: C.mono, fontSize: 12, color: C.cyan, letterSpacing: '0.08em' }}>
-          SIGNING CREDENTIAL...
+          BUILDING CREDENTIAL...
         </div>
         <p style={{ color: C.dim, fontSize: 11, marginTop: 8 }}>
-          Generating Ed25519 signature
+          Generating demo JWT-VC
         </p>
       </div>
     );
@@ -323,13 +341,22 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
         }}>
           {revoked ? '\u2717' : '\u2713'}
         </div>
-        <h2 style={{ fontSize: 20, fontWeight: 600, color: C.text, marginBottom: 4 }}>
-          {revoked ? 'Credential Revoked' : 'Credential Issued'}
-        </h2>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, marginBottom: 4 }}>
+          <h2 style={{ fontSize: 20, fontWeight: 600, color: C.text, margin: 0 }}>
+            {revoked ? 'Credential Revoked' : 'Credential Issued'}
+          </h2>
+          <span style={{
+            fontSize: 9, fontFamily: C.mono, fontWeight: 700,
+            padding: '2px 8px', borderRadius: 10, letterSpacing: '0.1em',
+            background: 'rgba(251, 191, 36, 0.1)',
+            color: '#fbbf24',
+            border: '1px solid rgba(251, 191, 36, 0.25)',
+          }}>DEMO</span>
+        </div>
         <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>
           {revoked
-            ? 'This credential has been revoked and will no longer pass status checks.'
-            : 'W3C Verifiable Credential signed and ready to use.'}
+            ? 'This demo credential is marked revoked locally. Nothing was persisted.'
+            : 'This JWT-VC was generated client-side for illustration only.'}
         </p>
       </div>
 
@@ -458,23 +485,6 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
 
       {/* Action buttons */}
       <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap', marginBottom: 12 }}>
-        {onGoToVerify && (
-          <button
-            onClick={() => onGoToVerify(credential!.jwt)}
-            style={{
-              background: 'rgba(96,165,250,0.06)', border: '1px solid rgba(96,165,250,0.15)',
-              color: C.blue, borderRadius: 8, padding: '10px 20px',
-              fontWeight: 600, fontSize: 13, cursor: 'pointer',
-              display: 'flex', alignItems: 'center', gap: 6,
-            }}
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-              <path d="M9 12l2 2 4-4" />
-              <path d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-            </svg>
-            Verify This Credential
-          </button>
-        )}
         <button
           onClick={checkStatus}
           disabled={checkingStatus}
@@ -521,7 +531,7 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
       {/* Send via Email inline form */}
       {emailOpen && (
         <div style={{ ...cardStyle, borderColor: 'rgba(168,85,247,0.2)' }}>
-          <div style={cardTitle}>Send Credential via Email</div>
+          <div style={cardTitle}>Send Credential via Email (demo)</div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <input
               type="email"
@@ -555,7 +565,7 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
               marginTop: 8, fontSize: 12, color: C.green, fontFamily: C.mono,
               display: 'flex', alignItems: 'center', gap: 6,
             }}>
-              <span>{'\u2713'}</span> Credential sent to {sendEmail}
+              <span>{'\u2713'}</span> Send simulated to {sendEmail} — no email was actually delivered
             </div>
           )}
           {sendResult && !sendResult.success && (

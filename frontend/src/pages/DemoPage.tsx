@@ -24,7 +24,6 @@ import {
   ResultsStep,
   AddressStep,
   CredentialStep,
-  VerifyCredentialStep,
   getErrorMessage,
 } from '../components/demo';
 import type { VerificationRequest, CaptureResult } from '../components/demo';
@@ -43,7 +42,12 @@ const DemoPage: React.FC = () => {
   const urlStep = searchParams.get('step');
   const urlVerificationId = searchParams.get('verification_id');
 
-  const [currentStep, setCurrentStep] = useState(urlStep ? parseInt(urlStep) : 1);
+  const [currentStep, setCurrentStep] = useState(() => {
+    if (!urlStep) return 1;
+    const parsed = parseInt(urlStep, 10);
+    if (Number.isNaN(parsed)) return 1;
+    return Math.min(Math.max(parsed, 1), 9);
+  });
   const [verificationRequest, setVerificationRequest] = useState<VerificationRequest | null>(null);
   const [verificationId, setVerificationId] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
@@ -83,9 +87,6 @@ const DemoPage: React.FC = () => {
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' && window.innerWidth < 768
   );
-
-  // Credential verification state
-  const [credentialJwt, setCredentialJwt] = useState<string>('');
 
   // Address verification state
   const [addressFile, setAddressFile] = useState<File | null>(null);
@@ -1507,19 +1508,8 @@ const DemoPage: React.FC = () => {
         return (
           <CredentialStep
             verificationId={verificationId!}
-            apiKey={apiKey}
             onStartNew={handleStartNew}
             onBack={() => setCurrentStep(7)}
-            onGoToVerify={(jwt) => { setCredentialJwt(jwt); setCurrentStep(10); }}
-          />
-        );
-
-      case 10:
-        return (
-          <VerifyCredentialStep
-            initialJwt={credentialJwt}
-            onStartNew={handleStartNew}
-            onBack={() => setCurrentStep(9)}
           />
         );
 
