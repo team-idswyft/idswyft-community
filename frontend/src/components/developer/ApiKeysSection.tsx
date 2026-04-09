@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Link } from 'react-router-dom'
 import { API_BASE_URL } from '../../config/api'
@@ -157,6 +157,16 @@ export function ApiKeysSection({ token, apiKeys, setApiKeys, stats, newFullKey, 
   const [verificationDetailLoading, setVerificationDetailLoading] = useState<string | null>(null)
   const [verificationDetailError, setVerificationDetailError] = useState<string | null>(null)
   const [detailTab, setDetailTab] = useState<'scores' | 'json'>('scores')
+  const newKeyBannerRef = useRef<HTMLDivElement | null>(null)
+
+  // When a new key is issued, scroll the banner into view so the dev
+  // sees the one-time full key immediately instead of having to hunt
+  // for it at a different scroll position.
+  useEffect(() => {
+    if (newFullKey && newKeyBannerRef.current) {
+      newKeyBannerRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    }
+  }, [newFullKey])
 
   const copyKey = async (key: string) => {
     const ok = await copyToClipboard(key)
@@ -317,9 +327,31 @@ export function ApiKeysSection({ token, apiKeys, setApiKeys, stats, newFullKey, 
 
   return (
     <>
-      {/* New key banner */}
+      {/* Usage strip */}
+      {stats && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 32 }}>
+          {[
+            { label: 'Requests this month', value: stats.monthly_usage.toLocaleString() },
+            { label: 'Verifications',        value: stats.successful_requests.toLocaleString() },
+            { label: 'Limit remaining',      value: (stats.monthly_limit - stats.monthly_usage).toLocaleString() },
+          ].map(({ label, value }) => (
+            <div key={label} style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 8, padding: '18px 20px' }}>
+              <div style={{ fontFamily: C.mono, fontSize: 24, fontWeight: 600, color: C.cyan }}>{value}</div>
+              <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>{label}</div>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {renderAfterStats}
+
+      {/* New key banner — placed just above the API Keys card so it
+          lands in the dev's viewport immediately after creating a key */}
       {newFullKey && (
-        <div style={{ background: C.greenDim, border: `1px solid ${C.green}`, borderRadius: 8, padding: '14px 18px', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 12 }}>
+        <div
+          ref={newKeyBannerRef}
+          style={{ background: C.greenDim, border: `1px solid ${C.green}`, borderRadius: 8, padding: '14px 18px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 12 }}
+        >
           <div style={{ flex: 1 }}>
             <div style={{ fontSize: 12, color: C.green, fontWeight: 600, marginBottom: 4 }}>Key created - copy it now, it won't be shown again</div>
             <code style={{ fontFamily: C.mono, fontSize: 13, color: C.text, wordBreak: 'break-all' }}>{newFullKey}</code>
@@ -338,24 +370,6 @@ export function ApiKeysSection({ token, apiKeys, setApiKeys, stats, newFullKey, 
           </button>
         </div>
       )}
-
-      {/* Usage strip */}
-      {stats && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 32 }}>
-          {[
-            { label: 'Requests this month', value: stats.monthly_usage.toLocaleString() },
-            { label: 'Verifications',        value: stats.successful_requests.toLocaleString() },
-            { label: 'Limit remaining',      value: (stats.monthly_limit - stats.monthly_usage).toLocaleString() },
-          ].map(({ label, value }) => (
-            <div key={label} style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 8, padding: '18px 20px' }}>
-              <div style={{ fontFamily: C.mono, fontSize: 24, fontWeight: 600, color: C.cyan }}>{value}</div>
-              <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>{label}</div>
-            </div>
-          ))}
-        </div>
-      )}
-
-      {renderAfterStats}
 
       {/* API Keys table */}
       <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 32 }}>
