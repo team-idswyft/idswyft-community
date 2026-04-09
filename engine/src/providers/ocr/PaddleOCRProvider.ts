@@ -1270,12 +1270,28 @@ export class PaddleOCRProvider implements OCRProvider {
       const text = line.text;
 
       // Sex — look for SEX/GENDER label + M/F value
+      // OCR can merge adjacent chars: "NSex", "0Sex" — so allow optional prefix char
       if (!ocrData.sex) {
         const sexM = text.match(/\b(?:SEX|GENDER)\s*[:\s]\s*([MF])\b/i)
-          ?? text.match(/\bSEX\s+([MF])\b/i);
+          ?? text.match(/\bSEX\s+([MF])\b/i)
+          ?? text.match(/(?:^|[^A-Za-z])SEX\b/i);
         if (sexM) {
-          ocrData.sex = sexM[1].toUpperCase();
-          ocrData.confidence_scores!.sex = line.confidence;
+          if (sexM[1]) {
+            // Direct capture — M/F right after label
+            ocrData.sex = sexM[1].toUpperCase();
+            ocrData.confidence_scores!.sex = line.confidence;
+          } else {
+            // Label-only match (e.g. "NSex  Eyes") — look for M/F later on same line
+            const valM = text.match(/\b(\d{1,2}\/\d{1,2}\/\d{4})\s+([MF])\b/)
+              ?? text.match(/\b([MF])\s+[A-Z]{2,4}\b/);
+            if (valM) {
+              const mf = valM[2] || valM[1];
+              if (/^[MF]$/.test(mf)) {
+                ocrData.sex = mf.toUpperCase();
+                ocrData.confidence_scores!.sex = line.confidence;
+              }
+            }
+          }
         }
       }
 
@@ -1304,7 +1320,7 @@ export class PaddleOCRProvider implements OCRProvider {
     // "09/29/1979 M BLK" on the next — M/F appears mid-line after DOB
     if (!ocrData.sex) {
       for (let i = 0; i < lines.length - 1; i++) {
-        if (/\b(?:SEX|GENDER)\b/i.test(lines[i].text)) {
+        if (/(?:^|[^A-Za-z])(?:SEX|GENDER)\b/i.test(lines[i].text)) {
           const nextText = lines[i + 1].text;
           const m = nextText.match(/^\s*([MF])\b/i)
             ?? nextText.match(/\b([MF])\s+[A-Z]{2,4}\b/);

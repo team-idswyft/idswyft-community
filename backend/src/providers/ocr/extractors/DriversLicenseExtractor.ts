@@ -1297,12 +1297,27 @@ export class DriversLicenseExtractor extends BaseExtractor {
     for (const line of lines) {
       const text = line.text;
 
+      // OCR can merge adjacent chars: "NSex", "0Sex" — allow optional prefix char
       if (!ocrData.sex) {
         const sexM = text.match(/\b(?:SEX|GENDER)\s*[:\s]\s*([MF])\b/i)
-          ?? text.match(/\bSEX\s+([MF])\b/i);
+          ?? text.match(/\bSEX\s+([MF])\b/i)
+          ?? text.match(/(?:^|[^A-Za-z])SEX\b/i);
         if (sexM) {
-          ocrData.sex = sexM[1].toUpperCase();
-          ocrData.confidence_scores!.sex = line.confidence;
+          if (sexM[1]) {
+            ocrData.sex = sexM[1].toUpperCase();
+            ocrData.confidence_scores!.sex = line.confidence;
+          } else {
+            // Label-only match (e.g. "NSex  Eyes") — look for M/F later on same line
+            const valM = text.match(/\b(\d{1,2}\/\d{1,2}\/\d{4})\s+([MF])\b/)
+              ?? text.match(/\b([MF])\s+[A-Z]{2,4}\b/);
+            if (valM) {
+              const mf = valM[2] || valM[1];
+              if (/^[MF]$/.test(mf)) {
+                ocrData.sex = mf.toUpperCase();
+                ocrData.confidence_scores!.sex = line.confidence;
+              }
+            }
+          }
         }
       }
 
@@ -1328,7 +1343,7 @@ export class DriversLicenseExtractor extends BaseExtractor {
     // US DLs: "Date of birth  Sex  Eyes" / "09/29/1979 M BLK" — M is mid-line
     if (!ocrData.sex) {
       for (let i = 0; i < lines.length - 1; i++) {
-        if (/\b(?:SEX|GENDER)\b/i.test(lines[i].text)) {
+        if (/(?:^|[^A-Za-z])(?:SEX|GENDER)\b/i.test(lines[i].text)) {
           const nextText = lines[i + 1].text;
           const m = nextText.match(/^\s*([MF])\b/i)
             ?? nextText.match(/\b([MF])\s+[A-Z]{2,4}\b/);
