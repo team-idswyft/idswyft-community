@@ -137,11 +137,14 @@ vi.mock('@/services/faceRecognition.js', () => ({
 }));
 
 // Auth middlewares — passthrough
+const mockApiKeyAuth = (req: any, _res: any, next: any) => {
+  req.apiKey = { id: 'key-123', is_sandbox: false, developer_id: 'dev-123' };
+  req.developer = { id: 'dev-123' };
+  next();
+};
 vi.mock('@/middleware/auth.js', () => ({
-  authenticateAPIKey: (req: any, _res: any, next: any) => {
-    req.developer = { id: 'dev-123' };
-    next();
-  },
+  authenticateAPIKey: mockApiKeyAuth,
+  authenticateAPIKeyOrHandoff: mockApiKeyAuth,
   authenticateUser: (_req: any, _res: any, next: any) => next(),
   checkSandboxMode: (_req: any, _res: any, next: any) => next(),
 }));

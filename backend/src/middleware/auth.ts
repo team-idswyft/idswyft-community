@@ -122,6 +122,107 @@ export const authenticateAPIKey = catchAsync(async (req: Request, res: Response,
   }
 });
 
+// Handoff token authentication — mobile devices use X-Handoff-Token instead of X-API-Key.
+// The token resolves to an api_key + developer via the mobile_handoff_sessions table.
+// Tokens are HMAC-SHA256 hashed before DB lookup (same pattern as API keys).
+export const authenticateHandoffToken = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
+  const handoffToken = req.headers['x-handoff-token'] as string;
+
+  if (!handoffToken) {
+    throw new AuthenticationError('Handoff token is required. Include X-Handoff-Token header.');
+  }
+
+  // Validate format: 64 hex chars
+  if (!/^[0-9a-f]{64}$/.test(handoffToken)) {
+    throw new AuthenticationError('Invalid handoff token format');
+  }
+
+  // Hash the token before DB lookup — raw token never stored
+  const tokenHash = hashHandoffToken(handoffToken);
+
+  try {
+    // Look up session with joined api_key and developer
+    const { data: session, error: sessionError } = await supabase
+      .from('mobile_handoff_sessions')
+      .select(`
+        id, token, api_key_id, user_id, status, expires_at,
+        api_key:api_keys!api_key_id(*, developer:developers(*))
+      `)
+      .eq('token', tokenHash)
+      .single();
+
+    if (sessionError || !session) {
+      throw new AuthenticationError('Invalid handoff token');
+    }
+
+    // Check expiry
+    if (new Date(session.expires_at) < new Date()) {
+      throw new AuthenticationError('Handoff session has expired');
+    }
+
+    // Allow both 'pending' and 'completed' sessions — the status tracks handoff
+    // lifecycle (desktop notification), not authorization. Rejecting 'completed'
+    // would cause a race condition when the mobile's PATCH /complete fires while
+    // a polling API call is still in-flight. Only reject truly terminal states.
+    if (session.status === 'expired' || session.status === 'failed') {
+      throw new AuthenticationError('Handoff session is no longer active');
+    }
+
+    const apiKeyRecord = session.api_key as any;
+    if (!apiKeyRecord || !apiKeyRecord.is_active) {
+      throw new AuthenticationError('Associated API key is no longer active');
+    }
+
+    // Check if key is expired
+    if (apiKeyRecord.expires_at && new Date(apiKeyRecord.expires_at) < new Date()) {
+      throw new AuthenticationError('Associated API key has expired');
+    }
+
+    // Update last used timestamp on the API key
+    await supabase
+      .from('api_keys')
+      .update({ last_used_at: new Date().toISOString() })
+      .eq('id', apiKeyRecord.id);
+
+    // Attach API key and developer to request (same shape as authenticateAPIKey)
+    req.apiKey = apiKeyRecord as APIKey;
+    req.developer = apiKeyRecord.developer as Developer;
+
+    // Check if developer account is suspended
+    if (req.developer?.status === 'suspended') {
+      throw new AuthorizationError('Developer account suspended');
+    }
+
+    logger.info('Handoff token authenticated', {
+      developerId: apiKeyRecord.developer_id,
+      handoffSessionId: session.id,
+      isSandbox: apiKeyRecord.is_sandbox,
+    });
+
+    next();
+  } catch (error) {
+    if (error instanceof AuthenticationError || error instanceof AuthorizationError) {
+      throw error;
+    }
+
+    logger.error('Handoff token authentication error:', error);
+    throw new AuthenticationError('Authentication failed');
+  }
+});
+
+// Flexible middleware: accepts API key OR handoff token.
+// If X-API-Key header is present → delegate to authenticateAPIKey.
+// If X-Handoff-Token header is present → delegate to authenticateHandoffToken.
+export const authenticateAPIKeyOrHandoff = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
+  if (req.headers['x-api-key']) {
+    return authenticateAPIKey(req, res, next);
+  }
+  if (req.headers['x-handoff-token']) {
+    return authenticateHandoffToken(req, res, next);
+  }
+  throw new AuthenticationError('API key or handoff token is required. Include X-API-Key or X-Handoff-Token header.');
+});
+
 // JWT authentication for admin users
 export const authenticateJWT = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
   const token = req.headers.authorization?.replace('Bearer ', '') || req.cookies?.idswyft_token;
@@ -386,6 +487,15 @@ export const authenticateDeveloperJWT = catchAsync(async (req: Request, res: Res
   }
 });
 
+// HMAC-SHA256 hash a handoff token — same secret as API keys.
+// Used by handoff routes (storage/lookup) and authenticateHandoffToken (auth).
+export const hashHandoffToken = (token: string): string => {
+  return crypto
+    .createHmac('sha256', config.apiKeySecret)
+    .update(token)
+    .digest('hex');
+};
+
 // Generate API key
 export const generateAPIKey = (): { key: string; hash: string; prefix: string } => {
   const key = `ik_${crypto.randomBytes(32).toString('hex')}`;
@@ -574,6 +684,8 @@ declare global {
 export default {
   authenticateServiceToken,
   authenticateAPIKey,
+  authenticateHandoffToken,
+  authenticateAPIKeyOrHandoff,
   authenticateJWT,
   authenticateDeveloperJWT,
   authenticateReviewerJWT,
@@ -589,5 +701,6 @@ export default {
   generateRegistrationToken,
   verifyRegistrationToken,
   generateAPIKey,
+  hashHandoffToken,
   logAuthEvent
 };
