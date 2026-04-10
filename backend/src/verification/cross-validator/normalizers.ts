@@ -16,9 +16,9 @@ const COUNTRY_MAP: Record<string, string> = {
   // EU / Eastern
   PL: 'POL', CZ: 'CZE', HU: 'HUN', RO: 'ROU', BG: 'BGR', HR: 'HRV',
   SK: 'SVK', SI: 'SVN', LT: 'LTU', LV: 'LVA', EE: 'EST',
-  // Latin America
+  // Latin America / Caribbean
   BR: 'BRA', MX: 'MEX', AR: 'ARG', CL: 'CHL', CO: 'COL', PE: 'PER',
-  VE: 'VEN', EC: 'ECU', UY: 'URY', PY: 'PRY', BO: 'BOL',
+  VE: 'VEN', EC: 'ECU', UY: 'URY', PY: 'PRY', BO: 'BOL', HT: 'HTI',
   // Asia-Pacific
   JP: 'JPN', CN: 'CHN', IN: 'IND', KR: 'KOR', SG: 'SGP', PH: 'PHL',
   TH: 'THA', MY: 'MYS', ID: 'IDN', VN: 'VNM', TW: 'TWN', HK: 'HKG',

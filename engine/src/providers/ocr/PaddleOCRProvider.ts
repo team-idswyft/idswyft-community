@@ -104,8 +104,18 @@ const AAMVA_CODES: Record<string, keyof OCRData> = {
 
 // ── Utilities ─────────────────────────────────────────────────
 
-/** Normalise any date string to YYYY-MM-DD */
-export function standardizeDateFormat(raw: string): string {
+/**
+ * Normalise any date string to YYYY-MM-DD.
+ *
+ * @param hint - Optional country-format hint for ambiguous dates (e.g., 01/02/2028).
+ *   - 'DMY' (European/French/Kreyòl): 01 = day, 02 = month
+ *   - 'MDY' (US, default when omitted): 01 = month, 02 = day
+ *   - 'YMD' (East Asian): year-month-day
+ *   When hint is undefined, falls back to p1 > 12 heuristic (defaults to MDY).
+ *   NOTE: If the first numeric part is already 4 digits (e.g., "2028-02-06"),
+ *   the value is treated as YYYY-first regardless of hint.
+ */
+export function standardizeDateFormat(raw: string, hint?: 'DMY' | 'MDY' | 'YMD'): string {
   const cleaned = raw.replace(/[^\d\/\-\.]/g, '');
   const parts   = cleaned.split(/[\/\-\.]/);
   if (parts.length !== 3) return raw;
@@ -113,16 +123,31 @@ export function standardizeDateFormat(raw: string): string {
 
   let [p1, p2, p3] = parts;
 
-  // Two-digit year
-  if (p3.length === 2) {
+  // 4-digit first part = already YYYY-first
+  if (p1.length === 4) return `${p1}-${p2.padStart(2, '0')}-${p3.padStart(2, '0')}`;
+
+  // Expand 2-digit year based on position (YMD puts year first, others put it last)
+  if (hint === 'YMD' && p1.length === 2) {
+    const yr = parseInt(p1, 10);
+    p1 = yr > 30 ? `19${p1}` : `20${p1}`;
+  } else if (p3.length === 2) {
     const yr = parseInt(p3, 10);
     p3 = yr > 30 ? `19${p3}` : `20${p3}`;
   }
 
-  // If first part > 12 → DD/MM/YYYY
-  return parseInt(p1, 10) > 12
-    ? `${p3}-${p2.padStart(2,'0')}-${p1.padStart(2,'0')}`
-    : `${p3}-${p1.padStart(2,'0')}-${p2.padStart(2,'0')}`;
+  // If no hint, use p1 > 12 heuristic (defaults to MDY for ambiguous)
+  if (!hint) {
+    return parseInt(p1, 10) > 12
+      ? `${p3}-${p2.padStart(2,'0')}-${p1.padStart(2,'0')}`
+      : `${p3}-${p1.padStart(2,'0')}-${p2.padStart(2,'0')}`;
+  }
+
+  // Hint-guided interpretation
+  switch (hint) {
+    case 'DMY': return `${p3}-${p2.padStart(2, '0')}-${p1.padStart(2, '0')}`;
+    case 'MDY': return `${p3}-${p1.padStart(2, '0')}-${p2.padStart(2, '0')}`;
+    case 'YMD': return `${p1}-${p2.padStart(2, '0')}-${p3.padStart(2, '0')}`;
+  }
 }
 
 /**
@@ -172,14 +197,17 @@ function parseAamvaDate(s: string): string | null {
   return null;
 }
 
-/** Extract ALL date strings from text (numeric and month-name formats) */
-function findAllDates(text: string): string[] {
+/**
+ * Extract ALL date strings from text (numeric and month-name formats).
+ * @param hint - Optional country-format hint passed to standardizeDateFormat.
+ */
+function findAllDates(text: string, hint?: 'DMY' | 'MDY' | 'YMD'): string[] {
   const results: string[] = [];
   // Numeric dates: DD/MM/YYYY etc.
   const re = /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
-    const norm = standardizeDateFormat(m[0]);
+    const norm = standardizeDateFormat(m[0], hint);
     if (norm) results.push(norm);
   }
   // Month-name dates: "1 JAN 1981", "JAN 1, 1981"
@@ -1343,11 +1371,43 @@ export class PaddleOCRProvider implements OCRProvider {
     if (/^\d+$/.test(v) || v.length < 2) return true;
     // Starts with "/" (bilingual label remnant like "/surname")
     if (v.startsWith('/')) return true;
-    // Known label fragments
+    // Known label fragments (English + common European + Haitian Creole)
     if (/\b(surname|given\s*name|first\s*name|last\s*name|family\s*name|date\s*of\s*birth|nationality|passport|card\s*no|document|expiry|number)\b/i.test(v)) return true;
+    if (/\b(date\s*de\s*naissance|lieu\s*de\s*naissance|date\s*d'?\s*expiration|date\s*d'?\s*[eé]mission|num[eé]ro\s*de\s*carte|nationalit[eé]|pr[eé]nom)(?![A-Za-z])/i.test(v)) return true;
+    if (/\b(kat\s*la\s*f[eè]t|kat\s*la\s*fini|dat\s*(?:ou\s*)?f[eè]t|kote\s*(?:ou\s*)?f[eè]t|nimewo\s*kat|nimewo\s*idantifikasyon|nasyonalite|siyati\s*m[eè]t)\b/i.test(v)) return true;
     // Passport/card field markers (e.g., "***" or "* text *")
     if (/^\*+/.test(v)) return true;
     return false;
+  }
+
+  /**
+   * Strip trailing label noise from a value. Common OCR artifact when two labels
+   * share a visual line: "DELAIRE Date de Naissance: /Dat.ou fet" → "DELAIRE".
+   * Covers English + French + Haitian Creole label prefixes.
+   *
+   * NOTE: Only multi-word label phrases are included — generic single-word English
+   * tokens (nationality/expiry/address) were deliberately omitted to avoid
+   * truncating legitimate values that happen to contain those words.
+   */
+  private stripTrailingLabelNoise(value: string): string {
+    const labelStart = /\s+(?:date\s*de\s*naissance|lieu\s*de\s*naissance|date\s*d'?\s*expiration|date\s*d'?\s*[eé]mission|num[eé]ro\s*de\s*carte|nationalit[eé]|nasyonalite|dat\s*(?:ou\s*)?f[eè]t|kat\s*la\s*f[eè]t|kat\s*la\s*fini|kote\s*(?:ou\s*)?f[eè]t|nimewo\s*kat|nimewo\s*idantifikasyon|signature|siyati\s*m[eè]t|date\s*of\s*birth|date\s*of\s*expiry)(?![A-Za-z]).*$/i;
+    return value.replace(labelStart, '').trim();
+  }
+
+  /**
+   * Strip leading label noise from a value. Common OCR artifact when the value
+   * line bleeds into the label line: "Nom/ Siyati Haitien / Ayisyen" → "Haitien / Ayisyen".
+   * Handles compound bilingual labels (French / Kreyòl, French / English, etc.).
+   *
+   * Each keyword in the group uses a trailing (?![A-Za-z]) lookahead to prevent
+   * stripping prefixes from legitimate values like "Nomadic" or "Nameplate".
+   * NOTE: Plain \b cannot be used here because JavaScript's \b is ASCII-only —
+   * it fails after non-ASCII chars like é (e.g., /nationalit[eé]\b/ won't match
+   * "nationalité" because \b doesn't see é as a word character).
+   */
+  private stripLeadingLabelNoise(value: string): string {
+    const compoundLabel = /^\s*(?:nom|pr[eé]nom|non|siyati|sexe|s[eè]ks|nationalit[eé]|nasyonalite|date|dat|lieu|kote|num[eé]ro|nimewo|signature|surname|given\s*name|name|dob)(?![A-Za-z])(?:\s*\/\s*(?:nom|pr[eé]nom|non|siyati|sexe|s[eè]ks|nationalit[eé]|nasyonalite|date|dat|lieu|kote|num[eé]ro|nimewo|signature|surname|given\s*name|name|dob)(?![A-Za-z]))*\s*[:\-]?\s*/i;
+    return value.replace(compoundLabel, '').trim();
   }
 
   /** Extract text appearing after a label match on the same line */
@@ -1563,8 +1623,9 @@ export class PaddleOCRProvider implements OCRProvider {
 
       if (surnamePatterns.length > 0) {
         this.findField(flatLines, surnamePatterns, (value, conf) => {
-          if (!isHeaderNoise(value) && !SPECIMEN_LABELS.test(value) && !this.isLabelOrNoise(value)) {
-            surname = value;
+          const cleaned = this.stripTrailingLabelNoise(value);
+          if (cleaned && !isHeaderNoise(cleaned) && !SPECIMEN_LABELS.test(cleaned) && !this.isLabelOrNoise(cleaned)) {
+            surname = cleaned;
             nameConf = Math.max(nameConf, conf);
             return; // accepted
           }
@@ -1573,8 +1634,9 @@ export class PaddleOCRProvider implements OCRProvider {
       }
       if (givenPatterns.length > 0) {
         this.findField(flatLines, givenPatterns, (value, conf) => {
-          if (!isHeaderNoise(value) && !SPECIMEN_LABELS.test(value) && !this.isLabelOrNoise(value)) {
-            givenName = value;
+          const cleaned = this.stripTrailingLabelNoise(value);
+          if (cleaned && !isHeaderNoise(cleaned) && !SPECIMEN_LABELS.test(cleaned) && !this.isLabelOrNoise(cleaned)) {
+            givenName = cleaned;
             nameConf = Math.max(nameConf, conf);
             return; // accepted
           }
@@ -1588,8 +1650,9 @@ export class PaddleOCRProvider implements OCRProvider {
       } else {
         // Fall back to combined name patterns
         this.findField(flatLines, labels.name, (value, conf) => {
-          if (!isHeaderNoise(value) && !SPECIMEN_LABELS.test(value) && !this.isLabelOrNoise(value)) {
-            ocrData.name = value;
+          const cleaned = this.stripTrailingLabelNoise(value);
+          if (cleaned && !isHeaderNoise(cleaned) && !SPECIMEN_LABELS.test(cleaned) && !this.isLabelOrNoise(cleaned)) {
+            ocrData.name = cleaned;
             ocrData.confidence_scores!.name = conf;
             return;
           }
@@ -1598,22 +1661,31 @@ export class PaddleOCRProvider implements OCRProvider {
       }
     }
 
-    // Extract date of birth with country date format hint
+    // Extract date of birth with country date format hint.
+    // The hint is also passed into findDateField so standardizeDateFormat
+    // resolves ambiguous DD/MM vs MM/DD correctly BEFORE normalizeDateWithHint
+    // would see a pre-normalized YYYY-MM-DD and no-op.
     this.findDateField(flatLines, labels.date_of_birth, (value, conf) => {
       ocrData.date_of_birth = this.normalizeDateWithHint(value, format.date_format);
       ocrData.confidence_scores!.date_of_birth = conf;
-    });
+    }, format.date_format);
 
     // Extract ID number
     this.findField(flatLines, labels.id_number, (value, conf) => {
-      const cleaned = value.replace(/\s+/g, '');
+      // Strip trailing label fragments before pattern matching
+      const valueClean = this.stripTrailingLabelNoise(value);
+      const cleaned = valueClean.replace(/\s+/g, '');
       if (/^[A-Z0-9\-]{4,15}$/i.test(cleaned) && !this.isLabelOrNoise(cleaned) && /\d/.test(cleaned)) {
         ocrData.document_number = cleaned;
         ocrData.confidence_scores!.document_number = conf;
         return;
       }
-      // Try to extract an ID-like token from the value (handles concatenated text)
-      const idM = value.match(/\b([A-Z]\d{7,12}[A-Z0-9]?)\b/i) ?? value.match(/\b(\d{6,12})\b/);
+      // Scan the cleaned value for an alphanumeric token containing a digit.
+      // The stricter pattern (leading letter + 7+ digits) handles formats like "T1K2N89G7".
+      const idM =
+        valueClean.match(/\b([A-Z]\d{6,12}[A-Z0-9]{0,3})\b/i) ??
+        valueClean.match(/\b([A-Z]{1,3}\d[A-Z0-9]{5,14})\b/i) ??
+        valueClean.match(/\b(\d{6,14})\b/);
       if (idM) {
         ocrData.document_number = idM[1];
         ocrData.confidence_scores!.document_number = conf * 0.9;
@@ -1622,21 +1694,35 @@ export class PaddleOCRProvider implements OCRProvider {
       return false;
     });
 
-    // Extract expiry date — use findLastDateField to disambiguate issue vs expiry
-    this.findLastDateField(flatLines, labels.expiry_date, (value, conf) => {
-      ocrData.expiration_date = this.normalizeDateWithHint(value, format.date_format);
-      ocrData.confidence_scores!.expiration_date = conf;
-    });
+    // Extract expiry date. Pass date_format hint so ambiguous dates like
+    // "06-02-2028" are interpreted correctly (DMY → 2028-02-06). The 2-line
+    // window is explicitly opted into via options.windowSize=2 to handle
+    // bilingual layouts where the dates sit below a two-row stacked label
+    // header (French / Kreyòl).
+    this.findLastDateField(
+      flatLines,
+      labels.expiry_date,
+      (value, conf) => {
+        ocrData.expiration_date = this.normalizeDateWithHint(value, format.date_format);
+        ocrData.confidence_scores!.expiration_date = conf;
+      },
+      format.date_format,
+      { windowSize: 2 },
+    );
 
     // Extract nationality
     this.findField(flatLines, labels.nationality, (value, conf) => {
       let cleaned = value.replace(/^\*+\s*/, '').replace(/\s*\*+$/, '').trim();
-      // Strip trailing numbers/IDs (e.g., "Shqiptare/Albanian 200000907" → "Shqiptare/Albanian")
       cleaned = cleaned.replace(/\s+\d{5,}$/, '').trim();
-      // For bilingual values like "Shqiptare/Albanian", take the English part (after /)
-      const slashParts = cleaned.split('/');
-      if (slashParts.length === 2 && slashParts[1].trim().length >= 2) {
-        cleaned = slashParts[1].trim();
+      // Strip leading compound labels like "Nom/ Siyati " from bilingual docs
+      cleaned = this.stripLeadingLabelNoise(cleaned);
+      const slashParts = cleaned.split('/').map(s => s.trim())
+        .filter(s => s.length >= 2 && !this.isLabelOrNoise(s));
+      if (slashParts.length >= 2) {
+        // Prefer the longest non-label token (typically the full nationality word)
+        cleaned = slashParts.reduce((a, b) => b.length > a.length ? b : a);
+      } else if (slashParts.length === 1) {
+        cleaned = slashParts[0];
       }
       if (cleaned.length >= 2 && cleaned.length <= 30 && !this.isLabelOrNoise(cleaned)) {
         ocrData.nationality = cleaned;
@@ -1899,49 +1985,70 @@ export class PaddleOCRProvider implements OCRProvider {
     }
   }
 
+  /**
+   * Like findField, but extracts and normalizes a date value.
+   * @param hint - Optional country date-format hint for ambiguous dates.
+   */
   private findDateField(
     lines:    Array<{ text: string; confidence: number }>,
     patterns: RegExp[],
     onMatch:  (value: string, confidence: number) => void,
+    hint?:    'DMY' | 'MDY' | 'YMD',
   ): void {
     this.findField(lines, patterns, (value, conf) => {
-      const dateStr = this.extractDate(value);
+      const dateStr = this.extractDate(value, hint);
       if (dateStr) { onMatch(dateStr, conf); return; }
       return false;
     });
   }
 
-  private extractDate(text: string): string | null {
+  /**
+   * Extract a single date from text (month-name or numeric).
+   * @param hint - Optional country date-format hint for ambiguous dates.
+   */
+  private extractDate(text: string, hint?: 'DMY' | 'MDY' | 'YMD'): string | null {
     // Try month-name dates first (e.g., "1 JAN 1981")
     const monthName = parseMonthNameDate(text);
     if (monthName) return monthName;
     // Numeric dates (e.g., "01/01/1981")
     const m = text.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
-    return m ? standardizeDateFormat(m[0]) : null;
+    return m ? standardizeDateFormat(m[0], hint) : null;
   }
 
   /**
    * Like findDateField(), but picks the LAST date found in the matched region.
    * Useful for expiry extraction where issue and expiry dates may appear
    * side-by-side on the same line or adjacent lines.
+   *
+   * @param hint - Optional country date-format hint (DMY/MDY/YMD). When provided,
+   *   ambiguous dates like "06-02-2028" are interpreted according to the hint
+   *   instead of falling back to the p1>12 heuristic.
+   * @param options - Optional config:
+   *   - windowSize: number of following lines to include in the search (default 1).
+   *     Set to 2 for multi-column bilingual layouts where dates sit below a
+   *     two-line stacked label header.
    */
   private findLastDateField(
     lines:    Array<{ text: string; confidence: number }>,
     patterns: RegExp[],
     onMatch:  (value: string, confidence: number) => void,
+    hint?:    'DMY' | 'MDY' | 'YMD',
+    options?: { windowSize?: 1 | 2 },
   ): void {
+    const windowSize = options?.windowSize ?? 1;
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       for (const pattern of patterns) {
         const match = line.text.match(pattern);
         if (!match) continue;
 
-        // Collect dates from the matched line + the next line
+        // Collect dates from the matched line + up to N following lines.
         const textToSearch = line.text.slice(match.index! + match[0].length);
-        const nextText = (i + 1 < lines.length) ? lines[i + 1].text : '';
-        const combined = textToSearch + ' ' + nextText;
+        const next1 = (i + 1 < lines.length) ? lines[i + 1].text : '';
+        const next2 = (windowSize >= 2 && i + 2 < lines.length) ? lines[i + 2].text : '';
+        const combined = textToSearch + ' ' + next1 + ' ' + next2;
 
-        const dates = findAllDates(combined);
+        const dates = findAllDates(combined, hint);
         if (dates.length > 0) {
           // Pick the last (chronologically latest) date
           const sorted = [...dates].sort();
