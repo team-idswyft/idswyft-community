@@ -1,4 +1,6 @@
+import './instrument.js';
 import 'dotenv/config';
+import * as Sentry from '@sentry/node';
 import express from 'express';
 import cookieParser from 'cookie-parser';
 import cors from 'cors';
@@ -243,6 +245,9 @@ app.use('*', (req, res) => {
     availableEndpoints: '/api/docs'
   });
 });
+
+// Sentry error handler — must be registered before any other error middleware
+Sentry.setupExpressErrorHandler(app);
 
 // Error handling middleware — delegates to full handler in middleware/errorHandler.ts
 app.use(errorHandler);

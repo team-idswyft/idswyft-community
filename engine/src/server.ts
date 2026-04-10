@@ -11,7 +11,9 @@
  * carries the heavy ML dependencies (~1.5GB).
  */
 
+import './instrument.js';
 import 'dotenv/config';
+import * as Sentry from '@sentry/node';
 import express from 'express';
 import { logger } from '@/utils/logger.js';
 import { configureSharedLogger } from '@idswyft/shared';
@@ -33,6 +35,9 @@ app.get('/health', (_req, res) => {
 
 // Extraction routes
 app.use('/extract', extractRouter);
+
+// Sentry error handler — must be registered before any other error middleware
+Sentry.setupExpressErrorHandler(app);
 
 // Global error handler
 app.use((err: Error, _req: express.Request, res: express.Response, _next: express.NextFunction) => {
