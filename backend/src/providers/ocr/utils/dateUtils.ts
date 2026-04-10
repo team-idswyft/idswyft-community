@@ -23,8 +23,16 @@ export function parseMonthNameDate(text: string): string | null {
   return null;
 }
 
-/** Normalise any date string to YYYY-MM-DD */
-export function standardizeDateFormat(raw: string): string {
+/**
+ * Normalise any date string to YYYY-MM-DD.
+ *
+ * @param hint - Optional country-format hint for ambiguous dates (e.g., 01/02/2028).
+ *   - 'DMY' (European/French/Kreyòl): 01 = day, 02 = month
+ *   - 'MDY' (US, default when omitted): 01 = month, 02 = day
+ *   - 'YMD' (East Asian): year-month-day
+ *   When hint is undefined, falls back to p1 > 12 heuristic (defaults to MDY).
+ */
+export function standardizeDateFormat(raw: string, hint?: 'DMY' | 'MDY' | 'YMD'): string {
   const cleaned = raw.replace(/[^\d\/\-\.]/g, '');
   const parts   = cleaned.split(/[\/\-\.]/);
   if (parts.length !== 3) return raw;
@@ -32,16 +40,31 @@ export function standardizeDateFormat(raw: string): string {
 
   let [p1, p2, p3] = parts;
 
-  // Two-digit year
-  if (p3.length === 2) {
+  // 4-digit first part = already YYYY-first
+  if (p1.length === 4) return `${p1}-${p2.padStart(2, '0')}-${p3.padStart(2, '0')}`;
+
+  // Expand 2-digit year based on position (YMD puts year first, others put it last)
+  if (hint === 'YMD' && p1.length === 2) {
+    const yr = parseInt(p1, 10);
+    p1 = yr > 30 ? `19${p1}` : `20${p1}`;
+  } else if (p3.length === 2) {
     const yr = parseInt(p3, 10);
     p3 = yr > 30 ? `19${p3}` : `20${p3}`;
   }
 
-  // If first part > 12 → DD/MM/YYYY
-  return parseInt(p1, 10) > 12
-    ? `${p3}-${p2.padStart(2,'0')}-${p1.padStart(2,'0')}`
-    : `${p3}-${p1.padStart(2,'0')}-${p2.padStart(2,'0')}`;
+  // If no hint, use p1 > 12 heuristic (defaults to MDY for ambiguous)
+  if (!hint) {
+    return parseInt(p1, 10) > 12
+      ? `${p3}-${p2.padStart(2,'0')}-${p1.padStart(2,'0')}`
+      : `${p3}-${p1.padStart(2,'0')}-${p2.padStart(2,'0')}`;
+  }
+
+  // Hint-guided interpretation
+  switch (hint) {
+    case 'DMY': return `${p3}-${p2.padStart(2, '0')}-${p1.padStart(2, '0')}`;
+    case 'MDY': return `${p3}-${p1.padStart(2, '0')}-${p2.padStart(2, '0')}`;
+    case 'YMD': return `${p1}-${p2.padStart(2, '0')}-${p3.padStart(2, '0')}`;
+  }
 }
 
 /**
@@ -91,14 +114,17 @@ export function parseAamvaDate(s: string): string | null {
   return null;
 }
 
-/** Extract ALL date strings from text (numeric and month-name formats) */
-export function findAllDates(text: string): string[] {
+/**
+ * Extract ALL date strings from text (numeric and month-name formats).
+ * @param hint - Optional country-format hint passed to standardizeDateFormat.
+ */
+export function findAllDates(text: string, hint?: 'DMY' | 'MDY' | 'YMD'): string[] {
   const results: string[] = [];
   // Numeric dates: DD/MM/YYYY etc.
   const re = /(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/g;
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
-    const norm = standardizeDateFormat(m[0]);
+    const norm = standardizeDateFormat(m[0], hint);
     if (norm) results.push(norm);
   }
   // Month-name dates: "1 JAN 1981", "JAN 1, 1981"

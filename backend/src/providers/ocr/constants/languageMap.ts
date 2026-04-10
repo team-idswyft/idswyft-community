@@ -27,7 +27,7 @@ const COUNTRY_SCRIPT_MAP: Record<string, OCRScript> = {
   CZ: 'latin', SK: 'latin', HU: 'latin', RO: 'latin', HR: 'latin',
   SI: 'latin', EE: 'latin', LV: 'latin', LT: 'latin', MT: 'latin',
   MX: 'latin', BR: 'latin', AR: 'latin', CO: 'latin', CL: 'latin',
-  PE: 'latin', VE: 'latin', PH: 'latin', ID: 'latin', MY: 'latin',
+  PE: 'latin', VE: 'latin', HT: 'latin', PH: 'latin', ID: 'latin', MY: 'latin',
   TR: 'latin', ZA: 'latin', NG: 'latin', KE: 'latin', GH: 'latin',
 
   // Cyrillic-script countries

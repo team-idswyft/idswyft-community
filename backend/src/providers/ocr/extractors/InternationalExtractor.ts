@@ -44,8 +44,9 @@ export class InternationalExtractor extends BaseExtractor {
 
       if (surnamePatterns.length > 0) {
         this.findField(flatLines, surnamePatterns, (value, conf) => {
-          if (!isHeaderNoise(value) && !SPECIMEN_LABELS.test(value) && !this.isLabelOrNoise(value)) {
-            surname = value;
+          const cleaned = this.stripTrailingLabelNoise(value);
+          if (cleaned && !isHeaderNoise(cleaned) && !SPECIMEN_LABELS.test(cleaned) && !this.isLabelOrNoise(cleaned)) {
+            surname = cleaned;
             nameConf = Math.max(nameConf, conf);
             return;
           }
@@ -54,8 +55,9 @@ export class InternationalExtractor extends BaseExtractor {
       }
       if (givenPatterns.length > 0) {
         this.findField(flatLines, givenPatterns, (value, conf) => {
-          if (!isHeaderNoise(value) && !SPECIMEN_LABELS.test(value) && !this.isLabelOrNoise(value)) {
-            givenName = value;
+          const cleaned = this.stripTrailingLabelNoise(value);
+          if (cleaned && !isHeaderNoise(cleaned) && !SPECIMEN_LABELS.test(cleaned) && !this.isLabelOrNoise(cleaned)) {
+            givenName = cleaned;
             nameConf = Math.max(nameConf, conf);
             return;
           }
@@ -68,8 +70,9 @@ export class InternationalExtractor extends BaseExtractor {
         ocrData.confidence_scores!.name = nameConf;
       } else {
         this.findField(flatLines, labels.name, (value, conf) => {
-          if (!isHeaderNoise(value) && !SPECIMEN_LABELS.test(value) && !this.isLabelOrNoise(value)) {
-            ocrData.name = value;
+          const cleaned = this.stripTrailingLabelNoise(value);
+          if (cleaned && !isHeaderNoise(cleaned) && !SPECIMEN_LABELS.test(cleaned) && !this.isLabelOrNoise(cleaned)) {
+            ocrData.name = cleaned;
             ocrData.confidence_scores!.name = conf;
             return;
           }
@@ -78,21 +81,31 @@ export class InternationalExtractor extends BaseExtractor {
       }
     }
 
-    // Extract date of birth with country date format hint
+    // Extract date of birth with country date format hint.
+    // The hint is also passed into findDateField so standardizeDateFormat
+    // resolves ambiguous DD/MM vs MM/DD correctly BEFORE normalizeDateWithHint
+    // would see a pre-normalized YYYY-MM-DD and no-op.
     this.findDateField(flatLines, labels.date_of_birth, (value, conf) => {
       ocrData.date_of_birth = this.normalizeDateWithHint(value, format.date_format);
       ocrData.confidence_scores!.date_of_birth = conf;
-    });
+    }, format.date_format);
 
     // Extract ID number
     this.findField(flatLines, labels.id_number, (value, conf) => {
-      const cleaned = value.replace(/\s+/g, '');
+      // Strip trailing label fragments before pattern matching
+      const valueClean = this.stripTrailingLabelNoise(value);
+      const cleaned = valueClean.replace(/\s+/g, '');
       if (/^[A-Z0-9\-]{4,15}$/i.test(cleaned) && !this.isLabelOrNoise(cleaned) && /\d/.test(cleaned)) {
         ocrData.document_number = cleaned;
         ocrData.confidence_scores!.document_number = conf;
         return;
       }
-      const idM = value.match(/\b([A-Z]\d{7,12}[A-Z0-9]?)\b/i) ?? value.match(/\b(\d{6,12})\b/);
+      // Scan the cleaned value for an alphanumeric token containing a digit.
+      // The stricter pattern (leading letter + 7+ digits) handles formats like "T1K2N89G7".
+      const idM =
+        valueClean.match(/\b([A-Z]\d{6,12}[A-Z0-9]{0,3})\b/i) ??
+        valueClean.match(/\b([A-Z]{1,3}\d[A-Z0-9]{5,14})\b/i) ??
+        valueClean.match(/\b(\d{6,14})\b/);
       if (idM) {
         ocrData.document_number = idM[1];
         ocrData.confidence_scores!.document_number = conf * 0.9;
@@ -101,19 +114,35 @@ export class InternationalExtractor extends BaseExtractor {
       return false;
     });
 
-    // Extract expiry date
-    this.findLastDateField(flatLines, labels.expiry_date, (value, conf) => {
-      ocrData.expiration_date = this.normalizeDateWithHint(value, format.date_format);
-      ocrData.confidence_scores!.expiration_date = conf;
-    });
+    // Extract expiry date. Pass date_format hint so ambiguous dates like
+    // "06-02-2028" are interpreted correctly (DMY → 2028-02-06). The 2-line
+    // window is explicitly opted into via options.windowSize=2 to handle
+    // bilingual layouts where the dates sit below a two-row stacked label
+    // header (French / Kreyòl).
+    this.findLastDateField(
+      flatLines,
+      labels.expiry_date,
+      (value, conf) => {
+        ocrData.expiration_date = this.normalizeDateWithHint(value, format.date_format);
+        ocrData.confidence_scores!.expiration_date = conf;
+      },
+      format.date_format,
+      { windowSize: 2 },
+    );
 
     // Extract nationality
     this.findField(flatLines, labels.nationality, (value, conf) => {
       let cleaned = value.replace(/^\*+\s*/, '').replace(/\s*\*+$/, '').trim();
       cleaned = cleaned.replace(/\s+\d{5,}$/, '').trim();
-      const slashParts = cleaned.split('/');
-      if (slashParts.length === 2 && slashParts[1].trim().length >= 2) {
-        cleaned = slashParts[1].trim();
+      // Strip leading compound labels like "Nom/ Siyati " from bilingual docs
+      cleaned = this.stripLeadingLabelNoise(cleaned);
+      const slashParts = cleaned.split('/').map(s => s.trim())
+        .filter(s => s.length >= 2 && !this.isLabelOrNoise(s));
+      if (slashParts.length >= 2) {
+        // Prefer the longest non-label token (typically the full nationality word)
+        cleaned = slashParts.reduce((a, b) => b.length > a.length ? b : a);
+      } else if (slashParts.length === 1) {
+        cleaned = slashParts[0];
       }
       if (cleaned.length >= 2 && cleaned.length <= 30 && !this.isLabelOrNoise(cleaned)) {
         ocrData.nationality = cleaned;

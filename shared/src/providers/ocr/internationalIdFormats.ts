@@ -196,6 +196,60 @@ export const INTERNATIONAL_ID_FORMATS: Record<string, CountryIdFormat> = {
     ],
   },
 
+  HT: {
+    // Haiti — Carte d'Identification Nationale (CIN) issued by ONI.
+    // Bilingual layout: French labels paired with Haitian Creole (Kreyòl) translations.
+    // Passport issued by DIE, ICAO 9303 compliant with standard 2×44 MRZ.
+    country: 'HT',
+    document_types: [
+      {
+        type: 'national_id', // Carte d'Identification Nationale (CIN)
+        // Post-2014 CIN uses a 14-digit NIN derived from NIF algorithm, but older cards
+        // and the specimen-visible "Numéro de carte" use 9-char alphanumeric (e.g., T1K2N89G7).
+        // Accept both formats.
+        id_number_regex: /^(?:\d{14}|[A-Z0-9]{8,12})$/,
+        field_labels: {
+          // "Nom / Siyati" = surname (French / Kreyòl). "Prénom / Non" = given name.
+          // Note: French "Nom" and Kreyòl "Non" are confusingly similar but distinct labels.
+          // Pattern sources include "surname"/"given" keywords so InternationalExtractor's
+          // surname/given filter (which matches regex source, not the regex itself) routes
+          // them to the right side of the name split. \b anchors prevent "nom" from firing
+          // inside "prenom".
+          name: [
+            /surname|\bsiyati\b|\bnom\b/i,       // → surnamePatterns (filter hits "surname")
+            /given|\bpr[eé]nom\b|\bnon\b/i,      // → givenPatterns   (filter hits "given")
+            /\bname\b/i,
+          ],
+          date_of_birth: [/date\s*de\s*naissance/i, /dat\s*(?:ou\s*)?f[eè]t/i, /n[eé]\s*le/i, /date\s*of\s*birth/i, /dob/i],
+          expiry_date: [/date\s*d'?\s*expiration/i, /dat\s*kat\s*la\s*fini/i, /valable\s*jusqu/i, /expiry/i, /expiration/i],
+          id_number: [/num[eé]ro\s*de\s*carte/i, /nimewo\s*kat\s*la/i, /n[°o]\s*cin/i, /num[eé]ro\s*d'?\s*identification/i, /nimewo\s*idantifikasyon/i, /id\s*no/i],
+          nationality: [/nationalit[eé]/i, /nasyonalite/i, /ha[iï]tien/i, /ayisyen/i, /nationality/i],
+          address: [/lieu\s*de\s*naissance/i, /kote\s*(?:ou\s*)?f[eè]t/i, /adresse/i, /domicile/i, /address/i],
+          issuing_authority: [/oni/i, /office\s*national\s*d'?\s*identification/i, /authority/i],
+        },
+        date_format: 'DMY', // French / Kreyòl convention: DD-MM-YYYY
+        has_mrz: false,
+      },
+      {
+        type: 'passport', // Haitian biometric passport issued by DIE
+        // ICAO format: typically letter(s) + digits. Exact pattern unverified against
+        // a real specimen, so accept the broad ICAO-compatible pattern.
+        id_number_regex: /^[A-Z]{1,2}\d{6,8}$/,
+        field_labels: {
+          name: [/\bnom\b/i, /\bsurname\b/i, /\bpr[eé]nom\b/i, /given\s*name/i, /name/i],
+          date_of_birth: [/date\s*de\s*naissance/i, /date\s*of\s*birth/i, /dob/i],
+          expiry_date: [/date\s*d'?\s*expiration/i, /date\s*of\s*expiry/i, /expiry/i],
+          id_number: [/passeport\s*n[°o]/i, /passport\s*no/i, /num[eé]ro/i, /id\s*no/i],
+          nationality: [/nationalit[eé]/i, /nationality/i, /ha[iï]tien/i],
+          address: [/adresse/i, /address/i],
+          issuing_authority: [/die/i, /direction\s*de\s*l'immigration/i, /authority/i],
+        },
+        date_format: 'DMY',
+        has_mrz: true, // standard 2×44 ICAO MRZ
+      },
+    ],
+  },
+
   IT: {
     country: 'IT',
     document_types: [
@@ -532,6 +586,9 @@ export const INTERNATIONAL_HEADER_NOISE = new Set([
   'personalausweis', 'f\u00fchrerschein', 'bundesrepublik deutschland',
   // French
   "carte nationale d'identit\u00e9", 'permis de conduire', 'r\u00e9publique fran\u00e7aise',
+  // Haiti — French + Haitian Creole
+  "r\u00e9publique d'ha\u00efti", "repiblik dayiti",
+  "carte d'identification nationale", "kat idantifikasyon nasyonal",
   // Italian
   "carta d'identit\u00e0", 'patente di guida', 'repubblica italiana',
   // Spanish
