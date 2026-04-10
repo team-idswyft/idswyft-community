@@ -5,6 +5,18 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.10] - 2026-04-10
+
+### Added
+- **Haiti CIN (Carte d'Identification Nationale) OCR support** — PaddleOCR extraction for Haitian national ID cards with bilingual French/Kreyòl label handling, DMY date format, and compass-rose watermark resilience. Benchmark: 5/6 fields (name, DOB, doc#, expiry, nationality).
+- **Date-format hint threading** — `standardizeDateFormat`, `findAllDates`, `findDateField`, `extractDate`, and `findLastDateField` now accept an optional `DMY`/`MDY`/`YMD` hint for country-specific date disambiguation.
+- **`stripTrailingLabelNoise` / `stripLeadingLabelNoise` helpers** — clean bilingual OCR artifacts (French + Haitian Creole label fragments concatenated with extracted values).
+- **59 unit tests** for `BaseExtractor` helpers (`stripLeadingLabelNoise`, `stripTrailingLabelNoise`, `findLastDateField`, `extractDate`, `isLabelOrNoise`).
+
+### Fixed
+- **JS `\b` word-boundary bug** — trailing `\b` in French label regexes silently failed after non-ASCII chars like `é` (JavaScript's `\b` is ASCII-only). Replaced with `(?![A-Za-z])` negative lookahead in both backend and engine.
+- **`findLastDateField` window/hint coupling** — search window size and date-format hint are now independent parameters (`options.windowSize` vs `hint`).
+
 ## [1.8.3] - 2026-04-09
 
 ### Fixed
