@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import multer from 'multer';
 import { body, param } from 'express-validator';
-import { authenticateAPIKey, authenticateUser, checkSandboxMode } from '@/middleware/auth.js';
+import { authenticateAPIKeyOrHandoff, authenticateUser, checkSandboxMode } from '@/middleware/auth.js';
 import { verificationRateLimit } from '@/middleware/rateLimit.js';
 import { catchAsync, ValidationError, FileUploadError } from '@/middleware/errorHandler.js';
 import { validate } from '@/middleware/validate.js';
@@ -763,7 +763,7 @@ async function requireOwnedVerification(req: Request, verificationId: string) {
 // ─── Routes ──────────────────────────────────
 
 router.post('/initialize',
-  authenticateAPIKey,
+  authenticateAPIKeyOrHandoff,
   checkSandboxMode,
   verificationRateLimit,
   [
@@ -931,7 +931,7 @@ router.post('/initialize',
 
 // ─── Re-verification: liveness-only re-check for returning users ────────────
 router.post('/re-verify',
-  authenticateAPIKey,
+  authenticateAPIKeyOrHandoff,
   checkSandboxMode,
   verificationRateLimit,
   [
@@ -1054,7 +1054,7 @@ router.post('/re-verify',
 );
 
 router.post('/:verification_id/front-document',
-  authenticateAPIKey,
+  authenticateAPIKeyOrHandoff,
   verificationRateLimit,
   upload.single('document'),
   [
@@ -1320,7 +1320,7 @@ router.post('/:verification_id/front-document',
 );
 
 router.post('/:verification_id/back-document',
-  authenticateAPIKey,
+  authenticateAPIKeyOrHandoff,
   verificationRateLimit,
   upload.single('document'),
   [
@@ -1500,7 +1500,7 @@ router.post('/:verification_id/back-document',
 
 // Cross-validation is now auto-triggered — this endpoint returns cached result
 router.post('/:verification_id/cross-validation',
-  authenticateAPIKey,
+  authenticateAPIKeyOrHandoff,
   verificationRateLimit,
   [
     param('verification_id').isUUID().withMessage('Invalid verification ID'),
@@ -1535,7 +1535,7 @@ router.post('/:verification_id/cross-validation',
 );
 
 router.post('/:verification_id/live-capture',
-  authenticateAPIKey,
+  authenticateAPIKeyOrHandoff,
   verificationRateLimit,
   upload.single('selfie'),
   [
@@ -1801,7 +1801,7 @@ router.post('/:verification_id/live-capture',
 // /finalize endpoint removed — final decision auto-triggers after live capture.
 // Return 410 Gone for backward compat awareness.
 router.post('/:verification_id/finalize',
-  authenticateAPIKey,
+  authenticateAPIKeyOrHandoff,
   [
     param('verification_id').isUUID().withMessage('Invalid verification ID'),
   ],
@@ -1830,7 +1830,7 @@ router.post('/:verification_id/finalize',
 
 // ─── Restart a failed verification (retry flow) ──────────────────────────
 router.post('/:verification_id/restart',
-  authenticateAPIKey,
+  authenticateAPIKeyOrHandoff,
   verificationRateLimit,
   [
     param('verification_id').isUUID().withMessage('Invalid verification ID'),
@@ -1915,7 +1915,7 @@ router.post('/:verification_id/restart',
 );
 
 router.get('/:verification_id/status',
-  authenticateAPIKey,
+  authenticateAPIKeyOrHandoff,
   [
     param('verification_id').isUUID().withMessage('Invalid verification ID'),
   ],
@@ -2036,7 +2036,7 @@ async function getSMSConfigForVerification(verificationRequestId: string) {
 }
 
 router.post('/:verification_id/phone-otp/send',
-  authenticateAPIKey,
+  authenticateAPIKeyOrHandoff,
   [
     param('verification_id').isUUID().withMessage('Invalid verification ID'),
     body('phone_number').matches(/^\+[1-9]\d{6,14}$/).withMessage('Phone number must be in E.164 format (e.g. +15551234567)'),
@@ -2073,7 +2073,7 @@ router.post('/:verification_id/phone-otp/send',
 );
 
 router.post('/:verification_id/phone-otp/verify',
-  authenticateAPIKey,
+  authenticateAPIKeyOrHandoff,
   [
     param('verification_id').isUUID().withMessage('Invalid verification ID'),
     body('code').matches(/^\d{6}$/).withMessage('Code must be a 6-digit number'),

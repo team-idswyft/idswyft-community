@@ -2,6 +2,7 @@ import express, { Request, Response } from 'express';
 import crypto from 'crypto';
 import { catchAsync, ValidationError } from '@/middleware/errorHandler.js';
 import { AuthenticationError } from '@/middleware/errorHandler.js';
+import { hashHandoffToken } from '@/middleware/auth.js';
 import { supabase } from '@/config/database.js';
 import { logger } from '@/utils/logger.js';
 import config from '@/config/index.js';
@@ -40,11 +41,12 @@ router.post('/create', basicRateLimit, catchAsync(async (req: Request, res: Resp
 
   const validSource = ['api', 'vaas', 'demo'].includes(source) ? source : 'api';
   const token = crypto.randomBytes(32).toString('hex');
+  const tokenHash = hashHandoffToken(token);
   const expiresAt = new Date(Date.now() + 30 * 60 * 1000); // 30 minutes
 
   const { error } = await supabase
     .from('mobile_handoff_sessions')
-    .insert({ token, api_key, user_id, source: validSource, expires_at: expiresAt.toISOString() });
+    .insert({ token: tokenHash, api_key_id: apiKeyRecord.id, user_id, source: validSource, expires_at: expiresAt.toISOString() });
 
   if (error) {
     logger.error('Failed to create handoff session', {
@@ -56,10 +58,11 @@ router.post('/create', basicRateLimit, catchAsync(async (req: Request, res: Resp
     throw new Error(`Failed to create handoff session: ${error.message}`);
   }
 
+  // Return the raw token — only the hash is stored
   res.status(201).json({ token, expires_at: expiresAt.toISOString() });
 }));
 
-// GET /api/verify/handoff/:token/session — mobile fetches api_key + user_id
+// GET /api/verify/handoff/:token/session — mobile fetches session + branding
 router.get('/:token/session', catchAsync(async (req: Request, res: Response) => {
   const { token } = req.params;
 
@@ -67,10 +70,17 @@ router.get('/:token/session', catchAsync(async (req: Request, res: Response) => 
     return res.status(404).json({ error: 'Session not found' });
   }
 
+  const tokenHash = hashHandoffToken(token);
+
   const { data, error } = await supabase
     .from('mobile_handoff_sessions')
-    .select('api_key, user_id, source, status, expires_at')
-    .eq('token', token)
+    .select(`
+      user_id, source, status, expires_at,
+      api_key:api_keys!api_key_id(
+        developer:developers(branding_logo_url, branding_accent_color, branding_company_name, company)
+      )
+    `)
+    .eq('token', tokenHash)
     .single();
 
   if (error || !data) {
@@ -81,9 +91,9 @@ router.get('/:token/session', catchAsync(async (req: Request, res: Response) => 
     const { error: expireError } = await supabase
       .from('mobile_handoff_sessions')
       .update({ status: 'expired' })
-      .eq('token', token);
+      .eq('token', tokenHash);
     if (expireError) {
-      logger.warn('Failed to mark handoff session as expired', { token, error: expireError });
+      logger.warn('Failed to mark handoff session as expired', { error: expireError });
     }
     return res.status(410).json({ error: 'Session expired' });
   }
@@ -92,7 +102,21 @@ router.get('/:token/session', catchAsync(async (req: Request, res: Response) => 
     return res.status(409).json({ error: 'Session already used' });
   }
 
-  res.json({ api_key: data.api_key, user_id: data.user_id, source: data.source || 'api' });
+  // Extract branding from the joined developer record
+  const dev = (data.api_key as any)?.developer;
+  const branding = dev
+    ? {
+        logo_url: dev.branding_logo_url || null,
+        accent_color: dev.branding_accent_color || null,
+        company_name: dev.branding_company_name || dev.company || null,
+      }
+    : null;
+
+  res.json({
+    user_id: data.user_id,
+    source: data.source || 'api',
+    branding,
+  });
 }));
 
 // PATCH /api/verify/handoff/:token/link — mobile links verification_id to session
@@ -112,10 +136,12 @@ router.patch('/:token/link', catchAsync(async (req: Request, res: Response) => {
     throw new ValidationError('Invalid verification_id format', 'verification_id', verification_id);
   }
 
+  const tokenHash = hashHandoffToken(token);
+
   const { data: updated, error } = await supabase
     .from('mobile_handoff_sessions')
     .update({ verification_id })
-    .eq('token', token)
+    .eq('token', tokenHash)
     .eq('status', 'pending')
     .select('id');
 
@@ -155,11 +181,13 @@ router.patch('/:token/complete', catchAsync(async (req: Request, res: Response) 
     }
   }
 
+  const tokenHash = hashHandoffToken(token);
+
   // First verify the session exists and hasn't expired
   const { data: session, error: fetchError } = await supabase
     .from('mobile_handoff_sessions')
     .select('status, expires_at')
-    .eq('token', token)
+    .eq('token', tokenHash)
     .single();
 
   if (fetchError || !session) {
@@ -174,7 +202,7 @@ router.patch('/:token/complete', catchAsync(async (req: Request, res: Response) 
   const { data: updated, error } = await supabase
     .from('mobile_handoff_sessions')
     .update({ status, result: result ?? null })
-    .eq('token', token)
+    .eq('token', tokenHash)
     .eq('status', 'pending')
     .select('id');
 
@@ -198,10 +226,12 @@ router.get('/:token/status', catchAsync(async (req: Request, res: Response) => {
     return res.status(404).json({ error: 'Session not found' });
   }
 
+  const tokenHash = hashHandoffToken(token);
+
   const { data, error } = await supabase
     .from('mobile_handoff_sessions')
     .select('status, result, expires_at, verification_id')
-    .eq('token', token)
+    .eq('token', tokenHash)
     .single();
 
   if (error || !data) {
@@ -212,9 +242,9 @@ router.get('/:token/status', catchAsync(async (req: Request, res: Response) => {
     const { error: expireError } = await supabase
       .from('mobile_handoff_sessions')
       .update({ status: 'expired' })
-      .eq('token', token);
+      .eq('token', tokenHash);
     if (expireError) {
-      logger.warn('Failed to mark handoff session as expired', { token, error: expireError });
+      logger.warn('Failed to mark handoff session as expired', { error: expireError });
     }
     return res.status(410).json({ error: 'Session expired' });
   }

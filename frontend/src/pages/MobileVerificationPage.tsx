@@ -384,7 +384,6 @@ const MobileVerificationPage: React.FC = () => {
   const isIdentity = verificationMode === 'identity';
 
   // Handoff state
-  const [apiKey, setApiKey] = useState<string | null>(null);
   const [_userId, setUserId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -460,22 +459,16 @@ const MobileVerificationPage: React.FC = () => {
         return r.json();
       })
       .then(data => {
-        if (!data.api_key || !data.user_id) throw new Error('Session response is incomplete. Please try scanning the QR code again.');
-        setApiKey(data.api_key);
+        if (!data.user_id) throw new Error('Session response is incomplete. Please try scanning the QR code again.');
         setUserId(data.user_id);
-        // Fetch page branding (fire-and-forget)
-        fetch(`${API_BASE_URL}/api/v2/verify/page-config?api_key=${encodeURIComponent(data.api_key)}`)
-          .then(r => r.ok ? r.json() : null)
-          .then(cfg => {
-            if (cfg?.branding) {
-              setBrandingLogo(cfg.branding.logo_url);
-              setBrandingCompany(cfg.branding.company_name);
-              setBrandingAccent(cfg.branding.accent_color);
-            }
-          })
-          .catch(() => {});
+        // Apply branding from the session response (inlined by backend)
+        if (data.branding) {
+          setBrandingLogo(data.branding.logo_url);
+          setBrandingCompany(data.branding.company_name);
+          setBrandingAccent(data.branding.accent_color);
+        }
         // Auto-start verification with source from handoff session
-        initializeVerification(data.api_key, data.user_id, data.source);
+        initializeVerification(data.user_id, data.source);
       })
       .catch(e => {
         if (e.name === 'AbortError') return;
@@ -491,18 +484,18 @@ const MobileVerificationPage: React.FC = () => {
   }, [token]);
 
   // ── API helper ─────────────────────────────────────────────────────────
-  const apiGet = useCallback(async (path: string, key: string) => {
-    const res = await fetch(`${API_BASE_URL}${path}`, { headers: { 'X-API-Key': key } });
+  const apiGet = useCallback(async (path: string) => {
+    const res = await fetch(`${API_BASE_URL}${path}`, { headers: { 'X-Handoff-Token': token! } });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
-  }, []);
+  }, [token]);
 
   // ── Step 0: Initialize verification session ────────────────────────────
-  const initializeVerification = async (key: string, uid: string, source?: string) => {
+  const initializeVerification = async (uid: string, source?: string) => {
     try {
       const res = await fetch(`${API_BASE_URL}/api/v2/verify/initialize`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-API-Key': key },
+        headers: { 'Content-Type': 'application/json', 'X-Handoff-Token': token! },
         body: JSON.stringify({
           user_id: uid,
           ...(source && { source }),
@@ -593,7 +586,7 @@ const MobileVerificationPage: React.FC = () => {
   }, []);
 
   const uploadFront = async () => {
-    if (!frontFile || !verificationId || !apiKey) return;
+    if (!frontFile || !verificationId || !token) return;
     setIsProcessing(true);
     setStepError(null);
     try {
@@ -601,7 +594,7 @@ const MobileVerificationPage: React.FC = () => {
       fd.append('document_type', documentType);
       fd.append('document', frontFile);
       const res = await fetch(`${API_BASE_URL}/api/v2/verify/${verificationId}/front-document`, {
-        method: 'POST', headers: { 'X-API-Key': apiKey }, body: fd,
+        method: 'POST', headers: { 'X-Handoff-Token': token }, body: fd,
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'Upload failed'); }
       if (!mountedRef.current) return;
@@ -641,10 +634,10 @@ const MobileVerificationPage: React.FC = () => {
 
   // ── Poll front OCR ─────────────────────────────────────────────────────
   const pollFrontOCR = async (attempt: number) => {
-    if (!verificationId || !apiKey || !mountedRef.current) return;
+    if (!verificationId || !token || !mountedRef.current) return;
     if (attempt >= 60) { setStepError('OCR timed out. Please try again.'); return; }
     try {
-      const data = await apiGet(`/api/v2/verify/${verificationId}/status`, apiKey);
+      const data = await apiGet(`/api/v2/verify/${verificationId}/status`);
       if (!mountedRef.current) return;
       if (data.ocr_data && Object.keys(data.ocr_data).length > 0) {
         // OCR complete — user can now upload back
@@ -659,10 +652,10 @@ const MobileVerificationPage: React.FC = () => {
 
   // ── Poll front OCR for identity mode (skip back doc, go to live) ──────
   const pollFrontOCRForIdentity = async (attempt: number) => {
-    if (!verificationId || !apiKey || !mountedRef.current) return;
+    if (!verificationId || !token || !mountedRef.current) return;
     if (attempt >= 60) { setStepError('OCR timed out. Please try again.'); return; }
     try {
-      const data = await apiGet(`/api/v2/verify/${verificationId}/status`, apiKey);
+      const data = await apiGet(`/api/v2/verify/${verificationId}/status`);
       if (!mountedRef.current) return;
       if (data.ocr_data && Object.keys(data.ocr_data).length > 0) {
         setScreenIdx(3); // OCR done — proceed to live capture
@@ -687,7 +680,7 @@ const MobileVerificationPage: React.FC = () => {
   };
 
   const uploadBack = async () => {
-    if (!backFile || !verificationId || !apiKey) return;
+    if (!backFile || !verificationId || !token) return;
     setIsProcessing(true);
     setStepError(null);
     try {
@@ -695,7 +688,7 @@ const MobileVerificationPage: React.FC = () => {
       fd.append('document', backFile);
       fd.append('document_type', documentType);
       const res = await fetch(`${API_BASE_URL}/api/v2/verify/${verificationId}/back-document`, {
-        method: 'POST', headers: { 'X-API-Key': apiKey }, body: fd,
+        method: 'POST', headers: { 'X-Handoff-Token': token }, body: fd,
       });
       if (!res.ok) { const e = await res.json(); throw new Error(e.message || 'Upload failed'); }
       if (!mountedRef.current) return;
@@ -721,14 +714,14 @@ const MobileVerificationPage: React.FC = () => {
 
   // ── Poll cross-validation ──────────────────────────────────────────────
   const pollCrossValidation = async (attempt: number) => {
-    if (!verificationId || !apiKey || !mountedRef.current) return;
+    if (!verificationId || !token || !mountedRef.current) return;
     if (attempt >= 60) { setStepError('Validation timed out. Please try again.'); return; }
 
     // Cycle checking messages
     if (attempt === 0) setCheckingMsg('Verifying your document…');
 
     try {
-      const data = await apiGet(`/api/v2/verify/${verificationId}/status`, apiKey);
+      const data = await apiGet(`/api/v2/verify/${verificationId}/status`);
       if (!mountedRef.current) return;
       const isComplete = !!data.cross_validation_results || data.final_result !== null;
       if (isComplete) {
@@ -789,7 +782,7 @@ const MobileVerificationPage: React.FC = () => {
 
   // ── Active liveness complete — submit blob + metadata directly ─────────
   const handleActiveLivenessComplete = useCallback(async (blob: Blob, metadata: LivenessMetadata) => {
-    if (!verificationId || !apiKey) return;
+    if (!verificationId || !token) return;
     setIsProcessing(true);
     setStepError(null);
     try {
@@ -797,7 +790,7 @@ const MobileVerificationPage: React.FC = () => {
       fd.append('selfie', blob, 'selfie.jpg');
       fd.append('liveness_metadata', JSON.stringify(metadata));
       const res = await fetch(`${API_BASE_URL}/api/v2/verify/${verificationId}/live-capture`, {
-        method: 'POST', headers: { 'X-API-Key': apiKey }, body: fd,
+        method: 'POST', headers: { 'X-Handoff-Token': token }, body: fd,
       });
       if (!res.ok) { const e = await res.json().catch(() => ({ message: 'Liveness check failed' })); throw new Error(e.message || 'Liveness check failed'); }
       if (!mountedRef.current) return;
@@ -819,7 +812,7 @@ const MobileVerificationPage: React.FC = () => {
     } finally {
       if (mountedRef.current) setIsProcessing(false);
     }
-  }, [verificationId, apiKey]);
+  }, [verificationId, token]);
 
   const handleActiveLivenessFallback = useCallback(() => {
     setShowActiveLiveness(false);
@@ -827,7 +820,7 @@ const MobileVerificationPage: React.FC = () => {
   }, []);
 
   const uploadSelfie = async () => {
-    if (!selfieFile || !verificationId || !apiKey) return;
+    if (!selfieFile || !verificationId || !token) return;
     setIsProcessing(true);
     setStepError(null);
     try {
@@ -837,7 +830,7 @@ const MobileVerificationPage: React.FC = () => {
         fd.append('liveness_metadata', JSON.stringify(selfieMetadataRef.current));
       }
       const res = await fetch(`${API_BASE_URL}/api/v2/verify/${verificationId}/live-capture`, {
-        method: 'POST', headers: { 'X-API-Key': apiKey }, body: fd,
+        method: 'POST', headers: { 'X-Handoff-Token': token }, body: fd,
       });
       if (!res.ok) { const e = await res.json().catch(() => ({ message: 'Selfie upload failed' })); throw new Error(e.message || 'Selfie upload failed'); }
       if (!mountedRef.current) return;
@@ -858,13 +851,13 @@ const MobileVerificationPage: React.FC = () => {
   };
 
   const waitForFinalResult = async (attempt: number) => {
-    if (!verificationId || !apiKey || !mountedRef.current) return;
+    if (!verificationId || !token || !mountedRef.current) return;
     if (attempt >= 60) {
       if (mountedRef.current) setStepError('Verification is taking too long. Please close and try again.');
       return;
     }
     try {
-      const data = await apiGet(`/api/v2/verify/${verificationId}/status`, apiKey);
+      const data = await apiGet(`/api/v2/verify/${verificationId}/status`);
       if (!mountedRef.current) return;
       if (data.final_result !== null) { showFinalResult(data); return; }
 
@@ -887,12 +880,12 @@ const MobileVerificationPage: React.FC = () => {
 
   // ── Retry failed verification ───────────────────────────────────────────
   const handleRetry = async () => {
-    if (!verificationId || !apiKey) return;
+    if (!verificationId || !token) return;
     setRetryProcessing(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/v2/verify/${verificationId}/restart`, {
         method: 'POST',
-        headers: { 'X-API-Key': apiKey },
+        headers: { 'X-Handoff-Token': token },
       });
       if (!res.ok) {
         const err = await res.json().catch(() => ({ message: 'Failed to restart' }));
