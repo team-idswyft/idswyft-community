@@ -82,6 +82,75 @@ export const DocsReference: React.FC = () => {
 
       {[
         {
+          version: '1.8.3',
+          date: '2026-04-09',
+          added: [],
+          fixed: [
+            'Compliance auth recursion bug — authenticateComplianceRequest self-recursed on the X-API-Key branch, which would have stack-overflowed any API key request (latent because the previous UI only ever hit the JWT branch)',
+          ],
+          changed: [
+            'Compliance ruleset UI moved from Developer Portal to Admin Dashboard (Verification Management → Compliance Rules tab, gated to organization admins on cloud edition)',
+            'Compliance endpoints now accept exactly two auth paths: X-API-Key (developer SDK/automation) OR organization-admin reviewer session cookie. Regular reviewers and platform admins are rejected',
+            'CSRF enforced on /api/v2/compliance routes (no-ops for X-API-Key callers, enforced for cookie-auth)',
+          ],
+        },
+        {
+          version: '1.8.2',
+          date: '2026-04-02',
+          added: [
+            'Verification page branding — white-label the hosted verification page with a custom logo, accent color, and company name',
+            'GET/PUT /api/developer/settings/branding — configure branding settings',
+            'POST /api/developer/branding/logo — upload branding logo (JPEG/PNG, max 2 MB)',
+            'GET /api/v2/verify/page-config?api_key=... — public endpoint returning developer branding (cached 5 min)',
+            'Live preview panel in Developer Portal Settings modal',
+          ],
+          fixed: [],
+          changed: [],
+        },
+        {
+          version: '1.8.1',
+          date: '2026-04-02',
+          added: [
+            'Custom verification flows — verification_mode now supports document_only (front → back → cross-validation) and identity (front → liveness → face match) presets',
+            'Endpoint guards: back-document returns 400 for identity/age_only flows; live-capture returns 400 for document_only/age_only flows',
+          ],
+          fixed: [],
+          changed: [],
+        },
+        {
+          version: '1.8.0',
+          date: '2026-04-02',
+          added: [
+            'Role-based access control — verification_reviewers table now has a role column (admin or reviewer), enabling Organization Admins with elevated privileges',
+            'Organization Admin role — access analytics, GDPR data deletion, and override verification decisions scoped to their developer',
+            'Role-aware reviewer invitations: POST /api/developer/reviewers/invite accepts optional role parameter',
+            'requireOrgAdminOrPlatformAdmin middleware — gates analytics, GDPR delete, and override endpoints',
+            'Team setup banner + role badges in Developer Portal Settings',
+          ],
+          fixed: [],
+          changed: [
+            'Developer escalation removed — POST /api/auth/admin/escalate now returns 410 Gone',
+            'Analytics endpoints opened to org admins (scoped by developer_id)',
+            'Verification override restricted to org admins and platform admins (regular reviewers get 403)',
+            'GET /api/admin/developers restricted to platform admins only',
+          ],
+        },
+        {
+          version: '1.7.2',
+          date: '2026-03-30',
+          added: [
+            'AML screening auto-trigger — runs automatically on all non-sandbox verifications when AML_PROVIDER is configured (no longer requires per-session addons.aml_screening)',
+            'Multi-provider AML screening — AML_PROVIDER supports comma-separated providers (e.g. opensanctions,offline), matches deduplicated, highest risk level wins',
+            'AML result persistence in aml_screenings table with full match details (listed name, list source, score, match type)',
+            'Address cross-validation — front OCR address compared against back barcode address as a supplementary signal',
+            'Developer aml_enabled column (opt-out)',
+          ],
+          fixed: [],
+          changed: [
+            'Risk scoring weights rebalanced to include aml_screening factor (weight 0.10)',
+          ],
+        },
+        {
           version: '1.7.0',
           date: '2026-03-27',
           added: [
@@ -183,7 +252,7 @@ export const DocsReference: React.FC = () => {
           <div style={{ padding: '16px 24px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <Pill color={C.cyan} bg={C.cyanDim}>v{release.version}</Pill>
             <span style={{ fontFamily: C.mono, fontSize: '0.78rem', color: C.dim }}>{release.date}</span>
-            {release.version === '1.7.0' && <Pill color={C.green} bg={C.greenDim}>latest</Pill>}
+            {release.version === '1.8.3' && <Pill color={C.green} bg={C.greenDim}>latest</Pill>}
           </div>
           <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 18 }}>
             {release.added.length > 0 && (
