@@ -125,7 +125,7 @@ app.use('/api/status', statusRoutes);
 app.use('/api/setup', setupRoutes);
 app.use('/api/v2/verify', credentialRoutes);
 app.use('/api/v2', credentialRoutes);
-app.use('/api/v2/compliance', complianceRoutes);
+app.use('/api/v2/compliance', conditionalCsrf, complianceRoutes);
 app.use('/api/v2/vault', vaultRoutes);
 app.use('/.well-known', wellKnownRoutes);
 
