@@ -219,6 +219,17 @@ setup_env() {
       divider
       return
     fi
+    # New secrets will be generated — remove stale postgres volume so
+    # the database reinitializes with the new DB_PASSWORD.
+    # (PostgreSQL only reads POSTGRES_PASSWORD on first volume init.)
+    local project_name
+    project_name=$(basename "$(pwd)" | tr '[:upper:]' '[:lower:]' | sed 's/[^a-z0-9]//g')
+    local vol="${project_name}_pgdata"
+    if docker volume inspect "$vol" &>/dev/null; then
+      warn "Removing old database volume (credentials will be regenerated)"
+      docker compose down 2>/dev/null || true
+      docker volume rm "$vol" 2>/dev/null || true
+    fi
   fi
 
   info "Generating secure secrets..."
