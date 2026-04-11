@@ -1405,7 +1405,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                   </div>
                   <button
                     style={{ background: 'none', border: `1px solid ${C.red}`, color: C.red, borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}
-                    onClick={() => { onClose(); setShowDeleteAccount(true) }}
+                    onClick={() => setShowDeleteAccount(true)}
                   >
                     Delete Account
                   </button>
@@ -1420,7 +1420,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
       {/* Delete account confirmation modal */}
       {showDeleteAccount && (
         <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 80 }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 110 }}
           onClick={() => setShowDeleteAccount(false)}
         >
           <div
