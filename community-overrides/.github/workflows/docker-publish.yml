@@ -60,9 +60,6 @@ jobs:
         uses: docker/metadata-action@c299e40c65443455700f0fdfc63efafe5b349051 # v5.10.0
         with:
           images: ${{ env.API_IMAGE }}
-          # Tag rules:
-          # - v1.2.0 tag push → :1.2.0, :1.2, :latest (skips pre-releases like v1.2.0-beta.1)
-          # - manual dispatch  → :latest (or custom tag if provided)
           tags: |
             type=semver,pattern={{version}}
             type=semver,pattern={{major}}.{{minor}}

@@ -13,8 +13,10 @@ frontend/src/components/PatternShowcase.tsx
 frontend/src/components/admin/ComplianceSection.tsx
 frontend/.env.production
 
-# Sync workflow (only needed on private repo)
+# Private-repo-only workflows
 .github/workflows/sync-community.yml
+.github/workflows/sync-release.yml
+.github/workflows/docker-publish.yml
 
 # NOTE: .community-ignore and community-overrides/ are cleaned up
 # explicitly in sync-community.yml AFTER the overlay step.
