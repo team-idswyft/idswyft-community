@@ -687,7 +687,7 @@ export function HomePage() {
               ))}
             </div>
             <a
-              href="https://github.com/team-idswyft/idswyft"
+              href="https://github.com/team-idswyft/idswyft-community"
               target="_blank"
               rel="noopener noreferrer"
               style={{

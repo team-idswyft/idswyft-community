@@ -830,7 +830,7 @@ export function HomePageV2() {
                 </div>
               ))}
             </div>
-            <a href="https://github.com/team-idswyft/idswyft" target="_blank" rel="noopener noreferrer"
+            <a href="https://github.com/team-idswyft/idswyft-community" target="_blank" rel="noopener noreferrer"
               className="cta-primary" style={{
                 display: 'block', textAlign: 'center', padding: '12px 20px', borderRadius: 8,
                 fontWeight: 600, fontSize: 13, textDecoration: 'none',

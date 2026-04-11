@@ -310,7 +310,7 @@ export const DocsReference: React.FC = () => {
           { icon: '🔍', title: 'Review Dashboard', desc: 'Review, approve, and manage verifications with your team', href: '/docs/review', cta: 'View Guide →' },
           { icon: '🎮', title: 'Live Demo', desc: 'Try the full verification flow with a sandbox key', href: '/demo', cta: 'Open Demo →' },
           { icon: '📦', title: 'JavaScript SDK', desc: 'TypeScript SDK with real-time events and embed component', href: 'https://www.npmjs.com/package/@idswyft/sdk', cta: 'npm install @idswyft/sdk' },
-          { icon: '🔧', title: 'GitHub', desc: 'Source code, examples, and issue tracker', href: 'https://github.com/team-idswyft/idswyft', cta: 'View on GitHub →' },
+          { icon: '🔧', title: 'GitHub', desc: 'Source code, examples, and issue tracker', href: 'https://github.com/team-idswyft/idswyft-community', cta: 'View on GitHub →' },
           { icon: '✉️', title: 'Email Support', desc: 'Technical support and integration help', href: 'mailto:support@idswyft.app', cta: 'support@idswyft.app' },
         ].map(r => (
           <div key={r.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '20px', display: 'flex', flexDirection: 'column', gap: 8 }}>

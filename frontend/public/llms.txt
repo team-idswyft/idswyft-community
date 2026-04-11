@@ -15,7 +15,7 @@ Self-hostable via Docker Compose (4 containers) or available as managed cloud at
 - [Developer Portal](https://idswyft.app/developer): Register, get API keys, manage webhooks
 - [Live Demo](https://idswyft.app/demo): Try the verification flow in sandbox mode
 - [Documentation](https://idswyft.app/docs): Interactive documentation
-- [GitHub](https://github.com/team-idswyft/idswyft): Source code (MIT license)
+- [GitHub](https://github.com/team-idswyft/idswyft-community): Source code (MIT license)
 
 ## SDKs
 

@@ -3,7 +3,7 @@ import { Link } from 'react-router-dom'
 import { C, injectFonts } from '../theme'
 import '../styles/patterns.css'
 
-const GITHUB_URL = 'https://github.com/team-idswyft/idswyft'
+const GITHUB_URL = 'https://github.com/team-idswyft/idswyft-community'
 const getEnterpriseUrl = () =>
   window.location.hostname.endsWith('.idswyft.app') || window.location.hostname === 'idswyft.app'
     ? 'https://enterprise.idswyft.app'

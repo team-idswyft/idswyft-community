@@ -14,7 +14,7 @@ interface LayoutProps {
   children: ReactNode
 }
 
-const getGitHubUrl = () => 'https://github.com/team-idswyft/idswyft'
+const getGitHubUrl = () => 'https://github.com/team-idswyft/idswyft-community'
 
 // Cloud navigation
 const cloudNavigation = [
