@@ -72,14 +72,10 @@ router.get('/:token/session', catchAsync(async (req: Request, res: Response) => 
 
   const tokenHash = hashHandoffToken(token);
 
+  // Fetch session (flat query — no nested joins for PgClient compatibility)
   const { data, error } = await supabase
     .from('mobile_handoff_sessions')
-    .select(`
-      user_id, source, status, expires_at,
-      api_key:api_keys!api_key_id(
-        developer:developers(branding_logo_url, branding_accent_color, branding_company_name, company)
-      )
-    `)
+    .select('user_id, source, status, expires_at, api_key_id')
     .eq('token', tokenHash)
     .single();
 
@@ -102,15 +98,31 @@ router.get('/:token/session', catchAsync(async (req: Request, res: Response) => 
     return res.status(409).json({ error: 'Session already used' });
   }
 
-  // Extract branding from the joined developer record
-  const dev = (data.api_key as any)?.developer;
-  const branding = dev
-    ? {
-        logo_url: dev.branding_logo_url || null,
-        accent_color: dev.branding_accent_color || null,
-        company_name: dev.branding_company_name || dev.company || null,
+  // Resolve branding via separate lookups (avoids 2-level nested join)
+  let branding = null;
+  if (data.api_key_id) {
+    const { data: apiKey } = await supabase
+      .from('api_keys')
+      .select('developer_id')
+      .eq('id', data.api_key_id)
+      .single();
+
+    if (apiKey?.developer_id) {
+      const { data: dev } = await supabase
+        .from('developers')
+        .select('branding_logo_url, branding_accent_color, branding_company_name, company')
+        .eq('id', apiKey.developer_id)
+        .single();
+
+      if (dev) {
+        branding = {
+          logo_url: dev.branding_logo_url || null,
+          accent_color: dev.branding_accent_color || null,
+          company_name: dev.branding_company_name || dev.company || null,
+        };
       }
-    : null;
+    }
+  }
 
   res.json({
     user_id: data.user_id,

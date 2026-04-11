@@ -14,6 +14,14 @@ const _getApiBaseUrl = (): string => {
 };
 export const API_BASE_URL = _getApiBaseUrl();
 
+/**
+ * Build a URL object for API requests. Handles the case where API_BASE_URL
+ * is '' (same-origin proxy) — the URL constructor needs an absolute URL,
+ * so we use window.location.origin as the base.
+ */
+export const buildApiUrl = (path: string): URL =>
+  new URL(`${API_BASE_URL}${path}`, window.location.origin);
+
 // Determine if we should use sandbox mode
 export const shouldUseSandbox = (_apiKey?: string) => {
   // First check explicit environment override

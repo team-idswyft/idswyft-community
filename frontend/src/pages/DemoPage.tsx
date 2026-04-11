@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import toast from 'react-hot-toast';
-import { API_BASE_URL, shouldUseSandbox } from '../config/api';
+import { API_BASE_URL, buildApiUrl, shouldUseSandbox } from '../config/api';
 import {
   CameraIcon,
   ExclamationTriangleIcon,
@@ -615,7 +615,7 @@ const DemoPage: React.FC = () => {
 
   const loadVerificationResults = async (verId: string) => {
     try {
-      const url = new URL(`${API_BASE_URL}/api/v2/verify/${verId}/status`);
+      const url = buildApiUrl(`/api/v2/verify/${verId}/status`);
       if (shouldUseSandbox()) {
         url.searchParams.append('sandbox', 'true');
       }
@@ -787,7 +787,7 @@ const DemoPage: React.FC = () => {
 
       const useSandbox = shouldUseSandbox();
 
-      const url = new URL(`${API_BASE_URL}/api/v2/verify/${verificationId}/front-document`);
+      const url = buildApiUrl(`/api/v2/verify/${verificationId}/front-document`);
       if (useSandbox) {
         url.searchParams.append('sandbox', 'true');
       }
@@ -855,7 +855,7 @@ const DemoPage: React.FC = () => {
 
     ocrPollRef.current = setInterval(async () => {
       try {
-        const url = new URL(`${API_BASE_URL}/api/v2/verify/${verificationId}/status`);
+        const url = buildApiUrl(`/api/v2/verify/${verificationId}/status`);
         if (shouldUseSandbox()) {
           url.searchParams.append('sandbox', 'true');
         }
@@ -926,7 +926,7 @@ const DemoPage: React.FC = () => {
       formData.append('document', backFile);
       formData.append('document_type', documentType || 'national_id');
 
-      const url = new URL(`${API_BASE_URL}/api/v2/verify/${verificationId}/back-document`);
+      const url = buildApiUrl(`/api/v2/verify/${verificationId}/back-document`);
       if (shouldUseSandbox()) url.searchParams.append('sandbox', 'true');
 
       const response = await fetch(url.toString(), {
@@ -976,7 +976,7 @@ const DemoPage: React.FC = () => {
 
     crossValPollRef.current = setInterval(async () => {
       try {
-        const url = new URL(`${API_BASE_URL}/api/v2/verify/${verificationId}/status`);
+        const url = buildApiUrl(`/api/v2/verify/${verificationId}/status`);
         if (shouldUseSandbox()) url.searchParams.append('sandbox', 'true');
 
         const response = await fetch(url.toString(), {
@@ -1136,7 +1136,7 @@ const DemoPage: React.FC = () => {
 
   const skipLiveCapture = async () => {
     try {
-      const url = new URL(`${API_BASE_URL}/api/v2/verify/${verificationId}/status`);
+      const url = buildApiUrl(`/api/v2/verify/${verificationId}/status`);
       if (shouldUseSandbox()) {
         url.searchParams.append('sandbox', 'true');
       }
@@ -1231,7 +1231,7 @@ const DemoPage: React.FC = () => {
       formData.append('document', addressFile);
       formData.append('document_type', addressDocType);
 
-      const url = new URL(`${API_BASE_URL}/api/v2/verify/${verificationId}/address-document`);
+      const url = buildApiUrl(`/api/v2/verify/${verificationId}/address-document`);
       if (shouldUseSandbox()) {
         url.searchParams.append('sandbox', 'true');
       }

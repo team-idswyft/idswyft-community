@@ -4,7 +4,7 @@ import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import EndUserVerification from '../components/verification/EndUserVerification';
 import { ContinueOnPhone } from '../components/ContinueOnPhone';
 import { C, injectFonts } from '../theme';
-import { API_BASE_URL, shouldUseSandbox } from '../config/api';
+import { API_BASE_URL, buildApiUrl, shouldUseSandbox } from '../config/api';
 
 // ─── State machine ─────────────────────────────────────────────────
 // 'choice'     → user picks mobile or desktop
@@ -187,7 +187,7 @@ const UserVerificationPage: React.FC = () => {
       formData.append('document', addressFile);
       formData.append('document_type', addressDocType);
 
-      const url = new URL(`${API_BASE_URL}/api/v2/verify/${verificationResult.verification_id}/address-document`);
+      const url = buildApiUrl(`/api/v2/verify/${verificationResult.verification_id}/address-document`);
       if (shouldUseSandbox()) url.searchParams.append('sandbox', 'true');
 
       const response = await fetch(url.toString(), {
