@@ -2,10 +2,11 @@ import * as Sentry from '@sentry/node';
 import { nodeProfilingIntegration } from '@sentry/profiling-node';
 
 const isProduction = process.env.NODE_ENV === 'production';
+const sentryDsn = process.env.SENTRY_DSN;
 
-if (isProduction) {
+if (isProduction && sentryDsn) {
   Sentry.init({
-    dsn: 'https://da769f625802954e7f2717a9aa788e81@o4511193409060864.ingest.us.sentry.io/4511193915654144',
+    dsn: sentryDsn,
     integrations: [
       nodeProfilingIntegration(),
     ],
