@@ -65,6 +65,10 @@ COPY --from=build /app/backend/package.json ./package.json
 COPY --from=build /app/backend/docker-entrypoint.sh ./docker-entrypoint.sh
 RUN sed -i 's/\r$//' ./docker-entrypoint.sh && chmod +x ./docker-entrypoint.sh
 
+# Pre-create volume mount points so Docker initialises named volumes
+# with nodeuser ownership (Docker copies ownership from image on first mount)
+RUN mkdir -p ./uploads ./temp
+
 # Migrations are bind-mounted from supabase/migrations/ at runtime
 ENV MIGRATIONS_DIR=/app/backend/migrations
 
