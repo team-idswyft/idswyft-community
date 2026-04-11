@@ -47,6 +47,7 @@ export class PgQueryBuilder {
   private rangeFrom: number | null = null;
   private rangeTo: number | null = null;
   private useSingle: boolean = false;
+  private useMaybeSingle: boolean = false;
   private insertData: Record<string, unknown> | Record<string, unknown>[] | null = null;
   private updateData: Record<string, unknown> | null = null;
   private upsertConflict: string | null = null;
@@ -179,6 +180,11 @@ export class PgQueryBuilder {
     return this;
   }
 
+  maybeSingle(): this {
+    this.useMaybeSingle = true;
+    return this;
+  }
+
   // ─── Execution ─────────────────────────────────────────────
 
   /**
@@ -290,6 +296,10 @@ export class PgQueryBuilder {
         return { data: null, error: { message: 'Row not found', code: 'PGRST116' }, count };
       }
       return { data: rows[0], error: null, count };
+    }
+
+    if (this.useMaybeSingle) {
+      return { data: rows.length > 0 ? rows[0] : null, error: null, count };
     }
 
     return { data: rows, error: null, count };
