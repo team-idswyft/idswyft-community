@@ -28,9 +28,19 @@ export function Layout({ children }: LayoutProps) {
   // ─────────────────────────────────────────
   // Community edition: no navbar, minimal footer
   // ─────────────────────────────────────────
+  const pathname = location.pathname
+  const showBackNav = pathname !== '/' && pathname !== '/developer' && pathname !== '/setup'
+
   return (
     <div className="min-h-screen bg-[#080c14] flex flex-col">
       <main className="flex-1">
+        {showBackNav && (
+          <div style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '10px 24px' }}>
+            <Link to="/" style={{ color: '#8896aa', fontSize: 13, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+              &#8592; Dev Portal
+            </Link>
+          </div>
+        )}
         {children}
       </main>
 
@@ -43,6 +53,8 @@ export function Layout({ children }: LayoutProps) {
               <span style={{ color: '#4a5568', fontSize: 13 }}>Powered by Idswyft</span>
             </a>
             <div className="flex items-center gap-6">
+              <Link to="/" style={{ color: '#8896aa', fontSize: 13 }}
+                className="hover:text-white transition-colors">Dev Portal</Link>
               <Link to="/docs" style={{ color: '#8896aa', fontSize: 13 }}
                 className="hover:text-white transition-colors">Docs</Link>
               <Link to="/demo" style={{ color: '#8896aa', fontSize: 13 }}

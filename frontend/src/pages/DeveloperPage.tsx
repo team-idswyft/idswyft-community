@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { API_BASE_URL } from '../config/api'
 import { isCommunity } from '../config/edition'
-import { fetchCsrfToken, csrfHeader, clearCsrfToken } from '../lib/csrf'
+import { fetchCsrfToken, getCsrfToken, csrfHeader, clearCsrfToken } from '../lib/csrf'
 import { C, injectFonts } from '../theme'
 import '../styles/patterns.css'
 import { AnalyticsCharts } from '../components/developer/AnalyticsCharts'
@@ -20,13 +20,16 @@ export function DeveloperPage() {
   const navigate = useNavigate()
   useEffect(() => { injectFonts() }, [])
 
-  const [token, setToken] = useState<string | null>(null)
+  const [token, setToken] = useState<string | null>(() => getCsrfToken() ? 'session' : null)
   const [setupNeeded, setSetupNeeded] = useState<boolean | null>(null)
 
   // On mount, check if an auth cookie exists by probing a protected endpoint
   useEffect(() => {
     fetch(`${API_BASE_URL}/api/developer/profile`, { credentials: 'include' })
-      .then(res => { if (res.ok) { setToken('session'); fetchCsrfToken(); } })
+      .then(res => {
+        if (res.ok) { setToken('session'); fetchCsrfToken(); }
+        else { setToken(null); clearCsrfToken(); }
+      })
       .catch(() => {})
   }, [])
 

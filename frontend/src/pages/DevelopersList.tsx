@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { API_BASE_URL } from '../config/api'
-import { fetchCsrfToken, csrfHeader, clearCsrfToken } from '../lib/csrf'
+import { fetchCsrfToken, getCsrfToken, csrfHeader, clearCsrfToken } from '../lib/csrf'
 import { C, injectFonts } from '../theme'
 import '../styles/patterns.css'
 import {
@@ -76,7 +76,7 @@ export function DevelopersList() {
   const [totalPages, setTotalPages] = useState(1)
   const [totalCount, setTotalCount] = useState(0)
   const [expandedId, setExpandedId] = useState<string | null>(null)
-  const [authReady, setAuthReady] = useState(false)
+  const [authReady, setAuthReady] = useState(() => !!getCsrfToken())
   const [isMobile, setIsMobile] = useState(false)
 
   const LIMIT = 25
@@ -95,11 +95,12 @@ export function DevelopersList() {
     fetch(`${API_BASE_URL}/api/admin/developers?limit=1`, { credentials: 'include' })
       .then(res => {
         if (res.ok) { setAuthReady(true); fetchCsrfToken(); return }
+        clearCsrfToken()
         // Not a platform admin — redirect to verifications or login
         if (res.status === 401) navigate('/admin/login')
         else navigate('/admin/verifications')
       })
-      .catch(() => navigate('/admin/login'))
+      .catch(() => { clearCsrfToken(); navigate('/admin/login') })
   }, [navigate])
 
   // ── Fetch developers ──
