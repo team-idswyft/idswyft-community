@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { API_BASE_URL } from '../config/api'
-import { fetchCsrfToken, csrfHeader, clearCsrfToken } from '../lib/csrf'
+import { fetchCsrfToken, getCsrfToken, csrfHeader, clearCsrfToken } from '../lib/csrf'
 import { C, injectFonts } from '../theme'
 import '../styles/patterns.css'
 import {
@@ -194,7 +194,7 @@ export function VerificationManagement() {
   const [actionReason, setActionReason] = useState('')
   const [overrideStatus, setOverrideStatus] = useState('verified')
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
-  const [authReady, setAuthReady] = useState(false)
+  const [authReady, setAuthReady] = useState(() => !!getCsrfToken())
   const [userRole, setUserRole] = useState<'admin' | 'reviewer' | 'platform'>('reviewer')
   const [isMobile, setIsMobile] = useState(false)
 
@@ -214,9 +214,9 @@ export function VerificationManagement() {
     fetch(`${API_BASE_URL}/api/admin/dashboard`, { credentials: 'include' })
       .then(res => {
         if (res.ok) { setAuthReady(true); fetchCsrfToken(); return }
-        navigate('/admin/login')
+        clearCsrfToken(); navigate('/admin/login')
       })
-      .catch(() => navigate('/admin/login'))
+      .catch(() => { clearCsrfToken(); navigate('/admin/login') })
   }, [navigate])
 
   // ── Detect user role (org admin vs reviewer vs platform admin) ──
