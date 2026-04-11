@@ -141,13 +141,10 @@ export const authenticateHandoffToken = catchAsync(async (req: Request, res: Res
   const tokenHash = hashHandoffToken(handoffToken);
 
   try {
-    // Look up session with joined api_key and developer
+    // Look up session (flat query — no nested joins for PgClient compatibility)
     const { data: session, error: sessionError } = await supabase
       .from('mobile_handoff_sessions')
-      .select(`
-        id, token, api_key_id, user_id, status, expires_at,
-        api_key:api_keys!api_key_id(*, developer:developers(*))
-      `)
+      .select('id, token, api_key_id, user_id, status, expires_at')
       .eq('token', tokenHash)
       .single();
 
@@ -168,14 +165,30 @@ export const authenticateHandoffToken = catchAsync(async (req: Request, res: Res
       throw new AuthenticationError('Handoff session is no longer active');
     }
 
-    const apiKeyRecord = session.api_key as any;
-    if (!apiKeyRecord || !apiKeyRecord.is_active) {
+    // Resolve api_key and developer via separate lookups (avoids 2-level nested join)
+    const { data: apiKeyRecord, error: keyError } = await supabase
+      .from('api_keys')
+      .select('*')
+      .eq('id', session.api_key_id)
+      .single();
+
+    if (keyError || !apiKeyRecord || !apiKeyRecord.is_active) {
       throw new AuthenticationError('Associated API key is no longer active');
     }
 
     // Check if key is expired
     if (apiKeyRecord.expires_at && new Date(apiKeyRecord.expires_at) < new Date()) {
       throw new AuthenticationError('Associated API key has expired');
+    }
+
+    const { data: developer, error: devError } = await supabase
+      .from('developers')
+      .select('*')
+      .eq('id', apiKeyRecord.developer_id)
+      .single();
+
+    if (devError || !developer) {
+      throw new AuthenticationError('Associated developer not found');
     }
 
     // Update last used timestamp on the API key
@@ -185,8 +198,8 @@ export const authenticateHandoffToken = catchAsync(async (req: Request, res: Res
       .eq('id', apiKeyRecord.id);
 
     // Attach API key and developer to request (same shape as authenticateAPIKey)
-    req.apiKey = apiKeyRecord as APIKey;
-    req.developer = apiKeyRecord.developer as Developer;
+    req.apiKey = { ...apiKeyRecord, developer } as APIKey;
+    req.developer = developer as Developer;
 
     // Check if developer account is suspended
     if (req.developer?.status === 'suspended') {
