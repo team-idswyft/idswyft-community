@@ -37,7 +37,7 @@
   "license": "MIT",
   "repository": {
     "type": "git",
-    "url": "https://github.com/team-idswyft/idswyft.git",
+    "url": "https://github.com/team-idswyft/idswyft-community.git",
     "directory": "sdks/react"
   },
   "homepage": "https://idswyft.app",

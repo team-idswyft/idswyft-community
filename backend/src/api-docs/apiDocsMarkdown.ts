@@ -1341,7 +1341,7 @@ Idswyft is open source and can be self-hosted using Docker Compose.
 ### Quick Start
 
 \`\`\`bash
-git clone https://github.com/team-idswyft/idswyft.git
+git clone https://github.com/team-idswyft/idswyft-community.git
 cd idswyft
 ./install.sh     # Interactive setup — generates .env and starts containers
 \`\`\`
@@ -1489,7 +1489,7 @@ On first boot, navigate to the frontend. If no developer account exists, a setup
 - **Live Demo:** https://idswyft.app/demo
 - **Documentation:** https://idswyft.app/docs
 - **SDK:** npm install @idswyft/sdk
-- **GitHub:** https://github.com/team-idswyft/idswyft
+- **GitHub:** https://github.com/team-idswyft/idswyft-community
 - **Email:** support@idswyft.app
 
 ---

@@ -12,7 +12,7 @@
 - [Live Demo](https://idswyft.app/demo): Try the verification flow in sandbox mode
 - [Documentation](https://idswyft.app/docs): Full interactive documentation
 - [SDK](https://www.npmjs.com/package/@idswyft/sdk): JavaScript/TypeScript SDK
-- [GitHub](https://github.com/team-idswyft/idswyft): Source code (MIT license)
+- [GitHub](https://github.com/team-idswyft/idswyft-community): Source code (MIT license)
 - [Full API Docs (Markdown)](https://api.idswyft.app/api/docs/markdown): Machine-readable API docs
 
 ---
@@ -854,7 +854,7 @@ Idswyft is open source and can be self-hosted using Docker Compose.
 ### Quick Start
 
 ```bash
-git clone https://github.com/team-idswyft/idswyft.git
+git clone https://github.com/team-idswyft/idswyft-community.git
 cd idswyft
 ./install.sh     # Interactive setup — generates .env and starts containers
 ```
@@ -981,7 +981,7 @@ On first boot, navigate to the frontend. If no developer account exists, a setup
 - Live Demo: https://idswyft.app/demo
 - Documentation: https://idswyft.app/docs
 - SDK: npm install @idswyft/sdk
-- GitHub: https://github.com/team-idswyft/idswyft
+- GitHub: https://github.com/team-idswyft/idswyft-community
 - Email: support@idswyft.app
 
 ---

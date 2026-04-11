@@ -68,7 +68,7 @@ The underlying MIT code license remains unchanged.
 If you fork Idswyft and make substantial modifications (new name, different branding, distinct product):
 
 - You **must** remove the Idswyft name and logo (do not represent your fork as "Idswyft")
-- You **should** include a notice like: "Based on Idswyft (https://github.com/team-idswyft/idswyft)"
+- You **should** include a notice like: "Based on Idswyft (https://github.com/team-idswyft/idswyft-community)"
 - The MIT license terms still apply to the code
 
 ## Enforcement

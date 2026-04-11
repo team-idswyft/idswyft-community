@@ -1,8 +1,8 @@
 # Idswyft — Open-Source Identity Verification
 
 [![License: MIT](https://img.shields.io/badge/License-MIT-22d3ee.svg)](https://opensource.org/licenses/MIT)
-[![GitHub Stars](https://img.shields.io/github/stars/team-idswyft/idswyft)](https://github.com/team-idswyft/idswyft/stargazers)
-[![GitHub Issues](https://img.shields.io/github/issues/team-idswyft/idswyft)](https://github.com/team-idswyft/idswyft/issues)
+[![GitHub Stars](https://img.shields.io/github/stars/team-idswyft/idswyft-community)](https://github.com/team-idswyft/idswyft-community/stargazers)
+[![GitHub Issues](https://img.shields.io/github/issues/team-idswyft/idswyft-community)](https://github.com/team-idswyft/idswyft-community/issues)
 
 Self-hostable identity verification platform for developers. Document OCR, barcode/MRZ parsing, cross-validation, liveness detection, and face matching — all in one API, running on your infrastructure.
 
@@ -13,7 +13,7 @@ Self-hostable identity verification platform for developers. Document OCR, barco
 ## Self-Host in One Command
 
 ```bash
-git clone https://github.com/team-idswyft/idswyft.git && cd idswyft && docker compose up -d
+git clone https://github.com/team-idswyft/idswyft-community.git && cd idswyft && docker compose up -d
 ```
 
 That's it — pre-built images are pulled from GitHub Container Registry in ~2 minutes. Visit `http://localhost` to access the developer portal.
@@ -25,7 +25,7 @@ The Community Edition is **free forever** — unlimited verifications, full sour
 For a guided installation with secrets generation:
 
 ```bash
-git clone https://github.com/team-idswyft/idswyft.git
+git clone https://github.com/team-idswyft/idswyft-community.git
 cd idswyft
 ./install.sh
 ```
@@ -362,5 +362,5 @@ For large features, open an issue first to discuss the approach.
 - **Website:** [idswyft.app](https://idswyft.app)
 - **Documentation:** [idswyft.app/docs](https://idswyft.app/docs)
 - **Demo:** [idswyft.app/demo](https://idswyft.app/demo)
-- **Issues:** [github.com/team-idswyft/idswyft/issues](https://github.com/team-idswyft/idswyft/issues)
+- **Issues:** [github.com/team-idswyft/idswyft-community/issues](https://github.com/team-idswyft/idswyft-community/issues)
 - **Enterprise:** [enterprise.idswyft.app](https://enterprise.idswyft.app)

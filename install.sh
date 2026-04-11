@@ -5,21 +5,21 @@ set -euo pipefail
 # Idswyft Community Edition — Install Script
 # ─────────────────────────────────────────────────
 # Usage (recommended — verify before running):
-#   curl -fsSL https://raw.githubusercontent.com/team-idswyft/idswyft/main/install.sh -o install.sh
+#   curl -fsSL https://raw.githubusercontent.com/team-idswyft/idswyft-community/main/install.sh -o install.sh
 #   sha256sum install.sh   # compare with published checksum in RELEASES
 #   bash install.sh
 #
 # Quick (less secure):
-#   curl -fsSL https://raw.githubusercontent.com/team-idswyft/idswyft/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/team-idswyft/idswyft-community/main/install.sh | bash
 #
 # Or clone and run locally:
-#   git clone https://github.com/team-idswyft/idswyft.git && cd idswyft && ./install.sh
+#   git clone https://github.com/team-idswyft/idswyft-community.git && cd idswyft && ./install.sh
 #
 # Options:
 #   --build    Build images from source instead of pulling pre-built images
 # ─────────────────────────────────────────────────
 
-REPO_URL="https://github.com/team-idswyft/idswyft.git"
+REPO_URL="https://github.com/team-idswyft/idswyft-community.git"
 BUILD_FROM_SOURCE=false
 ENABLE_HTTPS=false
 
@@ -186,7 +186,7 @@ ensure_repo() {
     stop_spinner
     cd idswyft
     ok "Repository cloned"
-    detail "github.com/team-idswyft/idswyft"
+    detail "github.com/team-idswyft/idswyft-community"
   else
     ok "Already in Idswyft directory"
   fi
@@ -617,7 +617,7 @@ print_success() {
   echo -e "    ${DIM}docker compose${compose_profile_flag} down -v${RESET}       ${GRAY}# Remove + delete data${RESET}"
   echo ""
   echo -e "    ${GRAY}Documentation:${RESET} ${CYAN}https://idswyft.app/docs${RESET}"
-  echo -e "    ${GRAY}GitHub:${RESET}        ${CYAN}https://github.com/team-idswyft/idswyft${RESET}"
+  echo -e "    ${GRAY}GitHub:${RESET}        ${CYAN}https://github.com/team-idswyft/idswyft-community${RESET}"
   echo ""
 }
 
