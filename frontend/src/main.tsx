@@ -7,9 +7,10 @@ import { Analytics } from '@vercel/analytics/react'
 import './index.css'
 import App from './App.tsx'
 
-if (window.location.hostname === 'idswyft.app') {
+const logrocketAppId = import.meta.env.VITE_LOGROCKET_APP_ID
+if (logrocketAppId) {
   import('logrocket').then(({ default: LogRocket }) => {
-    LogRocket.init('u6ckv4/idswyft')
+    LogRocket.init(logrocketAppId)
   })
 }
 
