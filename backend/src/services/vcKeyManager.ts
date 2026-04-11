@@ -3,7 +3,7 @@ import * as ed25519 from '@noble/ed25519';
 import { sha512 } from '@noble/hashes/sha512';
 
 // noble/ed25519 v2+ requires explicit sha512 hash registration
-ed25519.hashes.sha512 = sha512;
+ed25519.hashes.sha512 = sha512 as any;
 
 const VC_ISSUER_DID = process.env.VC_ISSUER_DID || 'did:web:api.idswyft.app';
 const VC_ISSUER_PRIVATE_KEY = process.env.VC_ISSUER_PRIVATE_KEY || '';
