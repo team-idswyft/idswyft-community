@@ -52,9 +52,11 @@ jobs:
             done < .community-ignore
           fi
 
-          # Overlay community versions of files
+          # Overlay community versions of files (dotglob ensures .github/ is copied)
           if [ -d community-overrides ]; then
+            shopt -s dotglob
             cp -r community-overrides/* .
+            shopt -u dotglob
             rm -rf community-overrides
           fi
 
