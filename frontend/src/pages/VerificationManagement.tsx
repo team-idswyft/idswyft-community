@@ -1,10 +1,8 @@
 import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { API_BASE_URL } from '../config/api'
-import { fetchCsrfToken, getCsrfToken, csrfHeader, clearCsrfToken } from '../lib/csrf'
+import { fetchCsrfToken, csrfHeader, clearCsrfToken } from '../lib/csrf'
 import { C, injectFonts } from '../theme'
-import { isCloud } from '../config/edition'
-import { ComplianceSection } from '../components/admin/ComplianceSection'
 import '../styles/patterns.css'
 import {
   ShieldCheckIcon,
@@ -196,10 +194,9 @@ export function VerificationManagement() {
   const [actionReason, setActionReason] = useState('')
   const [overrideStatus, setOverrideStatus] = useState('verified')
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
-  const [authReady, setAuthReady] = useState(() => !!getCsrfToken())
+  const [authReady, setAuthReady] = useState(false)
   const [userRole, setUserRole] = useState<'admin' | 'reviewer' | 'platform'>('reviewer')
   const [isMobile, setIsMobile] = useState(false)
-  const [activeTab, setActiveTab] = useState<'verifications' | 'compliance'>('verifications')
 
   const LIMIT = 25
 
@@ -217,9 +214,9 @@ export function VerificationManagement() {
     fetch(`${API_BASE_URL}/api/admin/dashboard`, { credentials: 'include' })
       .then(res => {
         if (res.ok) { setAuthReady(true); fetchCsrfToken(); return }
-        clearCsrfToken(); navigate('/admin/login')
+        navigate('/admin/login')
       })
-      .catch(() => { clearCsrfToken(); navigate('/admin/login') })
+      .catch(() => navigate('/admin/login'))
   }, [navigate])
 
   // ── Detect user role (org admin vs reviewer vs platform admin) ──
@@ -338,12 +335,6 @@ export function VerificationManagement() {
         v.user_id.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : verifications
-
-  // Compliance rulesets are per-dev-organization and managed by the org admin.
-  // Platform admins (Idswyft operators) do not manage tenant compliance — they
-  // oversee the Idswyft platform itself. Regular reviewers are read-only on
-  // verifications and have no compliance role. Cloud edition only.
-  const canManageCompliance = isCloud && userRole === 'admin'
 
   // ── Mobile guard ──
   if (isMobile) {
@@ -491,44 +482,6 @@ export function VerificationManagement() {
           ))}
         </div>
 
-        {/* ── Tab Switcher (org admin + cloud only) ── */}
-        {canManageCompliance && (
-          <div style={{
-            display: 'flex',
-            gap: 0,
-            borderBottom: `1px solid ${C.border}`,
-            marginBottom: 24,
-            fontFamily: C.mono,
-            fontSize: 13,
-          }}>
-            {(['verifications', 'compliance'] as const).map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                style={{
-                  padding: '12px 20px',
-                  background: 'transparent',
-                  color: activeTab === tab ? C.cyan : C.muted,
-                  border: 'none',
-                  borderBottom: activeTab === tab ? `2px solid ${C.cyan}` : '2px solid transparent',
-                  marginBottom: -1,
-                  cursor: 'pointer',
-                  fontFamily: C.mono,
-                  fontSize: 13,
-                  fontWeight: activeTab === tab ? 600 : 400,
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.5,
-                }}
-              >
-                {tab === 'verifications' ? 'Verifications' : 'Compliance Rules'}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* ── Verifications Tab Content (default) ── */}
-        {(!canManageCompliance || activeTab === 'verifications') && (
-        <>
         {/* ── Filter Bar ── */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16,
@@ -1229,13 +1182,6 @@ export function VerificationManagement() {
               Next
             </button>
           </div>
-        )}
-        </>
-        )}
-
-        {/* ── Compliance Tab Content (org admin + cloud only) ── */}
-        {canManageCompliance && activeTab === 'compliance' && (
-          <ComplianceSection token="session" />
         )}
       </div>
 
