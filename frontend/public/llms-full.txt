@@ -855,7 +855,7 @@ Idswyft is open source and can be self-hosted using Docker Compose.
 
 ```bash
 git clone https://github.com/team-idswyft/idswyft-community.git
-cd idswyft
+cd idswyft-community
 ./install.sh     # Interactive setup — generates .env and starts containers
 ```
 

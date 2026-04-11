@@ -13,7 +13,7 @@ Self-hostable identity verification platform for developers. Document OCR, barco
 ## Self-Host in One Command
 
 ```bash
-git clone https://github.com/team-idswyft/idswyft-community.git && cd idswyft && docker compose up -d
+git clone https://github.com/team-idswyft/idswyft-community.git && cd idswyft-community && docker compose up -d
 ```
 
 That's it — pre-built images are pulled from GitHub Container Registry in ~2 minutes. Visit `http://localhost` to access the developer portal.
@@ -26,7 +26,7 @@ For a guided installation with secrets generation:
 
 ```bash
 git clone https://github.com/team-idswyft/idswyft-community.git
-cd idswyft
+cd idswyft-community
 ./install.sh
 ```
 

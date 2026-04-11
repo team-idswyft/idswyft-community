@@ -13,7 +13,7 @@ set -euo pipefail
 #   curl -fsSL https://raw.githubusercontent.com/team-idswyft/idswyft/main/install.sh | bash
 #
 # Or clone and run locally:
-#   git clone https://github.com/team-idswyft/idswyft-community.git && cd idswyft && ./install.sh
+#   git clone https://github.com/team-idswyft/idswyft-community.git && cd idswyft-community && ./install.sh
 #
 # Options:
 #   --build    Build images from source instead of pulling pre-built images
@@ -182,9 +182,9 @@ ensure_repo() {
       fail "Git is not installed. Install from https://git-scm.com/"
     fi
     start_spinner "Cloning repository"
-    git clone --depth 1 "$REPO_URL" idswyft 2>/dev/null
+    git clone --depth 1 "$REPO_URL" idswyft-community 2>/dev/null
     stop_spinner
-    cd idswyft
+    cd idswyft-community
     ok "Repository cloned"
     detail "github.com/team-idswyft/idswyft-community"
   else
