@@ -286,20 +286,24 @@ export function VerifyCredentialPage() {
                 </p>
               </div>
 
-              {/* Identity Card visual */}
-              {(result.valid || isExpiredButSigOk) && result.claims && (() => {
+              {/* Identity Card visual — show whenever decoded claims exist */}
+              {result.claims && (() => {
                 const claims = result.claims as Record<string, unknown>;
-                const cardStatus: 'valid' | 'expired' | 'revoked' =
-                  statusResult && !statusResult.active ? 'revoked' : result.valid ? 'valid' : 'expired';
+                const vc = result.payload?.vc as Record<string, unknown> | undefined;
+                const cardStatus: 'valid' | 'expired' | 'invalid' | 'revoked' =
+                  statusResult && !statusResult.active ? 'revoked'
+                    : result.valid ? 'valid'
+                    : isExpiredButSigOk ? 'expired'
+                    : 'invalid';
                 return (
                   <div style={{ marginBottom: 24 }}>
                     <IdentityCard
                       ref={cardRef}
                       name={String(claims.name || claims.fullName || 'Unknown')}
                       dateOfBirth={claims.dateOfBirth as string | undefined}
-                      nationality={claims.nationality as string | undefined}
+                      nationality={(claims.nationality || claims.issuingCountry) as string | undefined}
                       documentType={claims.documentType as string | undefined}
-                      verifiedAt={claims.verifiedAt as string | undefined}
+                      verifiedAt={(claims.verifiedAt || vc?.issuanceDate) as string | undefined}
                       faceMatchScore={typeof claims.faceMatchScore === 'number' ? claims.faceMatchScore : undefined}
                       issuer={result.issuer ?? undefined}
                       jti={jti ?? undefined}
