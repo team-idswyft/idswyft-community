@@ -1,5 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { C } from '../../theme';
+import { IdentityCard } from '../credential/IdentityCard';
+import { downloadCardPng, downloadCardPdf } from '../credential/cardExport';
 
 interface CredentialStepProps {
   verificationId: string;
@@ -144,6 +146,7 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [credential, setCredential] = useState<{ jwt: string; jti: string; expires_at: string } | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
   const [statusResult, setStatusResult] = useState<{ active: boolean; reason?: string } | null>(null);
   const [revoking, setRevoking] = useState(false);
   const [revoked, setRevoked] = useState(false);
@@ -359,6 +362,51 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
             : 'This JWT-VC was generated client-side for illustration only.'}
         </p>
       </div>
+
+      {/* Identity Card visual */}
+      {vcClaims && (
+        <div style={{ marginBottom: 20 }}>
+          <IdentityCard
+            ref={cardRef}
+            name={String(vcClaims.fullName || vcClaims.name || 'Unknown')}
+            dateOfBirth={vcClaims.dateOfBirth}
+            nationality={vcClaims.issuingCountry}
+            documentType={vcClaims.documentType}
+            verifiedAt={payload?.vc?.issuanceDate}
+            issuer={payload?.iss}
+            jti={credential!.jti}
+            expiresAt={credential!.expires_at}
+            status={revoked ? 'revoked' : 'valid'}
+            isDemo={vcClaims.demo === true}
+          />
+          <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 12 }}>
+            <button
+              onClick={() => cardRef.current && downloadCardPng(cardRef.current)}
+              style={{
+                background: C.cyanDim, border: `1px solid ${C.cyanBorder}`,
+                color: C.cyan, borderRadius: 8, padding: '8px 18px',
+                fontFamily: C.mono, fontWeight: 600, fontSize: 11, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              PNG
+            </button>
+            <button
+              onClick={() => cardRef.current && downloadCardPdf(cardRef.current)}
+              style={{
+                background: C.cyanDim, border: `1px solid ${C.cyanBorder}`,
+                color: C.cyan, borderRadius: 8, padding: '8px 18px',
+                fontFamily: C.mono, fontWeight: 600, fontSize: 11, cursor: 'pointer',
+                display: 'flex', alignItems: 'center', gap: 6,
+              }}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+              PDF
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Claims card */}
       {vcClaims && (

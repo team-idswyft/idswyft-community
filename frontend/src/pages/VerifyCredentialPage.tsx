@@ -1,8 +1,10 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import { C } from '../theme';
 import { verifyCredential, type VerificationResult } from '../utils/vcVerifier';
 import { API_BASE_URL } from '../config/api';
+import { IdentityCard } from '../components/credential/IdentityCard';
+import { downloadCardPng, downloadCardPdf } from '../components/credential/cardExport';
 
 // ─── JSON syntax highlighting ────────────────────────────────
 const jsonColors = {
@@ -76,6 +78,7 @@ export function VerifyCredentialPage() {
   const [result, setResult] = useState<VerificationResult | null>(null);
   const [statusResult, setStatusResult] = useState<{ active: boolean; reason?: string } | null>(null);
   const [checkingStatus, setCheckingStatus] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   // Auto-verify from URL param
   useEffect(() => {
@@ -282,6 +285,57 @@ export function VerifyCredentialPage() {
                   {headerDesc}
                 </p>
               </div>
+
+              {/* Identity Card visual */}
+              {(result.valid || isExpiredButSigOk) && result.claims && (() => {
+                const claims = result.claims as Record<string, unknown>;
+                const cardStatus: 'valid' | 'expired' | 'revoked' =
+                  statusResult && !statusResult.active ? 'revoked' : result.valid ? 'valid' : 'expired';
+                return (
+                  <div style={{ marginBottom: 24 }}>
+                    <IdentityCard
+                      ref={cardRef}
+                      name={String(claims.name || claims.fullName || 'Unknown')}
+                      dateOfBirth={claims.dateOfBirth as string | undefined}
+                      nationality={claims.nationality as string | undefined}
+                      documentType={claims.documentType as string | undefined}
+                      verifiedAt={claims.verifiedAt as string | undefined}
+                      faceMatchScore={typeof claims.faceMatchScore === 'number' ? claims.faceMatchScore : undefined}
+                      issuer={result.issuer ?? undefined}
+                      jti={jti ?? undefined}
+                      expiresAt={result.expiresAt?.toISOString()}
+                      status={cardStatus}
+                      isDemo={claims.demo === true}
+                    />
+                    <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 12 }}>
+                      <button
+                        onClick={() => cardRef.current && downloadCardPng(cardRef.current)}
+                        style={{
+                          background: C.cyanDim, border: `1px solid ${C.cyanBorder}`,
+                          color: C.cyan, borderRadius: 8, padding: '8px 18px',
+                          fontFamily: C.mono, fontWeight: 600, fontSize: 11, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', gap: 6,
+                        }}
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        PNG
+                      </button>
+                      <button
+                        onClick={() => cardRef.current && downloadCardPdf(cardRef.current)}
+                        style={{
+                          background: C.cyanDim, border: `1px solid ${C.cyanBorder}`,
+                          color: C.cyan, borderRadius: 8, padding: '8px 18px',
+                          fontFamily: C.mono, fontWeight: 600, fontSize: 11, cursor: 'pointer',
+                          display: 'flex', alignItems: 'center', gap: 6,
+                        }}
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                        PDF
+                      </button>
+                    </div>
+                  </div>
+                );
+              })()}
 
               {/* Verification details */}
               <div style={card}>
