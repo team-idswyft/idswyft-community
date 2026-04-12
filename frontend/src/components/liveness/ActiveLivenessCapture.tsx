@@ -18,7 +18,9 @@ export function ActiveLivenessCapture({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [streamReady, setStreamReady] = useState(false);
-  const [videoDims, setVideoDims] = useState({ w: 640, h: 480 }); // landscape default for desktop webcams
+  // Always portrait — objectFit:'cover' crops landscape webcam feeds to fit.
+  // Keeping portrait ensures the oval face guide frames faces correctly on all devices.
+  const videoDims = { w: 480, h: 640 };
 
   // Start camera — use `playing` event for readiness instead of awaiting play(),
   // because the async gap after getUserMedia can expire the user-gesture context
@@ -41,9 +43,7 @@ export function ActiveLivenessCapture({
         if (video) {
           video.srcObject = stream;
           video.addEventListener('loadedmetadata', () => {
-            const w = video.videoWidth || 480;
-            const h = video.videoHeight || 640;
-            setVideoDims({ w, h });
+            // Dims used for canvas capture only — container stays portrait
           });
           // Listen for the video to actually start rendering frames
           video.addEventListener('playing', () => {
@@ -132,7 +132,7 @@ export function ActiveLivenessCapture({
     <div style={{
       position: 'relative',
       width: '100%',
-      maxWidth: 640,
+      maxWidth: 520,
       margin: '0 auto',
       background: '#040d1a',
       borderRadius: 16,
