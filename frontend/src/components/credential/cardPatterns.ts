@@ -2,37 +2,55 @@
 // Inline data URIs are required because html-to-image cannot capture CSS
 // pseudo-elements or external stylesheets during DOM-to-image conversion.
 
-/** Sine-wave guilloche mesh — tile 120x120, opacity controlled by caller. */
+/**
+ * Driver-license-style guilloche — concentric rosette curves with
+ * varying amplitude and phase offsets that weave through each other.
+ * Tile: 200x200, drawn with fine 0.4px strokes.
+ */
 export function guillocheDataUri(): string {
-  // Two offset sine waves that create a moiré-style security pattern
-  const w = 120, h = 120;
+  const w = 200, h = 200;
+  const cx = w / 2, cy = h / 2;
   let paths = '';
-  for (let i = 0; i < 6; i++) {
-    const y0 = i * 20 + 10;
+
+  // Rosette: overlapping parametric curves radiating from center
+  const curves = 12;
+  const steps = 360;
+  for (let c = 0; c < curves; c++) {
+    const phase = (c * Math.PI * 2) / curves;
+    const rBase = 30 + c * 6;
+    let d = '';
+    for (let s = 0; s <= steps; s++) {
+      const t = (s / steps) * Math.PI * 2;
+      const r = rBase + Math.sin(t * 6 + phase) * 12 + Math.sin(t * 3 - phase) * 8;
+      const x = cx + Math.cos(t) * r;
+      const y = cy + Math.sin(t) * r;
+      d += s === 0 ? `M${x.toFixed(1)},${y.toFixed(1)}` : ` L${x.toFixed(1)},${y.toFixed(1)}`;
+    }
+    paths += `<path d="${d}" fill="none" stroke="rgba(34,211,238,0.4)" stroke-width="0.4"/>`;
+  }
+
+  // Horizontal wave bands that interleave with the rosette
+  for (let band = 0; band < 10; band++) {
+    const y0 = band * 20 + 10;
     let d = `M0,${y0}`;
-    for (let x = 0; x <= w; x += 2) {
-      const y = y0 + Math.sin((x + i * 15) * 0.12) * 8;
+    for (let x = 0; x <= w; x += 1) {
+      const y = y0 + Math.sin(x * 0.08 + band * 0.7) * 5 + Math.sin(x * 0.15 - band) * 3;
       d += ` L${x},${y.toFixed(1)}`;
     }
-    paths += `<path d="${d}" fill="none" stroke="rgba(34,211,238,0.35)" stroke-width="0.5"/>`;
+    paths += `<path d="${d}" fill="none" stroke="rgba(34,211,238,0.25)" stroke-width="0.3"/>`;
   }
-  for (let i = 0; i < 6; i++) {
-    const x0 = i * 20 + 10;
-    let d = `M${x0},0`;
-    for (let y = 0; y <= h; y += 2) {
-      const x = x0 + Math.sin((y + i * 15) * 0.12) * 8;
-      d += ` L${x.toFixed(1)},${y}`;
-    }
-    paths += `<path d="${d}" fill="none" stroke="rgba(34,211,238,0.35)" stroke-width="0.5"/>`;
-  }
+
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${w}" height="${h}">${paths}</svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }
 
-/** Diagonal crosshatch grid — tile 16x16. */
+/**
+ * Fine security crosshatch — tight diagonal lines like the background
+ * hatching on government IDs. Tile: 10x10, very fine strokes.
+ */
 export function crosshatchDataUri(): string {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="16" height="16">
-    <path d="M0,0 L16,16 M16,0 L0,16" fill="none" stroke="rgba(255,255,255,0.3)" stroke-width="0.4"/>
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="10" height="10">
+    <path d="M0,0 L10,10 M10,0 L0,10 M0,5 L10,5 M5,0 L5,10" fill="none" stroke="rgba(34,211,238,0.2)" stroke-width="0.25"/>
   </svg>`;
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 }

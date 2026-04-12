@@ -378,6 +378,7 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
             expiresAt={credential!.expires_at}
             status={revoked ? 'revoked' : 'valid'}
             isDemo={vcClaims.demo === true}
+            jwtRaw={credential!.jwt}
           />
           <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 12 }}>
             <button

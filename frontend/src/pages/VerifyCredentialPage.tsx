@@ -306,6 +306,7 @@ export function VerifyCredentialPage() {
                       expiresAt={result.expiresAt?.toISOString()}
                       status={cardStatus}
                       isDemo={claims.demo === true}
+                      jwtRaw={jwtInput.trim()}
                     />
                     <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 12 }}>
                       <button

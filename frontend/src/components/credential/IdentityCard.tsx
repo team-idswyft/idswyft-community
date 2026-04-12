@@ -1,4 +1,4 @@
-import React, { forwardRef, useEffect, useRef, useState } from 'react';
+import React, { forwardRef, useEffect, useRef, useState, useMemo } from 'react';
 import { C } from '../../theme';
 import {
   guillocheDataUri,
@@ -19,6 +19,8 @@ export interface IdentityCardProps {
   expiresAt?: string;
   status: 'valid' | 'expired' | 'invalid' | 'revoked';
   isDemo?: boolean;
+  /** Raw JWT string — a fragment is rendered as background texture */
+  jwtRaw?: string;
 }
 
 // ── Card dimensions (ISO ID-1 ratio 1.586:1) ────────────────────────────────
@@ -68,10 +70,17 @@ export const IdentityCard = forwardRef<HTMLDivElement, IdentityCardProps>(
     const {
       name, dateOfBirth, nationality, documentType,
       verifiedAt, faceMatchScore, issuer, jti, expiresAt,
-      status, isDemo,
+      status, isDemo, jwtRaw,
     } = props;
 
     const seal = sealConfig[status];
+
+    // Build a JWT-like background string — use real JWT if available, else a dummy
+    const jwtBgText = useMemo(() => {
+      const raw = jwtRaw || 'eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJkaWQ6d2ViOmlkc3d5ZnQuYXBwIiwic3ViIjoiZGlkOmV4YW1wbGU6MTIzNDU2Nzg5MCIsInZjIjp7InR5cGUiOlsiVmVyaWZpYWJsZUNyZWRlbnRpYWwiXX19.SIGNATURE';
+      // Repeat enough to fill 3 lines across the card bottom
+      return (raw + '  ').repeat(4).slice(0, 600);
+    }, [jwtRaw]);
 
     // ── Responsive scaling ─────────────────────────────────────────────────
     const wrapperRef = useRef<HTMLDivElement>(null);
@@ -97,6 +106,7 @@ export const IdentityCard = forwardRef<HTMLDivElement, IdentityCardProps>(
           width: CARD_W * scale,
           height: CARD_H * scale,
           overflow: 'hidden',
+          margin: '0 auto',
         }}
       >
         <div
@@ -118,20 +128,20 @@ export const IdentityCard = forwardRef<HTMLDivElement, IdentityCardProps>(
             background: '#0a1628',
           }} />
 
-          {/* Layer 2: guilloche pattern */}
+          {/* Layer 2: guilloche rosette pattern */}
           <div style={{
             position: 'absolute', inset: 0,
             backgroundImage: `url("${guillocheDataUri()}")`,
             backgroundRepeat: 'repeat',
-            opacity: 0.06,
+            opacity: 0.09,
           }} />
 
-          {/* Layer 3: crosshatch overlay */}
+          {/* Layer 3: fine security crosshatch */}
           <div style={{
             position: 'absolute', inset: 0,
             backgroundImage: `url("${crosshatchDataUri()}")`,
             backgroundRepeat: 'repeat',
-            opacity: 0.04,
+            opacity: 0.06,
           }} />
 
           {/* Layer 4: microtext strips — top & bottom */}
@@ -148,21 +158,39 @@ export const IdentityCard = forwardRef<HTMLDivElement, IdentityCardProps>(
             opacity: 0.08,
           }} />
 
-          {/* Layer 5: diagonal watermark */}
+          {/* Layer 5: watermark — right-anchored, partially cut off by edge */}
           <div style={{
             position: 'absolute', inset: 0,
-            display: 'flex', alignItems: 'center', justifyContent: 'center',
             overflow: 'hidden',
+            display: 'flex', alignItems: 'center', justifyContent: 'flex-end',
           }}>
             <div style={{
-              fontFamily: C.sans, fontSize: 64, fontWeight: 700,
-              color: 'rgba(255,255,255,0.04)',
-              transform: 'rotate(-25deg)',
+              fontFamily: C.sans, fontSize: 80, fontWeight: 900,
+              color: 'rgba(255,255,255,0.025)',
+              transform: 'rotate(-25deg) translateX(40px)',
               whiteSpace: 'nowrap',
               userSelect: 'none',
-              letterSpacing: '0.1em',
+              letterSpacing: '0.08em',
+              marginRight: -60,
             }}>
               idswyft
+            </div>
+          </div>
+
+          {/* Layer 5b: JWT background text at bottom */}
+          <div style={{
+            position: 'absolute', bottom: 14, left: 0, right: 0,
+            overflow: 'hidden', height: 36,
+            display: 'flex', alignItems: 'flex-end',
+          }}>
+            <div style={{
+              fontFamily: C.mono, fontSize: 6, lineHeight: 1.5,
+              color: 'rgba(34,211,238,0.04)',
+              wordBreak: 'break-all',
+              userSelect: 'none',
+              padding: '0 22px',
+            }}>
+              {jwtBgText}
             </div>
           </div>
 
