@@ -283,3 +283,22 @@
     width: 100% !important;
   }
 }
+
+/* ── Mobile responsive — hero + scanning grid ────────────── */
+
+@media (max-width: 768px) {
+  .hero-section {
+    padding: 80px 16px 48px !important;
+    min-height: auto !important;
+  }
+
+  .scanning-grid {
+    grid-template-columns: 1fr !important;
+    gap: 20px !important;
+    max-width: 400px !important;
+  }
+
+  .scanning-result-card {
+    padding: 20px !important;
+  }
+}

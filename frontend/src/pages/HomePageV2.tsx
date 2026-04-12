@@ -145,7 +145,7 @@ function ScanningCard() {
   const faceMatchDone = step >= 5
 
   return (
-    <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, maxWidth: 960, margin: '0 auto', alignItems: 'center' }}>
+    <div className="scanning-grid" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 32, maxWidth: 960, margin: '0 auto', alignItems: 'center' }}>
 
       {/* ── LEFT COLUMN: stacked ID cards ── */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
@@ -201,8 +201,8 @@ function ScanningCard() {
       </div>
 
       {/* ── RIGHT COLUMN: result card ── */}
-      <div className="glass-card" style={{
-        padding: 32, height: '100%',
+      <div className="glass-card scanning-result-card" style={{
+        padding: 32,
         borderColor: isDone ? 'rgba(52,211,153,0.25)' : undefined,
         transition: 'border-color 0.5s ease',
         display: 'flex', flexDirection: 'column', justifyContent: 'center',
@@ -391,7 +391,7 @@ export function HomePageV2() {
     <div style={{ background: C.bg, color: C.text, fontFamily: C.sans, overflow: 'hidden' }}>
 
       {/* ── 1. HERO ──────────────────────────────────────── */}
-      <section style={{
+      <section className="hero-section" style={{
         minHeight: '100vh', display: 'flex', flexDirection: 'column',
         alignItems: 'center', justifyContent: 'center',
         padding: '120px 24px 80px', textAlign: 'center',
