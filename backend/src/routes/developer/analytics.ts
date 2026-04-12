@@ -211,7 +211,7 @@ router.get('/verifications/:verificationId',
     // Ownership check: verification must belong to this developer
     const { data: verification, error: verErr } = await supabase
       .from('verification_requests')
-      .select('id, is_sandbox')
+      .select('id, is_sandbox, duplicate_flags, verification_mode, manual_review_reason, status')
       .eq('id', verificationId)
       .eq('developer_id', developer.id)
       .single();
@@ -241,6 +241,7 @@ router.get('/verifications/:verificationId',
     res.json({
       success: true,
       verification_id: verificationId,
+      verification_mode: (verification as any).verification_mode ?? null,
       is_sandbox: verification.is_sandbox ?? false,
       status: mapped.status,
       current_step: mapped.current_step,
@@ -253,21 +254,23 @@ router.get('/verifications/:verificationId',
       cross_validation_results: state.cross_validation ?? null,
       face_match_results: state.face_match ?? null,
       liveness_results: state.liveness ?? null,
+      deepfake_check: (state as any).deepfake_check ?? null,
       aml_screening: state.aml_screening ?? null,
       risk_score: riskScore,
+      duplicate_flags: (verification as any).duplicate_flags ?? null,
       barcode_extraction_failed: state.back_extraction ? !state.back_extraction.qr_payload : null,
       documents_match: state.cross_validation ? !state.cross_validation.has_critical_failure : null,
       face_match_passed: state.face_match?.passed ?? null,
       liveness_passed: state.liveness?.passed ?? null,
-      final_result: mapped.final_result,
+      final_result: ['verified', 'failed', 'manual_review'].includes((verification as any).status)
+        ? (verification as any).status
+        : mapped.final_result,
       rejection_reason: state.rejection_reason,
       rejection_detail: state.rejection_detail,
       failure_reason: state.rejection_detail,
-      manual_review_reason: state.cross_validation?.verdict === 'REVIEW'
-        ? 'Cross-validation requires review'
-        : state.face_match?.skipped_reason
-          ? `Face match skipped: ${state.face_match.skipped_reason}`
-          : null,
+      manual_review_reason: (verification as any).manual_review_reason
+        || (state.cross_validation?.verdict === 'REVIEW' ? 'Cross-validation requires review' : null)
+        || (state.face_match?.skipped_reason ? `Face match skipped: ${state.face_match.skipped_reason}` : null),
       created_at: state.created_at,
       updated_at: state.updated_at,
     });

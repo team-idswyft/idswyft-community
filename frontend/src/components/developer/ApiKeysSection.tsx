@@ -13,6 +13,51 @@ import {
   CodeBracketIcon,
 } from '@heroicons/react/24/outline'
 import type { ApiKey, ApiActivity, VerificationDetail, DeveloperStats } from './types'
+
+// ─── JSON syntax highlighting ───────────────────────────────────
+const jsonTokenColors = {
+  key: C.cyan,
+  string: C.green,
+  number: C.amber,
+  boolean: C.purple,
+  null: C.red,
+  brace: C.dim,
+  comma: 'rgba(255,255,255,0.25)',
+} as const;
+
+function highlightJson(obj: unknown): React.ReactNode[] {
+  const raw = JSON.stringify(obj, null, 2);
+  if (!raw) return [];
+  const nodes: React.ReactNode[] = [];
+  const tokenRe = /("(?:[^"\\]|\\.)*")\s*:|("(?:[^"\\]|\\.)*")|(-?\d+(?:\.\d+)?(?:[eE][+-]?\d+)?)\b|(true|false)|(null)|([{}\[\]])|([,:])|\n( *)/g;
+  let lastIndex = 0;
+  let match: RegExpExecArray | null;
+  let i = 0;
+  while ((match = tokenRe.exec(raw)) !== null) {
+    if (match.index > lastIndex) nodes.push(raw.slice(lastIndex, match.index));
+    lastIndex = match.index + match[0].length;
+    if (match[1]) {
+      nodes.push(<span key={i++} style={{ color: jsonTokenColors.key }}>{match[1]}</span>);
+      nodes.push(<span key={i++} style={{ color: jsonTokenColors.comma }}>: </span>);
+    } else if (match[2]) {
+      nodes.push(<span key={i++} style={{ color: jsonTokenColors.string }}>{match[2]}</span>);
+    } else if (match[3]) {
+      nodes.push(<span key={i++} style={{ color: jsonTokenColors.number }}>{match[3]}</span>);
+    } else if (match[4]) {
+      nodes.push(<span key={i++} style={{ color: jsonTokenColors.boolean }}>{match[4]}</span>);
+    } else if (match[5]) {
+      nodes.push(<span key={i++} style={{ color: jsonTokenColors.null }}>{match[5]}</span>);
+    } else if (match[6]) {
+      nodes.push(<span key={i++} style={{ color: jsonTokenColors.brace }}>{match[6]}</span>);
+    } else if (match[7]) {
+      nodes.push(<span key={i++} style={{ color: jsonTokenColors.comma }}>{match[7]}</span>);
+    } else if (match[8] !== undefined) {
+      nodes.push('\n' + match[8]);
+    }
+  }
+  if (lastIndex < raw.length) nodes.push(raw.slice(lastIndex));
+  return nodes;
+}
 import { inputStyle, labelStyle, copyToClipboard } from './types'
 
 // Render an OCR field value. Most fields are primitives, but some
@@ -751,7 +796,7 @@ export function ApiKeysSection({ token, apiKeys, setApiKeys, stats, newFullKey, 
       {/* Verification detail modal */}
       {(verificationDetail || verificationDetailError) && (
         <div
-          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 70, padding: 16 }}
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.7)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 100, padding: 16 }}
           onClick={() => { setVerificationDetail(null); setVerificationDetailError(null) }}
         >
           <div
@@ -967,7 +1012,7 @@ export function ApiKeysSection({ token, apiKeys, setApiKeys, stats, newFullKey, 
                         <ClipboardDocumentIcon style={{ width: 12, height: 12 }} /> Copy
                       </button>
                     </div>
-                    <pre style={{ background: C.codeBg, borderRadius: 8, padding: '16px 18px', margin: 0, fontFamily: C.mono, fontSize: 12, color: C.code, lineHeight: 1.6, overflowX: 'auto', maxHeight: 500, overflowY: 'auto' }}>{JSON.stringify(verificationDetail, null, 2)}</pre>
+                    <pre style={{ background: C.codeBg, borderRadius: 8, padding: '16px 18px', margin: 0, fontFamily: C.mono, fontSize: 12, color: C.code, lineHeight: 1.6, overflowX: 'auto', maxHeight: 500, overflowY: 'auto' }}>{highlightJson(verificationDetail)}</pre>
                   </div>
                 )}
               </>
