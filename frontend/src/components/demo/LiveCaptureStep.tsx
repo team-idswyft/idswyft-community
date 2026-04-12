@@ -81,7 +81,7 @@ export const LiveCaptureStep: React.FC<LiveCaptureStepProps> = ({
             Follow the instructions below. Look at the camera and turn your head when prompted.
           </p>
 
-          <div style={{ maxWidth: 420, margin: '0 auto' }}>
+          <div style={{ margin: '0 auto' }}>
             {renderActiveLiveness()}
           </div>
         </>

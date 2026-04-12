@@ -18,7 +18,7 @@ export function ActiveLivenessCapture({
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [streamReady, setStreamReady] = useState(false);
-  const [videoDims, setVideoDims] = useState({ w: 480, h: 640 }); // portrait default for mobile
+  const [videoDims, setVideoDims] = useState({ w: 640, h: 480 }); // landscape default for desktop webcams
 
   // Start camera — use `playing` event for readiness instead of awaiting play(),
   // because the async gap after getUserMedia can expire the user-gesture context
@@ -132,7 +132,7 @@ export function ActiveLivenessCapture({
     <div style={{
       position: 'relative',
       width: '100%',
-      maxWidth: 480,
+      maxWidth: 640,
       margin: '0 auto',
       background: '#040d1a',
       borderRadius: 16,
