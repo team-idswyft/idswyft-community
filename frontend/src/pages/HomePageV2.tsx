@@ -716,6 +716,27 @@ export function HomePageV2() {
                 Signed by did:web:api.idswyft.app &middot; Ed25519
               </span>
             </div>
+
+            {/* Exported identity card preview */}
+            <div style={{ marginTop: 24, borderTop: `1px solid ${C.border}`, paddingTop: 20 }}>
+              <div style={{ fontFamily: C.mono, fontSize: 10, color: C.dim, letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 12 }}>
+                Exportable Identity Card
+              </div>
+              <div style={{
+                borderRadius: 12, overflow: 'hidden',
+                border: '1px solid rgba(34, 211, 238, 0.1)',
+                boxShadow: '0 8px 32px rgba(0, 0, 0, 0.3)',
+              }}>
+                <img
+                  src="/vc-identity-card.png"
+                  alt="Idswyft Verifiable Credential identity card"
+                  style={{ width: '100%', display: 'block' }}
+                />
+              </div>
+              <p style={{ fontFamily: C.mono, fontSize: 10, color: C.dim, marginTop: 8 }}>
+                Download as PNG or PDF — ISO ID-1 card dimensions
+              </p>
+            </div>
           </div>
 
           {/* Right: Flow steps */}
