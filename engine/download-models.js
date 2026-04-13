@@ -16,6 +16,25 @@ const __dirname = path.dirname(__filename);
 const modelsDir = path.join(__dirname, 'models');
 const baseUrl = 'https://raw.githubusercontent.com/vladmandic/face-api/master/model';
 
+/**
+ * Validate an ONNX file by checking header bytes.
+ * ONNX protobuf starts with 0x08 (varint field 1), not HTML (<) or empty.
+ */
+function isValidOnnx(filePath) {
+  try {
+    const stat = fs.statSync(filePath);
+    if (stat.size < 1024) return false; // Too small to be a real model
+    const buf = Buffer.alloc(4);
+    const fd = fs.openSync(filePath, 'r');
+    fs.readSync(fd, buf, 0, 4, 0);
+    fs.closeSync(fd);
+    // ONNX files start with protobuf varint (0x08), not HTML (0x3C '<') or text
+    return buf[0] === 0x08;
+  } catch {
+    return false;
+  }
+}
+
 // List of required model files (corrected names)
 const modelFiles = [
   // SSD MobileNet v1 (face detection)
@@ -40,16 +59,33 @@ const modelFiles = [
 ];
 
 /**
- * Download a file from URL to local path
+ * Download a file from URL to local path.
+ * For GitHub private repo release assets, set GITHUB_TOKEN env var.
  */
-function downloadFile(url, filePath, redirects = 0) {
+function downloadFile(url, filePath, redirects = 0, headers = {}) {
   return new Promise((resolve, reject) => {
     if (redirects === 0) console.log(`📥 Downloading: ${path.basename(filePath)}`);
     if (redirects > 5) { reject(new Error('Too many redirects')); return; }
 
     const file = fs.createWriteStream(filePath);
+    const parsed = new URL(url);
+    const reqHeaders = { ...headers };
 
-    https.get(url, (response) => {
+    // GitHub private release assets need token auth + octet-stream accept
+    const ghToken = process.env.GITHUB_TOKEN;
+    if (ghToken && redirects === 0 && parsed.hostname === 'github.com' && url.includes('/releases/download/')) {
+      // Use GitHub API URL for authenticated asset downloads
+      const match = url.match(/github\.com\/([^/]+)\/([^/]+)\/releases\/download\/([^/]+)\/(.+)/);
+      if (match) {
+        const [, owner, repo, tag, assetName] = match;
+        console.log(`   🔑 Using GITHUB_TOKEN for private release asset`);
+        // Resolve asset ID via API, then download with Accept: application/octet-stream
+        return downloadGitHubReleaseAsset(owner, repo, tag, assetName, filePath, ghToken)
+          .then(resolve, reject);
+      }
+    }
+
+    https.get(url, { headers: reqHeaders }, (response) => {
       // Follow redirects (GitHub releases return 302)
       if ([301, 302, 307, 308].includes(response.statusCode) && response.headers.location) {
         file.close();
@@ -58,6 +94,8 @@ function downloadFile(url, filePath, redirects = 0) {
       }
 
       if (response.statusCode !== 200) {
+        file.close();
+        fs.unlink(filePath, () => {});
         reject(new Error(`Failed to download ${url}: ${response.statusCode}`));
         return;
       }
@@ -74,6 +112,95 @@ function downloadFile(url, filePath, redirects = 0) {
       fs.unlink(filePath, () => {}); // Delete partial file
       reject(error);
     });
+  });
+}
+
+/**
+ * Download a release asset from a private GitHub repo using the API.
+ * 1. GET /repos/:owner/:repo/releases/tags/:tag → find asset by name
+ * 2. GET /repos/:owner/:repo/releases/assets/:id with Accept: application/octet-stream
+ */
+function downloadGitHubReleaseAsset(owner, repo, tag, assetName, filePath, token) {
+  return new Promise((resolve, reject) => {
+    // Step 1: Get release metadata to find asset ID
+    const apiUrl = `https://api.github.com/repos/${owner}/${repo}/releases/tags/${tag}`;
+    https.get(apiUrl, {
+      headers: {
+        'Authorization': `Bearer ${token}`,
+        'Accept': 'application/vnd.github+json',
+        'User-Agent': 'idswyft-model-downloader',
+      },
+    }, (res) => {
+      let body = '';
+      res.on('data', (chunk) => { body += chunk; });
+      res.on('end', () => {
+        if (res.statusCode !== 200) {
+          reject(new Error(`GitHub API error (${res.statusCode}): ${body.slice(0, 200)}`));
+          return;
+        }
+        try {
+          const release = JSON.parse(body);
+          const asset = release.assets?.find(a => a.name === assetName);
+          if (!asset) {
+            reject(new Error(`Asset "${assetName}" not found in release ${tag}`));
+            return;
+          }
+          // Step 2: Download the asset binary
+          const assetUrl = `https://api.github.com/repos/${owner}/${repo}/releases/assets/${asset.id}`;
+          downloadAssetBinary(assetUrl, filePath, token, asset.size).then(resolve, reject);
+        } catch (e) {
+          reject(new Error(`Failed to parse release metadata: ${e.message}`));
+        }
+      });
+    }).on('error', reject);
+  });
+}
+
+function downloadAssetBinary(assetUrl, filePath, token, expectedSize) {
+  return new Promise((resolve, reject) => {
+    const file = fs.createWriteStream(filePath);
+
+    function doGet(url, depth = 0) {
+      if (depth > 5) { reject(new Error('Too many redirects')); return; }
+      const parsed = new URL(url);
+      const headers = {
+        'User-Agent': 'idswyft-model-downloader',
+        'Accept': 'application/octet-stream',
+      };
+      // Only send auth to api.github.com (not to S3 redirect targets)
+      if (parsed.hostname === 'api.github.com') {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      https.get(url, { headers }, (res) => {
+        if ([301, 302, 307, 308].includes(res.statusCode) && res.headers.location) {
+          return doGet(res.headers.location, depth + 1);
+        }
+        if (res.statusCode !== 200) {
+          file.close();
+          fs.unlink(filePath, () => {});
+          reject(new Error(`Asset download failed: ${res.statusCode}`));
+          return;
+        }
+        res.pipe(file);
+        file.on('finish', () => {
+          file.close();
+          // Validate downloaded file size
+          const stat = fs.statSync(filePath);
+          if (expectedSize && stat.size !== expectedSize) {
+            fs.unlink(filePath, () => {});
+            reject(new Error(`Size mismatch: expected ${expectedSize} bytes, got ${stat.size}`));
+            return;
+          }
+          console.log(`✅ Downloaded: ${path.basename(filePath)} (${(stat.size / 1024 / 1024).toFixed(1)} MB)`);
+          resolve();
+        });
+      }).on('error', (err) => {
+        fs.unlink(filePath, () => {});
+        reject(err);
+      });
+    }
+
+    doGet(assetUrl);
   });
 }
 
@@ -135,18 +262,29 @@ async function downloadModels() {
     fs.mkdirSync(sharedModelsDir, { recursive: true });
   }
   const deepfakePath = path.join(sharedModelsDir, deepfakeModel.fileName);
-  if (fs.existsSync(deepfakePath)) {
-    console.log(`⏭️  Skipped: ${deepfakeModel.fileName} (already exists)`);
+  if (fs.existsSync(deepfakePath) && isValidOnnx(deepfakePath)) {
+    console.log(`⏭️  Skipped: ${deepfakeModel.fileName} (already exists, valid ONNX)`);
     skipped++;
-  } else if (deepfakeModel.url) {
-    try {
-      await downloadFile(deepfakeModel.url, deepfakePath);
-      downloaded++;
-    } catch (error) {
-      console.log(`⏭️  Skipped: ${deepfakeModel.fileName} (optional — download failed: ${error.message})`);
-    }
   } else {
-    console.log(`⏭️  Skipped: ${deepfakeModel.fileName} (optional — no DEEPFAKE_MODEL_URL set)`);
+    // Remove corrupt/placeholder file if it exists
+    if (fs.existsSync(deepfakePath)) {
+      console.log(`⚠️  Removing invalid ${deepfakeModel.fileName} — re-downloading`);
+      fs.unlinkSync(deepfakePath);
+    }
+    if (deepfakeModel.url) {
+      try {
+        await downloadFile(deepfakeModel.url, deepfakePath);
+        if (!isValidOnnx(deepfakePath)) {
+          fs.unlinkSync(deepfakePath);
+          throw new Error('Downloaded file is not a valid ONNX model (bad magic bytes)');
+        }
+        downloaded++;
+      } catch (error) {
+        console.log(`⏭️  Skipped: ${deepfakeModel.fileName} (optional — ${error.message})`);
+      }
+    } else {
+      console.log(`⏭️  Skipped: ${deepfakeModel.fileName} (optional — no DEEPFAKE_MODEL_URL set)`);
+    }
   }
 
   console.log('\n📊 Download Summary:');
