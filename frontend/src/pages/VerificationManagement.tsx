@@ -73,6 +73,18 @@ interface DuplicateFlag {
   hamming_distance: number
 }
 
+interface LinkedVerification {
+  id: string
+  status: string
+  created_at: string
+  user_id: string
+  document_type?: string | null
+  document_thumbnail?: string | null
+  selfie_thumbnail?: string | null
+  full_name?: string | null
+  document_number?: string | null
+}
+
 interface VerificationDetail {
   id: string
   user_id: string
@@ -196,6 +208,7 @@ export function VerificationManagement() {
   const [actionReason, setActionReason] = useState('')
   const [overrideStatus, setOverrideStatus] = useState('verified')
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
+  const [duplicateRefs, setDuplicateRefs] = useState<Record<string, LinkedVerification[]>>({})
   const [authReady, setAuthReady] = useState(() => !!getCsrfToken())
   const [userRole, setUserRole] = useState<'admin' | 'reviewer' | 'platform'>('reviewer')
   const [isMobile, setIsMobile] = useState(false)
@@ -296,6 +309,14 @@ export function VerificationManagement() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       setDetail(data.verification)
+      // Fetch duplicate reference records if flags exist
+      const flags = data.verification?.duplicate_flags
+      if (flags && flags.length > 0 && !duplicateRefs[id]) {
+        fetch(`${API_BASE_URL}/api/admin/verification/${id}/duplicates`, authFetchOpts())
+          .then(r => r.ok ? r.json() : null)
+          .then(d => { if (d?.linked_verifications) setDuplicateRefs(prev => ({ ...prev, [id]: d.linked_verifications })) })
+          .catch(() => {})
+      }
     } catch { setDetail(null) }
     finally { setDetailLoading(false) }
   }
@@ -966,45 +987,111 @@ export function VerificationManagement() {
                       </div>
 
                       {/* ── Duplicate Detection Warning ── */}
-                      {detail.duplicate_flags && detail.duplicate_flags.length > 0 && (
-                        <div style={{
-                          marginTop: 16, padding: 14, borderRadius: 8,
-                          background: C.amberDim, border: `1px solid rgba(251,191,36,0.3)`,
-                        }}>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-                            <ExclamationTriangleIcon style={{ width: 18, height: 18, color: C.amber }} />
-                            <span style={{ color: C.amber, fontSize: 13, fontWeight: 600 }}>
-                              Duplicate Detected ({detail.duplicate_flags.length} match{detail.duplicate_flags.length !== 1 ? 'es' : ''})
-                            </span>
+                      {detail.duplicate_flags && detail.duplicate_flags.length > 0 && (() => {
+                        const refs = duplicateRefs[detail.id] || []
+                        const refMap = new Map(refs.map(r => [r.id, r]))
+                        return (
+                          <div style={{
+                            marginTop: 16, padding: 14, borderRadius: 8,
+                            background: C.amberDim, border: `1px solid rgba(251,191,36,0.3)`,
+                          }}>
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                              <ExclamationTriangleIcon style={{ width: 18, height: 18, color: C.amber }} />
+                              <span style={{ color: C.amber, fontSize: 13, fontWeight: 600 }}>
+                                Duplicate Detected ({detail.duplicate_flags.length} match{detail.duplicate_flags.length !== 1 ? 'es' : ''})
+                              </span>
+                            </div>
+                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                              {detail.duplicate_flags.map((flag, i) => {
+                                const ref = refMap.get(flag.matched_verification_id)
+                                const sc = ref ? getStatusConfig(ref.status) : null
+                                return (
+                                  <div key={i} style={{
+                                    background: C.codeBg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 10,
+                                  }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: ref ? 8 : 0, fontSize: 12 }}>
+                                      <span style={{
+                                        padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600,
+                                        background: flag.type === 'document_phash' ? C.cyanDim : C.purpleDim,
+                                        color: flag.type === 'document_phash' ? C.cyan : C.purple,
+                                      }}>
+                                        {flag.type === 'document_phash' ? 'Document' : 'Face'}
+                                      </span>
+                                      <span style={{ color: C.muted }}>matches</span>
+                                      <button
+                                        onClick={() => toggleExpand(flag.matched_verification_id)}
+                                        style={{
+                                          background: 'none', border: 'none', color: C.cyan, cursor: 'pointer',
+                                          fontFamily: C.mono, fontSize: 11, textDecoration: 'underline', padding: 0,
+                                        }}
+                                      >
+                                        {truncateId(flag.matched_verification_id)}
+                                      </button>
+                                      <span style={{ color: C.dim, fontSize: 10 }}>
+                                        (distance: {flag.hamming_distance})
+                                      </span>
+                                    </div>
+                                    {ref && (
+                                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                                        {/* Thumbnails */}
+                                        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
+                                          {ref.document_thumbnail ? (
+                                            <img src={ref.document_thumbnail} alt="Doc" style={{
+                                              width: 36, height: 36, objectFit: 'cover', borderRadius: 4, border: `1px solid ${C.border}`,
+                                            }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                                          ) : (
+                                            <div style={{
+                                              width: 36, height: 36, borderRadius: 4, background: C.bg, border: `1px solid ${C.border}`,
+                                              display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                            }}>
+                                              <PhotoIcon style={{ width: 14, height: 14, color: C.dim }} />
+                                            </div>
+                                          )}
+                                          {ref.selfie_thumbnail && (
+                                            <img src={ref.selfie_thumbnail} alt="Live" style={{
+                                              width: 36, height: 36, objectFit: 'cover', borderRadius: 18, border: `1px solid ${C.border}`,
+                                            }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+                                          )}
+                                        </div>
+                                        {/* Details */}
+                                        <div style={{ flex: 1, minWidth: 0 }}>
+                                          {ref.full_name && (
+                                            <div style={{ color: C.text, fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                              {ref.full_name}
+                                            </div>
+                                          )}
+                                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2, fontSize: 11 }}>
+                                            {ref.document_number && (
+                                              <span style={{ color: C.muted, fontFamily: C.mono }}>{ref.document_number}</span>
+                                            )}
+                                            {ref.document_type && (
+                                              <span style={{ color: C.dim }}>{ref.document_type}</span>
+                                            )}
+                                          </div>
+                                        </div>
+                                        {/* Status + Date */}
+                                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                          {sc && (
+                                            <span style={{
+                                              fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
+                                              background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`,
+                                            }}>
+                                              {sc.label}
+                                            </span>
+                                          )}
+                                          <div style={{ color: C.dim, fontSize: 10, marginTop: 3 }}>
+                                            {formatDate(ref.created_at)}
+                                          </div>
+                                        </div>
+                                      </div>
+                                    )}
+                                  </div>
+                                )
+                              })}
+                            </div>
                           </div>
-                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                            {detail.duplicate_flags.map((flag, i) => (
-                              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
-                                <span style={{
-                                  padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600,
-                                  background: flag.type === 'document_phash' ? C.cyanDim : C.purpleDim,
-                                  color: flag.type === 'document_phash' ? C.cyan : C.purple,
-                                }}>
-                                  {flag.type === 'document_phash' ? 'Document' : 'Face'}
-                                </span>
-                                <span style={{ color: C.muted }}>matches</span>
-                                <button
-                                  onClick={() => toggleExpand(flag.matched_verification_id)}
-                                  style={{
-                                    background: 'none', border: 'none', color: C.cyan, cursor: 'pointer',
-                                    fontFamily: C.mono, fontSize: 11, textDecoration: 'underline', padding: 0,
-                                  }}
-                                >
-                                  {truncateId(flag.matched_verification_id)}
-                                </button>
-                                <span style={{ color: C.dim, fontSize: 10 }}>
-                                  (distance: {flag.hamming_distance})
-                                </span>
-                              </div>
-                            ))}
-                          </div>
-                        </div>
-                      )}
+                        )
+                      })()}
 
                       {/* Also show duplicate flags from debug.duplicates if available */}
                       {detail.debug?.duplicates?.flags && detail.debug.duplicates.flags.length > 0 && !detail.duplicate_flags?.length && (

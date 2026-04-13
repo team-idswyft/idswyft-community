@@ -1232,7 +1232,8 @@ router.post('/:verification_id/front-document',
       dbStatus = 'failed';
     } else if (isAgeOnly) {
       const ageResult = state.current_step === VerificationStatus.COMPLETE ? 'verified' : 'failed';
-      dbStatus = (ageResult === 'verified' && complianceForceReview) ? 'manual_review' : ageResult;
+      dbStatus = (ageResult === 'verified' && (complianceForceReview || (dedupFlags.length > 0 && !dedupBlocked)))
+        ? 'manual_review' : ageResult;
     } else {
       dbStatus = stepResult.passed ? 'processing' : 'failed';
     }
@@ -1710,7 +1711,8 @@ router.post('/:verification_id/live-capture',
     let dbStatus: string;
     const needsManualReview = state.cross_validation?.verdict === 'REVIEW'
       || !!state.face_match?.skipped_reason
-      || complianceForceReview;
+      || complianceForceReview
+      || (liveDedupFlags.length > 0 && !liveDedupBlocked);
     if (liveDedupBlocked) {
       dbStatus = 'failed';
     } else if (state.current_step === VerificationStatus.COMPLETE) {

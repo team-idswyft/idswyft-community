@@ -316,21 +316,41 @@ router.get('/verification/:id/duplicates',
       return res.json({ verification_id: id, linked_verifications: [] });
     }
 
-    // Fetch basic info for each linked verification (scoped to same developer for defense-in-depth)
+    // Fetch enriched info for each linked verification (scoped to same developer for defense-in-depth)
     const { data: linked } = await supabase
       .from('verification_requests')
-      .select('id, status, created_at, user_id')
+      .select('id, status, created_at, user_id, document_type, document_thumbnail, selfie_thumbnail')
       .in('id', linkedIds)
       .eq('developer_id', vr.developer_id);
 
+    // Fetch front document OCR data for name + document number
+    const { data: linkedDocs } = await supabase
+      .from('documents')
+      .select('verification_request_id, ocr_data')
+      .in('verification_request_id', linkedIds)
+      .eq('is_back_of_id', false);
+
+    const ocrByVerification = new Map<string, any>();
+    for (const doc of linkedDocs || []) {
+      ocrByVerification.set(doc.verification_request_id, doc.ocr_data);
+    }
+
     res.json({
       verification_id: id,
-      linked_verifications: (linked || []).map((v: any) => ({
-        id: v.id,
-        status: v.status,
-        created_at: v.created_at,
-        user_id: v.user_id,
-      })),
+      linked_verifications: (linked || []).map((v: any) => {
+        const ocr = ocrByVerification.get(v.id);
+        return {
+          id: v.id,
+          status: v.status,
+          created_at: v.created_at,
+          user_id: v.user_id,
+          document_type: v.document_type,
+          document_thumbnail: v.document_thumbnail,
+          selfie_thumbnail: v.selfie_thumbnail,
+          full_name: ocr?.full_name ?? null,
+          document_number: ocr?.id_number ?? ocr?.document_number ?? null,
+        };
+      }),
     });
   })
 );
