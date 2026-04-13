@@ -47,7 +47,10 @@ export function buildCorsOptions(config: CorsConfig) {
       // Allow server-to-server requests (no Origin header)
       if (!origin) return callback(null, true);
       if (isCorsAllowed(origin, config)) return callback(null, true);
-      return callback(new Error(`CORS: origin not allowed`), false);
+      // Silently deny — omit CORS headers so the browser blocks the request.
+      // Using callback(null, false) instead of callback(new Error(...)) avoids
+      // bubbling an unhandled error into Sentry for every bot/scanner hit.
+      return callback(null, false);
     },
     credentials: true,
     optionsSuccessStatus: 200,
