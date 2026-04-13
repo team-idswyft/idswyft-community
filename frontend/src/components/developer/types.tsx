@@ -135,7 +135,16 @@ export function getDevLifecycleStatus(deliveries: WebhookDeliveryLog[]): { label
   return { label: 'In Progress', color: C.muted, bg: 'rgba(255,255,255,0.04)' }
 }
 
-export function groupDevDeliveries(deliveries: WebhookDeliveryLog[]): { groupId: string; label: string; deliveries: WebhookDeliveryLog[] }[] {
+export interface DeliveryGroup {
+  groupId: string
+  label: string
+  deliveries: WebhookDeliveryLog[]
+  failedCount: number
+  latestEvent: string
+  dateLabel: string
+}
+
+export function groupDevDeliveries(deliveries: WebhookDeliveryLog[]): DeliveryGroup[] {
   const map = new Map<string, WebhookDeliveryLog[]>()
   for (const d of deliveries) {
     const sid = getDevPortalSessionId(d) ?? '__other__'
@@ -145,14 +154,25 @@ export function groupDevDeliveries(deliveries: WebhookDeliveryLog[]): { groupId:
   for (const [, group] of map) {
     group.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
   }
-  const result: { groupId: string; label: string; deliveries: WebhookDeliveryLog[] }[] = []
+
+  const buildGroup = (sid: string, group: WebhookDeliveryLog[]): DeliveryGroup => {
+    const failedCount = group.filter(d => d.status === 'failed' || (d.response_status && d.response_status >= 400)).length
+    const latestEvent = group[group.length - 1]?.event || ''
+    const firstDate = new Date(group[0].created_at).toLocaleDateString()
+    const lastDate = new Date(group[group.length - 1].created_at).toLocaleDateString()
+    const dateLabel = firstDate === lastDate ? firstDate : `${firstDate} \u2192 ${lastDate}`
+    const label = sid === '__other__' ? 'Other Events' : sid.substring(0, 8) + '\u2026'
+    return { groupId: sid, label, deliveries: group, failedCount, latestEvent, dateLabel }
+  }
+
+  const result: DeliveryGroup[] = []
   for (const [sid, group] of map) {
     if (sid === '__other__') continue
-    result.push({ groupId: sid, label: sid.substring(0, 8) + '...', deliveries: group })
+    result.push(buildGroup(sid, group))
   }
   result.sort((a, b) => new Date(b.deliveries[0].created_at).getTime() - new Date(a.deliveries[0].created_at).getTime())
   const other = map.get('__other__')
-  if (other) result.push({ groupId: '__other__', label: 'Other Events', deliveries: other })
+  if (other) result.push(buildGroup('__other__', other))
   return result
 }
 

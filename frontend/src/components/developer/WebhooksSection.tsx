@@ -519,10 +519,11 @@ export function WebhooksSection({ token, apiKeys }: WebhooksSectionProps) {
                       const hookGroups = expandedSessionGroups[hook.id] ?? defaultExpanded
 
                       return (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 400, overflowY: 'auto' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 400, overflowY: 'auto' }}>
                           {groups.map(group => {
                             const isGroupExpanded = hookGroups.has(group.groupId)
                             const lifecycle = getDevLifecycleStatus(group.deliveries)
+                            const allFailed = group.failedCount === group.deliveries.length && group.failedCount > 0
                             const toggleGroup = () => {
                               setExpandedSessionGroups(prev => {
                                 const current = prev[hook.id] ?? defaultExpanded
@@ -533,32 +534,48 @@ export function WebhooksSection({ token, apiKeys }: WebhooksSectionProps) {
                             }
 
                             return (
-                              <div key={group.groupId} style={{ border: `1px solid ${C.border}`, borderRadius: 6, overflow: 'hidden' }}>
+                              <div key={group.groupId} style={{
+                                borderRadius: 8, overflow: 'hidden',
+                                border: `1px solid ${allFailed ? 'rgba(248,113,113,0.25)' : C.border}`,
+                                borderLeft: `3px solid ${lifecycle.color}`,
+                              }}>
                                 {/* Group header */}
                                 <div
                                   onClick={toggleGroup}
                                   style={{
-                                    display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px',
-                                    background: C.surface, cursor: 'pointer', transition: 'background 0.15s',
+                                    display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
+                                    background: allFailed ? 'rgba(248,113,113,0.04)' : C.surface,
+                                    cursor: 'pointer', transition: 'background 0.15s',
                                   }}
                                 >
-                                  <span style={{ color: C.muted, fontSize: 10, transition: 'transform 0.15s', transform: isGroupExpanded ? 'rotate(90deg)' : 'none' }}>&#9656;</span>
-                                  <span style={{ fontFamily: C.mono, color: C.text, fontSize: 11 }}>{group.label}</span>
-                                  <span style={{ fontSize: 9, padding: '1px 6px', borderRadius: 8, background: 'rgba(255,255,255,0.06)', color: C.muted, fontFamily: C.mono }}>
-                                    {group.deliveries.length}
-                                  </span>
-                                  <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: lifecycle.bg, color: lifecycle.color }}>
-                                    {lifecycle.label}
-                                  </span>
-                                  <span style={{ color: C.muted, fontSize: 9, marginLeft: 'auto', whiteSpace: 'nowrap', fontFamily: C.mono }}>
-                                    {new Date(group.deliveries[0].created_at).toLocaleDateString()}
-                                    {group.deliveries.length > 1 && ` \u2192 ${new Date(group.deliveries[group.deliveries.length - 1].created_at).toLocaleDateString()}`}
-                                  </span>
+                                  <span style={{ color: C.muted, fontSize: 10, transition: 'transform 0.15s', transform: isGroupExpanded ? 'rotate(90deg)' : 'none', flexShrink: 0 }}>&#9656;</span>
+                                  <div style={{ flex: 1, minWidth: 0 }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                      <span style={{ fontFamily: C.mono, color: C.text, fontSize: 12, fontWeight: 600 }}>{group.label}</span>
+                                      <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: lifecycle.bg, color: lifecycle.color }}>
+                                        {lifecycle.label}
+                                      </span>
+                                      {group.failedCount > 0 && (
+                                        <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: C.redDim, color: C.red }}>
+                                          {group.failedCount}/{group.deliveries.length} failed
+                                        </span>
+                                      )}
+                                    </div>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}>
+                                      {group.latestEvent && (
+                                        <span style={{ fontFamily: C.mono, fontSize: 10, color: C.muted }}>{group.latestEvent}</span>
+                                      )}
+                                    </div>
+                                  </div>
+                                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                                    <div style={{ color: C.muted, fontSize: 10, fontFamily: C.mono, whiteSpace: 'nowrap' }}>{group.dateLabel}</div>
+                                    <div style={{ fontSize: 9, color: C.dim, marginTop: 2 }}>{group.deliveries.length} {group.deliveries.length === 1 ? 'delivery' : 'deliveries'}</div>
+                                  </div>
                                 </div>
 
                                 {/* Group body */}
                                 {isGroupExpanded && (
-                                  <div style={{ borderTop: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 2, padding: 4 }}>
+                                  <div style={{ borderTop: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 2, padding: 4, background: C.panel }}>
                                     {group.deliveries.map(d => renderDeliveryItem(d, hook.id, { compact: true }))}
                                   </div>
                                 )}
