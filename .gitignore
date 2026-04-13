@@ -153,3 +153,5 @@ caddy/certs/*.crt
 # Internal docs — all markdown (except README.md / CLAUDE.md) lives in docs/
 /docs/
 .vercel
+.aidesigner/*
+!.aidesigner/.gitkeep
