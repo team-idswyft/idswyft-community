@@ -519,11 +519,10 @@ export function WebhooksSection({ token, apiKeys }: WebhooksSectionProps) {
                       const hookGroups = expandedSessionGroups[hook.id] ?? defaultExpanded
 
                       return (
-                        <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxHeight: 400, overflowY: 'auto' }}>
+                        <div style={{ display: 'flex', flexDirection: 'column', gap: 4, maxHeight: 400, overflowY: 'auto' }}>
                           {groups.map(group => {
                             const isGroupExpanded = hookGroups.has(group.groupId)
                             const lifecycle = getDevLifecycleStatus(group.deliveries)
-                            const allFailed = group.failedCount === group.deliveries.length && group.failedCount > 0
                             const toggleGroup = () => {
                               setExpandedSessionGroups(prev => {
                                 const current = prev[hook.id] ?? defaultExpanded
@@ -534,48 +533,28 @@ export function WebhooksSection({ token, apiKeys }: WebhooksSectionProps) {
                             }
 
                             return (
-                              <div key={group.groupId} style={{
-                                borderRadius: 8, overflow: 'hidden',
-                                border: `1px solid ${allFailed ? 'rgba(248,113,113,0.25)' : C.border}`,
-                                borderLeft: `3px solid ${lifecycle.color}`,
-                              }}>
-                                {/* Group header */}
+                              <div key={group.groupId}>
+                                {/* Group header — single compact line */}
                                 <div
                                   onClick={toggleGroup}
                                   style={{
-                                    display: 'flex', alignItems: 'center', gap: 10, padding: '9px 12px',
-                                    background: allFailed ? 'rgba(248,113,113,0.04)' : C.surface,
+                                    display: 'flex', alignItems: 'center', gap: 8, padding: '6px 8px',
+                                    background: C.surface, borderRadius: isGroupExpanded ? '6px 6px 0 0' : 6,
                                     cursor: 'pointer', transition: 'background 0.15s',
                                   }}
                                 >
                                   <span style={{ color: C.muted, fontSize: 10, transition: 'transform 0.15s', transform: isGroupExpanded ? 'rotate(90deg)' : 'none', flexShrink: 0 }}>&#9656;</span>
-                                  <div style={{ flex: 1, minWidth: 0 }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                                      <span style={{ fontFamily: C.mono, color: C.text, fontSize: 12, fontWeight: 600 }}>{group.label}</span>
-                                      <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: lifecycle.bg, color: lifecycle.color }}>
-                                        {lifecycle.label}
-                                      </span>
-                                      {group.failedCount > 0 && (
-                                        <span style={{ fontSize: 9, fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: C.redDim, color: C.red }}>
-                                          {group.failedCount}/{group.deliveries.length} failed
-                                        </span>
-                                      )}
-                                    </div>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 3 }}>
-                                      {group.latestEvent && (
-                                        <span style={{ fontFamily: C.mono, fontSize: 10, color: C.muted }}>{group.latestEvent}</span>
-                                      )}
-                                    </div>
-                                  </div>
-                                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                                    <div style={{ color: C.muted, fontSize: 10, fontFamily: C.mono, whiteSpace: 'nowrap' }}>{group.dateLabel}</div>
-                                    <div style={{ fontSize: 9, color: C.dim, marginTop: 2 }}>{group.deliveries.length} {group.deliveries.length === 1 ? 'delivery' : 'deliveries'}</div>
-                                  </div>
+                                  <span style={{ fontFamily: C.mono, color: C.text, fontSize: 12 }}>{group.label}</span>
+                                  <span style={{ fontSize: 10, color: C.dim }}>{group.deliveries.length}</span>
+                                  <span style={{ fontSize: 9, fontWeight: 600, padding: '1px 6px', borderRadius: 4, background: lifecycle.bg, color: lifecycle.color }}>
+                                    {lifecycle.label}
+                                  </span>
+                                  <span style={{ color: C.muted, fontSize: 10, marginLeft: 'auto', whiteSpace: 'nowrap' }}>{group.dateLabel}</span>
                                 </div>
 
                                 {/* Group body */}
                                 {isGroupExpanded && (
-                                  <div style={{ borderTop: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', gap: 2, padding: 4, background: C.panel }}>
+                                  <div style={{ display: 'flex', flexDirection: 'column', gap: 2, padding: '4px 4px 4px 20px', background: C.panel, borderRadius: '0 0 6px 6px' }}>
                                     {group.deliveries.map(d => renderDeliveryItem(d, hook.id, { compact: true }))}
                                   </div>
                                 )}
