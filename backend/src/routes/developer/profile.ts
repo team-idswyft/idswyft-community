@@ -219,11 +219,12 @@ router.post('/branding/logo',
       throw new ValidationError('File content does not match a valid JPEG or PNG image', 'file', null);
     }
 
-    const storagePath = `branding/${developer.id}`;
+    const brandingBucket = 'branding';
+    const storagePath = `${developer.id}/logo`;
 
-    // Upload to Supabase Storage (upsert — overwrite on re-upload)
+    // Upload to dedicated public branding bucket (scoped by developer ID)
     const { error: uploadError } = await supabase.storage
-      .from(config.supabase.storageBucket)
+      .from(brandingBucket)
       .upload(storagePath, file.buffer, {
         contentType: file.mimetype,
         upsert: true,
@@ -235,9 +236,9 @@ router.post('/branding/logo',
       throw new Error('Failed to upload logo');
     }
 
-    // Get public URL
+    // Get public URL (branding bucket is public, so this URL is accessible)
     const { data: urlData } = supabase.storage
-      .from(config.supabase.storageBucket)
+      .from(brandingBucket)
       .getPublicUrl(storagePath);
 
     const logoUrl = urlData.publicUrl;
