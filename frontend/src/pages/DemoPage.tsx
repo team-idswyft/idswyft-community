@@ -67,8 +67,17 @@ const DemoPage: React.FC = () => {
   const isAgeOnly = verificationMode === 'age_only';
   const isDocumentOnly = verificationMode === 'document_only';
   const isIdentity = verificationMode === 'identity';
+
+  // Passport back-skip state (ref mirrors state for use in interval callbacks)
+  const [skipBack, setSkipBack] = useState(false);
+  const skipBackRef = useRef(false);
+
   // Display-step count (UI screens), not backend pipeline gate count
-  const totalSteps = isAgeOnly ? 3 : isDocumentOnly ? 5 : isIdentity ? 4 : 6;
+  const totalSteps = isAgeOnly ? 3
+    : (skipBack && isDocumentOnly) ? 3
+    : (isIdentity || skipBack) ? 4
+    : isDocumentOnly ? 5
+    : 6;
 
   // Live capture state
   const [showLiveCapture, setShowLiveCapture] = useState(false);
@@ -679,6 +688,8 @@ const DemoPage: React.FC = () => {
       if (backPreviewUrl) URL.revokeObjectURL(backPreviewUrl);
       setBackPreviewUrl(null);
       setCheckingStepError(null);
+      setSkipBack(false);
+      skipBackRef.current = false;
       setCurrentStep(2);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Failed to restart verification');
@@ -832,6 +843,13 @@ const DemoPage: React.FC = () => {
         return;
       }
 
+      // Detect passport back-skip from response
+      const backSkipped = data.detected_document_type === 'passport' || data.requires_back === false;
+      if (backSkipped && !isIdentity) {
+        setSkipBack(true);
+        skipBackRef.current = true;
+      }
+
       setCurrentStep(3);
       toast.success('Document uploaded successfully');
 
@@ -877,10 +895,17 @@ const DemoPage: React.FC = () => {
             return;
           }
 
+          // Check if verification already completed (document_only + passport)
+          if (data.final_result !== null && data.final_result !== undefined) {
+            stopOCRPolling();
+            setCurrentStep(7);
+            return;
+          }
+
           if (data.ocr_data && Object.keys(data.ocr_data).length > 0) {
             stopOCRPolling();
-            // identity flow: skip back doc → go straight to live capture
-            if (isIdentity) {
+            // identity or passport: skip back doc → go straight to live capture
+            if (isIdentity || skipBackRef.current) {
               setCurrentStep(6);
             } else {
               setCurrentStep(4); // back upload (full and document_only)
@@ -1462,7 +1487,7 @@ const DemoPage: React.FC = () => {
             showActiveLiveness={showLiveCapture}
             onStartLiveness={handleLiveCapture}
             onSkipLiveCapture={skipLiveCapture}
-            step={isIdentity ? 3 : 5}
+            step={(isIdentity || skipBack) ? 3 : 5}
             totalSteps={totalSteps}
             renderActiveLiveness={() => (
               <ActiveLivenessCapture
@@ -1557,14 +1582,19 @@ const DemoPage: React.FC = () => {
                 if (currentStep >= 2) return 2;
                 return 1;
               }
+              if (skipBack && isDocumentOnly) {
+                // Passport doc_only: 3 display steps: Start(1), Front(2), Results(3)
+                const map: Record<number, number> = { 1:1, 2:2, 3:2, 7:3, 8:3 };
+                return map[currentStep] || 1;
+              }
+              if (isIdentity || skipBack) {
+                // Identity or passport full: 4 display steps: Start(1), Front(2), Live(3), Results(4)
+                const map: Record<number, number> = { 1:1, 2:2, 3:2, 6:3, 7:4, 8:4 };
+                return map[currentStep] || 1;
+              }
               if (isDocumentOnly) {
                 // 5 display steps: Start(1), Front(2), Back(3), Checking(4), Results(5)
                 const map: Record<number, number> = { 1:1, 2:2, 3:2, 4:3, 5:4, 7:5, 8:5 };
-                return map[currentStep] || 1;
-              }
-              if (isIdentity) {
-                // 4 display steps: Start(1), Front(2), Live(3), Results(4)
-                const map: Record<number, number> = { 1:1, 2:2, 3:2, 6:3, 7:4, 8:4 };
                 return map[currentStep] || 1;
               }
               // Full flow: 6 display steps
@@ -1574,8 +1604,9 @@ const DemoPage: React.FC = () => {
             isMobile={isMobile}
             stepLabels={
               isAgeOnly ? ['Start', 'Upload ID', 'Results']
+              : (skipBack && isDocumentOnly) ? ['Start', 'Front ID', 'Results']
+              : (isIdentity || skipBack) ? ['Start', 'Front ID', 'Live Photo', 'Results']
               : isDocumentOnly ? ['Start', 'Front ID', 'Back ID', 'Checking', 'Results']
-              : isIdentity ? ['Start', 'Front ID', 'Live Photo', 'Results']
               : undefined
             }
           />

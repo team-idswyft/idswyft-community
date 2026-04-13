@@ -128,10 +128,13 @@ export class PaddleOCRProvider implements OCRProvider {
       }
     }
 
-    // Store classification result on OCR data
+    // Store detected document type (from auto-classification or user-provided)
     if (classificationResult) {
       ocrData.detected_document_type = classificationResult.type;
       ocrData.classification_confidence = classificationResult.confidence;
+    } else if (resolvedDocType === 'passport' || resolvedDocType === 'drivers_license' || resolvedDocType === 'national_id') {
+      ocrData.detected_document_type = resolvedDocType;
+      ocrData.classification_confidence = 1.0;
     }
 
     logger.info('PaddleOCRProvider: extraction result', {

@@ -229,6 +229,21 @@ export const FLOW_PRESETS: Record<VerificationMode, FlowConfig> = {
   age_only:      { preset: 'age_only',      requiresBack: false, requiresLiveness: false, requiresFaceMatch: false, totalSteps: 1, afterFront: 'COMPLETE',       afterCrossVal: 'COMPLETE' },
 };
 
+/**
+ * Passports are single-sided — skip back document + cross-validation.
+ * Returns a new FlowConfig with requiresBack=false and afterFront pointing
+ * to the next step after cross-validation (AWAITING_LIVE or COMPLETE).
+ */
+export function applyPassportOverride(flow: FlowConfig, detectedDocType?: string): FlowConfig {
+  if (detectedDocType === 'passport' && flow.requiresBack) {
+    // totalSteps is intentionally left unchanged — the STEP_MAPS index by
+    // flow.preset so the progress numbers (1 → 4 → 5 out of 5) remain valid
+    // even when steps 2-3 are skipped. Frontends maintain their own step lists.
+    return { ...flow, requiresBack: false, afterFront: flow.afterCrossVal };
+  }
+  return flow;
+}
+
 // --- Session State ---
 export interface SessionState {
   session_id: string;

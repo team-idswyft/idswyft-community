@@ -4,15 +4,18 @@
  * Enforces the 5-step verification flow with hard rejection gates.
  * Steps cannot be skipped or re-ordered. HARD_REJECTED is terminal.
  *
+ * Single-sided documents (passports) dynamically skip back document +
+ * cross-validation after front OCR detection.
+ *
  * Flow:
- *   AWAITING_FRONT → submitFront → Gate1 → AWAITING_BACK
+ *   AWAITING_FRONT → submitFront → Gate1 → AWAITING_BACK (or AWAITING_LIVE for passports)
  *   AWAITING_BACK  → submitBack  → Gate2 → auto: crossValidate → Gate3 → AWAITING_LIVE
  *   AWAITING_LIVE  → submitLiveCapture → Gate4 → auto: faceMatch → Gate5 → COMPLETE
  */
 
 import { randomUUID } from 'crypto';
 import { SessionFlowError } from '../exceptions.js';
-import { VerificationStatus, FLOW_PRESETS } from '@idswyft/shared';
+import { VerificationStatus, FLOW_PRESETS, applyPassportOverride } from '@idswyft/shared';
 import type {
   VerificationStatusType,
   FrontExtractionResult,
@@ -95,7 +98,7 @@ export interface SessionHydration {
 export class VerificationSession {
   private state: SessionState;
   private deps: SessionDeps;
-  readonly flow: FlowConfig;
+  private flow: FlowConfig;
 
   constructor(deps: SessionDeps, hydration?: SessionHydration, flow?: FlowConfig) {
     this.deps = deps;
@@ -125,6 +128,11 @@ export class VerificationSession {
     return { ...this.state };
   }
 
+  /** Read effective flow config (may differ from preset after passport detection) */
+  getFlow(): Readonly<FlowConfig> {
+    return this.flow;
+  }
+
   /**
    * Step 1 — Submit front document image.
    * Must be called when current_step === AWAITING_FRONT.
@@ -141,7 +149,17 @@ export class VerificationSession {
     }
 
     this.state.front_extraction = frontResult;
+
+    // Passports are single-sided — skip back document + cross-validation
+    this.flow = applyPassportOverride(this.flow, frontResult.ocr?.detected_document_type as string | undefined);
+
     this.transition(this.flow.afterFront as VerificationStatusType);
+
+    // document_only + passport: front is the final step — mark complete
+    if (this.state.current_step === VerificationStatus.COMPLETE) {
+      this.state.completed_at = new Date().toISOString();
+    }
+
     return this.passResult();
   }
 

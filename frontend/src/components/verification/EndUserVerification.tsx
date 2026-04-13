@@ -113,6 +113,9 @@ const EndUserVerification: React.FC<VerificationProps> = ({
   const [backFile, setBackFile] = useState<File | null>(null);
   const [backPreviewUrl, setBackPreviewUrl] = useState<string | null>(null);
 
+  // Passport back-skip state
+  const [skipBack, setSkipBack] = useState(false);
+
   // Result state
   const [finalResult, setFinalResult] = useState<any>(null);
   const [retryProcessing, setRetryProcessing] = useState(false);
@@ -224,8 +227,10 @@ const EndUserVerification: React.FC<VerificationProps> = ({
         return;
       }
       toast.success('Document uploaded successfully');
-      if (isIdentity) {
-        // Identity flow: skip back doc, go to scanning then liveness
+      // Passport or identity flow: skip back doc, go to scanning then liveness
+      const backSkipped = isIdentity || data.detected_document_type === 'passport' || data.requires_back === false;
+      if (backSkipped) {
+        setSkipBack(true);
         setCurrentStep(3);
         pollFrontOCRForIdentity();
       } else {
@@ -264,7 +269,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
     }
   };
 
-  // ── Step 3b: Poll for front OCR (identity mode — skip back doc) ──────────
+  // ── Step 3b: Poll for front OCR (back-skip modes — identity/passport) ──────
   const pollFrontOCRForIdentity = async (attempt = 0) => {
     if (!verificationId || !mountedRef.current) return;
     if (attempt >= MAX_POLL_ATTEMPTS) {
@@ -274,11 +279,12 @@ const EndUserVerification: React.FC<VerificationProps> = ({
     try {
       const data = await apiGet(`/api/v2/verify/${verificationId}/status`);
       if (!mountedRef.current) return;
-      if (data.ocr_data && Object.keys(data.ocr_data).length > 0) {
+      // Check final_result first — document_only + passport completes after front
+      if (data.final_result !== null && data.final_result !== undefined) {
+        showFinalResult(data);
+      } else if (data.ocr_data && Object.keys(data.ocr_data).length > 0) {
         setFrontOCR(data.ocr_data);
         setCurrentStep(6); // Skip back doc — go directly to selfie/liveness
-      } else if (data.final_result === 'failed' || data.final_result === 'manual_review') {
-        showFinalResult(data);
       } else {
         setTimeout(() => pollFrontOCRForIdentity(attempt + 1), 2000);
       }
@@ -433,6 +439,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
       setBackPreviewUrl(null);
       setFrontOCR(null);
       setFinalResult(null);
+      setSkipBack(false);
       if (redirectTimerRef.current) {
         clearTimeout(redirectTimerRef.current);
         redirectTimerRef.current = null;
@@ -447,8 +454,11 @@ const EndUserVerification: React.FC<VerificationProps> = ({
 
   // ── Progress bar ──────────────────────────────────────────────────────────
   const steps = isAgeOnly ? AGE_ONLY_STEPS
+    : (isIdentity || skipBack)
+      ? (isDocumentOnly
+        ? [{ step: 1, label: 'Start' }, { step: 2, label: 'Front ID' }, { step: 3, label: 'Scanning' }, { step: 7, label: 'Done' }]
+        : IDENTITY_STEPS)
     : isDocumentOnly ? DOCUMENT_ONLY_STEPS
-    : isIdentity ? IDENTITY_STEPS
     : FULL_STEPS;
   const stepIdx = steps.findIndex(s => s.step === currentStep);
   const activeStepIdx = stepIdx >= 0 ? stepIdx : steps.length - 1;

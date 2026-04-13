@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { VerificationSession } from '../session/VerificationSession.js';
 import { SessionFlowError } from '../exceptions.js';
-import { VerificationStatus } from '@idswyft/shared';
+import { VerificationStatus, FLOW_PRESETS } from '@idswyft/shared';
 import type { FrontExtractionResult, BackExtractionResult, LiveCaptureResult, FaceMatchResult, CrossValidationResult } from '@idswyft/shared';
 
 // ─── Mock dependencies ─────────────────────────────────────────
@@ -454,5 +454,143 @@ describe('VerificationSession — Hydration', () => {
     });
 
     await expect(session.submitFront(Buffer.from('front'))).rejects.toThrow(SessionFlowError);
+  });
+});
+
+// ─── Passport Back-Skip ──────────────────────────────────────────────────
+// Passports are single-sided — the session dynamically skips back document
+// and cross-validation when front OCR detects a passport.
+
+const mockPassportFrontResult: FrontExtractionResult = {
+  ocr: {
+    full_name: 'JANE DOE',
+    date_of_birth: '1985-03-20',
+    id_number: 'P12345678',
+    expiry_date: '2032-06-15',
+    nationality: 'USA',
+    detected_document_type: 'passport',
+  },
+  face_embedding: [0.1, 0.2, 0.3],
+  face_confidence: 0.90,
+  ocr_confidence: 0.85,
+  mrz_from_front: null,
+};
+
+describe('VerificationSession — Passport Back-Skip', () => {
+  it('full mode + passport: transitions to AWAITING_LIVE (skips back)', async () => {
+    mockExtractFront.mockResolvedValue(mockPassportFrontResult);
+    const session = createSession(); // default = full flow
+    const result = await session.submitFront(Buffer.from('passport-front'));
+
+    expect(result.passed).toBe(true);
+    expect(session.getState().current_step).toBe(VerificationStatus.AWAITING_LIVE);
+    expect(session.getState().front_extraction).toEqual(mockPassportFrontResult);
+  });
+
+  it('full mode + passport: getFlow() reflects modified flow', async () => {
+    mockExtractFront.mockResolvedValue(mockPassportFrontResult);
+    const session = createSession();
+    await session.submitFront(Buffer.from('passport-front'));
+
+    const flow = session.getFlow();
+    expect(flow.requiresBack).toBe(false);
+    expect(flow.afterFront).toBe('AWAITING_LIVE');
+  });
+
+  it('full mode + passport: can proceed with liveness after front', async () => {
+    mockExtractFront.mockResolvedValue(mockPassportFrontResult);
+    const session = createSession();
+    await session.submitFront(Buffer.from('passport-front'));
+
+    // Should be able to go straight to liveness
+    const result = await session.submitLiveCapture(Buffer.from('selfie'));
+    expect(result.passed).toBe(true);
+    expect(session.getState().current_step).toBe(VerificationStatus.COMPLETE);
+    expect(session.getState().face_match).toBeDefined();
+    expect(session.getState().cross_validation).toBeNull();
+  });
+
+  it('full mode + passport: submitBack throws SessionFlowError', async () => {
+    mockExtractFront.mockResolvedValue(mockPassportFrontResult);
+    const session = createSession();
+    await session.submitFront(Buffer.from('passport-front'));
+
+    // Session is in AWAITING_LIVE, not AWAITING_BACK
+    await expect(session.submitBack(Buffer.from('back'))).rejects.toThrow(SessionFlowError);
+  });
+
+  it('document_only + passport: transitions directly to COMPLETE', async () => {
+    mockExtractFront.mockResolvedValue(mockPassportFrontResult);
+    const session = new VerificationSession({
+      extractFront: mockExtractFront,
+      extractBack: mockExtractBack,
+      processLiveCapture: mockProcessLiveCapture,
+      computeFaceMatch: mockComputeFaceMatch,
+      faceMatchThreshold: 0.60,
+    }, undefined, FLOW_PRESETS.document_only);
+
+    const result = await session.submitFront(Buffer.from('passport-front'));
+    expect(result.passed).toBe(true);
+    expect(session.getState().current_step).toBe(VerificationStatus.COMPLETE);
+    expect(session.getState().completed_at).toBeTruthy();
+    expect(session.getState().cross_validation).toBeNull();
+  });
+
+  it('full mode + drivers_license: still transitions to AWAITING_BACK', async () => {
+    // Non-passport: no override, flow unchanged
+    const dlFrontResult: FrontExtractionResult = {
+      ...mockFrontResult,
+      ocr: { ...mockFrontResult.ocr!, detected_document_type: 'drivers_license' },
+    };
+    mockExtractFront.mockResolvedValue(dlFrontResult);
+    const session = createSession();
+    const result = await session.submitFront(Buffer.from('dl-front'));
+
+    expect(result.passed).toBe(true);
+    expect(session.getState().current_step).toBe(VerificationStatus.AWAITING_BACK);
+    expect(session.getFlow().requiresBack).toBe(true);
+  });
+
+  it('full mode + no detected_document_type: still transitions to AWAITING_BACK', async () => {
+    // No detected type at all — flow unchanged
+    mockExtractFront.mockResolvedValue(mockFrontResult); // has no detected_document_type
+    const session = createSession();
+    await session.submitFront(Buffer.from('front'));
+
+    expect(session.getState().current_step).toBe(VerificationStatus.AWAITING_BACK);
+    expect(session.getFlow().requiresBack).toBe(true);
+  });
+
+  it('identity mode + passport: no change (identity already skips back)', async () => {
+    mockExtractFront.mockResolvedValue(mockPassportFrontResult);
+    const session = new VerificationSession({
+      extractFront: mockExtractFront,
+      extractBack: mockExtractBack,
+      processLiveCapture: mockProcessLiveCapture,
+      computeFaceMatch: mockComputeFaceMatch,
+      faceMatchThreshold: 0.60,
+    }, undefined, FLOW_PRESETS.identity);
+
+    await session.submitFront(Buffer.from('passport-front'));
+    // Identity already has requiresBack: false, so passport override is a no-op
+    expect(session.getState().current_step).toBe(VerificationStatus.AWAITING_LIVE);
+    expect(session.getFlow().requiresBack).toBe(false);
+  });
+
+  it('liveness_only + passport: no change (liveness_only already skips back)', async () => {
+    mockExtractFront.mockResolvedValue(mockPassportFrontResult);
+    const session = new VerificationSession({
+      extractFront: mockExtractFront,
+      extractBack: mockExtractBack,
+      processLiveCapture: mockProcessLiveCapture,
+      computeFaceMatch: mockComputeFaceMatch,
+      faceMatchThreshold: 0.60,
+    }, undefined, FLOW_PRESETS.liveness_only);
+
+    await session.submitFront(Buffer.from('passport-front'));
+    // liveness_only already has requiresBack: false, so passport override is a no-op
+    expect(session.getState().current_step).toBe(VerificationStatus.AWAITING_LIVE);
+    expect(session.getFlow().requiresBack).toBe(false);
+    expect(session.getFlow().preset).toBe('liveness_only');
   });
 });

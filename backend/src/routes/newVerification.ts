@@ -25,6 +25,7 @@ import {
   createDeepfakeDetector,
   decryptSecret,
   FLOW_PRESETS,
+  applyPassportOverride,
 } from '@idswyft/shared';
 import type {
   HeadTurnLivenessMetadata,
@@ -179,7 +180,10 @@ async function hydrateSession(verificationId: string, isSandbox: boolean, develo
 
   // Resolve flow config from verification_mode
   const mode = (row?.verification_mode as VerificationMode) || 'full';
-  const flow = FLOW_PRESETS[mode] ?? INLINE_FLOW_FALLBACKS[mode] ?? FLOW_PRESETS.full;
+  let flow = FLOW_PRESETS[mode] ?? INLINE_FLOW_FALLBACKS[mode] ?? FLOW_PRESETS.full;
+
+  // Passports are single-sided — dynamically skip back step on re-hydration
+  flow = applyPassportOverride(flow, savedState?.front_extraction?.ocr?.detected_document_type as string | undefined);
 
   if (mode !== 'full') {
     logger.info('hydrateSession flow resolution', {
@@ -568,17 +572,23 @@ function mapStatusForResponse(state: Readonly<SessionState>, flow: FlowConfig = 
       finalResult = 'verified';
     } else if (flow.preset === 'document_only') {
       // Document-only: final result based on cross-validation verdict alone
-      const crossValVerdict = state.cross_validation?.verdict;
-      finalResult = crossValVerdict === 'REVIEW' ? 'manual_review'
-        : crossValVerdict === 'REJECT' ? 'failed'
-        : 'verified';
+      // Passports skip cross-validation (single-sided) — verified if Gate 1 passed
+      if (!state.cross_validation) {
+        finalResult = 'verified';
+      } else {
+        const crossValVerdict = state.cross_validation.verdict;
+        finalResult = crossValVerdict === 'REVIEW' ? 'manual_review'
+          : crossValVerdict === 'REJECT' ? 'failed'
+          : 'verified';
+      }
     } else if (flow.preset === 'identity') {
       // Identity: no crossval, result based on face match only
       const needsReview = !!state.face_match?.skipped_reason;
       finalResult = needsReview ? 'manual_review' : 'verified';
     } else {
       // full / liveness_only: standard logic
-      const needsReview = state.cross_validation?.verdict === 'REVIEW'
+      // Passports skip cross-validation, so only face match matters
+      const needsReview = (state.cross_validation ? state.cross_validation.verdict === 'REVIEW' : false)
         || !!state.face_match?.skipped_reason;
       finalResult = needsReview ? 'manual_review' : 'verified';
     }
@@ -1262,9 +1272,11 @@ router.post('/:verification_id/front-document',
         ? stepResult.user_message || 'Front document processing failed'
         : isAgeOnly
           ? (state.current_step === VerificationStatus.COMPLETE ? 'Age verification passed' : stepResult.user_message || 'Age verification failed')
-          : flow.afterFront === 'AWAITING_LIVE'
+          : state.current_step === VerificationStatus.AWAITING_LIVE
             ? 'Front document processed successfully - ready for live capture'
-            : 'Front document processed successfully - ready to upload back document';
+            : state.current_step === VerificationStatus.COMPLETE
+              ? 'Verification complete'
+              : 'Front document processed successfully - ready to upload back document';
 
     res.json({
       success: true,
@@ -1283,6 +1295,7 @@ router.post('/:verification_id/front-document',
       ...(mapped.final_result && { final_result: mapped.final_result }),
       ...(dedupBlocked && { final_result: 'failed' }),
       ...(dedupFlags.length > 0 && { duplicate_flags: dedupFlags }),
+      requires_back: session.getFlow().requiresBack,
       message: nextStepMessage,
     });
 
@@ -1352,15 +1365,26 @@ router.post('/:verification_id/back-document',
       .eq('id', verification_id)
       .single();
     const vrMode = (vrRow?.verification_mode as VerificationMode) || 'full';
-    const flow = FLOW_PRESETS[vrMode] ?? INLINE_FLOW_FALLBACKS[vrMode] ?? FLOW_PRESETS.full;
+    let flow = FLOW_PRESETS[vrMode] ?? INLINE_FLOW_FALLBACKS[vrMode] ?? FLOW_PRESETS.full;
     const complianceForceReview = (vrRow?.addons as any)?.compliance_force_manual_review === true;
 
+    // Passports are single-sided — check if front OCR already detected a passport
+    if (flow.requiresBack) {
+      const savedState = await loadSessionState(verification_id);
+      flow = applyPassportOverride(flow, savedState?.front_extraction?.ocr?.detected_document_type as string | undefined);
+    }
+
     if (!flow.requiresBack) {
+      const presetRequiresBack = (FLOW_PRESETS[vrMode] ?? FLOW_PRESETS.full).requiresBack;
+      const skippedDueToPassport = presetRequiresBack && !flow.requiresBack;
+      const reason = skippedDueToPassport
+        ? 'A passport was detected — passports are single-sided and do not require a back document.'
+        : `Back document is not required for "${vrMode}" verification mode.`;
       return res.status(400).json({
         success: false,
         verification_id,
         verification_mode: vrMode,
-        message: `Back document is not required for "${vrMode}" verification mode. ${flow.requiresLiveness ? 'Proceed to live capture.' : 'Verification is complete.'}`,
+        message: `${reason} ${flow.requiresLiveness ? 'Proceed to live capture.' : 'Verification is complete.'}`,
       });
     }
 

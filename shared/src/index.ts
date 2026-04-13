@@ -65,6 +65,7 @@ export {
   FaceMatchResultSchema,
   GateResultSchema,
   FLOW_PRESETS,
+  applyPassportOverride,
 } from './verification/models/schemas.js';
 export type {
   FrontExtractionResult,

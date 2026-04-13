@@ -40,6 +40,8 @@ const FULL_STEP_LABELS = ['Front ID', 'Back ID', 'Checking', 'Live Photo', 'Comp
 const DOCUMENT_ONLY_STEP_LABELS = ['Front ID', 'Back ID', 'Checking', 'Complete'];
 const IDENTITY_STEP_LABELS = ['Front ID', 'Checking', 'Live Photo', 'Complete'];
 const AGE_ONLY_STEP_LABELS = ['Upload ID', 'Complete'];
+// Passport in document_only mode: front scan → done
+const PASSPORT_DOC_ONLY_STEP_LABELS = ['Front ID', 'Checking', 'Complete'];
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 type Screen = 'front' | 'back' | 'checking' | 'live' | 'done';
@@ -417,6 +419,9 @@ const MobileVerificationPage: React.FC = () => {
   // Checking screen messages
   const [checkingMsg, setCheckingMsg] = useState('Verifying your document…');
 
+  // Passport back-skip state
+  const [skipBack, setSkipBack] = useState(false);
+
   // Final result
   const [finalResult, setFinalResult] = useState<any>(null);
   const [stepError, setStepError] = useState<string | null>(null);
@@ -615,8 +620,10 @@ const MobileVerificationPage: React.FC = () => {
         return;
       }
 
-      // Identity mode: skip back doc — go to checking, then live capture
-      if (isIdentity) {
+      // Identity mode or passport: skip back doc — go to checking, then live capture
+      const backSkipped = isIdentity || data?.detected_document_type === 'passport' || data?.requires_back === false;
+      if (backSkipped) {
+        setSkipBack(true);
         setScreenIdx(2);
         pollFrontOCRForIdentity(0);
         return;
@@ -650,17 +657,18 @@ const MobileVerificationPage: React.FC = () => {
     }
   };
 
-  // ── Poll front OCR for identity mode (skip back doc, go to live) ──────
+  // ── Poll front OCR for back-skip modes (identity/passport — skip back doc) ──
   const pollFrontOCRForIdentity = async (attempt: number) => {
     if (!verificationId || !token || !mountedRef.current) return;
     if (attempt >= 60) { setStepError('OCR timed out. Please try again.'); return; }
     try {
       const data = await apiGet(`/api/v2/verify/${verificationId}/status`);
       if (!mountedRef.current) return;
-      if (data.ocr_data && Object.keys(data.ocr_data).length > 0) {
-        setScreenIdx(3); // OCR done — proceed to live capture
-      } else if (data.final_result === 'failed' || data.final_result === 'manual_review') {
+      // Check final_result first — document_only + passport completes after front
+      if (data.final_result !== null && data.final_result !== undefined) {
         showFinalResult(data);
+      } else if (data.ocr_data && Object.keys(data.ocr_data).length > 0) {
+        setScreenIdx(3); // OCR done — proceed to live capture
       } else {
         setTimeout(() => pollFrontOCRForIdentity(attempt + 1), 2000);
       }
@@ -906,6 +914,7 @@ const MobileVerificationPage: React.FC = () => {
       setStepError(null);
       setShowActiveLiveness(false);
       setUseFallbackSelfie(false);
+      setSkipBack(false);
       selfieMetadataRef.current = null;
       setScreenIdx(0); // Back to front ID
     } catch (err: any) {
@@ -1055,14 +1064,18 @@ const MobileVerificationPage: React.FC = () => {
       <StepTracker
         activeIdx={
           isAgeOnly ? (screenIdx >= 4 ? 1 : 0)
+          : (isIdentity || skipBack)
+            ? (isDocumentOnly
+              ? (screenIdx === 0 ? 0 : screenIdx === 2 ? 1 : 2)  // passport doc_only: Front→Checking→Complete
+              : (screenIdx === 0 ? 0 : screenIdx === 2 ? 1 : screenIdx === 3 ? 2 : 3))  // passport full: Front→Checking→Live→Complete
           : isDocumentOnly ? (screenIdx >= 4 ? 3 : screenIdx)
-          : isIdentity ? (screenIdx === 0 ? 0 : screenIdx === 2 ? 1 : screenIdx === 3 ? 2 : 3)
           : screenIdx
         }
         labels={
           isAgeOnly ? AGE_ONLY_STEP_LABELS
+          : (isIdentity || skipBack)
+            ? (isDocumentOnly ? PASSPORT_DOC_ONLY_STEP_LABELS : IDENTITY_STEP_LABELS)
           : isDocumentOnly ? DOCUMENT_ONLY_STEP_LABELS
-          : isIdentity ? IDENTITY_STEP_LABELS
           : FULL_STEP_LABELS
         }
       />
@@ -1202,8 +1215,9 @@ const MobileVerificationPage: React.FC = () => {
               fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
               textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--teal)',
               marginBottom: 24,
-            }}>{isDocumentOnly ? 'Step 3 of 4 — Verification'
-              : isIdentity ? 'Step 2 of 4 — Verification'
+            }}>{isDocumentOnly
+              ? (skipBack ? 'Step 2 of 3 — Verification' : 'Step 3 of 4 — Verification')
+              : (isIdentity || skipBack) ? 'Step 2 of 4 — Verification'
               : 'Step 3 of 5 — Verification'}</span>
 
             <div style={{
@@ -1249,7 +1263,7 @@ const MobileVerificationPage: React.FC = () => {
               fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
               textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--teal)',
               marginBottom: 8,
-            }}>{isIdentity ? 'Step 3 of 4 — Live Photo' : 'Step 4 of 5 — Live Photo'}</span>
+            }}>{(isIdentity || skipBack) ? 'Step 3 of 4 — Live Photo' : 'Step 4 of 5 — Live Photo'}</span>
 
             {/* Active liveness (primary path) */}
             {!useFallbackSelfie && !selfieFile && !showSelfieCamera ? (
