@@ -906,7 +906,80 @@ export function HomePageV2() {
         </div>
       </section>
 
-      {/* ── 9. CTA ───────────────────────────────────────── */}
+      {/* ── 9. FOUNDER ────────────────────────────────────── */}
+      <section className="v2-reveal" style={{
+        padding: '100px 24px', maxWidth: 800, margin: '0 auto',
+        borderTop: '1px solid rgba(255,255,255,0.05)',
+      }}>
+        <div className="glass-card" style={{ padding: 0, overflow: 'hidden' }}>
+          <div style={{ display: 'flex', flexWrap: 'wrap', alignItems: 'stretch' }}>
+
+            {/* Photo side */}
+            <div style={{
+              flex: '0 0 200px', minHeight: 240, position: 'relative',
+              background: `url(https://res.cloudinary.com/doobee46/image/upload/v1680066932/seed_photo/doobee.jpg) center/cover no-repeat`,
+            }}>
+              <div style={{
+                position: 'absolute', bottom: 16, left: '50%', transform: 'translateX(-50%)',
+                background: C.cyan, color: C.bg,
+                fontFamily: C.mono, fontSize: 9, fontWeight: 700,
+                padding: '5px 12px', borderRadius: 20,
+                letterSpacing: '0.08em', textTransform: 'uppercase',
+                whiteSpace: 'nowrap',
+              }}>
+                Founder
+              </div>
+            </div>
+
+            {/* Quote side */}
+            <div style={{ flex: 1, minWidth: 260, padding: '32px 32px 28px', display: 'flex', flexDirection: 'column', justifyContent: 'center' }}>
+              {/* Quote mark */}
+              <div style={{ fontFamily: 'Georgia, serif', fontSize: 48, color: C.cyan, lineHeight: 1, marginBottom: 8, opacity: 0.5 }}>"</div>
+
+              <p style={{ fontSize: 15, color: C.text, lineHeight: 1.75, marginBottom: 16 }}>
+                I built Idswyft because every identity verification service I tried was either
+                ridiculously expensive, locked behind enterprise sales calls, or impossible to
+                self-host. I wanted something a solo developer could spin up in an afternoon —
+                with real OCR, real liveness detection, and real face matching — without
+                handing user data to a third party.
+              </p>
+
+              <p style={{ fontSize: 15, color: C.muted, lineHeight: 1.75, marginBottom: 24 }}>
+                So I used my understanding of software engineering and the power of coding
+                agents to build the tool I wished existed. Now it's yours — open source,
+                self-hostable, and free forever.
+              </p>
+
+              <div style={{ borderTop: `1px solid ${C.border}`, paddingTop: 16 }}>
+                <div style={{ fontWeight: 700, fontSize: 15, color: C.text }}>Obed Lorisson</div>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 2 }}>
+                  <span style={{ fontFamily: C.mono, fontSize: 12, color: C.muted }}>Founder & Developer</span>
+                  <a href="https://github.com/doobee46" target="_blank" rel="noopener noreferrer" style={{ color: C.muted, transition: 'color 0.2s' }} onMouseEnter={e => (e.currentTarget.style.color = C.text)} onMouseLeave={e => (e.currentTarget.style.color = C.muted)}>
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><path d="M12 0C5.37 0 0 5.37 0 12c0 5.31 3.435 9.795 8.205 11.385.6.105.825-.255.825-.57 0-.285-.015-1.23-.015-2.235-3.015.555-3.795-.735-4.035-1.41-.135-.345-.72-1.41-1.23-1.695-.42-.225-1.02-.78-.015-.795.945-.015 1.62.87 1.845 1.23 1.08 1.815 2.805 1.305 3.495.99.105-.78.42-1.305.765-1.605-2.67-.3-5.46-1.335-5.46-5.925 0-1.305.465-2.385 1.23-3.225-.12-.3-.54-1.53.12-3.18 0 0 1.005-.315 3.3 1.23.96-.27 1.98-.405 3-.405s2.04.135 3 .405c2.295-1.56 3.3-1.23 3.3-1.23.66 1.65.24 2.88.12 3.18.765.84 1.23 1.905 1.23 3.225 0 4.605-2.805 5.625-5.475 5.925.435.375.81 1.095.81 2.22 0 1.605-.015 2.895-.015 3.3 0 .315.225.69.825.57A12.02 12.02 0 0024 12c0-6.63-5.37-12-12-12z"/></svg>
+                  </a>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Motivation cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginTop: 20 }}>
+          {[
+            { icon: '💸', title: 'Cost Barrier', desc: 'Per-verification pricing made KYC unaffordable for small projects.' },
+            { icon: '🔒', title: 'Data Sovereignty', desc: 'Sending user photos to third-party APIs felt wrong. Self-hosting was non-negotiable.' },
+            { icon: '⚡', title: 'Developer Experience', desc: '5 REST endpoints, one Docker command. No SDKs-for-SDKs complexity.' },
+          ].map(card => (
+            <div key={card.title} className="glass-card" style={{ padding: '20px 18px', textAlign: 'center' }}>
+              <div style={{ fontSize: 22, marginBottom: 10 }}>{card.icon}</div>
+              <div style={{ fontWeight: 600, fontSize: 14, color: C.text, marginBottom: 6 }}>{card.title}</div>
+              <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.6 }}>{card.desc}</div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* ── 10. CTA ──────────────────────────────────────── */}
       <section className="v2-reveal" style={{
         padding: '100px 24px', textAlign: 'center', position: 'relative',
         borderTop: '1px solid rgba(255,255,255,0.05)',
