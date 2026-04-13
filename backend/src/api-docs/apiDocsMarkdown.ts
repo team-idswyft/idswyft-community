@@ -83,10 +83,13 @@ The \`verification_mode\` parameter controls which gates run per session. Choose
 | \`identity\` | Front → Liveness → FaceMatch | 3 | Quick identity check — no back doc, no crossval |
 | \`age_only\` | Front (DOB extraction + age check) | 1 | Age-gated content |
 
+**Passport back-skip:** Passports are single-sided documents with no back barcode or MRZ. When front OCR detects a passport (via auto-classification or explicit \`document_type: 'passport'\`), the back-document and cross-validation steps are dynamically skipped — even in \`full\` and \`document_only\` modes. The front-document response includes \`requires_back: false\` so clients know to skip the back upload. For \`full\` mode, the flow becomes: Front → Liveness → FaceMatch (3 effective steps). For \`document_only\`, the flow completes immediately after front OCR.
+
 **Endpoint guards per flow:**
 
 - \`document_only\` / \`age_only\`: Calling \`POST /:id/live-capture\` returns HTTP 400
 - \`identity\` / \`age_only\`: Calling \`POST /:id/back-document\` returns HTTP 400
+- Passport sessions (any mode): Calling \`POST /:id/back-document\` returns HTTP 400 with "A passport was detected" message
 
 **Final result determination per flow:**
 
@@ -233,7 +236,7 @@ Content-Type: multipart/form-data
 | document | File | Yes | JPEG, PNG, WebP, or PDF. Max 10 MB |
 | country_code | string | No | ISO 3166-1 alpha-2 country code (e.g. 'US', 'GB'). Improves OCR accuracy for international documents |
 
-**Response (201):** Includes \`ocr_data\` with extracted fields (name, DOB, document number, expiry, address) and \`confidence_scores\` per field. Also includes \`detected_document_type\` (the auto-detected or user-specified document type) and \`classification_confidence\` (0.50–1.0 indicating detection reliability). Auto-classification signals: MRZ patterns (TD1/TD2/TD3), keyword matching (PASSPORT, DRIVER LICENSE, NATIONAL ID), and field-pattern heuristics (AAMVA codes, DL tokens).
+**Response (201):** Includes \`ocr_data\` with extracted fields (name, DOB, document number, expiry, address) and \`confidence_scores\` per field. Also includes \`detected_document_type\` (the auto-detected or user-specified document type), \`classification_confidence\` (0.50–1.0 indicating detection reliability), and \`requires_back\` (boolean — \`false\` when passport detected or mode doesn't require back document). Auto-classification signals: MRZ patterns (TD1/TD2/TD3), keyword matching (PASSPORT, DRIVER LICENSE, NATIONAL ID), and field-pattern heuristics (AAMVA codes, DL tokens).
 
 ### Step 3: Upload Back Document
 

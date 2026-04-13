@@ -5,6 +5,19 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.11] - 2026-04-13
+
+### Added
+- **Passport back-skip** — passports are single-sided; when front OCR detects a passport, the verification flow dynamically skips the back-document upload and cross-validation steps
+- `applyPassportOverride()` in shared package — single source of truth for the flow override, used by session state machine and route handler
+- `requires_back` field in front-document response — signals to clients whether the back-document step is needed (reflects passport detection)
+- Passport-specific 400 error message on the back-document endpoint ("A passport was detected — passports are single-sided")
+- 9 unit tests covering all verification mode + passport combinations (full, document_only, identity, liveness_only, age_only)
+
+### Fixed
+- **PaddleOCR `detected_document_type` not set** — when user explicitly selected a document type (e.g. "passport"), auto-classification was skipped and `detected_document_type` was never populated; now set from user-provided type with confidence 1.0
+- **`mapStatusForResponse` null cross-validation** — `document_only` and `full` mode branches now handle null `cross_validation` (expected for passport flows that skip cross-validation)
+
 ## [1.8.10] - 2026-04-10
 
 ### Added

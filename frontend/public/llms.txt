@@ -42,6 +42,8 @@ GET  /api/v2/verify/:id/status          → Poll for final result
 | `identity` | Front → Live → FaceMatch | Quick identity check, no back doc |
 | `age_only` | Front (DOB check) | Age-gated content (18+/21+) |
 
+Passports are single-sided — when detected, back-document and cross-validation steps are automatically skipped (even in `full` and `document_only` modes). The front-document response includes `requires_back: false`.
+
 ## Verifiable Credentials (W3C JWT-VC)
 
 Issue W3C Verifiable Credentials for completed verifications. Credentials are signed with Ed25519 (EdDSA) and can be independently verified by any relying party using the issuer's DID document — no API key needed for verification.
