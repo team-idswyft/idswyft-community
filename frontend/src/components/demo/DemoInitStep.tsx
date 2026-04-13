@@ -78,7 +78,7 @@ export const DemoInitStep: React.FC<DemoInitStepProps> = ({
             Live Verification Demo
           </h2>
           <p style={{ color: '#8896aa', fontSize: 13, textAlign: 'center', marginBottom: 28 }}>
-            Enter your API key, then verify on this device or scan to use your phone.
+            Enter your API key, then scan to continue on your phone (recommended) or use this device.
           </p>
 
           <div style={{ maxWidth: 420, margin: '0 auto', display: 'flex', flexDirection: 'column', gap: 16, marginBottom: 24 }}>
@@ -155,17 +155,6 @@ export const DemoInitStep: React.FC<DemoInitStepProps> = ({
           </div>
 
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, maxWidth: 600, margin: '0 auto' }}>
-            <div style={{ background: '#0b0f19', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 10 }}>
-              <div style={{ fontSize: 13, color: '#dde2ec', fontWeight: 600 }}>Start Here</div>
-              <p style={{ fontSize: 12, color: '#8896aa', lineHeight: 1.5 }}>Upload documents and use webcam on this device.</p>
-              <button
-                onClick={onStart}
-                disabled={isLoading || !apiKey.trim() || !userId.trim()}
-                style={{ background: '#22d3ee', color: '#080c14', border: 'none', borderRadius: 8, padding: '9px 0', width: '100%', fontWeight: 600, fontSize: 13, cursor: isLoading || !apiKey.trim() || !userId.trim() ? 'not-allowed' : 'pointer', opacity: isLoading || !apiKey.trim() || !userId.trim() ? 0.5 : 1 }}
-              >
-                {isLoading ? 'Starting\u2026' : 'Start on This Device'}
-              </button>
-            </div>
             <ContinueOnPhone
               apiKey={apiKey}
               userId={userId}
@@ -181,6 +170,17 @@ export const DemoInitStep: React.FC<DemoInitStepProps> = ({
                 }
               }}
             />
+            <div style={{ background: '#0b0f19', border: '1px solid rgba(255,255,255,0.07)', borderRadius: 10, padding: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 10 }}>
+              <div style={{ fontSize: 13, color: '#8896aa', fontWeight: 500 }}>Or use this device</div>
+              <p style={{ fontSize: 12, color: '#4a5568', lineHeight: 1.5 }}>Upload documents and use webcam here instead.</p>
+              <button
+                onClick={onStart}
+                disabled={isLoading || !apiKey.trim() || !userId.trim()}
+                style={{ background: 'transparent', color: '#8896aa', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 8, padding: '9px 0', width: '100%', fontWeight: 600, fontSize: 13, cursor: isLoading || !apiKey.trim() || !userId.trim() ? 'not-allowed' : 'pointer', opacity: isLoading || !apiKey.trim() || !userId.trim() ? 0.5 : 1 }}
+              >
+                {isLoading ? 'Starting\u2026' : 'Start on This Device'}
+              </button>
+            </div>
           </div>
         </>
       )}

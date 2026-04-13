@@ -165,24 +165,23 @@ export const ContinueOnPhone: React.FC<ContinueOnPhoneProps> = ({
   // ── IDLE ──
   if (state === 'idle') {
     return (
-      <div className="border border-gray-200 rounded-2xl p-6 flex flex-col items-center text-center h-full justify-center gap-3">
-        <div className="text-4xl">📱</div>
-        <div>
-          <h3 className="font-semibold text-white">Continue on Phone</h3>
-          <p className="text-sm text-gray-500 mt-1">
-            Scan a QR code to complete verification on your mobile device
-          </p>
+      <div style={{ background: 'rgba(34,211,238,0.06)', border: '1px solid rgba(34,211,238,0.3)', borderRadius: 10, padding: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', height: '100%', justifyContent: 'center', gap: 10 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <span style={{ fontSize: 13, color: '#dde2ec', fontWeight: 600 }}>Continue on Phone</span>
+          <span style={{ fontSize: 10, background: 'rgba(34,211,238,0.15)', color: '#22d3ee', padding: '2px 8px', borderRadius: 99, fontWeight: 600 }}>Recommended</span>
         </div>
+        <p style={{ fontSize: 12, color: '#8896aa', lineHeight: 1.5 }}>
+          Better camera quality for liveness and document capture.
+        </p>
         <button
           onClick={generateQR}
           disabled={!apiKey.trim() || !userId.trim() || isGenerating}
-          className="mt-1 w-full py-2.5 px-4 bg-gray-900 text-white rounded-xl text-sm font-medium hover:bg-gray-800 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          style={{ background: '#22d3ee', color: '#080c14', border: 'none', borderRadius: 8, padding: '9px 0', width: '100%', fontWeight: 600, fontSize: 13, cursor: !apiKey.trim() || !userId.trim() || isGenerating ? 'not-allowed' : 'pointer', opacity: !apiKey.trim() || !userId.trim() || isGenerating ? 0.5 : 1 }}
         >
-          {isGenerating ? 'Generating…' : 'Generate QR Code'}
+          {isGenerating ? 'Generating\u2026' : 'Generate QR Code'}
         </button>
-        {/* Fix 4: user-visible error message */}
         {error && (
-          <p role="alert" className="text-xs text-red-500 mt-1">{error}</p>
+          <p role="alert" style={{ fontSize: 11, color: '#f87171', marginTop: 4 }}>{error}</p>
         )}
       </div>
     );
