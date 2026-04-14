@@ -4,7 +4,6 @@ import toast from 'react-hot-toast'
 import { API_BASE_URL } from '../../config/api'
 import { csrfHeader, clearCsrfToken } from '../../lib/csrf'
 import { C } from '../../theme'
-import { isCloud } from '../../config/edition'
 import {
   Cog6ToothIcon,
   UserCircleIcon,
@@ -18,17 +17,18 @@ import {
   ExclamationTriangleIcon,
   FingerPrintIcon,
   ShieldExclamationIcon,
-  ShieldCheckIcon,
+  ServerIcon,
 } from '@heroicons/react/24/outline'
 import { inputStyle, labelStyle } from './types'
 
-type SettingsTab = 'profile' | 'team' | 'integrations' | 'branding' | 'account'
+type SettingsTab = 'profile' | 'team' | 'integrations' | 'branding' | 'system' | 'account'
 
 const tabs: Array<{ id: SettingsTab; label: string; icon: React.ComponentType<{ style?: React.CSSProperties }>; bottom?: boolean }> = [
   { id: 'profile', label: 'Profile', icon: UserCircleIcon },
   { id: 'team', label: 'Team', icon: UsersIcon },
   { id: 'integrations', label: 'Integrations', icon: CodeBracketIcon },
   { id: 'branding', label: 'Branding', icon: PaintBrushIcon },
+  { id: 'system', label: 'System', icon: ServerIcon },
   { id: 'account', label: 'Account', icon: ExclamationTriangleIcon, bottom: true },
 ]
 
@@ -80,11 +80,6 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
   const [dedupLoading, setDedupLoading] = useState(false)
   const [dedupSaving, setDedupSaving] = useState(false)
 
-  // Verifiable Credentials settings (cloud-only)
-  const [vcEnabled, setVcEnabled] = useState(false)
-  const [vcLoading, setVcLoading] = useState(false)
-  const [vcSaving, setVcSaving] = useState(false)
-
   // Page branding settings
   const [brandLogoUrl, setBrandLogoUrl] = useState<string>('')
   const [brandAccentColor, setBrandAccentColor] = useState<string>('')
@@ -105,6 +100,12 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
   const [deleteAccountEmail, setDeleteAccountEmail] = useState('')
   const [deleteAccountLoading, setDeleteAccountLoading] = useState(false)
 
+  // System / Version info
+  const [versionInfo, setVersionInfo] = useState<{ current_version: string; latest_version: string | null; update_available: boolean; release_url: string | null } | null>(null)
+  const [versionLoading, setVersionLoading] = useState(false)
+  const [versionFetched, setVersionFetched] = useState(false)
+  const [copiedCommand, setCopiedCommand] = useState<string | null>(null)
+
   // Active settings tab
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile')
 
@@ -116,10 +117,43 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
     fetchSMSSettings()
     fetchAmlSettings()
     fetchDedupSettings()
-    if (isCloud) fetchVcSettings()
     fetchBrandingSettings()
     fetchReviewers()
   }, [token])
+
+  const fetchVersionInfo = async () => {
+    if (versionFetched) return
+    setVersionLoading(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/system/version`, {
+        headers: authHeaders,
+        credentials: 'include' as RequestCredentials,
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setVersionInfo(data)
+      }
+    } catch { /* network error */ }
+    setVersionLoading(false)
+    setVersionFetched(true)
+  }
+
+  // Lazy fetch version info when System tab is selected
+  useEffect(() => {
+    if (activeTab === 'system' && !versionFetched) {
+      fetchVersionInfo()
+    }
+  }, [activeTab])
+
+  const copyCommand = (cmd: string, label: string) => {
+    navigator.clipboard.writeText(cmd).then(() => {
+      setCopiedCommand(label)
+      toast.success('Copied to clipboard')
+      setTimeout(() => setCopiedCommand(null), 2000)
+    }).catch(() => {
+      toast.error('Failed to copy')
+    })
+  }
 
   const fetchProfile = async () => {
     setProfileLoading(true)
@@ -380,41 +414,6 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
       }
     } catch { toast.error('Network error') }
     setDedupSaving(false)
-  }
-
-  const fetchVcSettings = async () => {
-    setVcLoading(true)
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/developer/settings/vc`, {
-        headers: authHeaders,
-        credentials: 'include' as RequestCredentials,
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setVcEnabled(data.enabled ?? false)
-      }
-    } catch { /* network error */ }
-    setVcLoading(false)
-  }
-
-  const saveVcSettings = async () => {
-    if (!token) return
-    setVcSaving(true)
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/developer/settings/vc`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', ...authHeaders, ...csrfHeader() },
-        credentials: 'include' as RequestCredentials,
-        body: JSON.stringify({ enabled: vcEnabled }),
-      })
-      if (res.ok) {
-        toast.success('Verifiable Credentials settings saved')
-      } else {
-        const err = await res.json().catch(() => ({}))
-        toast.error(err.error || 'Failed to save settings')
-      }
-    } catch { toast.error('Network error') }
-    setVcSaving(false)
   }
 
   const fetchBrandingSettings = async () => {
@@ -1263,73 +1262,6 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                       </>
                     )}
                   </div>
-
-                  {/* Verifiable Credentials — cloud edition only */}
-                  {isCloud && (
-                    <>
-                      <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 24, paddingTop: 20 }} />
-
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                          <ShieldCheckIcon style={{ width: 16, height: 16, color: C.cyan }} />
-                          <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>Verifiable Credentials</div>
-                        </div>
-                        <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
-                          Issue <strong style={{ color: C.text, fontWeight: 500 }}>W3C Verifiable Credentials</strong> (JWT-VC format)
-                          after successful identity verification. Credentials are signed with <strong style={{ color: C.text, fontWeight: 500 }}>did:web</strong> and
-                          valid for 2 years. Developers fetch credentials via the API; users can re-present them to skip re-verification.
-                        </div>
-
-                        {vcLoading ? (
-                          <div style={{ color: C.muted, fontSize: 13 }}>Loading...</div>
-                        ) : (
-                          <>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-                              <button
-                                type="button"
-                                onClick={() => setVcEnabled(!vcEnabled)}
-                                style={{
-                                  width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
-                                  background: vcEnabled ? C.cyan : C.border,
-                                  position: 'relative', transition: 'background 0.2s',
-                                }}
-                              >
-                                <div style={{
-                                  width: 18, height: 18, borderRadius: '50%', background: '#fff',
-                                  position: 'absolute', top: 3,
-                                  left: vcEnabled ? 23 : 3,
-                                  transition: 'left 0.2s',
-                                }} />
-                              </button>
-                              <span style={{ color: C.text, fontSize: 13 }}>
-                                {vcEnabled ? 'Enabled' : 'Disabled'}
-                              </span>
-                            </div>
-
-                            {vcEnabled && (
-                              <div style={{ color: C.dim, fontSize: 12, marginBottom: 12, lineHeight: 1.6 }}>
-                                After a verification completes with status <strong style={{ color: C.text }}>verified</strong>,
-                                call <code style={{ color: C.cyan, fontSize: 11 }}>GET /api/v2/verify/:id/credential</code> to
-                                receive a signed JWT-VC.
-                              </div>
-                            )}
-
-                            <button
-                              onClick={saveVcSettings}
-                              disabled={vcSaving}
-                              style={{
-                                background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
-                                padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                                opacity: vcSaving ? 0.5 : 1,
-                              }}
-                            >
-                              {vcSaving ? 'Saving...' : 'Save'}
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </>
-                  )}
                 </div>
               )}
 
@@ -1497,6 +1429,110 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                           style={{ color: C.cyan, fontSize: 13, fontWeight: 500, textDecoration: 'none' }}>
                           Want more control? Try the Page Builder &rarr;
                         </Link>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* ─── System ─── */}
+              {activeTab === 'system' && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <ServerIcon style={{ width: 16, height: 16, color: C.cyan }} />
+                    <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>System</div>
+                  </div>
+                  <div style={{ color: C.muted, fontSize: 13, marginBottom: 20, lineHeight: 1.6 }}>
+                    Manage your self-hosted Idswyft installation.
+                  </div>
+
+                  {versionLoading ? (
+                    <div style={{ color: C.muted, fontSize: 13 }}>Loading version info...</div>
+                  ) : (
+                    <>
+                      {/* ── Version ── */}
+                      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20, marginBottom: 16 }}>
+                        <div style={{ fontSize: 11, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Current Version</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                          <span style={{ fontSize: 22, fontWeight: 700, color: C.text, fontFamily: C.mono }}>
+                            v{versionInfo?.current_version || '...'}
+                          </span>
+                          {versionInfo?.update_available && (
+                            <span style={{
+                              fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em',
+                              padding: '3px 8px', borderRadius: 4,
+                              background: C.greenDim, color: C.green,
+                            }}>
+                              Update Available
+                            </span>
+                          )}
+                        </div>
+                        {versionInfo?.latest_version && versionInfo.update_available && (
+                          <div style={{ fontSize: 13, color: C.muted }}>
+                            Latest: <span style={{ color: C.green, fontFamily: C.mono }}>v{versionInfo.latest_version}</span>
+                            {versionInfo.release_url && (
+                              <>
+                                {' \u00b7 '}
+                                <a
+                                  href={versionInfo.release_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{ color: C.cyan, textDecoration: 'none' }}
+                                >
+                                  Release notes &rarr;
+                                </a>
+                              </>
+                            )}
+                          </div>
+                        )}
+                        {versionInfo && !versionInfo.update_available && versionInfo.latest_version && (
+                          <div style={{ fontSize: 13, color: C.dim }}>You're on the latest version.</div>
+                        )}
+                      </div>
+
+                      {/* ── Update ── */}
+                      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20, marginBottom: 16 }}>
+                        <div style={{ fontSize: 11, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Update</div>
+                        <div style={{ color: C.muted, fontSize: 13, marginBottom: 12, lineHeight: 1.6 }}>
+                          Run the update script from your installation directory. This pulls the latest images and restarts containers without touching your data or secrets.
+                        </div>
+                        <button
+                          onClick={() => copyCommand('bash update.sh', 'update')}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                            background: C.bg, border: `1px solid ${C.border}`, borderRadius: 6,
+                            padding: '10px 14px', cursor: 'pointer', textAlign: 'left', marginBottom: 8,
+                          }}
+                        >
+                          <code style={{ flex: 1, fontFamily: C.mono, fontSize: 13, color: C.cyan }}>bash update.sh</code>
+                          <span style={{ fontSize: 11, color: copiedCommand === 'update' ? C.green : C.dim, flexShrink: 0 }}>
+                            {copiedCommand === 'update' ? 'Copied!' : 'Click to copy'}
+                          </span>
+                        </button>
+                        <div style={{ fontSize: 11, color: C.dim }}>
+                          Or manually: <code style={{ fontFamily: C.mono, color: C.muted }}>docker compose pull && docker compose up -d</code>
+                        </div>
+                      </div>
+
+                      {/* ── Uninstall ── */}
+                      <div style={{ background: C.redDim, border: `1px solid rgba(248,113,113,0.2)`, borderRadius: 10, padding: 20 }}>
+                        <div style={{ fontSize: 11, color: C.red, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8, fontWeight: 600 }}>Uninstall</div>
+                        <div style={{ color: C.muted, fontSize: 13, marginBottom: 12, lineHeight: 1.6 }}>
+                          Remove all Idswyft containers, images, and optionally your database and uploads.
+                        </div>
+                        <button
+                          onClick={() => copyCommand('bash uninstall.sh', 'uninstall')}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                            background: C.bg, border: `1px solid rgba(248,113,113,0.2)`, borderRadius: 6,
+                            padding: '10px 14px', cursor: 'pointer', textAlign: 'left',
+                          }}
+                        >
+                          <code style={{ flex: 1, fontFamily: C.mono, fontSize: 13, color: C.red }}>bash uninstall.sh</code>
+                          <span style={{ fontSize: 11, color: copiedCommand === 'uninstall' ? C.green : C.dim, flexShrink: 0 }}>
+                            {copiedCommand === 'uninstall' ? 'Copied!' : 'Click to copy'}
+                          </span>
+                        </button>
                       </div>
                     </>
                   )}
