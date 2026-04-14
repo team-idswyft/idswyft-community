@@ -16,6 +16,9 @@ export function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) 
   const [loading, setLoading] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
   const [githubConfigured, setGithubConfigured] = useState(false)
+  const [isReturning] = useState(() => localStorage.getItem('idswyft:has-session') === 'true')
+
+  const markReturning = () => localStorage.setItem('idswyft:has-session', 'true')
 
   const otpRefs = React.useRef(
     Array.from({ length: 6 }, () => React.createRef<HTMLInputElement>())
@@ -57,6 +60,7 @@ export function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) 
       .then(r => r.json().then(data => ({ ok: r.ok, data })))
       .then(({ ok, data }) => {
         if (!ok) throw new Error(data.message || 'GitHub login failed')
+        markReturning()
         onAuth('session', data.api_key?.key)
       })
       .catch((err: unknown) => {
@@ -161,6 +165,7 @@ export function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) 
         setStep('complete_registration')
       } else {
         // Existing user — login complete (cookie set by server)
+        markReturning()
         onAuth(data.token)
       }
     } catch (err: unknown) {
@@ -185,6 +190,7 @@ export function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) 
       const data = await res.json()
       if (!res.ok) throw new Error(data.message || 'Registration failed')
       // Cookie set by server
+      markReturning()
       onAuth(data.token, data.api_key?.key)
     } catch (err: unknown) {
       toast.error(err instanceof Error ? err.message : 'Registration failed')
@@ -224,10 +230,10 @@ export function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) 
         {step === 'enter_email' && (
           <>
             <h1 style={{ fontFamily: C.mono, fontSize: 22, fontWeight: 600, color: C.text, marginBottom: 8 }}>
-              Sign in
+              {isReturning ? 'Sign in' : 'Sign up'}
             </h1>
             <p style={{ color: C.muted, fontSize: 14, marginBottom: 28 }}>
-              Enter your email to get a verification code
+              {isReturning ? 'Enter your email to get a verification code' : 'Enter your email to create a developer account'}
             </p>
             <form onSubmit={e => { e.preventDefault(); sendOtp() }} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
