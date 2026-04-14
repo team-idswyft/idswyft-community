@@ -16,6 +16,10 @@ on:
   push:
     branches: [main, dev]
 
+concurrency:
+  group: community-sync
+  cancel-in-progress: false
+
 permissions:
   contents: read
 
