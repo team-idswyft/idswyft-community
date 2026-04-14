@@ -19,7 +19,7 @@ http://{$DOMAIN} {
         output stdout
     }
 
-    reverse_proxy frontend:80 {
+    reverse_proxy frontend:8080 {
         header_up X-Real-IP {remote_host}
         header_up X-Forwarded-For {remote_host}
         header_up X-Forwarded-Proto {scheme}
