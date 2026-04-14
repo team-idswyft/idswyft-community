@@ -4,7 +4,6 @@ import toast from 'react-hot-toast'
 import { API_BASE_URL } from '../../config/api'
 import { csrfHeader, clearCsrfToken } from '../../lib/csrf'
 import { C } from '../../theme'
-import { isCloud } from '../../config/edition'
 import {
   Cog6ToothIcon,
   UserCircleIcon,
@@ -18,7 +17,6 @@ import {
   ExclamationTriangleIcon,
   FingerPrintIcon,
   ShieldExclamationIcon,
-  ShieldCheckIcon,
 } from '@heroicons/react/24/outline'
 import { inputStyle, labelStyle } from './types'
 
@@ -80,11 +78,6 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
   const [dedupLoading, setDedupLoading] = useState(false)
   const [dedupSaving, setDedupSaving] = useState(false)
 
-  // Verifiable Credentials settings (cloud-only)
-  const [vcEnabled, setVcEnabled] = useState(false)
-  const [vcLoading, setVcLoading] = useState(false)
-  const [vcSaving, setVcSaving] = useState(false)
-
   // Page branding settings
   const [brandLogoUrl, setBrandLogoUrl] = useState<string>('')
   const [brandAccentColor, setBrandAccentColor] = useState<string>('')
@@ -116,7 +109,6 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
     fetchSMSSettings()
     fetchAmlSettings()
     fetchDedupSettings()
-    if (isCloud) fetchVcSettings()
     fetchBrandingSettings()
     fetchReviewers()
   }, [token])
@@ -380,41 +372,6 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
       }
     } catch { toast.error('Network error') }
     setDedupSaving(false)
-  }
-
-  const fetchVcSettings = async () => {
-    setVcLoading(true)
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/developer/settings/vc`, {
-        headers: authHeaders,
-        credentials: 'include' as RequestCredentials,
-      })
-      if (res.ok) {
-        const data = await res.json()
-        setVcEnabled(data.enabled ?? false)
-      }
-    } catch { /* network error */ }
-    setVcLoading(false)
-  }
-
-  const saveVcSettings = async () => {
-    if (!token) return
-    setVcSaving(true)
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/developer/settings/vc`, {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json', ...authHeaders, ...csrfHeader() },
-        credentials: 'include' as RequestCredentials,
-        body: JSON.stringify({ enabled: vcEnabled }),
-      })
-      if (res.ok) {
-        toast.success('Verifiable Credentials settings saved')
-      } else {
-        const err = await res.json().catch(() => ({}))
-        toast.error(err.error || 'Failed to save settings')
-      }
-    } catch { toast.error('Network error') }
-    setVcSaving(false)
   }
 
   const fetchBrandingSettings = async () => {
@@ -1263,73 +1220,6 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                       </>
                     )}
                   </div>
-
-                  {/* Verifiable Credentials — cloud edition only */}
-                  {isCloud && (
-                    <>
-                      <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 24, paddingTop: 20 }} />
-
-                      <div>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                          <ShieldCheckIcon style={{ width: 16, height: 16, color: C.cyan }} />
-                          <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>Verifiable Credentials</div>
-                        </div>
-                        <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
-                          Issue <strong style={{ color: C.text, fontWeight: 500 }}>W3C Verifiable Credentials</strong> (JWT-VC format)
-                          after successful identity verification. Credentials are signed with <strong style={{ color: C.text, fontWeight: 500 }}>did:web</strong> and
-                          valid for 2 years. Developers fetch credentials via the API; users can re-present them to skip re-verification.
-                        </div>
-
-                        {vcLoading ? (
-                          <div style={{ color: C.muted, fontSize: 13 }}>Loading...</div>
-                        ) : (
-                          <>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
-                              <button
-                                type="button"
-                                onClick={() => setVcEnabled(!vcEnabled)}
-                                style={{
-                                  width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
-                                  background: vcEnabled ? C.cyan : C.border,
-                                  position: 'relative', transition: 'background 0.2s',
-                                }}
-                              >
-                                <div style={{
-                                  width: 18, height: 18, borderRadius: '50%', background: '#fff',
-                                  position: 'absolute', top: 3,
-                                  left: vcEnabled ? 23 : 3,
-                                  transition: 'left 0.2s',
-                                }} />
-                              </button>
-                              <span style={{ color: C.text, fontSize: 13 }}>
-                                {vcEnabled ? 'Enabled' : 'Disabled'}
-                              </span>
-                            </div>
-
-                            {vcEnabled && (
-                              <div style={{ color: C.dim, fontSize: 12, marginBottom: 12, lineHeight: 1.6 }}>
-                                After a verification completes with status <strong style={{ color: C.text }}>verified</strong>,
-                                call <code style={{ color: C.cyan, fontSize: 11 }}>GET /api/v2/verify/:id/credential</code> to
-                                receive a signed JWT-VC.
-                              </div>
-                            )}
-
-                            <button
-                              onClick={saveVcSettings}
-                              disabled={vcSaving}
-                              style={{
-                                background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
-                                padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                                opacity: vcSaving ? 0.5 : 1,
-                              }}
-                            >
-                              {vcSaving ? 'Saving...' : 'Save'}
-                            </button>
-                          </>
-                        )}
-                      </div>
-                    </>
-                  )}
                 </div>
               )}
 
