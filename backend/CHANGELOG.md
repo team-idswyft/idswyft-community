@@ -5,7 +5,7 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [1.8.12] - 2026-04-14
+## [1.8.34] - 2026-04-14
 
 ### Added
 - **`update.sh`** — safe upgrade script for community edition; pulls latest images and recreates containers without touching `.env` or database volumes
