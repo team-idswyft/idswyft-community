@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Link } from 'react-router-dom'
-import { API_BASE_URL } from '../../config/api'
+import { API_BASE_URL, getDocumentationApiUrl } from '../../config/api'
 import { csrfHeader } from '../../lib/csrf'
 import { C } from '../../theme'
 import {
@@ -365,7 +365,8 @@ export function ApiKeysSection({ token, apiKeys, setApiKeys, stats, newFullKey, 
     }
   }
 
-  const curlSnippet = `curl -X POST https://api.idswyft.app/api/verification/sessions \\
+  const apiUrl = getDocumentationApiUrl();
+  const curlSnippet = `curl -X POST ${apiUrl}/api/verification/sessions \\
   -H "X-API-Key: YOUR_API_KEY" \\
   -H "Content-Type: application/json" \\
   -d '{"mode":"sandbox"}'`

@@ -38,7 +38,7 @@ import credentialRoutes from './routes/credentials.js';
 import complianceRoutes from './routes/compliance.js';
 import wellKnownRoutes from './routes/well-known.js';
 import vaultRoutes from './routes/vault.js';
-import { API_DOCS_MARKDOWN } from './api-docs/apiDocsMarkdown.js';
+import { getApiDocsMarkdown } from './api-docs/apiDocsMarkdown.js';
 
 const app = express();
 
@@ -166,11 +166,19 @@ app.get('/', (req, res) => {
   });
 });
 
-// LLM-friendly markdown documentation
-app.get('/api/docs/markdown', (_req, res) => {
+// LLM-friendly markdown documentation — self-hosted deployments see their own domain
+app.get('/api/docs/markdown', (req, res) => {
+  let baseUrl = 'https://api.idswyft.app';
+  const rawProto = req.headers['x-forwarded-proto'];
+  const proto = (Array.isArray(rawProto) ? rawProto[0] : rawProto)?.split(',')[0]?.trim() || req.protocol;
+  const rawHost = req.headers['x-forwarded-host'] || req.headers['host'];
+  const hostStr = Array.isArray(rawHost) ? rawHost[0] : rawHost;
+  if (hostStr && (proto === 'http' || proto === 'https') && /^[a-zA-Z0-9._-]+(:\d+)?$/.test(hostStr)) {
+    baseUrl = `${proto}://${hostStr}`;
+  }
   res.setHeader('Content-Type', 'text/markdown; charset=utf-8');
   res.setHeader('Cache-Control', 'public, max-age=3600');
-  res.send(API_DOCS_MARKDOWN);
+  res.send(getApiDocsMarkdown(baseUrl));
 });
 
 // API documentation endpoint - clean, user-facing routes

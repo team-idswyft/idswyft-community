@@ -44,7 +44,7 @@ export const DocsSdk: React.FC = () => {
 
 const sdk = new IdswyftSDK({
   apiKey: 'ik_your_api_key',
-  baseURL: '${apiUrl}',     // optional, defaults to https://api.idswyft.app
+  baseURL: '${apiUrl}',     // optional, defaults to your deployment's base URL
   sandbox: false,            // set true for sandbox mode
 });`} />
 

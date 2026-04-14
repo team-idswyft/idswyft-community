@@ -2,6 +2,8 @@
 
 > Open-source identity verification platform. Verify government-issued IDs with OCR, cross-validation, liveness detection, and face matching.
 
+> **Base URL:** `https://api.idswyft.app` (replace with your own domain for self-hosted deployments)
+
 ## Overview
 
 Idswyft provides a REST API for identity verification. Developers integrate via API key (`X-API-Key: ik_...`) to run a 5-step pipeline: front document OCR, back document barcode/MRZ, cross-validation, liveness detection, and face matching. All decisions are deterministic — no LLMs in the decision pipeline.

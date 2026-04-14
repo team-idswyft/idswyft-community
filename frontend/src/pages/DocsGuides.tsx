@@ -4,7 +4,7 @@ import {
   H2, Lead, Divider, SectionAnchor, Callout,
   FieldRow, Pre, CodeTabs, CodeTabType, Pill,
 } from '../components/docs/shared';
-import { getDocumentationApiUrl } from '../config/api';
+import { getDocumentationApiUrl, getDocumentationSiteUrl } from '../config/api';
 import { C } from '../theme';
 import '../styles/patterns.css';
 
@@ -18,6 +18,7 @@ const NAV: NavItem[] = [
 
 export const DocsGuides: React.FC = () => {
   const apiUrl = getDocumentationApiUrl();
+  const siteUrl = getDocumentationSiteUrl();
   const [tab, setTab] = useState<CodeTabType>('curl');
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' && window.innerWidth < 768
@@ -48,7 +49,7 @@ export const DocsGuides: React.FC = () => {
           Idswyft hosts a complete verification UI at the following URL. This is the page used by all three integration methods below — redirect, iframe, or SDK embed.
         </p>
         <code style={{ fontFamily: C.mono, fontSize: '0.85rem', color: C.cyan, display: 'block', padding: '8px 12px', background: C.bg, borderRadius: 6, border: `1px solid ${C.border}` }}>
-          https://idswyft.app/user-verification
+          {siteUrl}/user-verification
         </code>
       </div>
 
@@ -108,7 +109,7 @@ export const DocsGuides: React.FC = () => {
       </div>
 
       <Pre label="Option 1: Redirect (link or window.location)" code={`// Redirect the user to the hosted verification page
-window.location.href = 'https://idswyft.app/user-verification'
+window.location.href = '${siteUrl}/user-verification'
   + '?api_key=ik_your_api_key'
   + '&user_id=user-123'
   + '&redirect_url=' + encodeURIComponent('https://yourapp.com/done')
@@ -143,7 +144,7 @@ if (status === 'verified' && verificationId) {
 
       <Pre label="Option 2: Iframe embed (HTML)" code={`<!-- Embed the verification page inline on your site -->
 <iframe
-  src="https://idswyft.app/user-verification?api_key=ik_your_api_key&user_id=user-123&theme=dark"
+  src="${siteUrl}/user-verification?api_key=ik_your_api_key&user_id=user-123&theme=dark"
   width="100%" height="700" frameborder="0"
   allow="camera; microphone"
   style="border: none; border-radius: 8px;"
@@ -420,7 +421,7 @@ const handoff = await fetch(\`${apiUrl}/api/verify/handoff/create\`, {
 }).then(r => r.json());
 
 // Build the verification URL with the token
-const verifyUrl = \`https://idswyft.app/user-verification?token=\${handoff.token}\`;
+const verifyUrl = \`${siteUrl}/user-verification?token=\${handoff.token}\`;
 
 // Display QR code (use any QR library: qrcode, qrcode.react, etc.)
 showQrCode(verifyUrl);
@@ -454,7 +455,7 @@ handoff = requests.post(f'{BASE}/api/verify/handoff/create',
 ).json()
 
 # Build the verification URL with the token
-verify_url = f'https://idswyft.app/user-verification?token={handoff["token"]}'
+verify_url = f'${siteUrl}/user-verification?token={handoff["token"]}'
 print('Scan this URL:', verify_url)
 
 # Poll for completion using the token

@@ -39,12 +39,27 @@ export const shouldUseSandbox = (_apiKey?: string) => {
   return false;
 };
 
-// Get the production URL for documentation
+// Get the production URL for documentation and code examples.
+// In dev, always show the cloud URL (developers won't use localhost in real docs).
+// In production, use the explicit override if set, otherwise use the current origin
+// so that self-hosted community deployments show their own domain everywhere.
 export const getDocumentationApiUrl = () => {
   if (import.meta.env.DEV) {
     return 'https://api.idswyft.app';
   }
-  return API_BASE_URL || 'https://api.idswyft.app';
+  if (API_BASE_URL) return API_BASE_URL;
+  return typeof window !== 'undefined' ? window.location.origin : 'https://api.idswyft.app';
+};
+
+// Get the site/frontend URL for documentation code examples (verification page,
+// redirect URLs, etc). Distinct from getDocumentationApiUrl() because in cloud
+// the API is at api.idswyft.app but the site is at idswyft.app. In community
+// self-hosted, both are the same origin (nginx proxies /api/* to backend).
+export const getDocumentationSiteUrl = () => {
+  if (import.meta.env.DEV) {
+    return 'https://idswyft.app';
+  }
+  return typeof window !== 'undefined' ? window.location.origin : 'https://idswyft.app';
 };
 
 if (import.meta.env.DEV) {

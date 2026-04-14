@@ -1,10 +1,17 @@
 /**
- * Static markdown representation of the Idswyft API documentation.
+ * Markdown representation of the Idswyft API documentation.
  * Served at GET /api/docs/markdown for LLM/crawler consumption.
+ * Accepts a baseUrl so self-hosted deployments see their own domain.
  */
-export const API_DOCS_MARKDOWN = `# Idswyft API Documentation
+export const getApiDocsMarkdown = (baseUrl: string = 'https://api.idswyft.app') => {
+  // Derive frontend/site URL from the API base URL.
+  // Cloud: https://api.idswyft.app → https://idswyft.app (strip api. subdomain)
+  // Self-hosted: https://verify.example.com → unchanged (no api. prefix)
+  // Self-hosted with port: http://localhost:8080 → unchanged (port preserved)
+  const siteUrl = baseUrl.replace(/^(https?:\/\/)api\./, '$1');
+  return `# Idswyft API Documentation
 
-> **Base URL:** \`https://api.idswyft.app\`
+> **Base URL:** \`${baseUrl}\`
 > **Version:** v1.8.2 — April 2026
 
 ---
@@ -465,7 +472,7 @@ Public endpoint — no authentication header required. Returns the developer's b
 Three ways to add identity verification — from zero-code to full control. All use the same hosted page:
 
 \`\`\`
-https://idswyft.app/user-verification
+${siteUrl}/user-verification
 \`\`\`
 
 ### Option 1: Redirect (Easiest)
@@ -473,7 +480,7 @@ https://idswyft.app/user-verification
 Send users to the hosted page with a link or redirect. After verification, they return to your \`redirect_url\`.
 
 \`\`\`javascript
-window.location.href = 'https://idswyft.app/user-verification'
+window.location.href = '${siteUrl}/user-verification'
   + '?api_key=ik_your_key'
   + '&user_id=user-123'
   + '&redirect_url=' + encodeURIComponent('https://yourapp.com/done')
@@ -513,7 +520,7 @@ Embed the hosted page inside your app. Users never leave your site.
 
 \`\`\`html
 <iframe
-  src="https://idswyft.app/user-verification?api_key=ik_your_key&user_id=user-123&theme=dark"
+  src="${siteUrl}/user-verification?api_key=ik_your_key&user_id=user-123&theme=dark"
   width="100%" height="700" frameborder="0"
   allow="camera; microphone"
   style="border: none; border-radius: 8px;"
@@ -626,7 +633,7 @@ const { IdswyftSDK } = require('@idswyft/sdk');
 
 const sdk = new IdswyftSDK({
   apiKey: 'ik_your_api_key',
-  baseURL: 'https://api.idswyft.app',
+  baseURL: '${baseUrl}',
   sandbox: false,
 });
 \`\`\`
@@ -692,7 +699,7 @@ embed.open(sessionToken, {
 | width | string | '100%' | Container width (inline mode) |
 | height | string | '700px' | Container height (inline mode) |
 | closeOnBackdropClick | boolean | true | Allow closing modal by clicking backdrop |
-| verificationUrl | string | 'https://idswyft.app' | Override verification page URL |
+| verificationUrl | string | '${siteUrl}' | Override verification page URL |
 
 ## React Component
 
@@ -828,7 +835,7 @@ POST /api/v2/verify/:id/credential/send
 Content-Type: application/json
 \`\`\`
 
-Send the credential to a user via email with an embedded QR code. Issues the credential if not already issued; reuses the stored JWT if already issued. The QR code encodes a link to \`https://idswyft.app/verify-credential?jwt=...\` for instant client-side verification.
+Send the credential to a user via email with an embedded QR code. Issues the credential if not already issued; reuses the stored JWT if already issued. The QR code encodes a link to \`${siteUrl}/verify-credential?jwt=...\` for instant client-side verification.
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
@@ -1487,15 +1494,19 @@ On first boot, navigate to the frontend. If no developer account exists, a setup
 
 ## Support
 
-- **Developer Portal:** https://idswyft.app/developer
-- **Review Dashboard:** https://idswyft.app/admin/verifications
-- **Live Demo:** https://idswyft.app/demo
-- **Documentation:** https://idswyft.app/docs
+- **Developer Portal:** ${siteUrl}/developer
+- **Review Dashboard:** ${siteUrl}/admin/verifications
+- **Live Demo:** ${siteUrl}/demo
+- **Documentation:** ${siteUrl}/docs
 - **SDK:** npm install @idswyft/sdk
 - **GitHub:** https://github.com/team-idswyft/idswyft-community
 - **Email:** support@idswyft.app
 
 ---
 
-*Generated from Idswyft API v1.8.2 — https://idswyft.app/docs*
+*Generated from Idswyft API v1.8.2 — ${siteUrl}/docs*
 `;
+}
+
+// Backwards-compatible static export (always uses cloud URL, used by llms.txt serving)
+export const API_DOCS_MARKDOWN = getApiDocsMarkdown();

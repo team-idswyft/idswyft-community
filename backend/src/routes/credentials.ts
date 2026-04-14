@@ -157,8 +157,9 @@ router.post('/:id/credential/send',
     const state = await loadSessionState(verificationId);
     const recipientName = state?.front_extraction?.ocr?.full_name || 'there';
 
-    // Build verify URL and QR code
-    const verifyUrl = `https://idswyft.app/verify-credential?jwt=${jwt}`;
+    // Build verify URL and QR code — use FRONTEND_URL for self-hosted deployments
+    const siteUrl = process.env.FRONTEND_URL || 'https://idswyft.app';
+    const verifyUrl = `${siteUrl}/verify-credential?jwt=${jwt}`;
     const qrDataUri = await QRCode.toDataURL(verifyUrl, { width: 280, margin: 2 });
 
     // Send email
