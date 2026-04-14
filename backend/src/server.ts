@@ -39,6 +39,8 @@ import complianceRoutes from './routes/compliance.js';
 import wellKnownRoutes from './routes/well-known.js';
 import vaultRoutes from './routes/vault.js';
 import { getApiDocsMarkdown } from './api-docs/apiDocsMarkdown.js';
+import systemRoutes from './routes/system.js';
+import { APP_VERSION } from './utils/version.js';
 
 const app = express();
 
@@ -130,6 +132,7 @@ app.use('/api/v2', credentialRoutes);
 app.use('/api/v2/compliance', conditionalCsrf, complianceRoutes);
 app.use('/api/v2/vault', vaultRoutes);
 app.use('/.well-known', wellKnownRoutes);
+app.use('/api/system', conditionalCsrf, systemRoutes);
 
 // Local file serving — authenticated with API key, path traversal blocked in serveLocalFile
 if (config.storage.provider === 'local') {
@@ -141,7 +144,7 @@ app.get('/health', (req, res) => {
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    version: '1.0.0',
+    version: APP_VERSION,
     environment: config.nodeEnv
   });
 });
@@ -149,7 +152,7 @@ app.get('/api/health', (req, res) => {
   res.json({
     status: 'healthy',
     timestamp: new Date().toISOString(),
-    version: '1.0.0',
+    version: APP_VERSION,
     environment: config.nodeEnv
   });
 });
@@ -158,7 +161,7 @@ app.get('/api/health', (req, res) => {
 app.get('/', (req, res) => {
   res.json({
     message: 'Idswyft Identity Verification API',
-    version: '1.0.0',
+    version: APP_VERSION,
     status: 'running',
     environment: config.nodeEnv,
     documentation: '/api/docs',
@@ -185,7 +188,7 @@ app.get('/api/docs/markdown', (req, res) => {
 app.get('/api/docs', (req, res) => {
   res.json({
     title: 'Idswyft API Documentation',
-    version: '1.0.0',
+    version: APP_VERSION,
     generated: new Date().toISOString(),
     endpoints: {
       health: {

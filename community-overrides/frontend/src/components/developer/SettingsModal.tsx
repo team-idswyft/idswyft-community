@@ -17,16 +17,18 @@ import {
   ExclamationTriangleIcon,
   FingerPrintIcon,
   ShieldExclamationIcon,
+  ServerIcon,
 } from '@heroicons/react/24/outline'
 import { inputStyle, labelStyle } from './types'
 
-type SettingsTab = 'profile' | 'team' | 'integrations' | 'branding' | 'account'
+type SettingsTab = 'profile' | 'team' | 'integrations' | 'branding' | 'system' | 'account'
 
 const tabs: Array<{ id: SettingsTab; label: string; icon: React.ComponentType<{ style?: React.CSSProperties }>; bottom?: boolean }> = [
   { id: 'profile', label: 'Profile', icon: UserCircleIcon },
   { id: 'team', label: 'Team', icon: UsersIcon },
   { id: 'integrations', label: 'Integrations', icon: CodeBracketIcon },
   { id: 'branding', label: 'Branding', icon: PaintBrushIcon },
+  { id: 'system', label: 'System', icon: ServerIcon },
   { id: 'account', label: 'Account', icon: ExclamationTriangleIcon, bottom: true },
 ]
 
@@ -98,6 +100,12 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
   const [deleteAccountEmail, setDeleteAccountEmail] = useState('')
   const [deleteAccountLoading, setDeleteAccountLoading] = useState(false)
 
+  // System / Version info
+  const [versionInfo, setVersionInfo] = useState<{ current_version: string; latest_version: string | null; update_available: boolean; release_url: string | null } | null>(null)
+  const [versionLoading, setVersionLoading] = useState(false)
+  const [versionFetched, setVersionFetched] = useState(false)
+  const [copiedCommand, setCopiedCommand] = useState<string | null>(null)
+
   // Active settings tab
   const [activeTab, setActiveTab] = useState<SettingsTab>('profile')
 
@@ -112,6 +120,40 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
     fetchBrandingSettings()
     fetchReviewers()
   }, [token])
+
+  const fetchVersionInfo = async () => {
+    if (versionFetched) return
+    setVersionLoading(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/system/version`, {
+        headers: authHeaders,
+        credentials: 'include' as RequestCredentials,
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setVersionInfo(data)
+      }
+    } catch { /* network error */ }
+    setVersionLoading(false)
+    setVersionFetched(true)
+  }
+
+  // Lazy fetch version info when System tab is selected
+  useEffect(() => {
+    if (activeTab === 'system' && !versionFetched) {
+      fetchVersionInfo()
+    }
+  }, [activeTab])
+
+  const copyCommand = (cmd: string, label: string) => {
+    navigator.clipboard.writeText(cmd).then(() => {
+      setCopiedCommand(label)
+      toast.success('Copied to clipboard')
+      setTimeout(() => setCopiedCommand(null), 2000)
+    }).catch(() => {
+      toast.error('Failed to copy')
+    })
+  }
 
   const fetchProfile = async () => {
     setProfileLoading(true)
@@ -1387,6 +1429,110 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                           style={{ color: C.cyan, fontSize: 13, fontWeight: 500, textDecoration: 'none' }}>
                           Want more control? Try the Page Builder &rarr;
                         </Link>
+                      </div>
+                    </>
+                  )}
+                </div>
+              )}
+
+              {/* ─── System ─── */}
+              {activeTab === 'system' && (
+                <div>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                    <ServerIcon style={{ width: 16, height: 16, color: C.cyan }} />
+                    <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>System</div>
+                  </div>
+                  <div style={{ color: C.muted, fontSize: 13, marginBottom: 20, lineHeight: 1.6 }}>
+                    Manage your self-hosted Idswyft installation.
+                  </div>
+
+                  {versionLoading ? (
+                    <div style={{ color: C.muted, fontSize: 13 }}>Loading version info...</div>
+                  ) : (
+                    <>
+                      {/* ── Version ── */}
+                      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20, marginBottom: 16 }}>
+                        <div style={{ fontSize: 11, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Current Version</div>
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
+                          <span style={{ fontSize: 22, fontWeight: 700, color: C.text, fontFamily: C.mono }}>
+                            v{versionInfo?.current_version || '...'}
+                          </span>
+                          {versionInfo?.update_available && (
+                            <span style={{
+                              fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em',
+                              padding: '3px 8px', borderRadius: 4,
+                              background: C.greenDim, color: C.green,
+                            }}>
+                              Update Available
+                            </span>
+                          )}
+                        </div>
+                        {versionInfo?.latest_version && versionInfo.update_available && (
+                          <div style={{ fontSize: 13, color: C.muted }}>
+                            Latest: <span style={{ color: C.green, fontFamily: C.mono }}>v{versionInfo.latest_version}</span>
+                            {versionInfo.release_url && (
+                              <>
+                                {' \u00b7 '}
+                                <a
+                                  href={versionInfo.release_url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{ color: C.cyan, textDecoration: 'none' }}
+                                >
+                                  Release notes &rarr;
+                                </a>
+                              </>
+                            )}
+                          </div>
+                        )}
+                        {versionInfo && !versionInfo.update_available && versionInfo.latest_version && (
+                          <div style={{ fontSize: 13, color: C.dim }}>You're on the latest version.</div>
+                        )}
+                      </div>
+
+                      {/* ── Update ── */}
+                      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20, marginBottom: 16 }}>
+                        <div style={{ fontSize: 11, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Update</div>
+                        <div style={{ color: C.muted, fontSize: 13, marginBottom: 12, lineHeight: 1.6 }}>
+                          Run the update script from your installation directory. This pulls the latest images and restarts containers without touching your data or secrets.
+                        </div>
+                        <button
+                          onClick={() => copyCommand('bash update.sh', 'update')}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                            background: C.bg, border: `1px solid ${C.border}`, borderRadius: 6,
+                            padding: '10px 14px', cursor: 'pointer', textAlign: 'left', marginBottom: 8,
+                          }}
+                        >
+                          <code style={{ flex: 1, fontFamily: C.mono, fontSize: 13, color: C.cyan }}>bash update.sh</code>
+                          <span style={{ fontSize: 11, color: copiedCommand === 'update' ? C.green : C.dim, flexShrink: 0 }}>
+                            {copiedCommand === 'update' ? 'Copied!' : 'Click to copy'}
+                          </span>
+                        </button>
+                        <div style={{ fontSize: 11, color: C.dim }}>
+                          Or manually: <code style={{ fontFamily: C.mono, color: C.muted }}>docker compose pull && docker compose up -d</code>
+                        </div>
+                      </div>
+
+                      {/* ── Uninstall ── */}
+                      <div style={{ background: C.redDim, border: `1px solid rgba(248,113,113,0.2)`, borderRadius: 10, padding: 20 }}>
+                        <div style={{ fontSize: 11, color: C.red, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8, fontWeight: 600 }}>Uninstall</div>
+                        <div style={{ color: C.muted, fontSize: 13, marginBottom: 12, lineHeight: 1.6 }}>
+                          Remove all Idswyft containers, images, and optionally your database and uploads.
+                        </div>
+                        <button
+                          onClick={() => copyCommand('bash uninstall.sh', 'uninstall')}
+                          style={{
+                            display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                            background: C.bg, border: `1px solid rgba(248,113,113,0.2)`, borderRadius: 6,
+                            padding: '10px 14px', cursor: 'pointer', textAlign: 'left',
+                          }}
+                        >
+                          <code style={{ flex: 1, fontFamily: C.mono, fontSize: 13, color: C.red }}>bash uninstall.sh</code>
+                          <span style={{ fontSize: 11, color: copiedCommand === 'uninstall' ? C.green : C.dim, flexShrink: 0 }}>
+                            {copiedCommand === 'uninstall' ? 'Copied!' : 'Click to copy'}
+                          </span>
+                        </button>
                       </div>
                     </>
                   )}

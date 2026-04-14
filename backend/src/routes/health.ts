@@ -3,6 +3,7 @@ import crypto from 'crypto';
 import { supabase } from '@/config/database.js';
 import config from '@/config/index.js';
 import { catchAsync } from '@/middleware/errorHandler.js';
+import { APP_VERSION } from '@/utils/version.js';
 
 const router = express.Router();
 
@@ -13,7 +14,7 @@ router.get('/', catchAsync(async (req: Request, res: Response) => {
     message: 'OK',
     timestamp: new Date().toISOString(),
     environment: config.nodeEnv,
-    version: '1.0.0'
+    version: APP_VERSION
   };
   
   res.status(200).json(healthcheck);
@@ -54,7 +55,7 @@ router.get('/detailed', catchAsync(async (req: Request, res: Response) => {
     uptime: process.uptime(),
     timestamp: new Date().toISOString(),
     environment: config.nodeEnv,
-    version: '1.0.0',
+    version: APP_VERSION,
     responseTime: Date.now() - startTime,
     services: {
       database: {
