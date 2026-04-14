@@ -5,6 +5,16 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.34] - 2026-04-14
+
+### Added
+- **`update.sh`** — safe upgrade script for community edition; pulls latest images and recreates containers without touching `.env` or database volumes
+- **`GET /api/system/version`** — version check endpoint with GitHub API integration, 1-hour cache, and semver comparison (requires developer JWT)
+- **System tab** in community Settings modal — shows current version, update available badge, click-to-copy update/uninstall commands
+
+### Fixed
+- Health and root endpoints now return actual version from `package.json` instead of hardcoded `1.0.0`
+
 ## [1.8.11] - 2026-04-13
 
 ### Added
