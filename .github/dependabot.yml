@@ -1,0 +1,39 @@
+# ─────────────────────────────────────────────────
+# Dependabot — security updates only
+# ─────────────────────────────────────────────────
+# Grouped updates, weekly schedule. Workspace packages
+# (@idswyft/*) are ignored since they are resolved
+# locally via npm workspaces, not from the registry.
+# ─────────────────────────────────────────────────
+
+version: 2
+
+updates:
+  # Root + backend + engine (npm workspaces)
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+    groups:
+      npm_and_yarn:
+        patterns: ["*"]
+    ignore:
+      - dependency-name: "@idswyft/*"
+    open-pull-requests-limit: 5
+
+  # Frontend (separate lockfile)
+  - package-ecosystem: npm
+    directory: /frontend
+    schedule:
+      interval: weekly
+    groups:
+      npm_and_yarn:
+        patterns: ["*"]
+    open-pull-requests-limit: 5
+
+  # GitHub Actions
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 3
