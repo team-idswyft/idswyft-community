@@ -1,18 +1,11 @@
 /**
- * Edition configuration — controls Community vs Cloud behavior.
+ * Edition configuration — Community edition only.
  *
- * Set via VITE_EDITION env var at build time:
- *   - "community" (default): Self-hosted, Dev Portal is the root
- *   - "cloud": Managed by Idswyft, marketing site is the root
- *
- * Vite replaces import.meta.env values at build time, enabling
- * dead code elimination for unused edition paths.
+ * This is the community (self-hosted) build. There is no cloud edition
+ * in this repository.
  */
 
-export type Edition = 'community' | 'cloud'
+export const EDITION = 'community' as const
 
-export const EDITION: Edition =
-  (import.meta.env.VITE_EDITION as Edition) || 'community'
-
-export const isCommunity = EDITION === 'community'
-export const isCloud = EDITION === 'cloud'
+export const isCommunity = true
+export const isCloud = false
