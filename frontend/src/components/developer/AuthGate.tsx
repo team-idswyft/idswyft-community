@@ -266,6 +266,12 @@ export function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) 
                 </button>
               </>
             )}
+
+            {!isReturning && (
+              <p style={{ color: C.dim, fontSize: 12, textAlign: 'center', marginTop: 16 }}>
+                Already have an account? Just enter your email above.
+              </p>
+            )}
           </>
         )}
 
