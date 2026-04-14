@@ -20,6 +20,8 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
     volumes:
       - pgdata:/var/lib/postgresql/data
     environment:
@@ -38,6 +40,8 @@ services:
   engine:
     image: ghcr.io/team-idswyft/idswyft-engine:latest
     restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
     environment:
       NODE_ENV: production
       PORT: "3002"
@@ -55,6 +59,8 @@ services:
   api:
     image: ghcr.io/team-idswyft/idswyft-api:latest
     restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
     depends_on:
       postgres:
         condition: service_healthy
@@ -74,6 +80,7 @@ services:
       SANDBOX_MODE: ${SANDBOX_MODE:-false}
       MIGRATIONS_LENIENT: "true"
       ENGINE_URL: http://engine:3002
+      WATCHTOWER_API_TOKEN: "${WATCHTOWER_API_TOKEN:-}"
     volumes:
       - uploads:/app/backend/uploads
       - temp:/app/backend/temp
@@ -91,6 +98,8 @@ services:
   frontend:
     image: ghcr.io/team-idswyft/idswyft-frontend:latest
     restart: unless-stopped
+    labels:
+      - "com.centurylinklabs.watchtower.enable=true"
     depends_on:
       - api
     ports:
@@ -125,6 +134,28 @@ services:
       timeout: 5s
       retries: 3
       start_period: 30s
+
+  # ─────────────────────────────────────────
+  # Watchtower (optional auto-update sidecar)
+  # Only starts with: docker compose --profile autoupdate up -d
+  # ─────────────────────────────────────────
+  watchtower:
+    image: containrrr/watchtower
+    restart: unless-stopped
+    profiles:
+      - autoupdate
+    environment:
+      WATCHTOWER_LABEL_ENABLE: "true"
+      WATCHTOWER_SCHEDULE: "${WATCHTOWER_SCHEDULE:-0 0 4 * * *}"
+      WATCHTOWER_CLEANUP: "true"
+      WATCHTOWER_ROLLING_RESTART: "true"
+      WATCHTOWER_HTTP_API_METRICS: "true"
+      WATCHTOWER_HTTP_API_TOKEN: "${WATCHTOWER_API_TOKEN:-}"
+      TZ: "${TZ:-UTC}"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    labels:
+      - "com.centurylinklabs.watchtower.enable=false"
 
 volumes:
   pgdata:

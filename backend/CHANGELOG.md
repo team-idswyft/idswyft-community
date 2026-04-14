@@ -5,6 +5,15 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.35] - 2026-04-14
+
+### Added
+- **Watchtower auto-update** — optional sidecar for automatic container updates via Docker Compose `--profile autoupdate`; checks for new images daily at 4 AM UTC with rolling restarts, never touches the database
+- **`install.sh` auto-update step** — interactive prompt to enable Watchtower during installation, generates API token, appends to `.env`
+- **Watchtower probe in `/api/system/version`** — checks Watchtower metrics endpoint (2s timeout) and returns `configured`, `running`, `containers_scanned/updated/failed` status
+- **Auto-Update card** in community Settings modal System tab — three-state display (running with metrics, configured but stopped, not configured)
+- **`update.sh` / `uninstall.sh`** — detect and include `--profile autoupdate` in compose commands when Watchtower is running
+
 ## [1.8.34] - 2026-04-14
 
 ### Added

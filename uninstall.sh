@@ -73,7 +73,7 @@ divider
 # ── Show what will be removed ────────────────────
 echo -e "  ${GRAY}│${RESET}  ${BOLD}The following will be removed:${RESET}"
 echo -e "  ${GRAY}│${RESET}"
-echo -e "  ${GRAY}│${RESET}    ${RED}●${RESET}  All Idswyft containers (api, engine, frontend, postgres, caddy)"
+echo -e "  ${GRAY}│${RESET}    ${RED}●${RESET}  All Idswyft containers (api, engine, frontend, postgres, caddy, watchtower)"
 if [ "$KEEP_DATA" = true ]; then
   echo -e "  ${GRAY}│${RESET}    ${GREEN}●${RESET}  Database volume will be ${GREEN}kept${RESET}"
 else
@@ -105,7 +105,11 @@ divider
 compose_cmd="docker compose"
 # Include HTTPS profile if caddy was running
 if docker compose --profile https ps --format '{{.Name}}' 2>/dev/null | grep -q caddy; then
-  compose_cmd="docker compose --profile https"
+  compose_cmd="$compose_cmd --profile https"
+fi
+# Include autoupdate profile if watchtower was running
+if docker compose --profile autoupdate ps --format '{{.Name}}' 2>/dev/null | grep -q watchtower; then
+  compose_cmd="$compose_cmd --profile autoupdate"
 fi
 
 if [ "$KEEP_DATA" = true ]; then

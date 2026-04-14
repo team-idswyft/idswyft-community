@@ -101,7 +101,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
   const [deleteAccountLoading, setDeleteAccountLoading] = useState(false)
 
   // System / Version info
-  const [versionInfo, setVersionInfo] = useState<{ current_version: string; latest_version: string | null; update_available: boolean; release_url: string | null } | null>(null)
+  const [versionInfo, setVersionInfo] = useState<{ current_version: string; latest_version: string | null; update_available: boolean; release_url: string | null; watchtower?: { configured: boolean; running: boolean; containers_scanned?: number | null; containers_updated?: number | null; containers_failed?: number | null } } | null>(null)
   const [versionLoading, setVersionLoading] = useState(false)
   const [versionFetched, setVersionFetched] = useState(false)
   const [copiedCommand, setCopiedCommand] = useState<string | null>(null)
@@ -1512,6 +1512,89 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                         <div style={{ fontSize: 11, color: C.dim }}>
                           Or manually: <code style={{ fontFamily: C.mono, color: C.muted }}>docker compose pull && docker compose up -d</code>
                         </div>
+                      </div>
+
+                      {/* ── Auto-Update ── */}
+                      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 20, marginBottom: 16 }}>
+                        <div style={{ fontSize: 11, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 8 }}>Auto-Update</div>
+
+                        {versionInfo?.watchtower?.configured ? (
+                          versionInfo.watchtower.running ? (
+                            <>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                                <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.green, flexShrink: 0 }} />
+                                <span style={{ fontSize: 13, color: C.text, fontWeight: 500 }}>Watchtower is running</span>
+                              </div>
+                              <div style={{ color: C.muted, fontSize: 13, marginBottom: 8, lineHeight: 1.6 }}>
+                                Containers are checked for updates automatically.
+                              </div>
+                              {(versionInfo.watchtower.containers_scanned != null || versionInfo.watchtower.containers_updated != null) && (
+                                <div style={{ display: 'flex', gap: 16, marginBottom: 8, flexWrap: 'wrap' }}>
+                                  {versionInfo.watchtower.containers_scanned != null && (
+                                    <div style={{ fontSize: 12, color: C.dim }}>
+                                      Scanned: <span style={{ color: C.text, fontFamily: C.mono }}>{versionInfo.watchtower.containers_scanned}</span>
+                                    </div>
+                                  )}
+                                  {versionInfo.watchtower.containers_updated != null && (
+                                    <div style={{ fontSize: 12, color: C.dim }}>
+                                      Updated: <span style={{ color: C.green, fontFamily: C.mono }}>{versionInfo.watchtower.containers_updated}</span>
+                                    </div>
+                                  )}
+                                  {(versionInfo.watchtower.containers_failed ?? 0) > 0 && (
+                                    <div style={{ fontSize: 12, color: C.dim }}>
+                                      Failed: <span style={{ color: C.red, fontFamily: C.mono }}>{versionInfo.watchtower.containers_failed}</span>
+                                    </div>
+                                  )}
+                                </div>
+                              )}
+                            </>
+                          ) : (
+                            <>
+                              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
+                                <div style={{ width: 8, height: 8, borderRadius: '50%', background: C.dim, flexShrink: 0 }} />
+                                <span style={{ fontSize: 13, color: C.muted, fontWeight: 500 }}>Watchtower configured but not running</span>
+                              </div>
+                              <div style={{ color: C.muted, fontSize: 13, marginBottom: 12, lineHeight: 1.6 }}>
+                                Start the auto-update sidecar from your installation directory:
+                              </div>
+                              <button
+                                onClick={() => copyCommand('docker compose --profile autoupdate up -d watchtower', 'watchtower-start')}
+                                style={{
+                                  display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                                  background: C.bg, border: `1px solid ${C.border}`, borderRadius: 6,
+                                  padding: '10px 14px', cursor: 'pointer', textAlign: 'left',
+                                }}
+                              >
+                                <code style={{ flex: 1, fontFamily: C.mono, fontSize: 13, color: C.cyan }}>docker compose --profile autoupdate up -d watchtower</code>
+                                <span style={{ fontSize: 11, color: copiedCommand === 'watchtower-start' ? C.green : C.dim, flexShrink: 0 }}>
+                                  {copiedCommand === 'watchtower-start' ? 'Copied!' : 'Click to copy'}
+                                </span>
+                              </button>
+                            </>
+                          )
+                        ) : (
+                          <>
+                            <div style={{ color: C.muted, fontSize: 13, marginBottom: 12, lineHeight: 1.6 }}>
+                              Enable automatic container updates with Watchtower. Checks for new images daily and restarts containers with minimal downtime. Never touches the database.
+                            </div>
+                            <button
+                              onClick={() => copyCommand('bash install.sh', 'autoupdate-enable')}
+                              style={{
+                                display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                                background: C.bg, border: `1px solid ${C.border}`, borderRadius: 6,
+                                padding: '10px 14px', cursor: 'pointer', textAlign: 'left',
+                              }}
+                            >
+                              <code style={{ flex: 1, fontFamily: C.mono, fontSize: 13, color: C.cyan }}>bash install.sh</code>
+                              <span style={{ fontSize: 11, color: copiedCommand === 'autoupdate-enable' ? C.green : C.dim, flexShrink: 0 }}>
+                                {copiedCommand === 'autoupdate-enable' ? 'Copied!' : 'Click to copy'}
+                              </span>
+                            </button>
+                            <div style={{ fontSize: 11, color: C.dim, marginTop: 6 }}>
+                              Re-run the installer and select "Enable auto-updates" when prompted.
+                            </div>
+                          </>
+                        )}
                       </div>
 
                       {/* ── Uninstall ── */}

@@ -180,11 +180,15 @@ divider
 echo -e "  ${CYAN}${BOLD}━━━ Step 3/4: Pulling latest images ━━━${RESET}"
 divider
 
-# Detect HTTPS profile (same pattern as uninstall.sh)
+# Detect active profiles
 compose_cmd="docker compose"
 if docker compose --profile https ps --format '{{.Name}}' 2>/dev/null | grep -q caddy; then
-  compose_cmd="docker compose --profile https"
+  compose_cmd="$compose_cmd --profile https"
   ok "HTTPS profile detected — including Caddy"
+fi
+if docker compose --profile autoupdate ps --format '{{.Name}}' 2>/dev/null | grep -q watchtower; then
+  compose_cmd="$compose_cmd --profile autoupdate"
+  ok "Auto-update profile detected — including Watchtower"
 fi
 
 start_spinner "Pulling latest images"
@@ -309,4 +313,8 @@ echo "    ╰──────────────────────�
 echo -e "${RESET}"
 echo -e "    ${DIM}Your .env, database, and uploads are untouched.${RESET}"
 echo -e "    ${DIM}View logs:${RESET} ${CYAN}$compose_cmd logs -f${RESET}"
+if echo "$compose_cmd" | grep -q "autoupdate"; then
+  echo ""
+  echo -e "    ${CYAN}Note:${RESET} Watchtower is active — future updates will be applied automatically."
+fi
 echo ""

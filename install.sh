@@ -22,6 +22,7 @@ set -euo pipefail
 REPO_URL="https://github.com/team-idswyft/idswyft-community.git"
 BUILD_FROM_SOURCE=false
 ENABLE_HTTPS=false
+ENABLE_AUTOUPDATE=false
 
 # Parse arguments
 for arg in "$@"; do
@@ -50,7 +51,7 @@ BG_RED="\033[41m"
 SPINNER_CHARS='⣾⣽⣻⢿⡿⣟⣯⣷'
 SPINNER_PID=""
 STEP_CURRENT=0
-STEP_TOTAL=6
+STEP_TOTAL=7
 START_TIME=$(date +%s)
 
 # ── Banner ────────────────────────────────────────
@@ -234,12 +235,13 @@ setup_env() {
 
   info "Generating secure secrets..."
 
-  local db_password jwt_secret api_key_secret encryption_key service_token
+  local db_password jwt_secret api_key_secret encryption_key service_token watchtower_token
   db_password=$(generate_secret)
   jwt_secret=$(generate_secret)
   api_key_secret=$(generate_secret)
   encryption_key=$(generate_secret)
   service_token=$(generate_secret)
+  watchtower_token=$(generate_secret)
 
   cat > .env <<EOF
 # ─────────────────────────────────────────
@@ -269,6 +271,11 @@ SANDBOX_MODE=false
 ENABLE_HTTPS=false
 DOMAIN=
 CORS_ORIGINS=
+
+# Auto-update (configured by install.sh)
+ENABLE_AUTOUPDATE=false
+WATCHTOWER_API_TOKEN=${watchtower_token}
+# WATCHTOWER_SCHEDULE=0 0 4 * * *   (6-field cron: sec min hour day month weekday)
 EOF
 
   ok "Created .env with secure secrets"
@@ -352,7 +359,51 @@ setup_https() {
 }
 
 # ─────────────────────────────────────────
-# Step 5: Pull images (or build from source)
+# Step 5: Configure auto-updates (optional)
+# ─────────────────────────────────────────
+setup_autoupdate() {
+  step "Auto-update configuration"
+  divider
+
+  echo -e "  ${GRAY}│${RESET}"
+  echo -e "  ${GRAY}│${RESET}  ${BOLD}Enable automatic container updates?${RESET}"
+  echo -e "  ${GRAY}│${RESET}  ${DIM}Uses Watchtower to check for new images daily at 4 AM.${RESET}"
+  echo -e "  ${GRAY}│${RESET}  ${DIM}Only updates engine, API, and frontend — never the database.${RESET}"
+  echo -e "  ${GRAY}│${RESET}"
+  read -rp "       Enable auto-updates? (y/N): " want_autoupdate
+
+  if [[ ! "$want_autoupdate" =~ ^[Yy]$ ]]; then
+    ok "Skipping auto-updates — manual updates via update.sh"
+    detail "You can enable this later by re-running install.sh"
+    divider
+    return
+  fi
+
+  ENABLE_AUTOUPDATE=true
+
+  # Update .env (handle both existing and older .env files)
+  if grep -q "^ENABLE_AUTOUPDATE=" .env; then
+    sed -i "s|^ENABLE_AUTOUPDATE=.*|ENABLE_AUTOUPDATE=true|" .env
+  else
+    echo "" >> .env
+    echo "# Auto-update (configured by install.sh)" >> .env
+    echo "ENABLE_AUTOUPDATE=true" >> .env
+  fi
+
+  # Ensure WATCHTOWER_API_TOKEN exists (may be missing from older .env files)
+  if ! grep -q "^WATCHTOWER_API_TOKEN=" .env; then
+    local wt_token
+    wt_token=$(generate_secret)
+    echo "WATCHTOWER_API_TOKEN=${wt_token}" >> .env
+  fi
+
+  ok "Auto-updates enabled (daily at 4:00 AM UTC)"
+  detail "Customize schedule: set WATCHTOWER_SCHEDULE in .env"
+  divider
+}
+
+# ─────────────────────────────────────────
+# Step 6: Pull images (or build from source)
 # ─────────────────────────────────────────
 start_services() {
   if [ "$BUILD_FROM_SOURCE" = true ]; then
@@ -463,6 +514,11 @@ start_services() {
     compose_cmd="$compose_cmd --profile https"
   fi
 
+  # Add autoupdate profile if enabled
+  if [ "$ENABLE_AUTOUPDATE" = true ]; then
+    compose_cmd="$compose_cmd --profile autoupdate"
+  fi
+
   # Start containers in background (--no-deps avoids blocking on health checks)
   info "Creating containers..."
   $compose_cmd up -d --no-deps postgres 2>/dev/null
@@ -562,6 +618,13 @@ start_services() {
       ok "Caddy is running"
     fi
   fi
+
+  # Start Watchtower if auto-updates are enabled
+  if [ "$ENABLE_AUTOUPDATE" = true ]; then
+    echo -e "  ${GRAY}│${RESET}"
+    $compose_cmd up -d --no-deps watchtower 2>/dev/null
+    ok "watchtower (auto-update sidecar)"
+  fi
   divider
 }
 
@@ -571,6 +634,8 @@ start_services() {
 print_success() {
   local domain base_url compose_profile_flag
   domain=$(grep -E "^DOMAIN=" .env 2>/dev/null | cut -d= -f2 || echo "")
+
+  compose_profile_flag=""
 
   if [ "$ENABLE_HTTPS" = true ] && [ -n "$domain" ]; then
     base_url="https://${domain}"
@@ -583,7 +648,10 @@ print_success() {
     else
       base_url="http://localhost:${port}"
     fi
-    compose_profile_flag=""
+  fi
+
+  if [ "$ENABLE_AUTOUPDATE" = true ]; then
+    compose_profile_flag="${compose_profile_flag} --profile autoupdate"
   fi
 
   echo ""
@@ -617,6 +685,9 @@ print_success() {
   if [ "$ENABLE_HTTPS" = true ]; then
     echo -e "    ${BOLD}caddy${RESET}        ${GRAY}HTTPS reverse proxy (TLS termination)${RESET}"
   fi
+  if [ "$ENABLE_AUTOUPDATE" = true ]; then
+    echo -e "    ${BOLD}watchtower${RESET}   ${GRAY}Auto-update sidecar (daily at 4 AM UTC)${RESET}"
+  fi
   echo ""
   echo -e "    ${CYAN}${BOLD}Commands${RESET}"
   echo -e "    ${GRAY}────────────────────────────────────${RESET}"
@@ -644,6 +715,7 @@ main() {
   ensure_repo
   setup_env
   setup_https
+  setup_autoupdate
   start_services
   print_success
 }

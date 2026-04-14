@@ -66,6 +66,34 @@ router.get('/version', authenticateDeveloperJWT as any, catchAsync(async (req: R
     response.release_url = null;
   }
 
+  // Watchtower auto-update status probe
+  const watchtowerToken = process.env.WATCHTOWER_API_TOKEN;
+  if (watchtowerToken) {
+    const wt: Record<string, unknown> = { configured: true, running: false };
+    try {
+      const wtRes = await fetch('http://watchtower:8080/v1/metrics', {
+        headers: { Authorization: `Bearer ${watchtowerToken}` },
+        signal: AbortSignal.timeout(2000),
+      });
+      if (wtRes.ok) {
+        const body = await wtRes.text();
+        wt.running = true;
+        const extract = (key: string): number | null => {
+          const m = body.match(new RegExp(`${key}\\s+(\\d+)`));
+          return m ? Number(m[1]) : null;
+        };
+        wt.containers_scanned = extract('watchtower_containers_scanned');
+        wt.containers_updated = extract('watchtower_containers_updated');
+        wt.containers_failed = extract('watchtower_containers_failed');
+      }
+    } catch {
+      // Watchtower not reachable — configured but not running
+    }
+    response.watchtower = wt;
+  } else {
+    response.watchtower = { configured: false, running: false };
+  }
+
   res.json(response);
 }));
 
