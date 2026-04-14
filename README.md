@@ -20,9 +20,21 @@ That's it — pre-built images are pulled from GitHub Container Registry in ~2 m
 
 The Community Edition is **free forever** — unlimited verifications, full source code, MIT license. Your data stays on your servers.
 
-### Interactive Setup
+### Prerequisites
 
-For a guided installation with secrets generation:
+| Dependency | Minimum Version | Check |
+|------------|----------------|-------|
+| **Docker** | 20.10+ | `docker --version` |
+| **Docker Compose** | V2 (plugin) | `docker compose version` |
+| **Git** | Any | `git --version` |
+
+Docker Compose V2 ships as a plugin with Docker Desktop and recent Docker Engine installs. If `docker compose` doesn't work, install the [compose plugin](https://docs.docker.com/compose/install/).
+
+**OS support:** Any Linux distribution (Debian, Ubuntu, RHEL, Alpine), macOS, or Windows with Docker Desktop. Production deployments are recommended on Linux.
+
+### Interactive Setup (Recommended)
+
+For a guided installation with secrets generation and optional HTTPS:
 
 ```bash
 git clone https://github.com/team-idswyft/idswyft-community.git
@@ -31,10 +43,12 @@ cd idswyft-community
 ```
 
 The install script will:
+- Verify Docker and Docker Compose are installed
 - Pull pre-built Docker images from `ghcr.io/team-idswyft/`
 - Generate secure random values for `JWT_SECRET`, `API_KEY_SECRET`, `ENCRYPTION_KEY`
 - Create a `.env` file with your configuration
-- Start the stack via Docker Compose
+- Optionally configure HTTPS with automatic Let's Encrypt certificates
+- Start all services and wait for health checks
 
 ### Build from Source
 
@@ -107,6 +121,37 @@ docker compose --profile https up -d
 ```
 
 Caddy automatically obtains and renews Let's Encrypt certificates. Requirements: ports 80 + 443 open, DNS A record pointing to your server.
+
+### Uninstall
+
+To cleanly remove Idswyft from your server:
+
+```bash
+cd idswyft-community
+bash uninstall.sh
+```
+
+The uninstall script will:
+- Stop and remove all containers and networks
+- Remove database volumes (all verification data)
+- Remove Docker images (`ghcr.io/team-idswyft/*`)
+- Clean up generated config files (`.env`, `Caddyfile`)
+- Optionally delete the installation directory
+
+**Options:**
+
+| Flag | Description |
+|------|-------------|
+| `--yes` | Skip confirmation prompts (non-interactive) |
+| `--keep-data` | Remove containers but preserve the database volume |
+
+```bash
+# Non-interactive full removal
+bash uninstall.sh --yes
+
+# Remove containers but keep your database for reinstall
+bash uninstall.sh --keep-data
+```
 
 ---
 
