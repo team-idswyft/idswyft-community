@@ -14,6 +14,11 @@ const NAV: NavItem[] = [
   { id: 'guide-e2e', label: 'End-to-End Tutorial', depth: 1 },
   { id: 'guide-mobile', label: 'Mobile Handoff', depth: 1 },
   { id: 'guide-custom-ui', label: 'Building Custom UI', depth: 1 },
+  { id: 'self-hosting', label: 'Self-Hosting', depth: 0 },
+  { id: 'sh-prerequisites', label: 'Prerequisites', depth: 1 },
+  { id: 'sh-install', label: 'Install', depth: 1 },
+  { id: 'sh-external-db', label: 'External Database', depth: 1 },
+  { id: 'sh-commands', label: 'Useful Commands', depth: 1 },
 ];
 
 export const DocsGuides: React.FC = () => {
@@ -582,6 +587,175 @@ if (status.ocr_data) {
         <a href="/docs/sdk#embed" style={{ color: C.cyan, textDecoration: 'none', fontFamily: C.mono, fontSize: 'inherit' }}>Embed Component</a>{' '}
         — it provides a complete verification experience you can drop into your app with zero frontend code.
       </Callout>
+
+      <Divider />
+
+      {/* ══ SELF-HOSTING GUIDE ════════════════════════════════════════════ */}
+      <SectionAnchor id="self-hosting" />
+      <H2>Self-Hosting Guide</H2>
+      <Lead>Deploy Idswyft Community Edition on your own server with Docker Compose. Full control over your data and infrastructure.</Lead>
+
+      {/* ── Prerequisites ── */}
+      <SectionAnchor id="sh-prerequisites" />
+      <h3 style={{ fontFamily: C.mono, fontSize: '1rem', fontWeight: 600, color: C.text, margin: '32px 0 8px' }}>
+        <span style={{ color: C.cyan, fontWeight: 400 }}>→</span> Prerequisites
+      </h3>
+      <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
+        A clean Linux server (Debian 12+, Ubuntu 22.04+) with root access and a domain name pointed to the server's IP address.
+      </p>
+
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 24 }}>
+        <div style={{ padding: '12px 20px', borderBottom: `1px solid ${C.border}`, fontFamily: C.mono, fontSize: '0.72rem', color: C.muted, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Required software</div>
+        <div style={{ padding: '8px 20px' }}>
+          {[
+            { name: 'Git', desc: 'For cloning the repository' },
+            { name: 'Docker', desc: 'Container runtime (v20+)' },
+            { name: 'Docker Compose', desc: 'Multi-container orchestration (V2, included with Docker)' },
+            { name: 'curl', desc: 'For downloading the install script' },
+          ].map(dep => (
+            <div key={dep.name} style={{ display: 'flex', gap: 12, padding: '8px 0', borderTop: `1px solid ${C.border}`, alignItems: 'center' }}>
+              <code style={{ fontFamily: C.mono, fontSize: '0.75rem', color: C.cyan, width: 140, flexShrink: 0 }}>{dep.name}</code>
+              <span style={{ fontFamily: C.sans, fontSize: '0.82rem', color: C.muted, flex: 1 }}>{dep.desc}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <Pre label="Install dependencies on Debian / Ubuntu" code={`apt-get update && apt-get install -y git curl
+
+# Install Docker
+curl -fsSL https://get.docker.com | sh
+
+# Verify
+docker --version
+docker compose version`} />
+
+      {/* ── Install ── */}
+      <SectionAnchor id="sh-install" />
+      <h3 style={{ fontFamily: C.mono, fontSize: '1rem', fontWeight: 600, color: C.text, margin: '32px 0 8px' }}>
+        <span style={{ color: C.cyan, fontWeight: 400 }}>→</span> Install
+      </h3>
+      <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
+        Three install options, from quickest to most control.
+      </p>
+
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 16, marginBottom: 24 }}>
+        {[
+          {
+            emoji: '⚡', title: 'One-line Install',
+            tag: { label: 'Quickest', color: C.green, bg: C.greenDim },
+            desc: 'Downloads and runs the install script directly. Pulls pre-built Docker images from the registry.',
+          },
+          {
+            emoji: '📋', title: 'Clone & Install',
+            tag: { label: 'Recommended', color: C.cyan, bg: `${C.cyan}22` },
+            desc: 'Clone the repo first so you can inspect the script before running it. Still pulls pre-built images.',
+          },
+          {
+            emoji: '🔧', title: 'Build from Source',
+            tag: { label: 'Full control', color: C.amber, bg: `${C.amber}22` },
+            desc: 'Clone the repo and build Docker images locally from source. Useful for custom modifications.',
+          },
+        ].map(opt => (
+          <div key={opt.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <span style={{ fontSize: '1.5rem' }}>{opt.emoji}</span>
+              <span style={{ fontFamily: C.sans, fontWeight: 700, fontSize: '1rem', color: C.text }}>{opt.title}</span>
+              <Pill color={opt.tag.color} bg={opt.tag.bg}>{opt.tag.label}</Pill>
+            </div>
+            <p style={{ fontFamily: C.sans, fontSize: '0.83rem', color: C.muted, lineHeight: 1.65, margin: 0 }}>{opt.desc}</p>
+          </div>
+        ))}
+      </div>
+
+      <Pre label="Option 1: One-line install" code={`curl -fsSL https://raw.githubusercontent.com/team-idswyft/idswyft-community/main/install.sh | bash`} />
+
+      <Pre label="Option 2: Clone & install (recommended)" code={`git clone https://github.com/team-idswyft/idswyft-community.git
+cd idswyft-community
+bash install.sh`} />
+
+      <Pre label="Option 3: Build from source" code={`git clone https://github.com/team-idswyft/idswyft-community.git
+cd idswyft-community
+bash install.sh --build`} />
+
+      <p style={{ fontFamily: C.sans, fontSize: '0.85rem', color: C.muted, lineHeight: 1.65, marginBottom: 16 }}>
+        The installer will interactively prompt for:
+      </p>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          {[
+            'Domain name — for HTTPS via Caddy reverse proxy',
+            'Database — bundled PostgreSQL or bring your own (external URL)',
+            'Storage — local filesystem or S3-compatible object storage',
+            'Auto-updates — optional Watchtower sidecar for automatic container updates',
+          ].map(item => (
+            <div key={item} style={{ fontFamily: C.sans, fontSize: '0.82rem', color: C.muted, display: 'flex', gap: 8, alignItems: 'flex-start' }}>
+              <span style={{ color: C.cyan, fontSize: '0.7rem', marginTop: 3 }}>◆</span> {item}
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <Callout type="tip">
+        After installation, verify all containers are healthy with <code style={{ fontFamily: C.mono }}>docker ps</code> and
+        check the API with <code style={{ fontFamily: C.mono }}>curl -s http://localhost:3001/health | jq</code>.
+      </Callout>
+
+      {/* ── External Database ── */}
+      <SectionAnchor id="sh-external-db" />
+      <h3 style={{ fontFamily: C.mono, fontSize: '1rem', fontWeight: 600, color: C.text, margin: '32px 0 8px' }}>
+        <span style={{ color: C.cyan, fontWeight: 400 }}>→</span> External Database (BYOD)
+      </h3>
+      <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
+        If using an external database provider (Railway, Supabase, RDS, etc.), keep these in mind:
+      </p>
+
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 24 }}>
+        <div style={{ padding: '8px 20px' }}>
+          {[
+            { issue: 'Internal hostnames', fix: 'Use the public connection string, not internal/private hostnames (e.g., use mainline.proxy.rlwy.net instead of postgres.railway.internal)' },
+            { issue: 'SSL certificate errors', fix: 'Set DATABASE_SSL_REJECT_UNAUTHORIZED=false in .env if your provider uses self-signed certificates' },
+            { issue: 'Env changes not applied', fix: 'After editing .env, recreate containers with docker compose up -d --force-recreate api (restart alone reuses old env)' },
+          ].map(r => (
+            <div key={r.issue} style={{ display: 'flex', gap: 12, padding: '10px 0', borderTop: `1px solid ${C.border}`, alignItems: 'flex-start' }}>
+              <code style={{ fontFamily: C.mono, fontSize: '0.75rem', color: C.amber, width: 180, flexShrink: 0 }}>{r.issue}</code>
+              <span style={{ fontFamily: C.sans, fontSize: '0.82rem', color: C.muted, flex: 1, lineHeight: 1.6 }}>{r.fix}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      <Pre label=".env — external database configuration" code={`DATABASE_URL=postgresql://user:password@your-host.example.com:5432/dbname
+DATABASE_SSL=true
+DATABASE_SSL_REJECT_UNAUTHORIZED=false`} />
+
+      <Callout type="warning">
+        After changing <code style={{ fontFamily: C.mono }}>.env</code>, you must recreate the container — not just restart it.
+        Use <code style={{ fontFamily: C.mono }}>docker compose up -d --force-recreate api</code> to pick up new environment variables.
+      </Callout>
+
+      {/* ── Useful Commands ── */}
+      <SectionAnchor id="sh-commands" />
+      <h3 style={{ fontFamily: C.mono, fontSize: '1rem', fontWeight: 600, color: C.text, margin: '32px 0 8px' }}>
+        <span style={{ color: C.cyan, fontWeight: 400 }}>→</span> Useful Commands
+      </h3>
+
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 24 }}>
+        <div style={{ padding: '8px 20px' }}>
+          {[
+            { cmd: 'docker compose logs -f api', desc: 'Stream API logs in real-time' },
+            { cmd: 'docker compose down && docker compose up -d', desc: 'Restart the entire stack' },
+            { cmd: 'docker compose up -d --force-recreate api', desc: 'Recreate API container (after .env changes)' },
+            { cmd: 'bash update.sh', desc: 'Pull latest images and update' },
+            { cmd: 'bash uninstall.sh', desc: 'Remove Idswyft and clean up' },
+          ].map(r => (
+            <div key={r.cmd} style={{ display: 'flex', gap: 12, padding: '10px 0', borderTop: `1px solid ${C.border}`, alignItems: 'flex-start' }}>
+              <code style={{ fontFamily: C.mono, fontSize: '0.75rem', color: C.cyan, width: isMobile ? 200 : 380, flexShrink: 0 }}>{r.cmd}</code>
+              <span style={{ fontFamily: C.sans, fontSize: '0.82rem', color: C.muted, flex: 1, lineHeight: 1.6 }}>{r.desc}</span>
+            </div>
+          ))}
+        </div>
+      </div>
 
     </DocLayout>
   );
