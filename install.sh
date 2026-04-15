@@ -376,16 +376,19 @@ setup_infrastructure() {
     if [ "$USE_EXTERNAL_DB" = true ]; then
       _set_env_var "DATABASE_URL" "$db_url"
 
-      # Ask about SSL
+      # Configure SSL — cloud providers (Railway, Supabase, RDS, etc.) require
+      # SSL but typically use self-signed certificates. Default to SSL on with
+      # rejectUnauthorized off, which is the correct setting for most providers.
       echo -e "  ${GRAY}│${RESET}"
-      read -rp "       Require SSL for database connection? (y/N): " want_ssl
-      if [[ "$want_ssl" =~ ^[Yy]$ ]]; then
-        _set_env_var "DATABASE_SSL" "true"
-        _set_env_var "DATABASE_SSL_REJECT_UNAUTHORIZED" "true"
-        detail "SSL enabled (set DATABASE_SSL_REJECT_UNAUTHORIZED=false in .env for self-signed certs)"
-      else
-        _remove_env_var "DATABASE_SSL"
+      read -rp "       Require SSL for database connection? (Y/n): " want_ssl
+      if [[ "$want_ssl" =~ ^[Nn]$ ]]; then
+        _set_env_var "DATABASE_SSL" "false"
         _remove_env_var "DATABASE_SSL_REJECT_UNAUTHORIZED"
+        detail "SSL disabled"
+      else
+        _set_env_var "DATABASE_SSL" "true"
+        _set_env_var "DATABASE_SSL_REJECT_UNAUTHORIZED" "false"
+        ok "SSL enabled (accepts cloud provider certificates)"
       fi
 
       # Generate docker-compose.override.yml with busybox stub
