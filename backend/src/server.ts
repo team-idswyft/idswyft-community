@@ -6,7 +6,7 @@ import cookieParser from 'cookie-parser';
 import cors from 'cors';
 import { buildCorsOptions } from './middleware/cors.js';
 import { conditionalCsrf } from './middleware/csrf.js';
-import { serveLocalFile } from './middleware/fileServing.js';
+import { serveLocalFile, servePublicAsset } from './middleware/fileServing.js';
 import helmet from 'helmet';
 import compression from 'compression';
 import morgan from 'morgan';
@@ -133,6 +133,12 @@ app.use('/api/v2/compliance', conditionalCsrf, complianceRoutes);
 app.use('/api/v2/vault', vaultRoutes);
 app.use('/.well-known', wellKnownRoutes);
 app.use('/api/system', conditionalCsrf, systemRoutes);
+
+// Public asset serving (branding logos, avatars) — no auth, folder-scoped in handler
+// For local: serves directly from filesystem. For S3: proxies via download.
+if (config.storage.provider === 'local' || config.storage.provider === 's3') {
+  app.get('/api/public/assets/*', servePublicAsset);
+}
 
 // Local file serving — authenticated with API key, path traversal blocked in serveLocalFile
 if (config.storage.provider === 'local') {

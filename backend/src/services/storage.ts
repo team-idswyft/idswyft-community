@@ -198,6 +198,58 @@ export class StorageService {
     return key;
   }
 
+  // ─── Public asset operations ────────────────────────────────
+
+  /**
+   * Store a public asset (branding logo, avatar) and return a publicly
+   * accessible URL.  Unlike storeDocument / storeSelfie, this uses upsert
+   * so re-uploads overwrite the previous file at the same path.
+   */
+  async storePublicAsset(
+    buffer: Buffer,
+    folder: string,
+    fileName: string,
+    mimeType: string
+  ): Promise<string> {
+    const storagePath = `${folder}/${fileName}`;
+
+    if (config.storage.provider === 'local') {
+      await this.storeLocally(buffer, fileName, folder);
+      return `/api/public/assets/${folder}/${fileName}`;
+
+    } else if (config.storage.provider === 'supabase') {
+      // Branding uses a dedicated public bucket; other assets use the default bucket
+      const bucket = folder === 'branding'
+        ? 'branding'
+        : config.supabase.storageBucket;
+
+      const { error } = await supabase.storage
+        .from(bucket)
+        .upload(storagePath, buffer, {
+          contentType: mimeType,
+          upsert: true,
+          duplex: 'half',
+        });
+
+      if (error) {
+        logger.error('Supabase public asset upload error:', error);
+        throw new Error('Failed to upload to Supabase storage');
+      }
+
+      const { data } = supabase.storage.from(bucket).getPublicUrl(storagePath);
+      return data.publicUrl;
+
+    } else if (config.storage.provider === 's3') {
+      await this.storeInS3(buffer, fileName, folder, mimeType);
+      // Proxy through the API server (same as local) so no bucket policy
+      // or ACL configuration is needed — objects stay private in S3.
+      return `/api/public/assets/${storagePath}`;
+
+    } else {
+      throw new Error(`Unsupported storage provider: ${config.storage.provider}`);
+    }
+  }
+
   // ─── Read / URL operations ─────────────────────────────────
 
   async getFileUrl(filePath: string, expiresIn: number = 3600): Promise<string> {

@@ -12,6 +12,7 @@ lerna-debug.log*
 
 # Environment variables
 .env
+docker-compose.override.yml
 .mcp.json
 .env.local
 .env.development.local

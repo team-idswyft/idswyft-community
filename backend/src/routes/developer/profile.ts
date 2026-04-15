@@ -1,6 +1,7 @@
 import express, { Request, Response } from 'express';
 import { body, param } from 'express-validator';
 import multer from 'multer';
+import path from 'path';
 import { supabase } from '@/config/database.js';
 import { authenticateDeveloperJWT } from '@/middleware/auth.js';
 import { catchAsync, ValidationError, NotFoundError, AuthenticationError } from '@/middleware/errorHandler.js';
@@ -9,6 +10,7 @@ import { logger } from '@/utils/logger.js';
 import rateLimit from 'express-rate-limit';
 import { config } from '@/config/index.js';
 import { emailService } from '@/services/emailService.js';
+import { StorageService } from '@/services/storage.js';
 
 const router = express.Router();
 
@@ -163,28 +165,11 @@ router.post('/avatar',
       throw new ValidationError('File content does not match a valid JPEG or PNG image', 'file', null);
     }
 
-    const storagePath = `avatars/${developer.id}`;
+    const ext = path.extname(file.originalname) || (file.mimetype === 'image/png' ? '.png' : '.jpeg');
+    const fileName = `${developer.id}${ext}`;
 
-    // Upload to Supabase Storage (upsert — overwrite on re-upload)
-    const { error: uploadError } = await supabase.storage
-      .from(config.supabase.storageBucket)
-      .upload(storagePath, file.buffer, {
-        contentType: file.mimetype,
-        upsert: true,
-        duplex: 'half',
-      });
-
-    if (uploadError) {
-      logger.error('Avatar upload failed:', uploadError);
-      throw new Error('Failed to upload avatar');
-    }
-
-    // Get public URL
-    const { data: urlData } = supabase.storage
-      .from(config.supabase.storageBucket)
-      .getPublicUrl(storagePath);
-
-    const avatarUrl = urlData.publicUrl;
+    const storageService = new StorageService();
+    const avatarUrl = await storageService.storePublicAsset(file.buffer, 'avatars', fileName, file.mimetype);
 
     // Update developer record
     await supabase
@@ -219,29 +204,11 @@ router.post('/branding/logo',
       throw new ValidationError('File content does not match a valid JPEG or PNG image', 'file', null);
     }
 
-    const brandingBucket = 'branding';
-    const storagePath = `${developer.id}/logo`;
+    const ext = path.extname(file.originalname) || (file.mimetype === 'image/png' ? '.png' : '.jpeg');
+    const fileName = `${developer.id}_logo${ext}`;
 
-    // Upload to dedicated public branding bucket (scoped by developer ID)
-    const { error: uploadError } = await supabase.storage
-      .from(brandingBucket)
-      .upload(storagePath, file.buffer, {
-        contentType: file.mimetype,
-        upsert: true,
-        duplex: 'half',
-      });
-
-    if (uploadError) {
-      logger.error('Branding logo upload failed:', uploadError);
-      throw new Error('Failed to upload logo');
-    }
-
-    // Get public URL (branding bucket is public, so this URL is accessible)
-    const { data: urlData } = supabase.storage
-      .from(brandingBucket)
-      .getPublicUrl(storagePath);
-
-    const logoUrl = urlData.publicUrl;
+    const storageService = new StorageService();
+    const logoUrl = await storageService.storePublicAsset(file.buffer, 'branding', fileName, file.mimetype);
 
     // Update developer record
     await supabase

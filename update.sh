@@ -135,6 +135,13 @@ if [ ! -f ".env" ]; then
   fail ".env file not found — run install.sh first"
 fi
 ok ".env file present (will not be modified)"
+
+# Detect external database (override file with busybox stub)
+USE_EXTERNAL_DB=false
+if [ -f "docker-compose.override.yml" ] && grep -q "busybox" docker-compose.override.yml 2>/dev/null; then
+  USE_EXTERNAL_DB=true
+  ok "External database detected"
+fi
 divider
 
 # ── Confirmation ─────────────────────────────────
@@ -225,22 +232,26 @@ divider
 echo -e "  ${CYAN}${BOLD}━━━ Step 4/4: Health checks ━━━${RESET}"
 divider
 
-# Wait for postgres
-start_spinner "Waiting for database"
-retries=0
-while [ $retries -lt 30 ]; do
-  if docker compose exec -T postgres pg_isready &>/dev/null 2>&1; then
-    break
-  fi
-  retries=$((retries + 1))
-  sleep 2
-done
-stop_spinner
-if [ $retries -ge 30 ]; then
-  warn "Database health check timed out"
-  detail "Check logs: docker compose logs postgres"
+# Wait for postgres (skip for external DB)
+if [ "$USE_EXTERNAL_DB" = true ]; then
+  ok "Database: external PostgreSQL"
 else
-  ok "Database ready"
+  start_spinner "Waiting for database"
+  retries=0
+  while [ $retries -lt 30 ]; do
+    if docker compose exec -T postgres pg_isready &>/dev/null 2>&1; then
+      break
+    fi
+    retries=$((retries + 1))
+    sleep 2
+  done
+  stop_spinner
+  if [ $retries -ge 30 ]; then
+    warn "Database health check timed out"
+    detail "Check logs: docker compose logs postgres"
+  else
+    ok "Database ready"
+  fi
 fi
 
 # Wait for engine (ML models take time to load)

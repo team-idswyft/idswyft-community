@@ -1,8 +1,12 @@
 import path from 'path';
 import fs from 'fs/promises';
 import { Request, Response } from 'express';
+import config from '@/config/index.js';
 
 const UPLOADS_BASE = path.resolve(process.cwd(), 'uploads');
+
+/** Folders allowed to be served without authentication. */
+const PUBLIC_ASSET_FOLDERS = ['avatars', 'branding'];
 
 /**
  * Decode a percent-encoded relative path and resolve it within UPLOADS_BASE.
@@ -60,4 +64,87 @@ export async function serveLocalFile(req: Request, res: Response): Promise<void>
   } catch {
     res.status(404).json({ error: 'File not found' });
   }
+}
+
+/**
+ * Serve public assets (branding logos, avatars).
+ * Scoped to PUBLIC_ASSET_FOLDERS only — no auth required.
+ * Handles both local filesystem and S3 storage providers.
+ */
+export async function servePublicAsset(req: Request, res: Response): Promise<void> {
+  const requestedPath = (req.params as any)[0]; // everything after /api/public/assets/
+
+  if (!requestedPath) {
+    res.status(403).json({ error: 'Forbidden' });
+    return;
+  }
+
+  // Only allow serving from explicitly public folders
+  const folder = requestedPath.split('/')[0];
+  if (!PUBLIC_ASSET_FOLDERS.includes(folder)) {
+    res.status(403).json({ error: 'Forbidden' });
+    return;
+  }
+
+  // ── Local filesystem ─────────────────────────────
+  if (config.storage.provider === 'local') {
+    const absolutePath = safeDecode(requestedPath);
+    if (!absolutePath) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
+
+    try {
+      await fs.access(absolutePath);
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.sendFile(absolutePath);
+    } catch {
+      res.status(404).json({ error: 'File not found' });
+    }
+    return;
+  }
+
+  // ── S3 storage (proxy through API server) ────────
+  if (config.storage.provider === 's3') {
+    // Only allow safe characters in the key
+    if (!/^[a-zA-Z0-9_\-./]+$/.test(requestedPath)) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
+
+    // Normalize and re-validate to block path traversal (e.g. avatars/../../documents/secret)
+    const normalized = path.posix.normalize(requestedPath);
+    if (normalized.startsWith('..') || normalized.startsWith('/')) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
+    const normalizedFolder = normalized.split('/')[0];
+    if (!PUBLIC_ASSET_FOLDERS.includes(normalizedFolder)) {
+      res.status(403).json({ error: 'Forbidden' });
+      return;
+    }
+
+    try {
+      const { StorageService } = await import('@/services/storage.js');
+      const storage = new StorageService();
+      const buffer = await storage.downloadFile(normalized);
+
+      const ext = path.extname(normalized).toLowerCase();
+      const mimeTypes: Record<string, string> = {
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+      };
+      const contentType = mimeTypes[ext] || 'application/octet-stream';
+
+      res.setHeader('Content-Type', contentType);
+      res.setHeader('Cache-Control', 'public, max-age=3600');
+      res.send(buffer);
+    } catch {
+      res.status(404).json({ error: 'File not found' });
+    }
+    return;
+  }
+
+  res.status(404).json({ error: 'File not found' });
 }
