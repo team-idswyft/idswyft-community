@@ -5,6 +5,11 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.38] - 2026-04-15
+
+### Fixed
+- **Handoff restart after verification failure** — mobile users clicking "Try Again" after a failed verification no longer get 401; `authenticateHandoffToken` now allows `'failed'` sessions for the `/restart` endpoint only, and the restart handler resets the handoff session to `'pending'` (with atomic guard) so the next `PATCH /complete` cycle succeeds
+
 ## [1.8.36] - 2026-04-15
 
 ### Added

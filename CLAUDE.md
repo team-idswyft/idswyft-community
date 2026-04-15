@@ -118,6 +118,20 @@ postgres:16-alpine → engine (ML, port 3002) → api (port 3001) → frontend (
 - Docker images are built on `v*` tag push (not on merge to main)
 - CODEOWNERS requires `@doobee46` approval on all changes
 
+## Deployment
+
+When the user says "deploy", follow this sequence:
+
+1. **Commit** the feature/fix to `dev` (direct push — always work on `dev`)
+2. **Bump version** in `backend/package.json` (patch increment, e.g., `1.8.37` → `1.8.38`)
+3. **Add changelog entry** to `backend/CHANGELOG.md` under a new `## [x.y.z] - YYYY-MM-DD` heading, following Keep a Changelog format
+4. **Commit** the version bump: `chore: bump version to x.y.z`
+5. **Push** to `origin/dev`: `git push origin dev`
+6. **Merge `dev` into `main`**: `git checkout main && git merge dev && git push origin main`
+7. **Create annotated tag on `main`**: `git tag -a vx.y.z -m "summary"` — tags must be on `main`, never on `dev`
+8. **Push the tag**: `git push origin vx.y.z` — triggers `sync-release.yml` → community repo sync → Docker image CI
+9. **Switch back to `dev`**: `git checkout dev`
+
 ## Development
 
 ```bash
