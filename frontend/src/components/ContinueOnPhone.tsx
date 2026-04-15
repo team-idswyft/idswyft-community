@@ -15,6 +15,7 @@ interface VerificationResult {
 interface ContinueOnPhoneProps {
   apiKey: string;
   userId: string;
+  sessionToken?: string;
   source?: 'api' | 'vaas' | 'demo';
   verificationMode?: 'full' | 'document_only' | 'identity' | 'age_only';
   ageThreshold?: number;
@@ -24,6 +25,7 @@ interface ContinueOnPhoneProps {
 export const ContinueOnPhone: React.FC<ContinueOnPhoneProps> = ({
   apiKey,
   userId,
+  sessionToken,
   source,
   verificationMode,
   ageThreshold,
@@ -58,11 +60,14 @@ export const ContinueOnPhone: React.FC<ContinueOnPhoneProps> = ({
     setIsGenerating(true);
     setError(null);
     try {
+      const handoffHeaders: Record<string, string> = { 'Content-Type': 'application/json' };
+      if (sessionToken) handoffHeaders['X-Session-Token'] = sessionToken;
+
       const res = await fetch(`${API_BASE_URL}/api/verify/handoff/create`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: handoffHeaders,
         body: JSON.stringify({
-          api_key: apiKey,
+          ...(!sessionToken && { api_key: apiKey }),
           user_id: userId,
           ...(source && { source }),
           ...(verificationMode && { verification_mode: verificationMode }),
@@ -126,9 +131,12 @@ export const ContinueOnPhone: React.FC<ContinueOnPhoneProps> = ({
         } else if (data.verification_id) {
           // Handoff still pending but we have a verification_id — check directly
           try {
+            const statusHeaders: Record<string, string> = sessionToken
+              ? { 'X-Session-Token': sessionToken }
+              : { 'X-API-Key': apiKey };
             const vRes = await fetch(
               `${API_BASE_URL}/api/v2/verify/${data.verification_id}/status`,
-              { headers: { 'X-API-Key': apiKey } },
+              { headers: statusHeaders },
             );
             if (!mountedRef.current) return;
             if (vRes.ok) {
@@ -175,8 +183,8 @@ export const ContinueOnPhone: React.FC<ContinueOnPhoneProps> = ({
         </p>
         <button
           onClick={generateQR}
-          disabled={!apiKey.trim() || !userId.trim() || isGenerating}
-          style={{ background: '#22d3ee', color: '#080c14', border: 'none', borderRadius: 8, padding: '9px 0', width: '100%', fontWeight: 600, fontSize: 13, cursor: !apiKey.trim() || !userId.trim() || isGenerating ? 'not-allowed' : 'pointer', opacity: !apiKey.trim() || !userId.trim() || isGenerating ? 0.5 : 1 }}
+          disabled={(!sessionToken && (!apiKey.trim() || !userId.trim())) || isGenerating}
+          style={{ background: '#22d3ee', color: '#080c14', border: 'none', borderRadius: 8, padding: '9px 0', width: '100%', fontWeight: 600, fontSize: 13, cursor: (!sessionToken && (!apiKey.trim() || !userId.trim())) || isGenerating ? 'not-allowed' : 'pointer', opacity: (!sessionToken && (!apiKey.trim() || !userId.trim())) || isGenerating ? 0.5 : 1 }}
         >
           {isGenerating ? 'Generating\u2026' : 'Generate QR Code'}
         </button>

@@ -67,6 +67,8 @@ export interface LivenessResults {
 export interface InitializeResponse {
   success: boolean;
   verification_id: string;
+  session_token: string;
+  verification_url: string;
   verification_mode: string;
   status: VerificationStatus;
   current_step: number;

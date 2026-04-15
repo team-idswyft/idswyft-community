@@ -50,6 +50,7 @@ const UserVerificationPage: React.FC = () => {
   const navigate = useNavigate();
   const { slug } = useParams<{ slug?: string }>();
 
+  const sessionParam = searchParams.get('session') || '';
   const apiKey = searchParams.get('api_key') || process.env.REACT_APP_IDSWYFT_API_KEY || '';
   const userId = searchParams.get('user_id') || '';
   const redirectUrl = searchParams.get('redirect_url') || '';
@@ -59,7 +60,21 @@ const UserVerificationPage: React.FC = () => {
   const verificationMode = (searchParams.get('verification_mode') as 'full' | 'age_only') || undefined;
   const ageThreshold = searchParams.get('age_threshold') ? parseInt(searchParams.get('age_threshold')!, 10) : undefined;
 
-  const viewOnly = !apiKey || !userId;
+  // Deprecation warning for api_key in URL
+  if (apiKey && !sessionParam) {
+    console.warn('[Idswyft] Passing api_key in the URL is deprecated. Use session tokens instead. See: https://docs.idswyft.app/session-tokens');
+  }
+
+  // Session-based auth state (populated from session-info endpoint)
+  const [sessionToken] = useState<string>(sessionParam);
+  const [sessionVerificationId, setSessionVerificationId] = useState<string>('');
+  const [sessionUserId, setSessionUserId] = useState<string>('');
+  const [sessionMode, setSessionMode] = useState<string>('');
+  const [sessionAgeThreshold, setSessionAgeThreshold] = useState<number | undefined>(undefined);
+  const [sessionReady, setSessionReady] = useState(!sessionParam); // true immediately if no session param
+  const [sessionError, setSessionError] = useState<string>('');
+
+  const viewOnly = !sessionParam && (!apiKey || !userId);
 
   const [phase, setPhase] = useState<Phase>('choice');
   const [isMobile, setIsMobile] = useState(() =>
@@ -88,8 +103,39 @@ const UserVerificationPage: React.FC = () => {
 
   useEffect(() => { injectFonts(); }, []);
 
-  // Fetch page branding config (supports both api_key and slug-based lookup)
+  // Fetch session info when using session token (replaces api_key-based page-config)
   useEffect(() => {
+    if (!sessionParam) return;
+    fetch(`${API_BASE_URL}/api/v2/verify/session-info`, {
+      headers: { 'X-Session-Token': sessionParam },
+    })
+      .then(r => {
+        if (!r.ok) throw new Error(`HTTP ${r.status}`);
+        return r.json();
+      })
+      .then(data => {
+        setSessionVerificationId(data.verification_id);
+        setSessionUserId(data.user_id);
+        setSessionMode(data.verification_mode || 'full');
+        if (data.age_threshold != null) setSessionAgeThreshold(data.age_threshold);
+        if (data.branding) setBranding(data.branding);
+        if (data.page_builder_config) setPageConfig(data.page_builder_config);
+        setSessionReady(true);
+      })
+      .catch((err) => {
+        setSessionError(
+          err.message?.includes('410')
+            ? 'This verification link has expired. Please request a new one.'
+            : 'Invalid or expired verification link.'
+        );
+        setSessionReady(true);
+      });
+  }, [sessionParam]);
+
+  // Fetch page branding config (supports both api_key and slug-based lookup)
+  // Skipped when using session token — session-info already provides branding
+  useEffect(() => {
+    if (sessionParam) return; // session-info already handled branding
     const url = slug
       ? `${API_BASE_URL}/api/v2/verify/page-config/slug/${encodeURIComponent(slug)}`
       : apiKey
@@ -103,7 +149,7 @@ const UserVerificationPage: React.FC = () => {
         if (data?.page_builder_config) setPageConfig(data.page_builder_config);
       })
       .catch(() => {});
-  }, [apiKey, slug]);
+  }, [apiKey, slug, sessionParam]);
 
   // Track viewport width for responsive layout
   useEffect(() => {
@@ -113,6 +159,45 @@ const UserVerificationPage: React.FC = () => {
     setIsMobile(mq.matches);
     return () => mq.removeEventListener('change', handler);
   }, []);
+
+  // ── Effective values (session data takes precedence) ──────────────
+  const effectiveApiKey = sessionParam ? '' : apiKey; // not needed with session token
+  const effectiveUserId = sessionParam ? sessionUserId : userId;
+  const effectiveMode = (sessionParam ? sessionMode : verificationMode) as 'full' | 'age_only' | undefined;
+  const effectiveAgeThreshold = sessionParam ? sessionAgeThreshold : ageThreshold;
+
+  // Don't render until session info is loaded
+  if (!sessionReady) {
+    return (
+      <div style={{ background: C.bg, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ fontFamily: C.sans, color: C.muted, fontSize: '0.9rem' }}>Loading...</div>
+      </div>
+    );
+  }
+
+  // Session token was provided but failed to resolve
+  if (sessionParam && sessionError) {
+    return (
+      <div style={{ background: C.bg, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+        <div style={{ maxWidth: 440, width: '100%', textAlign: 'center' }}>
+          <img src="/idswyft-logo.png" alt="Idswyft" style={{ height: 36, margin: '0 auto 32px' }} />
+          <div style={{
+            width: 56, height: 56, borderRadius: '50%', margin: '0 auto 16px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24,
+            background: C.redDim, border: `1px solid ${C.red}`, color: C.red,
+          }}>
+            !
+          </div>
+          <h1 style={{ fontFamily: C.sans, fontSize: '1.3rem', fontWeight: 600, color: C.text, margin: '0 0 8px' }}>
+            Verification Unavailable
+          </h1>
+          <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, margin: 0 }}>
+            {sessionError}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   // ── Handlers ──────────────────────────────────────────────────────
   /** Append verification result params to the redirect URL */
@@ -190,9 +275,13 @@ const UserVerificationPage: React.FC = () => {
       const url = buildApiUrl(`/api/v2/verify/${verificationResult.verification_id}/address-document`);
       if (shouldUseSandbox()) url.searchParams.append('sandbox', 'true');
 
+      const authHeaders: Record<string, string> = sessionToken
+        ? { 'X-Session-Token': sessionToken }
+        : { 'X-API-Key': apiKey };
+
       const response = await fetch(url.toString(), {
         method: 'POST',
-        headers: { 'X-API-Key': apiKey },
+        headers: authHeaders,
         body: formData,
       });
 
@@ -266,16 +355,16 @@ const UserVerificationPage: React.FC = () => {
           fontFamily: C.sans, fontSize: '0.78rem', color: C.muted,
           margin: '0 0 8px', lineHeight: 1.5,
         }}>
-          This page requires <code style={{ fontFamily: C.mono, fontSize: '0.72rem', color: C.cyan }}>api_key</code> and{' '}
-          <code style={{ fontFamily: C.mono, fontSize: '0.72rem', color: C.cyan }}>user_id</code> URL
-          parameters to start a real verification. You're seeing a read-only preview.
+          This page requires a <code style={{ fontFamily: C.mono, fontSize: '0.72rem', color: C.cyan }}>session</code> token
+          (from <code style={{ fontFamily: C.mono, fontSize: '0.72rem', color: C.cyan }}>POST /api/v2/verify/initialize</code>)
+          to start a real verification. You're seeing a read-only preview.
         </p>
         <div style={{
           fontFamily: C.mono, fontSize: '0.68rem', color: C.dim,
           background: C.bg, borderRadius: 6, padding: '6px 10px',
           wordBreak: 'break-all',
         }}>
-          /user-verification?api_key=<span style={{ color: C.cyan }}>ik_your_api_key</span>&user_id=<span style={{ color: C.cyan }}>user-uuid</span>&verification_mode=<span style={{ color: C.cyan }}>age_only</span>&age_threshold=<span style={{ color: C.cyan }}>21</span>
+          /user-verification?session=<span style={{ color: C.cyan }}>session_token_from_initialize</span>
         </div>
       </div>
     </div>
@@ -288,10 +377,11 @@ const UserVerificationPage: React.FC = () => {
         <BackBtn />
         <div style={{ maxWidth: 440, width: '100%' }}>
           <ContinueOnPhone
-            apiKey={apiKey}
-            userId={userId}
-            verificationMode={verificationMode}
-            ageThreshold={ageThreshold}
+            apiKey={effectiveApiKey}
+            userId={effectiveUserId}
+            sessionToken={sessionToken || undefined}
+            verificationMode={effectiveMode}
+            ageThreshold={effectiveAgeThreshold}
             onComplete={(result) => {
               handleVerificationComplete({
                 verification_id: result.verification_id ?? 'mobile-handoff',
@@ -314,15 +404,17 @@ const UserVerificationPage: React.FC = () => {
       <div className="relative min-h-screen">
         <BackBtn />
         <EndUserVerification
-          apiKey={apiKey}
-          userId={userId}
+          apiKey={effectiveApiKey}
+          userId={effectiveUserId}
+          sessionToken={sessionToken || undefined}
+          sessionVerificationId={sessionVerificationId || undefined}
           redirectUrl={redirectUrl}
           theme={theme}
           onComplete={handleVerificationComplete}
           onRedirect={handleRedirect}
           allowedDocumentTypes={['passport', 'drivers_license', 'national_id']}
-          verificationMode={verificationMode}
-          ageThreshold={ageThreshold}
+          verificationMode={effectiveMode}
+          ageThreshold={effectiveAgeThreshold}
           branding={branding ?? undefined}
         />
       </div>

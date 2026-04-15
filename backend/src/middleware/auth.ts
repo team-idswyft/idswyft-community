@@ -223,9 +223,95 @@ export const authenticateHandoffToken = catchAsync(async (req: Request, res: Res
   }
 });
 
-// Flexible middleware: accepts API key OR handoff token.
+// Session token authentication — end-user verification pages use X-Session-Token
+// instead of X-API-Key. The token resolves to a verification_request, then to
+// developer + api_key. Tokens are HMAC-SHA256 hashed before DB lookup.
+export const authenticateSessionToken = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
+  const sessionToken = req.headers['x-session-token'] as string;
+
+  if (!sessionToken) {
+    throw new AuthenticationError('Session token is required. Include X-Session-Token header.');
+  }
+
+  // Validate format: 64 hex chars
+  if (!/^[0-9a-f]{64}$/.test(sessionToken)) {
+    throw new AuthenticationError('Invalid session token format');
+  }
+
+  // Hash the token before DB lookup — raw token never stored
+  const tokenHash = hashHandoffToken(sessionToken);
+
+  try {
+    // Look up verification_request by session_token_hash
+    const { data: verification, error: verError } = await supabase
+      .from('verification_requests')
+      .select('id, developer_id, session_token_expires_at, session_api_key_id')
+      .eq('session_token_hash', tokenHash)
+      .single();
+
+    if (verError || !verification) {
+      throw new AuthenticationError('Invalid session token');
+    }
+
+    // Check expiry
+    if (!verification.session_token_expires_at || new Date(verification.session_token_expires_at) < new Date()) {
+      throw new AuthenticationError('Session token has expired');
+    }
+
+    // Resolve developer
+    const { data: developer, error: devError } = await supabase
+      .from('developers')
+      .select('*')
+      .eq('id', verification.developer_id)
+      .single();
+
+    if (devError || !developer) {
+      throw new AuthenticationError('Associated developer not found');
+    }
+
+    // Resolve the exact API key that was used during initialization
+    let apiKeyRecord = null;
+    if (verification.session_api_key_id) {
+      const { data } = await supabase
+        .from('api_keys')
+        .select('*')
+        .eq('id', verification.session_api_key_id)
+        .single();
+      apiKeyRecord = data;
+    }
+
+    // Attach API key and developer to request (same shape as authenticateAPIKey)
+    req.apiKey = apiKeyRecord ? { ...apiKeyRecord, developer } as APIKey : undefined;
+    req.developer = developer as Developer;
+
+    // Bind this token to its specific verification — enforced by requireOwnedVerification
+    req.sessionVerificationId = verification.id;
+
+    // Check if developer account is suspended
+    if (req.developer?.status === 'suspended') {
+      throw new AuthorizationError('Developer account suspended');
+    }
+
+    logger.info('Session token authenticated', {
+      developerId: verification.developer_id,
+      verificationId: verification.id,
+    });
+
+    next();
+  } catch (error) {
+    if (error instanceof AuthenticationError || error instanceof AuthorizationError) {
+      throw error;
+    }
+
+    logger.error('Session token authentication error:', error);
+    throw new AuthenticationError('Authentication failed');
+  }
+});
+
+// Flexible middleware: accepts API key, handoff token, or session token.
 // If X-API-Key header is present → delegate to authenticateAPIKey.
 // If X-Handoff-Token header is present → delegate to authenticateHandoffToken.
+// If X-Session-Token header is present → delegate to authenticateSessionToken.
 export const authenticateAPIKeyOrHandoff = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
   if (req.headers['x-api-key']) {
     return authenticateAPIKey(req, res, next);
@@ -233,7 +319,10 @@ export const authenticateAPIKeyOrHandoff = catchAsync(async (req: Request, res: 
   if (req.headers['x-handoff-token']) {
     return authenticateHandoffToken(req, res, next);
   }
-  throw new AuthenticationError('API key or handoff token is required. Include X-API-Key or X-Handoff-Token header.');
+  if (req.headers['x-session-token']) {
+    return authenticateSessionToken(req, res, next);
+  }
+  throw new AuthenticationError('API key, handoff token, or session token is required. Include X-API-Key, X-Handoff-Token, or X-Session-Token header.');
 });
 
 // JWT authentication for admin users
@@ -698,6 +787,7 @@ export default {
   authenticateServiceToken,
   authenticateAPIKey,
   authenticateHandoffToken,
+  authenticateSessionToken,
   authenticateAPIKeyOrHandoff,
   authenticateJWT,
   authenticateDeveloperJWT,

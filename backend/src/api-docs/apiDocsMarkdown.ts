@@ -73,11 +73,15 @@ Content-Type: application/json
 {
   "success": true,
   "verification_id": "550e8400-e29b-41d4-a716-446655440001",
+  "session_token": "a1b2c3...64-char-hex-token",
+  "verification_url": "https://yourdomain.com/user-verification?session=a1b2c3...64-char-hex-token",
   "status": "AWAITING_FRONT",
   "current_step": 1,
   "total_steps": 5
 }
 \`\`\`
+
+**Session Tokens:** Every \`initialize\` call returns a \`session_token\` and \`verification_url\`. Redirect end users to \`verification_url\` — the token is scoped to this single verification and expires after 1 hour. The API key never touches the browser. Use \`X-Session-Token\` header instead of \`X-API-Key\` for subsequent API calls from the browser.
 
 ### Verification Flows (Custom Gate Pipeline)
 
@@ -465,6 +469,35 @@ Public endpoint — no authentication header required. Returns the developer's b
 - Response includes \`Cache-Control: public, max-age=300\` for client-side caching
 - Rate limited
 
+### Session Info (for session-token-based flows)
+
+\`\`\`
+GET /api/v2/verify/session-info
+X-Session-Token: <session_token>
+\`\`\`
+
+Returns metadata and branding for a session token (from \`initialize\` response). No API key needed.
+
+**Response (200):**
+
+\`\`\`json
+{
+  "verification_id": "550e8400-e29b-41d4-a716-446655440001",
+  "user_id": "user-123",
+  "status": "pending",
+  "verification_mode": "full",
+  "branding": {
+    "logo_url": "https://example.com/logo.png",
+    "accent_color": "#ff6600",
+    "company_name": "Acme Corp"
+  },
+  "page_builder_config": null
+}
+\`\`\`
+
+- Returns 410 if the session token has expired (1 hour TTL)
+- Rate limited
+
 ---
 
 ## Integration Options
@@ -477,15 +510,25 @@ ${siteUrl}/user-verification
 
 ### Option 1: Redirect (Easiest)
 
-Send users to the hosted page with a link or redirect. After verification, they return to your \`redirect_url\`.
+Initialize verification server-side, then redirect the user to the \`verification_url\` — no API key in the browser.
 
 \`\`\`javascript
-window.location.href = '${siteUrl}/user-verification'
-  + '?api_key=ik_your_key'
-  + '&user_id=user-123'
+// Server-side: initialize and get session token
+const res = await fetch('${siteUrl}/api/v2/verify/initialize', {
+  method: 'POST',
+  headers: { 'Content-Type': 'application/json', 'X-API-Key': 'ik_your_key' },
+  body: JSON.stringify({ user_id: 'user-123' }),
+});
+const { verification_url } = await res.json();
+// Redirect user to verification_url (includes session token)
+
+// Client-side: redirect
+window.location.href = verification_url
   + '&redirect_url=' + encodeURIComponent('https://yourapp.com/done')
   + '&theme=dark';
 \`\`\`
+
+> **Legacy:** \`?api_key=ik_...\` still works but is deprecated — API keys in URLs leak via browser history and referrer headers.
 
 **Redirect callback parameters:** When verification completes, the user is redirected to your \`redirect_url\` with these query parameters appended:
 

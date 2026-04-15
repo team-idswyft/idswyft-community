@@ -9,6 +9,7 @@ declare global {
 
 interface LiveCaptureWidgetProps {
   apiKey: string;
+  sessionToken?: string;
   verificationId: string;
   onComplete: () => void;
   onError?: (error: string) => void;
@@ -17,11 +18,15 @@ interface LiveCaptureWidgetProps {
 
 export const LiveCaptureWidget: React.FC<LiveCaptureWidgetProps> = ({
   apiKey,
+  sessionToken,
   verificationId,
   onComplete,
   onError,
   theme = 'light',
 }) => {
+  const authHeader: Record<string, string> = sessionToken
+    ? { 'X-Session-Token': sessionToken }
+    : { 'X-API-Key': apiKey };
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const animationRef = useRef<number | null>(null);
@@ -234,7 +239,7 @@ export const LiveCaptureWidget: React.FC<LiveCaptureWidgetProps> = ({
 
   const performCapture = async () => {
     const canvas = canvasRef.current;
-    if (!canvas || !apiKey || !verificationId) {
+    if (!canvas || (!apiKey && !sessionToken) || !verificationId) {
       const msg = 'Missing required capture data.';
       setError(msg);
       setChallengeState('waiting');
@@ -255,7 +260,7 @@ export const LiveCaptureWidget: React.FC<LiveCaptureWidgetProps> = ({
 
       const res = await fetch(`${API_BASE_URL}/api/v2/verify/${verificationId}/live-capture`, {
         method: 'POST',
-        headers: { 'X-API-Key': apiKey },
+        headers: authHeader,
         body: formData,
         signal: AbortSignal.timeout(30000),
       });
@@ -306,7 +311,7 @@ export const LiveCaptureWidget: React.FC<LiveCaptureWidgetProps> = ({
 
       const res = await fetch(`${API_BASE_URL}/api/v2/verify/${verificationId}/live-capture`, {
         method: 'POST',
-        headers: { 'X-API-Key': apiKey },
+        headers: authHeader,
         body: formData,
         signal: AbortSignal.timeout(30000),
       });

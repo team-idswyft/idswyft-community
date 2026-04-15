@@ -363,6 +363,7 @@ declare global {
       apiKey?: APIKey;
       user?: User;
       reviewer?: Reviewer;
+      sessionVerificationId?: string;
     }
   }
 }

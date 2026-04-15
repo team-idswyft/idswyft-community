@@ -7,6 +7,8 @@ import { LiveCaptureWidget } from './LiveCaptureWidget';
 export interface VerificationProps {
   apiKey: string;
   userId: string;
+  sessionToken?: string;
+  sessionVerificationId?: string;
   onComplete?: (result: VerificationResult) => void;
   onRedirect?: (url: string) => void;
   redirectUrl?: string;
@@ -83,6 +85,8 @@ interface FrontOCRData {
 const EndUserVerification: React.FC<VerificationProps> = ({
   apiKey,
   userId,
+  sessionToken,
+  sessionVerificationId,
   onComplete,
   onRedirect,
   redirectUrl,
@@ -157,9 +161,13 @@ const EndUserVerification: React.FC<VerificationProps> = ({
   };
 
   // ── API helpers ────────────────────────────────────────────────────────────
+  const authHeader: Record<string, string> = sessionToken
+    ? { 'X-Session-Token': sessionToken }
+    : { 'X-API-Key': apiKey };
+
   const apiGet = async (path: string) => {
     const res = await fetch(`${API_BASE_URL}${path}`, {
-      headers: { 'X-API-Key': apiKey },
+      headers: authHeader,
     });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     return res.json();
@@ -167,12 +175,19 @@ const EndUserVerification: React.FC<VerificationProps> = ({
 
   // ── Step 1: Initialize ─────────────────────────────────────────────────────
   const startVerification = async () => {
+    // When using session token, the verification is already initialized server-side
+    if (sessionToken && sessionVerificationId) {
+      setVerificationId(sessionVerificationId);
+      setCurrentStep(2);
+      return;
+    }
+
     if (!apiKey || !userId) { toast.error('Missing required parameters'); return; }
     setIsLoading(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/v2/verify/initialize`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', 'X-API-Key': apiKey },
+        headers: { 'Content-Type': 'application/json', ...authHeader },
         body: JSON.stringify({
           user_id: userId,
           ...(verificationMode && { verification_mode: verificationMode }),
@@ -213,7 +228,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
 
       const res = await fetch(`${API_BASE_URL}/api/v2/verify/${verificationId}/front-document`, {
         method: 'POST',
-        headers: { 'X-API-Key': apiKey },
+        headers: authHeader,
         body: formData,
       });
       if (!res.ok) {
@@ -312,7 +327,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
 
       const res = await fetch(`${API_BASE_URL}/api/v2/verify/${verificationId}/back-document`, {
         method: 'POST',
-        headers: { 'X-API-Key': apiKey },
+        headers: authHeader,
         body: formData,
       });
       if (!res.ok) {
@@ -423,7 +438,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
     try {
       const res = await fetch(`${API_BASE_URL}/api/v2/verify/${verificationId}/restart`, {
         method: 'POST',
-        headers: { 'X-API-Key': apiKey },
+        headers: authHeader,
       });
       if (!res.ok) {
         const err = await res.json();
@@ -690,6 +705,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
         return (
           <LiveCaptureWidget
             apiKey={apiKey}
+            sessionToken={sessionToken}
             verificationId={verificationId!}
             theme={theme}
             onComplete={() => {
@@ -889,6 +905,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
                   <ContinueOnPhone
                     apiKey={apiKey}
                     userId={userId}
+                    sessionToken={sessionToken}
                     verificationMode={verificationMode}
                     ageThreshold={ageThreshold}
                     onComplete={result => {

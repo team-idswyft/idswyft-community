@@ -1,7 +1,8 @@
 import express, { Request, Response } from 'express';
 import multer from 'multer';
 import { body, param } from 'express-validator';
-import { authenticateAPIKeyOrHandoff, authenticateUser, checkSandboxMode } from '@/middleware/auth.js';
+import crypto from 'crypto';
+import { authenticateAPIKeyOrHandoff, authenticateUser, checkSandboxMode, hashHandoffToken } from '@/middleware/auth.js';
 import { verificationRateLimit } from '@/middleware/rateLimit.js';
 import { catchAsync, ValidationError, FileUploadError } from '@/middleware/errorHandler.js';
 import { validate } from '@/middleware/validate.js';
@@ -762,6 +763,11 @@ async function fireWebhookEvent(
 // ─── Auth helper ──────────────────────────────
 
 async function requireOwnedVerification(req: Request, verificationId: string) {
+  // Session tokens are scoped to a single verification — enforce binding
+  if (req.sessionVerificationId && req.sessionVerificationId !== verificationId) {
+    throw new ValidationError('Session token is not authorized for this verification', 'verification_id', verificationId);
+  }
+
   const developerId = (req as any).developer.id;
   const verification = await verificationService.getVerificationRequestForDeveloper(verificationId, developerId);
   if (!verification) {
@@ -900,6 +906,35 @@ router.post('/initialize',
       sandbox: isSandbox,
     });
 
+    // ─── Generate session token ─────────────────────────────────
+    // Short-lived token for hosted verification page — replaces raw API key in URLs.
+    const sessionToken = crypto.randomBytes(32).toString('hex');
+    const sessionTokenHash = hashHandoffToken(sessionToken);
+    const sessionTokenExpiresAt = new Date(Date.now() + 60 * 60 * 1000); // 1 hour
+
+    const { error: tokenError } = await supabase
+      .from('verification_requests')
+      .update({
+        session_token_hash: sessionTokenHash,
+        session_token_expires_at: sessionTokenExpiresAt.toISOString(),
+        session_api_key_id: (req as any).apiKey?.id || null,
+      })
+      .eq('id', verificationRecord.id);
+
+    if (tokenError) {
+      logger.error('Failed to store session token', {
+        verificationId: verificationRecord.id,
+        error: tokenError.message,
+      });
+    }
+
+    // Build verification URL from Origin/Referer or FRONTEND_URL env
+    const frontendBase = process.env.FRONTEND_URL
+      || req.headers.origin
+      || req.headers.referer?.replace(/\/[^/]*$/, '')
+      || `${req.protocol}://${req.get('host')}`;
+    const verificationUrl = `${frontendBase}/user-verification?session=${sessionToken}`;
+
     const isAgeOnly = resolvedMode === 'age_only';
     const mapped = mapStatusForResponse(session.getState(), flow);
 
@@ -913,6 +948,8 @@ router.post('/initialize',
     res.status(201).json({
       success: true,
       verification_id: verificationRecord.id,
+      session_token: sessionToken,
+      verification_url: verificationUrl,
       verification_mode: resolvedMode,
       status: mapped.status,
       current_step: mapped.current_step,

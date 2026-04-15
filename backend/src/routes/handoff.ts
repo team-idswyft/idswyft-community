@@ -11,32 +11,69 @@ import { basicRateLimit } from '@/middleware/rateLimit.js';
 const router = express.Router();
 
 // POST /api/verify/handoff/create — desktop creates a session, returns token
+// Accepts either api_key in body OR X-Session-Token header for session-based auth.
 router.post('/create', basicRateLimit, catchAsync(async (req: Request, res: Response) => {
   const { api_key, user_id, source } = req.body;
+  const sessionToken = req.headers['x-session-token'] as string | undefined;
 
-  if (!api_key || !user_id) {
-    throw new ValidationError('api_key and user_id are required', 'body', req.body);
-  }
+  let resolvedApiKeyId: string;
+  let resolvedUserId: string;
 
-  // Validate the API key exists and is active
-  const keyHash = crypto
-    .createHmac('sha256', config.apiKeySecret)
-    .update(api_key)
-    .digest('hex');
+  if (sessionToken) {
+    // Session token auth — resolve api_key_id from the verification request
+    if (!/^[0-9a-f]{64}$/.test(sessionToken)) {
+      throw new AuthenticationError('Invalid session token format');
+    }
 
-  const { data: apiKeyRecord, error: keyError } = await supabase
-    .from('api_keys')
-    .select('id, developer_id, is_active, expires_at')
-    .eq('key_hash', keyHash)
-    .eq('is_active', true)
-    .single();
+    const stHash = hashHandoffToken(sessionToken);
+    const { data: verification, error: verError } = await supabase
+      .from('verification_requests')
+      .select('id, developer_id, user_id, session_token_expires_at, session_api_key_id')
+      .eq('session_token_hash', stHash)
+      .single();
 
-  if (keyError || !apiKeyRecord) {
-    throw new AuthenticationError('Invalid API key');
-  }
+    if (verError || !verification) {
+      throw new AuthenticationError('Invalid session token');
+    }
+    if (!verification.session_token_expires_at || new Date(verification.session_token_expires_at) < new Date()) {
+      throw new AuthenticationError('Session token has expired');
+    }
 
-  if (apiKeyRecord.expires_at && new Date(apiKeyRecord.expires_at) < new Date()) {
-    throw new AuthenticationError('API key has expired');
+    // Use the exact API key that was used during initialization
+    if (!verification.session_api_key_id) {
+      throw new AuthenticationError('No API key associated with this session');
+    }
+
+    resolvedApiKeyId = verification.session_api_key_id;
+    resolvedUserId = user_id || verification.user_id;
+  } else {
+    // Traditional api_key auth
+    if (!api_key || !user_id) {
+      throw new ValidationError('api_key and user_id are required', 'body', req.body);
+    }
+
+    const keyHash = crypto
+      .createHmac('sha256', config.apiKeySecret)
+      .update(api_key)
+      .digest('hex');
+
+    const { data: apiKeyRecord, error: keyError } = await supabase
+      .from('api_keys')
+      .select('id, developer_id, is_active, expires_at')
+      .eq('key_hash', keyHash)
+      .eq('is_active', true)
+      .single();
+
+    if (keyError || !apiKeyRecord) {
+      throw new AuthenticationError('Invalid API key');
+    }
+
+    if (apiKeyRecord.expires_at && new Date(apiKeyRecord.expires_at) < new Date()) {
+      throw new AuthenticationError('API key has expired');
+    }
+
+    resolvedApiKeyId = apiKeyRecord.id;
+    resolvedUserId = user_id;
   }
 
   const validSource = ['api', 'vaas', 'demo'].includes(source) ? source : 'api';
@@ -46,7 +83,7 @@ router.post('/create', basicRateLimit, catchAsync(async (req: Request, res: Resp
 
   const { error } = await supabase
     .from('mobile_handoff_sessions')
-    .insert({ token: tokenHash, api_key_id: apiKeyRecord.id, user_id, source: validSource, expires_at: expiresAt.toISOString() });
+    .insert({ token: tokenHash, api_key_id: resolvedApiKeyId, user_id: resolvedUserId, source: validSource, expires_at: expiresAt.toISOString() });
 
   if (error) {
     logger.error('Failed to create handoff session', {

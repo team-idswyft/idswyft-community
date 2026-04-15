@@ -10,7 +10,7 @@
 import express, { Request, Response } from 'express';
 import multer from 'multer';
 import { param, body } from 'express-validator';
-import { authenticateAPIKey } from '@/middleware/auth.js';
+import { authenticateAPIKeyOrHandoff } from '@/middleware/auth.js';
 import { verificationRateLimit } from '@/middleware/rateLimit.js';
 import { catchAsync, FileUploadError } from '@/middleware/errorHandler.js';
 import { validate } from '@/middleware/validate.js';
@@ -40,7 +40,7 @@ const VALID_ADDRESS_DOC_TYPES: AddressDocumentType[] = ['utility_bill', 'bank_st
  */
 router.post(
   '/:verification_id/address-document',
-  authenticateAPIKey,
+  authenticateAPIKeyOrHandoff,
   verificationRateLimit,
   upload.single('document') as any,
   [
@@ -164,7 +164,7 @@ router.post(
  */
 router.get(
   '/:verification_id/address-status',
-  authenticateAPIKey,
+  authenticateAPIKeyOrHandoff,
   [param('verification_id').isUUID()],
   validate,
   catchAsync(async (req: Request, res: Response) => {

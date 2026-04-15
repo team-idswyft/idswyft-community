@@ -147,6 +147,7 @@ vi.mock('@/middleware/auth.js', () => ({
   authenticateAPIKeyOrHandoff: mockApiKeyAuth,
   authenticateUser: (_req: any, _res: any, next: any) => next(),
   checkSandboxMode: (_req: any, _res: any, next: any) => next(),
+  hashHandoffToken: (token: string) => 'mock_hash_' + token.substring(0, 8),
 }));
 
 // Rate limit — passthrough
