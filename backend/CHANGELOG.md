@@ -5,6 +5,11 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.39] - 2026-04-15
+
+### Added
+- **Self-hosting guide** on the docs page (`/docs/guides#self-hosting`) — prerequisites, three install options, external database (BYOD) troubleshooting, and useful commands reference
+
 ## [1.8.38] - 2026-04-15
 
 ### Fixed
