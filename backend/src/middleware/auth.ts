@@ -157,11 +157,16 @@ export const authenticateHandoffToken = catchAsync(async (req: Request, res: Res
       throw new AuthenticationError('Handoff session has expired');
     }
 
-    // Allow both 'pending' and 'completed' sessions — the status tracks handoff
+    // Allow 'pending' and 'completed' sessions — the status tracks handoff
     // lifecycle (desktop notification), not authorization. Rejecting 'completed'
     // would cause a race condition when the mobile's PATCH /complete fires while
-    // a polling API call is still in-flight. Only reject truly terminal states.
-    if (session.status === 'expired' || session.status === 'failed') {
+    // a polling API call is still in-flight.
+    // 'failed' sessions are only allowed for the restart endpoint so the mobile
+    // user can retry after a failed verification. All other endpoints reject it.
+    if (session.status === 'expired') {
+      throw new AuthenticationError('Handoff session is no longer active');
+    }
+    if (session.status === 'failed' && !req.path.endsWith('/restart')) {
       throw new AuthenticationError('Handoff session is no longer active');
     }
 

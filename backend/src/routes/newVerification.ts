@@ -1963,6 +1963,18 @@ router.post('/:verification_id/restart',
       retryCount: currentRetryCount + 1,
     });
 
+    // If authenticated via handoff token, reset the session to 'pending' so the
+    // next attempt can complete the handoff lifecycle (PATCH /complete requires
+    // status = 'pending' for its atomic guard).
+    const handoffToken = req.headers['x-handoff-token'] as string;
+    if (handoffToken) {
+      const tokenHash = hashHandoffToken(handoffToken);
+      await supabase.from('mobile_handoff_sessions')
+        .update({ status: 'pending', result: null })
+        .eq('token', tokenHash)
+        .eq('status', 'failed');
+    }
+
     res.json({
       success: true,
       verification_id,
