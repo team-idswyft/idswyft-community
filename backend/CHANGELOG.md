@@ -5,6 +5,20 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.36] - 2026-04-15
+
+### Added
+- **Secure session tokens** — `POST /api/v2/verify/initialize` now returns a short-lived `session_token` and `verification_url`; end users load `/user-verification?session=<token>` instead of exposing the raw API key in the URL
+- **`GET /api/v2/verify/session-info`** — public endpoint to resolve session token to verification metadata and developer branding
+- **`authenticateSessionToken` middleware** — reuses HMAC handoff pattern; `X-Session-Token` header accepted on all verification endpoints
+- **Session token scope enforcement** — `requireOwnedVerification` ensures a session token can only access its bound verification
+
+### Changed
+- Address verification routes now accept session token and handoff token auth (not just API key)
+- Handoff creation accepts `X-Session-Token` header as alternative to `api_key` body field
+- SDK `InitializeResponse` type includes `session_token` and `verification_url` fields
+- Old `?api_key=` URL flow still works (backward compatible) with console deprecation warning
+
 ## [1.8.35] - 2026-04-14
 
 ### Added
