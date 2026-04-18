@@ -23,7 +23,7 @@
   "author": "Idswyft Team",
   "license": "MIT",
   "devDependencies": {
-    "concurrently": "^8.2.2"
+    "concurrently": "^9.2.1"
   },
   "workspaces": ["shared", "backend", "frontend", "engine"]
 }
