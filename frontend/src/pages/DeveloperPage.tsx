@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import React, { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { API_BASE_URL } from '../config/api'
 import { isCommunity } from '../config/edition'
@@ -149,7 +149,7 @@ export function DeveloperPage() {
   }
 
   return (
-    <div className="pattern-microprint pattern-faint pattern-fade-edges pattern-full" style={{ background: C.bg, fontFamily: C.sans, color: C.text, fontSize: 14, minHeight: '100vh' }}>
+    <div className="pattern-guilloche-rainbow pattern-full" style={{ background: C.bg, fontFamily: C.sans, color: C.text, fontSize: 14, minHeight: '100vh', '--pattern-opacity': '0.01' } as React.CSSProperties}>
       <div style={{ maxWidth: 1080, margin: '0 auto', padding: '48px 32px' }}>
 
         {/* Header */}

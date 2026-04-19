@@ -442,11 +442,11 @@ export function HomePageV2() {
         {/* Gradient mesh background */}
         <div className="hero-gradient-mesh" />
 
-        {/* Security pattern overlays — multi-color guilloche + crosshatch */}
-        <div className="pattern-guilloche-rainbow pattern-faint pattern-animate-slow"
-          style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }} />
-        <div className="pattern-crosshatch-rainbow pattern-faint pattern-animate"
-          style={{ position: 'absolute', inset: 0, pointerEvents: 'none' }} />
+        {/* Security pattern overlays — guilloche + crosshatch */}
+        <div className="pattern-guilloche-rainbow pattern-full pattern-animate-slow"
+          style={{ position: 'absolute', inset: 0, pointerEvents: 'none', '--pattern-opacity': '0.01' } as React.CSSProperties} />
+        <div className="pattern-crosshatch-rainbow pattern-full pattern-animate"
+          style={{ position: 'absolute', inset: 0, pointerEvents: 'none', '--pattern-opacity': '0.01' } as React.CSSProperties} />
 
         <div className="wrap" style={{ position: 'relative', zIndex: 1 }}>
           <div className="hero-grid" style={{
@@ -468,7 +468,7 @@ export function HomePageV2() {
                 built for <span style={{
                   color: 'var(--accent-ink)', background: 'var(--accent-soft)',
                   padding: '0 0.1em',
-                }}>engineers</span>,<br />
+                }}>devs</span>,<br />
                 <span style={{ color: 'var(--mid)' }}>not ticket queues.</span>
               </h1>
 

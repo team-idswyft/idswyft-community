@@ -220,7 +220,7 @@ export function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) 
   }
 
   return (
-    <div className="pattern-shield pattern-faint pattern-full" style={{ minHeight: 'calc(100vh - 120px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24 }}>
+    <div className="pattern-guilloche-rainbow pattern-full" style={{ minHeight: 'calc(100vh - 120px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 24, '--pattern-opacity': '0.01' } as React.CSSProperties}>
       <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: 40, width: '100%', maxWidth: 400 }}>
         <div style={{ fontFamily: C.mono, fontSize: 11, color: C.muted, letterSpacing: '0.08em', marginBottom: 24 }}>
           idswyft / developer-portal
