@@ -5,6 +5,14 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.41] - 2026-04-19
+
+### Changed
+- **v2 frontend design overhaul** — new technical editorial aesthetic: Geist + JetBrains Mono fonts, oklch green accents, sharp borders, light/dark theme toggle, sticky nav, grid-based layouts across all pages
+- **Hero section** — interactive demo panel with specimen ID images, v2 typography and copy, subtle guilloche security pattern background
+- **Developer portal** — guilloche security pattern background on auth gate and dashboard
+- **Security fixes** — XSS prevention in JSON syntax highlighter, stabilized React hook dependencies, removed duplicate font loading
+
 ## [1.8.40] - 2026-04-15
 
 ### Fixed
