@@ -6,6 +6,7 @@ import { Toaster } from 'react-hot-toast'
 import { Analytics } from '@vercel/analytics/react'
 import './index.css'
 import App from './App.tsx'
+// Theme initialized by inline <script> in index.html (anti-FOUC)
 
 const logrocketAppId = import.meta.env.VITE_LOGROCKET_APP_ID
 if (logrocketAppId) {
@@ -35,8 +36,9 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
           toastOptions={{
             duration: 4000,
             style: {
-              background: '#363636',
-              color: '#fff',
+              background: 'var(--panel)',
+              color: 'var(--ink)',
+              border: '1px solid var(--rule)',
             },
             success: {
               duration: 3000,

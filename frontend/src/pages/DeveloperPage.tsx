@@ -163,14 +163,14 @@ export function DeveloperPage() {
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
             <button
               onClick={() => setShowSettings(true)}
-              style={{ background: 'none', border: `1px solid ${C.border}`, color: C.muted, borderRadius: 6, padding: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+              style={{ background: 'none', border: `1px solid ${C.borderStrong}`, color: C.muted, borderRadius: 0, padding: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
               title="Settings"
             >
               <Cog6ToothIcon style={{ width: 16, height: 16 }} />
             </button>
             <button
               onClick={handleLogout}
-              style={{ background: 'none', border: `1px solid ${C.border}`, color: C.muted, borderRadius: 6, padding: '8px 14px', cursor: 'pointer', fontSize: 13 }}
+              style={{ background: 'none', border: `1px solid ${C.borderStrong}`, color: C.muted, borderRadius: 0, padding: '8px 14px', cursor: 'pointer', fontSize: 13, fontFamily: C.mono }}
             >
               Sign out
             </button>
@@ -180,7 +180,7 @@ export function DeveloperPage() {
         {/* Team setup banner — shown when no org admin exists */}
         {hasOrgAdmin === false && !teamBannerDismissed && (
           <div style={{
-            background: C.cyanDim, border: `1px solid ${C.cyanBorder}`, borderRadius: 10,
+            background: C.accentSoft, border: `1px solid ${C.cyanBorder}`, borderRadius: 0,
             padding: '16px 20px', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 16,
           }}>
             <div style={{ flex: 1 }}>
@@ -192,10 +192,8 @@ export function DeveloperPage() {
             </div>
             <button
               onClick={() => setShowSettings(true)}
-              style={{
-                background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
-                padding: '8px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600, whiteSpace: 'nowrap',
-              }}
+              className="btn-accent"
+              style={{ whiteSpace: 'nowrap' }}
             >
               Invite Admin
             </button>
@@ -224,12 +222,12 @@ export function DeveloperPage() {
 
         {/* Page Builder card */}
         <div style={{
-          background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10,
+          background: C.panel, border: `1px solid ${C.border}`, borderRadius: 0,
           padding: '20px 24px', marginTop: 24, display: 'flex', alignItems: 'center',
           justifyContent: 'space-between',
         }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <PaintBrushIcon style={{ width: 20, height: 20, color: C.cyan }} />
+            <PaintBrushIcon style={{ width: 20, height: 20, color: C.accent }} />
             <div>
               <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Page Builder</div>
               <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
@@ -239,11 +237,8 @@ export function DeveloperPage() {
           </div>
           <button
             onClick={() => navigate('/developer/page-builder')}
-            style={{
-              background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
-              padding: '8px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-              whiteSpace: 'nowrap',
-            }}
+            className="btn-accent"
+            style={{ whiteSpace: 'nowrap' }}
           >
             Open Builder
           </button>

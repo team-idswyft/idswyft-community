@@ -1,43 +1,39 @@
 /*
- * Glassmorphic Design System — HomePageV2
+ * v2 Design System — HomePageV2 overrides
  *
- * Frosted glass panels, gradient meshes, animated scan lines,
- * and staggered reveal animations. All CSS-only (no JS).
+ * Solid borders, sharp edges, CSS variable colors.
+ * Animations and responsive rules preserved.
  */
 
-/* ── Glass card base ──────────────────────────────────────── */
+/* ── Glass card base (v2: solid panel, no blur) ─────────── */
 
 .glass-card {
-  background: rgba(255, 255, 255, 0.03);
-  border: 1px solid rgba(255, 255, 255, 0.07);
-  border-radius: 14px;
-  backdrop-filter: blur(12px);
-  -webkit-backdrop-filter: blur(12px);
-  transition: transform 0.25s ease, border-color 0.25s ease, box-shadow 0.25s ease, background 0.25s ease;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 0;
+  transition: transform 0.25s ease, border-color 0.25s ease, background 0.25s ease;
 }
 
 /* ── Bento card hover ─────────────────────────────────────── */
 
 .bento-card:hover {
-  transform: translateY(-4px);
-  border-color: rgba(34, 211, 238, 0.15);
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(34, 211, 238, 0.05);
-  background: rgba(255, 255, 255, 0.05);
+  transform: translateY(-1px);
+  border-color: var(--ink);
 }
 
 /* ── Pipeline step hover ──────────────────────────────────── */
 
 .pipeline-glass-step:hover {
-  transform: translateY(-2px);
-  border-color: rgba(34, 211, 238, 0.2);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
+  transform: translateY(-1px);
+  border-color: var(--ink);
 }
 
 /* ── Pricing highlight card ───────────────────────────────── */
 
 .pricing-highlight {
-  border: 2px solid rgba(34, 211, 238, 0.3) !important;
-  background: rgba(34, 211, 238, 0.03) !important;
+  border: 2px solid var(--accent) !important;
+  background: var(--accent-soft) !important;
+  border-radius: 0 !important;
 }
 
 .pricing-badge {
@@ -45,13 +41,13 @@
   top: -12px;
   left: 50%;
   transform: translateX(-50%);
-  background: #22d3ee;
-  color: #080c14;
-  font-family: 'IBM Plex Mono', monospace;
+  background: var(--accent);
+  color: var(--paper);
+  font-family: var(--mono);
   font-size: 11px;
   font-weight: 600;
   padding: 4px 14px;
-  border-radius: 20px;
+  border-radius: 0;
   letter-spacing: 0.04em;
 }
 
@@ -62,7 +58,7 @@
   inset: 0;
   pointer-events: none;
   background:
-    radial-gradient(ellipse 600px 400px at 30% 20%, rgba(34, 211, 238, 0.06), transparent),
+    radial-gradient(ellipse 600px 400px at 30% 20%, color-mix(in oklab, var(--accent) 6%, transparent), transparent),
     radial-gradient(ellipse 500px 350px at 70% 60%, rgba(96, 165, 250, 0.04), transparent),
     radial-gradient(ellipse 400px 300px at 50% 40%, rgba(167, 139, 250, 0.03), transparent);
 }
@@ -70,7 +66,7 @@
 /* ── Hero gradient text ───────────────────────────────────── */
 
 .hero-gradient-text {
-  background: linear-gradient(135deg, #22d3ee 0%, #60a5fa 50%, #a78bfa 100%);
+  background: linear-gradient(135deg, var(--accent) 0%, #60a5fa 50%, #a78bfa 100%);
   -webkit-background-clip: text;
   background-clip: text;
   -webkit-text-fill-color: transparent;
@@ -79,7 +75,8 @@
 /* ── Scanning card ────────────────────────────────────────── */
 
 .scanning-card {
-  border-color: rgba(34, 211, 238, 0.2) !important;
+  border-color: var(--rule) !important;
+  border-radius: 0 !important;
 }
 
 /* Scan line animation */
@@ -103,25 +100,23 @@
   50%      { opacity: 1;   transform: translateX(4px); }
 }
 
-/* ── CTA button effects ───────────────────────────────────── */
+/* ── CTA button effects (v2: minimal, no glow) ──────────── */
 
 .cta-primary {
-  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  transition: transform 0.2s ease;
 }
 
 .cta-primary:hover {
-  transform: translateY(-2px);
-  box-shadow: 0 8px 24px rgba(34, 211, 238, 0.2);
+  transform: translateY(-1px);
 }
 
 .cta-secondary {
-  transition: transform 0.2s ease, border-color 0.2s ease, background 0.2s ease;
+  transition: transform 0.2s ease, border-color 0.2s ease;
 }
 
 .cta-secondary:hover {
-  transform: translateY(-2px);
-  border-color: rgba(255, 255, 255, 0.2);
-  background: rgba(255, 255, 255, 0.06);
+  transform: translateY(-1px);
+  border-color: var(--ink);
 }
 
 /* ── V2 scroll reveal ─────────────────────────────────────── */
@@ -152,13 +147,12 @@
 
 /* ── Verifiable Credentials section ──────────────────────── */
 
-/* Credential card with emerald trust accent */
+/* Credential card — v2: solid border, no glassmorphism */
 .vc-card {
   position: relative;
-  background:
-    linear-gradient(135deg, rgba(34, 211, 238, 0.04) 0%, rgba(34, 211, 238, 0.02) 100%);
-  border: 1px solid rgba(34, 211, 238, 0.15);
-  border-radius: 16px;
+  background: var(--panel);
+  border: 1px solid var(--rule);
+  border-radius: 0;
   overflow: hidden;
 }
 
@@ -171,15 +165,15 @@
       90deg,
       transparent,
       transparent 19px,
-      rgba(34, 211, 238, 0.02) 19px,
-      rgba(34, 211, 238, 0.02) 20px
+      color-mix(in oklab, var(--accent) 4%, transparent) 19px,
+      color-mix(in oklab, var(--accent) 4%, transparent) 20px
     ),
     repeating-linear-gradient(
       0deg,
       transparent,
       transparent 19px,
-      rgba(34, 211, 238, 0.02) 19px,
-      rgba(34, 211, 238, 0.02) 20px
+      color-mix(in oklab, var(--accent) 4%, transparent) 19px,
+      color-mix(in oklab, var(--accent) 4%, transparent) 20px
     );
   pointer-events: none;
 }
@@ -192,13 +186,13 @@
 @keyframes sealPulse {
   0%, 100% {
     box-shadow:
-      0 0 0 0 rgba(34, 211, 238, 0.3),
-      0 0 20px rgba(34, 211, 238, 0.1);
+      0 0 0 0 color-mix(in oklab, var(--accent) 30%, transparent),
+      0 0 20px color-mix(in oklab, var(--accent) 10%, transparent);
   }
   50% {
     box-shadow:
-      0 0 0 8px rgba(34, 211, 238, 0),
-      0 0 40px rgba(34, 211, 238, 0.2);
+      0 0 0 8px transparent,
+      0 0 40px color-mix(in oklab, var(--accent) 20%, transparent);
   }
 }
 
@@ -237,15 +231,11 @@
   to { stroke-dashoffset: 0; }
 }
 
-/* Credential shimmer on hover */
+/* Credential hover — v2: border change only */
 .vc-card:hover {
-  border-color: rgba(34, 211, 238, 0.3);
-  box-shadow:
-    0 16px 48px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(34, 211, 238, 0.08),
-    inset 0 1px 0 rgba(255, 255, 255, 0.03);
-  transform: translateY(-4px);
-  transition: all 0.35s ease;
+  border-color: var(--ink);
+  transform: translateY(-1px);
+  transition: all 0.25s ease;
 }
 
 /* Flow step connector animation */

@@ -59,8 +59,8 @@ export const LiveCaptureStep: React.FC<LiveCaptureStepProps> = ({
               onClick={onSkipLiveCapture}
               style={{
                 background: 'transparent', color: C.muted,
-                border: `1px solid ${C.border}`, borderRadius: 10,
-                padding: '11px 0', fontWeight: 600, fontSize: 13,
+                border: `1px solid ${C.border}`,
+                padding: '11px 0', fontFamily: C.mono, fontWeight: 500, fontSize: 13,
                 cursor: 'pointer', width: '100%',
               }}
             >

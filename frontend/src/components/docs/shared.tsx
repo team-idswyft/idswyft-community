@@ -17,7 +17,7 @@ import { C } from '../../theme';
 export const Pill = ({ children, color, bg }: { children: React.ReactNode; color: string; bg: string }) => (
   <span style={{
     fontFamily: C.mono, fontSize: '0.65rem', fontWeight: 600,
-    letterSpacing: '0.06em', padding: '2px 8px', borderRadius: 4,
+    letterSpacing: '0.06em', padding: '2px 8px', borderRadius: 0,
     background: bg, color, border: `1px solid ${color}30`,
   }}>{children}</span>
 );
@@ -51,7 +51,7 @@ export const Callout = ({ type = 'note', children }: { type?: 'note' | 'warning'
     tip:     { c: C.green,  bg: C.greenDim,  icon: <CheckCircleIcon className="w-4 h-4 flex-shrink-0" />, label: 'Tip' },
   }[type];
   return (
-    <div style={{ borderLeft: `3px solid ${cfg.c}`, background: cfg.bg, borderRadius: '0 6px 6px 0', padding: '12px 16px', marginBottom: 16, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
+    <div style={{ borderLeft: `3px solid ${cfg.c}`, background: cfg.bg, borderRadius: 0, padding: '12px 16px', marginBottom: 16, display: 'flex', gap: 10, alignItems: 'flex-start' }}>
       <span style={{ color: cfg.c, marginTop: 1 }}>{cfg.icon}</span>
       <div style={{ fontFamily: C.sans, fontSize: '0.85rem', color: C.text, lineHeight: 1.65 }}>
         <strong style={{ color: cfg.c, textTransform: 'uppercase', fontSize: '0.7rem', letterSpacing: '0.08em', marginRight: 8, fontFamily: C.mono }}>{cfg.label}</strong>
@@ -65,10 +65,13 @@ export const Callout = ({ type = 'note', children }: { type?: 'note' | 'warning'
 
 export const SectionAnchor = ({ id }: { id: string }) => <div id={id} style={{ scrollMarginTop: 88 }} />;
 
-export const H2 = ({ children }: { children: React.ReactNode }) => (
-  <h2 style={{ fontFamily: C.mono, fontSize: '1.35rem', fontWeight: 600, color: C.text, margin: '0 0 6px', display: 'flex', alignItems: 'center', gap: 10 }}>
-    <span style={{ color: C.cyan, fontWeight: 400 }}>#</span>{children}
-  </h2>
+export const H2 = ({ children, index }: { children: React.ReactNode; index?: string }) => (
+  <div className="section-head" style={{ display: 'grid', gridTemplateColumns: index ? '180px 1fr' : '1fr', gap: 16, padding: '32px 0 12px' }}>
+    {index && <span className="eyebrow" style={{ fontFamily: C.mono, fontSize: '0.68rem', fontWeight: 500, letterSpacing: '0.1em', textTransform: 'uppercase', color: C.muted }}>{index}</span>}
+    <h2 style={{ fontFamily: C.sans, fontSize: '1.35rem', fontWeight: 700, color: C.text, margin: 0, lineHeight: 1.1 }}>
+      {children}
+    </h2>
+  </div>
 );
 
 export const Lead = ({ children }: { children: React.ReactNode }) => (
@@ -183,9 +186,9 @@ export const Pre = ({ code, label }: { code: string; label?: string }) => {
   const language = inferLanguage(code, label);
   const extension = language === 'json' ? 'json' : language === 'bash' ? 'sh' : 'txt';
   return (
-    <div style={{ borderRadius: 8, border: `1px solid ${C.border}`, overflow: 'hidden', marginBottom: 16 }}>
+    <div className="code-panel" style={{ borderRadius: 0, border: `1px solid ${C.borderStrong}`, overflow: 'hidden', marginBottom: 16, background: C.codeBg }}>
       {label && (
-        <div style={{ background: C.surface, padding: '6px 20px', borderBottom: `1px solid ${C.border}`, fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.07em', textTransform: 'uppercase' }}>
+        <div style={{ background: C.surface, padding: '6px 20px', borderBottom: `1px solid ${C.borderStrong}`, fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.07em', textTransform: 'uppercase' }}>
           {label}
         </div>
       )}
@@ -209,10 +212,10 @@ export const CodeTabs = ({ curl, js, python, tab, onChange }: { curl?: string; j
   const code = activeTab === 'curl' ? curl! : activeTab === 'js' ? js : python;
   const meta = TAB_META[activeTab];
   return (
-    <div style={{ borderRadius: 8, border: `1px solid ${C.border}`, overflow: 'hidden', marginBottom: 16 }}>
-      <div style={{ display: 'flex', background: C.surface, borderBottom: `1px solid ${C.border}` }}>
+    <div className="code-panel" style={{ borderRadius: 0, border: `1px solid ${C.borderStrong}`, overflow: 'hidden', marginBottom: 16, background: C.codeBg }}>
+      <div style={{ display: 'flex', background: C.surface, borderBottom: `1px solid ${C.borderStrong}` }}>
         {tabs.map(t => (
-          <button key={t} onClick={() => onChange(t)} style={{ padding: '8px 18px', fontFamily: CODE_FONT, fontSize: '0.75rem', fontWeight: 500, color: activeTab === t ? C.cyan : C.muted, background: 'none', border: 'none', borderBottom: activeTab === t ? `2px solid ${C.cyan}` : '2px solid transparent', cursor: 'pointer', transition: 'color 0.15s' }}>
+          <button key={t} onClick={() => onChange(t)} className={`case-tab${activeTab === t ? ' active' : ''}`} style={{ padding: '10px 18px', fontFamily: C.mono, fontSize: '0.75rem', fontWeight: 500, color: activeTab === t ? C.text : C.muted, background: 'none', border: 'none', borderBottom: activeTab === t ? `2px solid ${C.text}` : '2px solid transparent', cursor: 'pointer', transition: 'color 0.15s' }}>
             {TAB_META[t].label}
           </button>
         ))}
@@ -228,10 +231,10 @@ export const EndpointCard = ({ step, method, path, title, badge, children }: {
   step?: number; method: 'GET' | 'POST'; path: string; title: string;
   badge?: { label: string; color: string; bg: string }; children: React.ReactNode;
 }) => (
-  <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, marginBottom: 28, overflow: 'hidden' }}>
-    <div style={{ padding: '14px 24px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 12, background: `linear-gradient(90deg, ${C.surface}, rgba(34,211,238,0.03))` }}>
+  <div className="card" style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 0, marginBottom: 28, overflow: 'hidden' }}>
+    <div style={{ padding: '14px 24px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 12, background: C.surface }}>
       {step && (
-        <div style={{ width: 26, height: 26, borderRadius: '50%', background: C.cyanDim, border: `1px solid ${C.cyanBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: C.mono, fontSize: '0.7rem', fontWeight: 700, color: C.cyan, flexShrink: 0 }}>{step}</div>
+        <div style={{ width: 26, height: 26, borderRadius: 0, background: C.cyanDim, border: `1px solid ${C.cyanBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: C.mono, fontSize: '0.7rem', fontWeight: 700, color: C.cyan, flexShrink: 0 }}>{step}</div>
       )}
       <div style={{ flex: 1 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 3, flexWrap: 'wrap' }}>
@@ -257,13 +260,13 @@ export const Pipeline = () => {
     { n: 5, label: 'Results', color: C.green },
   ];
   return (
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '24px 32px', marginBottom: 24 }}>
-      <p style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.1em', textTransform: 'uppercase', margin: '0 0 20px' }}>Verification Pipeline</p>
+    <div className="card" style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 0, padding: '24px 32px', marginBottom: 24 }}>
+      <p className="eyebrow" style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.1em', textTransform: 'uppercase', margin: '0 0 20px' }}>Verification Pipeline</p>
       <div style={{ display: 'flex', alignItems: 'flex-start', overflowX: 'auto', paddingBottom: 4 }}>
         {steps.map((s, i) => (
           <React.Fragment key={s.n}>
             <div style={{ textAlign: 'center', flexShrink: 0, minWidth: 80 }}>
-              <div style={{ width: 36, height: 36, borderRadius: '50%', background: `${s.color}18`, border: `1.5px solid ${s.color}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: C.mono, fontSize: '0.78rem', fontWeight: 700, color: s.color, margin: '0 auto 8px' }}>{s.n}</div>
+              <div style={{ width: 36, height: 36, borderRadius: 0, background: `${s.color}18`, border: `1.5px solid ${s.color}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: C.mono, fontSize: '0.78rem', fontWeight: 700, color: s.color, margin: '0 auto 8px' }}>{s.n}</div>
               <div style={{ fontFamily: C.sans, fontSize: '0.72rem', color: C.muted, lineHeight: 1.4, whiteSpace: 'nowrap' }}>{s.label}</div>
             </div>
             {i < steps.length - 1 && (
@@ -275,8 +278,8 @@ export const Pipeline = () => {
           </React.Fragment>
         ))}
       </div>
-      <div style={{ marginTop: 16, padding: '10px 14px', background: C.redDim, borderRadius: 6, border: `1px solid ${C.red}25`, fontFamily: C.sans, fontSize: '0.78rem', color: C.muted }}>
-        <span style={{ color: C.red, fontWeight: 600 }}>⚠ Cross-validation gate:</span>{' '}
+      <div style={{ marginTop: 16, padding: '10px 14px', background: C.redDim, borderRadius: 0, border: `1px solid ${C.red}25`, fontFamily: C.sans, fontSize: '0.78rem', color: C.muted }}>
+        <span style={{ color: C.red, fontWeight: 600 }}>Cross-validation gate:</span>{' '}
         If Step 3 (back-of-ID) fails cross-validation, status is set to <code style={{ fontFamily: C.mono, color: C.red }}>failed</code> and Step 4 is blocked.
       </div>
     </div>

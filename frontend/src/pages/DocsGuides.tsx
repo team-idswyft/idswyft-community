@@ -42,18 +42,18 @@ export const DocsGuides: React.FC = () => {
 
       {/* ══ INTEGRATION OPTIONS ══════════════════════════════════════════ */}
       <SectionAnchor id="integration" />
-      <H2>Integration Options</H2>
+      <H2 index="01">Integration Options</H2>
       <Lead>Three ways to add identity verification to your product — from zero-code to full control.</Lead>
 
       {/* ── Hosted page URL callout ── */}
-      <div style={{ background: `${C.cyan}11`, border: `1px solid ${C.cyan}33`, borderRadius: 10, padding: '16px 20px', marginBottom: 24 }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.cyan}`, borderRadius: 0, padding: '16px 20px', marginBottom: 24 }}>
         <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.text, margin: '0 0 8px', fontWeight: 600 }}>
           Hosted Verification Page
         </p>
         <p style={{ fontFamily: C.sans, fontSize: '0.83rem', color: C.muted, margin: '0 0 8px', lineHeight: 1.65 }}>
           Idswyft hosts a complete verification UI at the following URL. This is the page used by all three integration methods below — redirect, iframe, or SDK embed.
         </p>
-        <code style={{ fontFamily: C.mono, fontSize: '0.85rem', color: C.cyan, display: 'block', padding: '8px 12px', background: C.bg, borderRadius: 6, border: `1px solid ${C.border}` }}>
+        <code style={{ fontFamily: C.mono, fontSize: '0.85rem', color: C.cyan, display: 'block', padding: '8px 12px', background: C.bg, borderRadius: 0, border: `1px solid ${C.border}` }}>
           {siteUrl}/user-verification
         </code>
       </div>
@@ -79,7 +79,7 @@ export const DocsGuides: React.FC = () => {
             features: ['Modal or inline mode', 'onComplete / onError callbacks', 'postMessage communication', 'Best for: SPAs, React, Vue'],
           },
         ].map(opt => (
-          <div key={opt.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div key={opt.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontSize: '1.5rem' }}>{opt.emoji}</span>
               <span style={{ fontFamily: C.sans, fontWeight: 700, fontSize: '1rem', color: C.text }}>{opt.title}</span>
@@ -102,7 +102,7 @@ export const DocsGuides: React.FC = () => {
         <a href="/docs" style={{ color: C.cyan, textDecoration: 'none', fontFamily: C.mono, fontSize: 'inherit' }}>REST API</a> section.
       </p>
 
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 24 }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, overflow: 'hidden', marginBottom: 24 }}>
         <div style={{ padding: '12px 20px', borderBottom: `1px solid ${C.border}`, fontFamily: C.mono, fontSize: '0.72rem', color: C.muted, letterSpacing: '0.07em', textTransform: 'uppercase' }}>URL parameters</div>
         <div style={{ padding: '8px 20px' }}>
           <FieldRow name="api_key" type="string" req={true} desc="Your Idswyft API key." />
@@ -120,7 +120,7 @@ window.location.href = '${siteUrl}/user-verification'
   + '&redirect_url=' + encodeURIComponent('https://yourapp.com/done')
   + '&theme=dark';`} />
 
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 24 }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, overflow: 'hidden', marginBottom: 24 }}>
         <div style={{ padding: '12px 20px', borderBottom: `1px solid ${C.border}`, fontFamily: C.mono, fontSize: '0.72rem', color: C.muted, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Redirect callback parameters</div>
         <div style={{ padding: '12px 20px' }}>
           <p style={{ fontFamily: C.sans, fontSize: '0.83rem', color: C.muted, lineHeight: 1.65, margin: '0 0 12px' }}>
@@ -166,13 +166,13 @@ embed.open(sessionToken, {
 
       {/* ══ GUIDES & TUTORIALS ════════════════════════════════════════════ */}
       <SectionAnchor id="guides" />
-      <H2>Guides & Tutorials</H2>
+      <H2 index="02">Guides & Tutorials</H2>
       <Lead>Step-by-step walkthroughs for common integration patterns. Each guide includes production-ready code with proper error handling.</Lead>
 
       {/* ── Guide 1: End-to-End Tutorial ── */}
       <SectionAnchor id="guide-e2e" />
-      <h3 style={{ fontFamily: C.mono, fontSize: '1rem', fontWeight: 600, color: C.text, margin: '32px 0 8px' }}>
-        <span style={{ color: C.cyan, fontWeight: 400 }}>→</span> End-to-End Verification Tutorial
+      <h3 style={{ fontFamily: C.sans, fontSize: '1rem', fontWeight: 700, color: C.text, margin: '32px 0 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span className="eyebrow" style={{ fontFamily: C.mono, fontSize: '0.68rem', fontWeight: 500, color: C.muted, letterSpacing: '0.08em' }}>--</span> End-to-End Verification Tutorial
       </h3>
       <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
         A complete walkthrough with proper error handling, exponential backoff polling, and all 5 verification steps.
@@ -377,8 +377,8 @@ print('Liveness:', final.get('liveness_results', {}).get('liveness_passed'))`} /
 
       {/* ── Guide 2: Mobile Handoff ── */}
       <SectionAnchor id="guide-mobile" />
-      <h3 style={{ fontFamily: C.mono, fontSize: '1rem', fontWeight: 600, color: C.text, margin: '32px 0 8px' }}>
-        <span style={{ color: C.cyan, fontWeight: 400 }}>→</span> Mobile Handoff
+      <h3 style={{ fontFamily: C.sans, fontSize: '1rem', fontWeight: 700, color: C.text, margin: '32px 0 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span className="eyebrow" style={{ fontFamily: C.mono, fontSize: '0.68rem', fontWeight: 500, color: C.muted, letterSpacing: '0.08em' }}>--</span> Mobile Handoff
       </h3>
       <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
         Let users start verification on desktop and continue on their phone. Your backend creates a handoff
@@ -386,7 +386,7 @@ print('Liveness:', final.get('liveness_results', {}).get('liveness_passed'))`} /
         the hosted verification page and camera access works natively.
       </p>
 
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '14px 18px', marginBottom: 16 }}>
         <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>How handoff works</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 16px' }}>
           {[
@@ -480,7 +480,7 @@ while True:
   "expires_at": "2026-03-20T10:10:00Z"
 }`} />
 
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '14px 18px', marginBottom: 16 }}>
         <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>Best practices</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {[
@@ -499,21 +499,21 @@ while True:
 
       {/* ── Guide 3: Building Custom UI ── */}
       <SectionAnchor id="guide-custom-ui" />
-      <h3 style={{ fontFamily: C.mono, fontSize: '1rem', fontWeight: 600, color: C.text, margin: '32px 0 8px' }}>
-        <span style={{ color: C.cyan, fontWeight: 400 }}>→</span> Building a Custom Verification UI
+      <h3 style={{ fontFamily: C.sans, fontSize: '1rem', fontWeight: 700, color: C.text, margin: '32px 0 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span className="eyebrow" style={{ fontFamily: C.mono, fontSize: '0.68rem', fontWeight: 500, color: C.muted, letterSpacing: '0.08em' }}>--</span> Building a Custom Verification UI
       </h3>
       <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
         Patterns and best practices for building your own verification UI on top of the REST API.
       </p>
 
-      <h4 style={{ fontFamily: C.mono, fontSize: '0.85rem', fontWeight: 600, color: C.text, margin: '24px 0 12px' }}>Polling Strategies</h4>
+      <h4 style={{ fontFamily: C.sans, fontSize: '0.85rem', fontWeight: 700, color: C.text, margin: '24px 0 12px' }}>Polling Strategies</h4>
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 12, marginBottom: 24 }}>
         {[
           { title: 'Fixed Interval', color: C.amber, pros: 'Simple to implement', cons: 'Wastes requests if processing is slow', code: 'setInterval(() => poll(), 2000)' },
           { title: 'Exponential Backoff', color: C.green, pros: 'Efficient — reduces load over time', cons: 'Slightly slower on fast responses', code: 'delay = min(delay * 1.5, 10s)' },
           { title: 'SDK watch()', color: C.cyan, pros: 'Event-driven, auto-cleanup', cons: 'Requires @idswyft/sdk', code: 'sdk.watch(id).on(\'done\', cb)' },
         ].map(s => (
-          <div key={s.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '18px 20px' }}>
+          <div key={s.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '18px 20px' }}>
             <div style={{ fontFamily: C.mono, fontSize: '0.78rem', fontWeight: 600, color: s.color, marginBottom: 8 }}>{s.title}</div>
             <div style={{ fontFamily: C.sans, fontSize: '0.78rem', color: C.muted, marginBottom: 4 }}><span style={{ color: C.green }}>+</span> {s.pros}</div>
             <div style={{ fontFamily: C.sans, fontSize: '0.78rem', color: C.muted, marginBottom: 8 }}><span style={{ color: C.red }}>-</span> {s.cons}</div>
@@ -522,11 +522,11 @@ while True:
         ))}
       </div>
 
-      <h4 style={{ fontFamily: C.mono, fontSize: '0.85rem', fontWeight: 600, color: C.text, margin: '24px 0 12px' }}>Progress Indicators</h4>
+      <h4 style={{ fontFamily: C.sans, fontSize: '0.85rem', fontWeight: 700, color: C.text, margin: '24px 0 12px' }}>Progress Indicators</h4>
       <p style={{ fontFamily: C.sans, fontSize: '0.85rem', color: C.muted, lineHeight: 1.7, marginBottom: 12 }}>
         Map the <code style={{ fontFamily: C.mono, color: C.cyan }}>status</code> field to user-friendly step labels:
       </p>
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 24 }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, overflow: 'hidden', marginBottom: 24 }}>
         <div style={{ padding: '8px 20px' }}>
           {[
             { status: 'AWAITING_FRONT', label: 'Upload your ID (front)', step: '1/4' },
@@ -546,8 +546,8 @@ while True:
         </div>
       </div>
 
-      <h4 style={{ fontFamily: C.mono, fontSize: '0.85rem', fontWeight: 600, color: C.text, margin: '24px 0 12px' }}>Error Recovery</h4>
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 24 }}>
+      <h4 style={{ fontFamily: C.sans, fontSize: '0.85rem', fontWeight: 700, color: C.text, margin: '24px 0 12px' }}>Error Recovery</h4>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, overflow: 'hidden', marginBottom: 24 }}>
         <div style={{ padding: '8px 20px' }}>
           {[
             { code: '409 Conflict', action: 'Session was rejected by a gate. Start a new verification session.', color: C.orange },
@@ -563,7 +563,7 @@ while True:
         </div>
       </div>
 
-      <h4 style={{ fontFamily: C.mono, fontSize: '0.85rem', fontWeight: 600, color: C.text, margin: '24px 0 12px' }}>Displaying OCR Results</h4>
+      <h4 style={{ fontFamily: C.sans, fontSize: '0.85rem', fontWeight: 700, color: C.text, margin: '24px 0 12px' }}>Displaying OCR Results</h4>
       <Pre label="Parse OCR data from status response" code={`const status = await fetch(
   \`${apiUrl}/api/v2/verify/\${vid}/status\`,
   { headers: { 'X-API-Key': 'your-key' } },
@@ -592,19 +592,19 @@ if (status.ocr_data) {
 
       {/* ══ SELF-HOSTING GUIDE ════════════════════════════════════════════ */}
       <SectionAnchor id="self-hosting" />
-      <H2>Self-Hosting Guide</H2>
+      <H2 index="03">Self-Hosting Guide</H2>
       <Lead>Deploy Idswyft Community Edition on your own server with Docker Compose. Full control over your data and infrastructure.</Lead>
 
       {/* ── Prerequisites ── */}
       <SectionAnchor id="sh-prerequisites" />
-      <h3 style={{ fontFamily: C.mono, fontSize: '1rem', fontWeight: 600, color: C.text, margin: '32px 0 8px' }}>
-        <span style={{ color: C.cyan, fontWeight: 400 }}>→</span> Prerequisites
+      <h3 style={{ fontFamily: C.sans, fontSize: '1rem', fontWeight: 700, color: C.text, margin: '32px 0 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span className="eyebrow" style={{ fontFamily: C.mono, fontSize: '0.68rem', fontWeight: 500, color: C.muted, letterSpacing: '0.08em' }}>--</span> Prerequisites
       </h3>
       <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
         A clean Linux server (Debian 12+, Ubuntu 22.04+) with root access and a domain name pointed to the server's IP address.
       </p>
 
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 24 }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, overflow: 'hidden', marginBottom: 24 }}>
         <div style={{ padding: '12px 20px', borderBottom: `1px solid ${C.border}`, fontFamily: C.mono, fontSize: '0.72rem', color: C.muted, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Required software</div>
         <div style={{ padding: '8px 20px' }}>
           {[
@@ -632,8 +632,8 @@ docker compose version`} />
 
       {/* ── Install ── */}
       <SectionAnchor id="sh-install" />
-      <h3 style={{ fontFamily: C.mono, fontSize: '1rem', fontWeight: 600, color: C.text, margin: '32px 0 8px' }}>
-        <span style={{ color: C.cyan, fontWeight: 400 }}>→</span> Install
+      <h3 style={{ fontFamily: C.sans, fontSize: '1rem', fontWeight: 700, color: C.text, margin: '32px 0 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span className="eyebrow" style={{ fontFamily: C.mono, fontSize: '0.68rem', fontWeight: 500, color: C.muted, letterSpacing: '0.08em' }}>--</span> Install
       </h3>
       <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
         Three install options, from quickest to most control.
@@ -657,7 +657,7 @@ docker compose version`} />
             desc: 'Clone the repo and build Docker images locally from source. Useful for custom modifications.',
           },
         ].map(opt => (
-          <div key={opt.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div key={opt.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontSize: '1.5rem' }}>{opt.emoji}</span>
               <span style={{ fontFamily: C.sans, fontWeight: 700, fontSize: '1rem', color: C.text }}>{opt.title}</span>
@@ -681,7 +681,7 @@ bash install.sh --build`} />
       <p style={{ fontFamily: C.sans, fontSize: '0.85rem', color: C.muted, lineHeight: 1.65, marginBottom: 16 }}>
         The installer will interactively prompt for:
       </p>
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '14px 18px', marginBottom: 16 }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {[
             'Domain name — for HTTPS via Caddy reverse proxy',
@@ -703,14 +703,14 @@ bash install.sh --build`} />
 
       {/* ── External Database ── */}
       <SectionAnchor id="sh-external-db" />
-      <h3 style={{ fontFamily: C.mono, fontSize: '1rem', fontWeight: 600, color: C.text, margin: '32px 0 8px' }}>
-        <span style={{ color: C.cyan, fontWeight: 400 }}>→</span> External Database (BYOD)
+      <h3 style={{ fontFamily: C.sans, fontSize: '1rem', fontWeight: 700, color: C.text, margin: '32px 0 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span className="eyebrow" style={{ fontFamily: C.mono, fontSize: '0.68rem', fontWeight: 500, color: C.muted, letterSpacing: '0.08em' }}>--</span> External Database (BYOD)
       </h3>
       <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
         If using an external database provider (Railway, Supabase, RDS, etc.), keep these in mind:
       </p>
 
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 24 }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, overflow: 'hidden', marginBottom: 24 }}>
         <div style={{ padding: '8px 20px' }}>
           {[
             { issue: 'Internal hostnames', fix: 'Use the public connection string, not internal/private hostnames (e.g., use mainline.proxy.rlwy.net instead of postgres.railway.internal)' },
@@ -736,11 +736,11 @@ DATABASE_SSL_REJECT_UNAUTHORIZED=false`} />
 
       {/* ── Useful Commands ── */}
       <SectionAnchor id="sh-commands" />
-      <h3 style={{ fontFamily: C.mono, fontSize: '1rem', fontWeight: 600, color: C.text, margin: '32px 0 8px' }}>
-        <span style={{ color: C.cyan, fontWeight: 400 }}>→</span> Useful Commands
+      <h3 style={{ fontFamily: C.sans, fontSize: '1rem', fontWeight: 700, color: C.text, margin: '32px 0 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span className="eyebrow" style={{ fontFamily: C.mono, fontSize: '0.68rem', fontWeight: 500, color: C.muted, letterSpacing: '0.08em' }}>--</span> Useful Commands
       </h3>
 
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 24 }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, overflow: 'hidden', marginBottom: 24 }}>
         <div style={{ padding: '8px 20px' }}>
           {[
             { cmd: 'docker compose logs -f api', desc: 'Stream API logs in real-time' },

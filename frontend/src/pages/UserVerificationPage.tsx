@@ -91,8 +91,6 @@ const UserVerificationPage: React.FC = () => {
   // Page branding — fetched from developer config
   const [branding, setBranding] = useState<PageBranding | null>(null);
   const [pageConfig, setPageConfig] = useState<PageBuilderConfig | null>(null);
-  const accent = branding?.accent_color || C.cyan;
-  const accentDim = branding?.accent_color ? `${branding.accent_color}1a` : C.cyanDim;
   const accentBorder = branding?.accent_color ? `${branding.accent_color}40` : C.cyanBorder;
   const hasCustomBranding = !!(branding?.logo_url || branding?.company_name || branding?.accent_color);
 
@@ -169,8 +167,8 @@ const UserVerificationPage: React.FC = () => {
   // Don't render until session info is loaded
   if (!sessionReady) {
     return (
-      <div style={{ background: C.bg, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-        <div style={{ fontFamily: C.sans, color: C.muted, fontSize: '0.9rem' }}>Loading...</div>
+      <div style={{ background: 'var(--paper)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ fontFamily: C.sans, color: 'var(--mid)', fontSize: '0.9rem' }}>Loading...</div>
       </div>
     );
   }
@@ -178,20 +176,21 @@ const UserVerificationPage: React.FC = () => {
   // Session token was provided but failed to resolve
   if (sessionParam && sessionError) {
     return (
-      <div style={{ background: C.bg, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ background: 'var(--paper)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
         <div style={{ maxWidth: 440, width: '100%', textAlign: 'center' }}>
           <img src="/idswyft-logo.png" alt="Idswyft" style={{ height: 36, margin: '0 auto 32px' }} />
           <div style={{
-            width: 56, height: 56, borderRadius: '50%', margin: '0 auto 16px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24,
+            width: 56, height: 56, margin: '0 auto 16px',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            fontFamily: C.mono, fontSize: 13, fontWeight: 600, letterSpacing: '0.04em',
             background: C.redDim, border: `1px solid ${C.red}`, color: C.red,
           }}>
-            !
+            ERR
           </div>
-          <h1 style={{ fontFamily: C.sans, fontSize: '1.3rem', fontWeight: 600, color: C.text, margin: '0 0 8px' }}>
+          <h1 style={{ fontFamily: C.sans, fontSize: '1.3rem', fontWeight: 600, color: 'var(--ink)', margin: '0 0 8px' }}>
             Verification Unavailable
           </h1>
-          <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, margin: 0 }}>
+          <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: 'var(--mid)', margin: 0 }}>
             {sessionError}
           </p>
         </div>
@@ -311,13 +310,13 @@ const UserVerificationPage: React.FC = () => {
         <button
           onClick={() => phase === 'choice' ? handleGoBack() : setPhase('choice')}
           style={{
-            fontFamily: C.sans,
-            fontSize: '0.82rem',
+            fontFamily: C.mono,
+            fontSize: '0.75rem',
             fontWeight: 500,
-            color: C.muted,
-            background: C.surface,
-            border: `1px solid ${C.border}`,
-            borderRadius: 10,
+            letterSpacing: '0.04em',
+            color: 'var(--mid)',
+            background: 'var(--panel)',
+            border: '1px solid var(--rule)',
             padding: '8px 16px',
             display: 'inline-flex',
             alignItems: 'center',
@@ -334,37 +333,36 @@ const UserVerificationPage: React.FC = () => {
   // ── View-only banner ──────────────────────────────────────────────
   const ViewOnlyBanner = () => (
     <div style={{
-      background: C.amberDim,
-      border: `1px solid ${C.amber}35`,
-      borderRadius: 10,
+      background: 'var(--flag-soft)',
+      border: '1px solid var(--flag)',
       padding: '12px 18px',
       marginBottom: 24,
       display: 'flex',
       gap: 10,
       alignItems: 'flex-start',
     }}>
-      <span style={{ color: C.amber, fontSize: '1rem', flexShrink: 0, marginTop: 1 }}>⚠</span>
+      <span style={{ fontFamily: C.mono, fontSize: '0.7rem', fontWeight: 600, color: 'var(--flag)', flexShrink: 0, marginTop: 2 }}>WARN</span>
       <div>
         <p style={{
-          fontFamily: C.sans, fontSize: '0.82rem', fontWeight: 600, color: C.amber,
+          fontFamily: C.sans, fontSize: '0.82rem', fontWeight: 600, color: 'var(--flag)',
           margin: '0 0 4px',
         }}>
           Preview Mode
         </p>
         <p style={{
-          fontFamily: C.sans, fontSize: '0.78rem', color: C.muted,
+          fontFamily: C.sans, fontSize: '0.78rem', color: 'var(--mid)',
           margin: '0 0 8px', lineHeight: 1.5,
         }}>
-          This page requires a <code style={{ fontFamily: C.mono, fontSize: '0.72rem', color: C.cyan }}>session</code> token
-          (from <code style={{ fontFamily: C.mono, fontSize: '0.72rem', color: C.cyan }}>POST /api/v2/verify/initialize</code>)
+          This page requires a <code style={{ fontFamily: C.mono, fontSize: '0.72rem', color: 'var(--accent-ink)' }}>session</code> token
+          (from <code style={{ fontFamily: C.mono, fontSize: '0.72rem', color: 'var(--accent-ink)' }}>POST /api/v2/verify/initialize</code>)
           to start a real verification. You're seeing a read-only preview.
         </p>
         <div style={{
-          fontFamily: C.mono, fontSize: '0.68rem', color: C.dim,
-          background: C.bg, borderRadius: 6, padding: '6px 10px',
+          fontFamily: C.mono, fontSize: '0.68rem', color: 'var(--soft)',
+          background: 'var(--paper)', padding: '6px 10px',
           wordBreak: 'break-all',
         }}>
-          /user-verification?session=<span style={{ color: C.cyan }}>session_token_from_initialize</span>
+          /user-verification?session=<span style={{ color: 'var(--accent-ink)' }}>session_token_from_initialize</span>
         </div>
       </div>
     </div>
@@ -373,7 +371,7 @@ const UserVerificationPage: React.FC = () => {
   // ── Phase: mobile-qr ──────────────────────────────────────────────
   if (!viewOnly && phase === 'mobile-qr') {
     return (
-      <div style={{ background: C.bg, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ background: 'var(--paper)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
         <BackBtn />
         <div style={{ maxWidth: 440, width: '100%' }}>
           <ContinueOnPhone
@@ -428,28 +426,25 @@ const UserVerificationPage: React.FC = () => {
     const isSuccess = statusLabel === 'Verified';
     const isFailed = statusLabel === 'Failed';
     return (
-      <div style={{ background: C.bg, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ background: 'var(--paper)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
         <div style={{ maxWidth: 440, width: '100%', textAlign: 'center' }}>
           {branding?.logo_url ? (
             <img src={branding.logo_url} alt={branding.company_name || 'Logo'} style={{ height: 36, margin: '0 auto 32px', objectFit: 'contain' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
           ) : (
             <img src="/idswyft-logo.png" alt="Idswyft" style={{ height: 36, margin: '0 auto 32px' }} />
           )}
-          <div style={{
-            width: 56, height: 56, borderRadius: '50%', margin: '0 auto 16px',
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 24,
-            background: isSuccess ? C.greenDim : isFailed ? C.redDim : C.amberDim,
-            border: `1px solid ${isSuccess ? C.green : isFailed ? C.red : C.amber}`,
-            color: isSuccess ? C.green : isFailed ? C.red : C.amber,
+          <div className={isSuccess ? 'result-badge badge-success' : isFailed ? 'result-badge badge-error' : 'result-badge badge-warning'} style={{
+            margin: '0 auto 16px', display: 'inline-flex', padding: '8px 16px',
+            fontFamily: C.mono, fontSize: 12, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
           }}>
-            {isSuccess ? '✓' : isFailed ? '✗' : '⏳'}
+            {isSuccess ? 'PASS' : isFailed ? 'FAIL' : 'REVIEW'}
           </div>
-          <h1 style={{ fontFamily: C.sans, fontSize: '1.4rem', fontWeight: 600, color: C.text, margin: '0 0 8px' }}>
+          <h1 style={{ fontFamily: C.sans, fontSize: '1.4rem', fontWeight: 600, color: 'var(--ink)', margin: '16px 0 8px' }}>
             {verificationMode === 'age_only'
               ? isSuccess ? 'Age Verified' : 'Age Verification Failed'
               : `Verification ${statusLabel}`}
           </h1>
-          <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, margin: '0 0 24px' }}>
+          <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: 'var(--mid)', margin: '0 0 24px' }}>
             {verificationMode === 'age_only'
               ? isSuccess
                 ? `You meet the minimum age requirement of ${ageThreshold ?? 18}.`
@@ -461,36 +456,32 @@ const UserVerificationPage: React.FC = () => {
                 : 'Your verification is being reviewed. You will be notified of the result.'}
           </p>
           {verificationResult && (
-            <div style={{
-              background: C.surface, border: `1px solid ${C.border}`, borderRadius: 14,
-              padding: '16px 20px', textAlign: 'left', fontSize: '0.82rem',
-              display: 'flex', flexDirection: 'column', gap: 8,
-            }}>
+            <div className="result-grid" style={{ textAlign: 'left' }}>
               {verificationResult.confidence_score != null && (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: C.muted }}>Confidence</span>
-                  <span style={{ color: C.text, fontWeight: 600 }}>{Math.round(verificationResult.confidence_score * 100)}%</span>
-                </div>
+                <>
+                  <div>Confidence</div>
+                  <div style={{ color: 'var(--ink)', fontWeight: 600 }}>{Math.round(verificationResult.confidence_score * 100)}%</div>
+                </>
               )}
               {verificationResult.face_match_score != null && (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: C.muted }}>Face Match</span>
-                  <span style={{ color: C.text, fontWeight: 600 }}>{Math.round(verificationResult.face_match_score * 100)}%</span>
-                </div>
+                <>
+                  <div>Face Match</div>
+                  <div style={{ color: 'var(--ink)', fontWeight: 600 }}>{Math.round(verificationResult.face_match_score * 100)}%</div>
+                </>
               )}
               {verificationResult.liveness_score != null && (
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: C.muted }}>Liveness</span>
-                  <span style={{ color: C.text, fontWeight: 600 }}>{Math.round(verificationResult.liveness_score * 100)}%</span>
-                </div>
+                <>
+                  <div>Liveness</div>
+                  <div style={{ color: 'var(--ink)', fontWeight: 600 }}>{Math.round(verificationResult.liveness_score * 100)}%</div>
+                </>
               )}
             </div>
           )}
-          <p style={{ fontFamily: C.sans, fontSize: '0.75rem', color: C.dim, marginTop: 24 }}>
+          <p style={{ fontFamily: C.mono, fontSize: '0.72rem', color: 'var(--soft)', marginTop: 24, letterSpacing: '0.04em' }}>
             You can close this window.
           </p>
           {hasCustomBranding && showPoweredBy && (
-            <p style={{ fontFamily: C.sans, fontSize: '0.68rem', color: C.dim, marginTop: 12 }}>
+            <p style={{ fontFamily: C.mono, fontSize: '0.68rem', color: 'var(--soft)', marginTop: 12, letterSpacing: '0.04em' }}>
               Powered by Idswyft
             </p>
           )}
@@ -502,38 +493,34 @@ const UserVerificationPage: React.FC = () => {
   // ── Phase: address — optional proof-of-address after identity ─────
   if (!viewOnly && phase === 'address') {
     return (
-      <div style={{ background: C.bg, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+      <div style={{ background: 'var(--paper)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
         <div style={{ maxWidth: 480, width: '100%' }}>
           <div style={{ textAlign: 'center', marginBottom: 32 }}>
             <img src="/idswyft-logo.png" alt="Idswyft" style={{ height: 36, margin: '0 auto 24px' }} />
-            <div style={{
-              width: 48, height: 48, borderRadius: '50%', margin: '0 auto 16px',
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              background: C.greenDim, border: `1px solid ${C.green}`, color: C.green, fontSize: 20,
+            <div className="badge-success" style={{
+              margin: '0 auto 16px', display: 'inline-flex', padding: '6px 14px',
+              fontFamily: C.mono, fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
             }}>
-              ✓
+              PASS
             </div>
-            <h1 style={{ fontFamily: C.sans, fontSize: '1.4rem', fontWeight: 600, color: C.text, margin: '0 0 6px' }}>
+            <h1 style={{ fontFamily: C.sans, fontSize: '1.4rem', fontWeight: 600, color: 'var(--ink)', margin: '0 0 6px' }}>
               Identity Verified
             </h1>
-            <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, margin: '0 0 24px' }}>
+            <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: 'var(--mid)', margin: '0 0 24px' }}>
               Now upload a proof-of-address document to complete your verification.
             </p>
           </div>
 
           {!addressResult ? (
-            <div style={{
-              background: C.surface, border: `1px solid ${C.border}`,
-              borderRadius: 14, padding: 24, display: 'flex', flexDirection: 'column', gap: 16,
-            }}>
+            <div className="card" style={{ padding: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
-                <label style={{ display: 'block', fontFamily: C.sans, fontSize: '0.78rem', color: C.muted, marginBottom: 6, fontWeight: 500 }}>
+                <label className="form-label">
                   Document Type
                 </label>
                 <select
                   value={addressDocType}
                   onChange={(e) => setAddressDocType(e.target.value)}
-                  style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.text, borderRadius: 8, padding: '10px 14px', width: '100%', fontSize: '0.88rem', fontFamily: C.sans, outline: 'none' }}
+                  className="form-input"
                 >
                   <option value="utility_bill">Utility Bill</option>
                   <option value="bank_statement">Bank Statement</option>
@@ -541,15 +528,12 @@ const UserVerificationPage: React.FC = () => {
                 </select>
               </div>
 
-              <label htmlFor="address-upload" style={{
-                display: 'block', border: `2px dashed ${C.border}`, borderRadius: 10,
-                padding: '28px 16px', textAlign: 'center', cursor: 'pointer',
-              }}>
+              <label htmlFor="address-upload" className="file-upload-zone" style={{ display: 'block' }}>
                 <input type="file" accept="image/jpeg,image/png,application/pdf" onChange={handleAddressFileSelect} style={{ display: 'none' }} id="address-upload" />
-                <p style={{ fontFamily: C.sans, fontSize: '0.85rem', color: C.muted, margin: '0 0 4px' }}>
+                <p style={{ fontFamily: C.sans, fontSize: '0.85rem', color: 'var(--mid)', margin: '0 0 4px' }}>
                   {addressFile ? addressFile.name : 'Click to upload or drag and drop'}
                 </p>
-                <p style={{ fontFamily: C.sans, fontSize: '0.72rem', color: C.dim, margin: 0 }}>
+                <p style={{ fontFamily: C.mono, fontSize: '0.72rem', color: 'var(--soft)', margin: 0 }}>
                   {addressFile ? `${(addressFile.size / 1024 / 1024).toFixed(2)} MB` : 'JPEG, PNG, or PDF (max 10MB)'}
                 </p>
               </label>
@@ -557,11 +541,9 @@ const UserVerificationPage: React.FC = () => {
               <button
                 onClick={uploadAddressDocument}
                 disabled={!addressFile || addressUploading}
+                className={!addressFile || addressUploading ? 'btn' : 'btn-accent'}
                 style={{
-                  width: '100%', padding: '12px 0', borderRadius: 10, border: 'none',
-                  background: !addressFile || addressUploading ? C.dim : C.cyan,
-                  color: !addressFile || addressUploading ? C.muted : '#080c14',
-                  fontFamily: C.sans, fontSize: '0.88rem', fontWeight: 600,
+                  width: '100%', padding: '12px 0', justifyContent: 'center',
                   cursor: !addressFile || addressUploading ? 'not-allowed' : 'pointer',
                 }}
               >
@@ -570,56 +552,42 @@ const UserVerificationPage: React.FC = () => {
 
               <button
                 onClick={finishVerification}
+                className="btn-outline"
                 style={{
-                  width: '100%', padding: '10px 0', borderRadius: 10,
-                  background: 'transparent', color: C.muted,
-                  border: `1px solid ${C.border}`,
-                  fontFamily: C.sans, fontSize: '0.82rem', fontWeight: 500, cursor: 'pointer',
+                  width: '100%', padding: '10px 0', justifyContent: 'center',
+                  cursor: 'pointer',
                 }}
               >
-                Skip — I'll do this later
+                Skip -- I'll do this later
               </button>
             </div>
           ) : (
-            <div style={{
-              background: C.surface, border: `1px solid ${C.border}`,
-              borderRadius: 14, padding: 24, textAlign: 'center',
-            }}>
-              <div style={{
-                width: 48, height: 48, borderRadius: '50%', margin: '0 auto 12px',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 20,
-                background: addressResult.status === 'verified' ? C.greenDim : C.amberDim,
-                border: `1px solid ${addressResult.status === 'verified' ? C.green : C.amber}`,
-                color: addressResult.status === 'verified' ? C.green : C.amber,
+            <div className="card" style={{ padding: 24, textAlign: 'center' }}>
+              <div className={addressResult.status === 'verified' ? 'badge-success' : 'badge-warning'} style={{
+                margin: '0 auto 12px', display: 'inline-flex', padding: '6px 14px',
+                fontFamily: C.mono, fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
               }}>
-                {addressResult.status === 'verified' ? '✓' : '⚠'}
+                {addressResult.status === 'verified' ? 'PASS' : 'REVIEW'}
               </div>
-              <h3 style={{ fontFamily: C.sans, fontSize: '1.1rem', fontWeight: 600, color: C.text, margin: '0 0 8px' }}>
+              <h3 style={{ fontFamily: C.sans, fontSize: '1.1rem', fontWeight: 600, color: 'var(--ink)', margin: '0 0 8px' }}>
                 Address {addressResult.status === 'verified' ? 'Verified' : 'Under Review'}
               </h3>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6, textAlign: 'left', marginBottom: 20, fontSize: '0.82rem' }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: C.muted }}>Score</span>
-                  <span style={{ color: C.text, fontWeight: 600 }}>{Math.round((addressResult.score || 0) * 100)}%</span>
-                </div>
-                <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                  <span style={{ color: C.muted }}>Name Match</span>
-                  <span style={{ color: C.text, fontWeight: 600 }}>{Math.round((addressResult.name_match_score || 0) * 100)}%</span>
-                </div>
+              <div className="result-grid" style={{ textAlign: 'left', marginBottom: 20 }}>
+                <div>Score</div>
+                <div style={{ color: 'var(--ink)', fontWeight: 600 }}>{Math.round((addressResult.score || 0) * 100)}%</div>
+                <div>Name Match</div>
+                <div style={{ color: 'var(--ink)', fontWeight: 600 }}>{Math.round((addressResult.name_match_score || 0) * 100)}%</div>
                 {addressResult.address && (
-                  <div style={{ display: 'flex', justifyContent: 'space-between' }}>
-                    <span style={{ color: C.muted }}>Address</span>
-                    <span style={{ color: C.text, textAlign: 'right', maxWidth: 200 }}>{addressResult.address}</span>
-                  </div>
+                  <>
+                    <div>Address</div>
+                    <div style={{ color: 'var(--ink)' }}>{addressResult.address}</div>
+                  </>
                 )}
               </div>
               <button
                 onClick={finishVerification}
-                style={{
-                  width: '100%', padding: '12px 0', borderRadius: 10, border: 'none',
-                  background: C.cyan, color: '#080c14',
-                  fontFamily: C.sans, fontSize: '0.88rem', fontWeight: 600, cursor: 'pointer',
-                }}
+                className="btn-accent"
+                style={{ width: '100%', padding: '12px 0', justifyContent: 'center', cursor: 'pointer' }}
               >
                 Done
               </button>
@@ -632,7 +600,7 @@ const UserVerificationPage: React.FC = () => {
 
   // ── Phase: choice (default) — also shown in view-only mode ────────
   return (
-    <div style={{ background: C.bg, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+    <div style={{ background: 'var(--paper)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
       <BackBtn />
       <div style={{ maxWidth: 560, width: '100%' }}>
         {/* Logo */}
@@ -649,7 +617,7 @@ const UserVerificationPage: React.FC = () => {
 
         {/* Heading */}
         <div style={{ textAlign: 'center', marginBottom: 32 }}>
-          <h1 style={{ fontFamily: pbFont || C.sans, fontSize: '1.6rem', fontWeight: 600, color: pbText || C.text, margin: '0 0 8px' }}>
+          <h1 style={{ fontFamily: pbFont || C.sans, fontSize: '1.6rem', fontWeight: 600, color: pbText || 'var(--ink)', margin: '0 0 8px' }}>
             {verificationMode === 'age_only'
               ? 'Verify Your Age'
               : pageConfig?.headerTitle
@@ -658,7 +626,7 @@ const UserVerificationPage: React.FC = () => {
                   ? `Verify with ${branding.company_name}`
                   : 'Verify Your Identity'}
           </h1>
-          <p style={{ fontFamily: pbFont || C.sans, fontSize: '0.92rem', color: C.muted, margin: 0 }}>
+          <p style={{ fontFamily: pbFont || C.sans, fontSize: '0.92rem', color: 'var(--mid)', margin: 0 }}>
             {verificationMode === 'age_only'
               ? `Upload your ID to confirm you are ${ageThreshold ?? 18}+`
               : pageConfig?.headerSubtitle || 'Choose how you\'d like to complete verification'}
@@ -668,29 +636,28 @@ const UserVerificationPage: React.FC = () => {
         {/* Cards */}
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16 }}>
           {/* ── Mobile card (recommended) ── */}
-          <div style={{
-            background: C.surface, border: `1.5px solid ${accentBorder}`,
-            borderRadius: 14, padding: 24, display: 'flex', flexDirection: 'column', gap: 14,
+          <div className="card" style={{
+            border: `1px solid ${accentBorder}`,
+            padding: 24, display: 'flex', flexDirection: 'column', gap: 14,
             opacity: viewOnly ? 0.6 : 1,
           }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-              <span style={{
+              <span className="badge-success" style={{
                 fontFamily: C.mono, fontSize: '0.6rem', fontWeight: 600,
-                letterSpacing: '0.08em', padding: '2px 8px', borderRadius: 4,
-                background: accentDim, color: accent, border: `1px solid ${accentBorder}`,
+                letterSpacing: '0.08em', padding: '2px 8px',
               }}>
                 RECOMMENDED
               </span>
             </div>
-            <div style={{ fontSize: '2rem' }}>📱</div>
+            <div style={{ fontFamily: C.mono, fontSize: '0.8rem', color: 'var(--mid)', letterSpacing: '0.04em' }}>MOBILE</div>
             <div>
-              <h3 style={{ fontFamily: C.sans, fontSize: '1rem', fontWeight: 600, color: C.text, margin: '0 0 6px' }}>
+              <h3 style={{ fontFamily: C.sans, fontSize: '1rem', fontWeight: 600, color: 'var(--ink)', margin: '0 0 6px' }}>
                 Continue on Your Phone
               </h3>
-              <ul style={{ margin: 0, padding: 0, listStyle: 'none', display: 'flex', flexDirection: 'column', gap: 4 }}>
+              <ul className="checklist">
                 {['Better camera quality', 'Guided capture experience', 'Higher success rate'].map(b => (
-                  <li key={b} style={{ fontFamily: C.sans, fontSize: '0.78rem', color: C.muted, display: 'flex', gap: 6, alignItems: 'center' }}>
-                    <span style={{ color: C.green, fontSize: '0.65rem' }}>✓</span> {b}
+                  <li key={b} className="ok" style={{ fontSize: '0.78rem', borderBottom: 'none', padding: '2px 0' }}>
+                    <span className="dot">--</span> <span>{b}</span>
                   </li>
                 ))}
               </ul>
@@ -698,12 +665,9 @@ const UserVerificationPage: React.FC = () => {
             <button
               onClick={() => !viewOnly && setPhase('mobile-qr')}
               disabled={viewOnly}
+              className={viewOnly ? 'btn' : 'btn-accent'}
               style={{
-                marginTop: 'auto', width: '100%', padding: '12px 0',
-                background: viewOnly ? C.dim : accent,
-                color: viewOnly ? C.muted : '#080c14',
-                fontFamily: C.sans, fontSize: '0.88rem', fontWeight: 600,
-                border: 'none', borderRadius: 10,
+                marginTop: 'auto', width: '100%', padding: '12px 0', justifyContent: 'center',
                 cursor: viewOnly ? 'not-allowed' : 'pointer',
               }}
             >
@@ -711,33 +675,28 @@ const UserVerificationPage: React.FC = () => {
             </button>
           </div>
 
-          {/* ── Desktop card (secondary) — hidden on mobile ── */}
+          {/* ── Desktop card (secondary) -- hidden on mobile ── */}
           {!isMobile && (
-            <div style={{
-              background: C.surface, border: `1px solid ${C.border}`,
-              borderRadius: 14, padding: 24, display: 'flex', flexDirection: 'column', gap: 14,
+            <div className="card" style={{
+              padding: 24, display: 'flex', flexDirection: 'column', gap: 14,
               opacity: viewOnly ? 0.6 : 1,
             }}>
               <div style={{ height: 20 }} /> {/* spacer to align with RECOMMENDED pill */}
-              <div style={{ fontSize: '2rem' }}>💻</div>
+              <div style={{ fontFamily: C.mono, fontSize: '0.8rem', color: 'var(--mid)', letterSpacing: '0.04em' }}>DESKTOP</div>
               <div>
-                <h3 style={{ fontFamily: C.sans, fontSize: '1rem', fontWeight: 600, color: C.text, margin: '0 0 6px' }}>
+                <h3 style={{ fontFamily: C.sans, fontSize: '1rem', fontWeight: 600, color: 'var(--ink)', margin: '0 0 6px' }}>
                   Use This Device
                 </h3>
-                <p style={{ fontFamily: C.sans, fontSize: '0.78rem', color: C.muted, margin: 0, lineHeight: 1.55 }}>
+                <p style={{ fontFamily: C.sans, fontSize: '0.78rem', color: 'var(--mid)', margin: 0, lineHeight: 1.55 }}>
                   Upload photos and use your webcam to complete verification on this computer.
                 </p>
               </div>
               <button
                 onClick={() => !viewOnly && setPhase('desktop')}
                 disabled={viewOnly}
+                className="btn-outline"
                 style={{
-                  marginTop: 'auto', width: '100%', padding: '12px 0',
-                  background: 'transparent',
-                  color: viewOnly ? C.dim : C.text,
-                  fontFamily: C.sans, fontSize: '0.88rem', fontWeight: 600,
-                  border: `1px solid ${viewOnly ? C.border : C.borderStrong}`,
-                  borderRadius: 10,
+                  marginTop: 'auto', width: '100%', padding: '12px 0', justifyContent: 'center',
                   cursor: viewOnly ? 'not-allowed' : 'pointer',
                 }}
               >
@@ -748,7 +707,7 @@ const UserVerificationPage: React.FC = () => {
         </div>
 
         {hasCustomBranding && showPoweredBy && (
-          <p style={{ fontFamily: C.sans, fontSize: '0.68rem', color: C.dim, textAlign: 'center', marginTop: 20 }}>
+          <p style={{ fontFamily: C.mono, fontSize: '0.68rem', color: 'var(--soft)', textAlign: 'center', marginTop: 20, letterSpacing: '0.04em' }}>
             Powered by Idswyft
           </p>
         )}

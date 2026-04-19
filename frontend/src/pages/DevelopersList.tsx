@@ -148,9 +148,8 @@ export function DevelopersList() {
         padding: '32px 24px', textAlign: 'center',
       }}>
         <div style={{
-          background: C.panel, borderRadius: 16, padding: '48px 32px',
-          border: `1px solid ${C.border}`, maxWidth: 400, backdropFilter: 'blur(12px)',
-        }}>
+          background: C.panel, padding: '48px 32px',
+          border: `1px solid ${C.border}`, maxWidth: 400,         }}>
           <ComputerDesktopIcon style={{ width: 48, height: 48, color: C.cyan, margin: '0 auto 20px' }} />
           <h2 style={{ color: C.text, fontSize: 20, fontWeight: 600, margin: '0 0 12px', fontFamily: C.sans }}>
             Desktop Required
@@ -161,8 +160,7 @@ export function DevelopersList() {
           <button
             onClick={() => navigate(-1)}
             style={{
-              background: 'none', border: `1px solid ${C.border}`, borderRadius: 8,
-              color: C.text, padding: '10px 24px', cursor: 'pointer', fontFamily: C.sans,
+              background: 'none', border: `1px solid ${C.border}`,               color: C.text, padding: '10px 24px', cursor: 'pointer', fontFamily: C.sans,
               fontSize: 14, fontWeight: 500, transition: 'border-color 0.2s',
             }}
             onMouseEnter={e => (e.currentTarget.style.borderColor = C.cyan)}
@@ -205,26 +203,16 @@ export function DevelopersList() {
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <button
               onClick={() => navigate('/admin/verifications')}
-              style={{
-                background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8,
-                color: C.muted, padding: '8px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-                fontFamily: C.sans, fontSize: 13, transition: 'all 0.15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = C.cyanBorder; e.currentTarget.style.color = C.cyan }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.muted }}
+              className="btn-secondary"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 13 }}
             >
               <ShieldCheckIcon style={{ width: 14, height: 14 }} />
               Verifications
             </button>
             <button
               onClick={() => fetchDevelopers()}
-              style={{
-                background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8,
-                color: C.muted, padding: '8px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-                fontFamily: C.sans, fontSize: 13, transition: 'all 0.15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = C.cyanBorder; e.currentTarget.style.color = C.cyan }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.muted }}
+              className="btn-secondary"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 13 }}
             >
               <ArrowPathIcon style={{ width: 14, height: 14 }} />
               Refresh
@@ -235,13 +223,10 @@ export function DevelopersList() {
                 clearCsrfToken()
                 navigate('/admin/login')
               }}
-              style={{
-                background: 'none', border: `1px solid ${C.border}`, borderRadius: 8,
-                color: C.muted, padding: '8px 16px', cursor: 'pointer',
-                fontFamily: C.sans, fontSize: 13, transition: 'all 0.15s',
-              }}
+              className="btn-outline"
+              style={{ padding: '8px 16px', fontSize: 13 }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = C.red; e.currentTarget.style.color = C.red }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.muted }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--rule)'; e.currentTarget.style.color = 'var(--ink)' }}
             >
               Sign Out
             </button>
@@ -257,9 +242,8 @@ export function DevelopersList() {
             { label: 'With Activity', value: withKeysCount, color: C.cyan, icon: KeyIcon },
           ].map(s => (
             <div key={s.label} style={{
-              background: C.panel, border: `1px solid ${C.border}`, borderRadius: 10, padding: '16px 20px',
-              backdropFilter: 'blur(12px)',
-            }}>
+              background: C.panel, border: `1px solid ${C.border}`, padding: '16px 20px',
+                          }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
                 {React.createElement(s.icon, { style: { width: 14, height: 14, color: s.color } })}
                 <span style={{ color: C.dim, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
@@ -276,9 +260,7 @@ export function DevelopersList() {
         {/* ── Search Bar ── */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16,
-          background: C.panel, border: `1px solid ${C.border}`, borderRadius: 10,
-          padding: '12px 16px', backdropFilter: 'blur(12px)',
-        }}>
+          background: C.panel, border: `1px solid ${C.border}`, padding: '12px 16px',         }}>
           <div style={{ position: 'relative', flex: 1, maxWidth: 400 }}>
             <MagnifyingGlassIcon style={{ width: 14, height: 14, color: C.dim, position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)' }} />
             <input
@@ -287,8 +269,7 @@ export function DevelopersList() {
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               style={{
-                background: C.surface, border: `1px solid ${C.border}`, borderRadius: 6,
-                padding: '6px 10px 6px 30px', color: C.text, fontSize: 12, fontFamily: C.mono,
+                background: C.surface, border: `1px solid ${C.border}`,                 padding: '6px 10px 6px 30px', color: C.text, fontSize: 12, fontFamily: C.mono,
                 width: '100%', outline: 'none',
               }}
               onFocus={e => (e.currentTarget.style.borderColor = C.cyanBorder)}
@@ -302,9 +283,7 @@ export function DevelopersList() {
 
         {/* ── Table ── */}
         <div style={{
-          background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12,
-          overflow: 'auto', backdropFilter: 'blur(12px)',
-        }}>
+          background: C.panel, border: `1px solid ${C.border}`, overflow: 'auto',         }}>
           {/* Table header */}
           <div style={{
             display: 'grid', gridTemplateColumns: '40px 1.5fr 2fr 1.5fr 100px 100px 130px', minWidth: 860,
@@ -313,7 +292,7 @@ export function DevelopersList() {
             {['', 'Name', 'Email', 'Company', 'Verified', 'Verifications', 'Signed Up'].map((h, i) => (
               <div key={i} style={{
                 color: C.dim, fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
-                letterSpacing: '0.1em', fontFamily: C.sans,
+                letterSpacing: '0.1em', fontFamily: C.mono,
               }}>
                 {h}
               </div>
@@ -335,8 +314,7 @@ export function DevelopersList() {
               <XCircleIcon style={{ width: 32, height: 32, color: C.red, margin: '0 auto 12px' }} />
               <div style={{ color: C.red, fontSize: 14, marginBottom: 8 }}>{error}</div>
               <button onClick={fetchDevelopers} style={{
-                background: C.redDim, border: `1px solid rgba(248,113,113,0.3)`, borderRadius: 6,
-                color: C.red, padding: '6px 16px', cursor: 'pointer', fontSize: 12, fontFamily: C.sans,
+                background: C.redDim, border: `1px solid rgba(248,113,113,0.3)`, color: C.red, padding: '6px 16px', cursor: 'pointer', fontSize: 12, fontFamily: C.mono,
               }}>
                 Retry
               </button>
@@ -405,7 +383,7 @@ export function DevelopersList() {
                       <span style={{
                         display: 'inline-flex', alignItems: 'center', gap: 4,
                         background: C.greenDim, border: `1px solid rgba(52,211,153,0.3)`,
-                        borderRadius: 6, padding: '2px 8px',
+                        padding: '2px 8px',
                         color: C.green, fontSize: 11, fontWeight: 600,
                       }}>
                         <CheckBadgeIcon style={{ width: 12, height: 12 }} />
@@ -415,7 +393,7 @@ export function DevelopersList() {
                       <span style={{
                         display: 'inline-flex', alignItems: 'center', gap: 4,
                         background: C.amberDim, border: `1px solid rgba(251,191,36,0.3)`,
-                        borderRadius: 6, padding: '2px 8px',
+                        padding: '2px 8px',
                         color: C.amber, fontSize: 11, fontWeight: 600,
                       }}>
                         No
@@ -451,7 +429,7 @@ export function DevelopersList() {
                           Verification Breakdown
                         </div>
                         <div style={{
-                          background: C.codeBg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 16,
+                          background: C.codeBg, border: `1px solid ${C.border}`, padding: 16,
                         }}>
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(5, 1fr)', gap: 12 }}>
                             {[
@@ -480,7 +458,7 @@ export function DevelopersList() {
                           Developer Details
                         </div>
                         <div style={{
-                          background: C.codeBg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 16,
+                          background: C.codeBg, border: `1px solid ${C.border}`, padding: 16,
                         }}>
                           <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                             <tbody>
@@ -539,9 +517,8 @@ export function DevelopersList() {
               disabled={page <= 1}
               onClick={() => setPage(p => Math.max(1, p - 1))}
               style={{
-                background: C.surface, border: `1px solid ${C.border}`, borderRadius: 6,
-                color: page <= 1 ? C.dim : C.muted, padding: '6px 14px', cursor: page <= 1 ? 'default' : 'pointer',
-                fontSize: 12, fontFamily: C.sans, opacity: page <= 1 ? 0.5 : 1,
+                background: C.surface, border: `1px solid ${C.border}`,                 color: page <= 1 ? C.dim : C.muted, padding: '6px 14px', cursor: page <= 1 ? 'default' : 'pointer',
+                fontSize: 12, fontFamily: C.mono, opacity: page <= 1 ? 0.5 : 1,
               }}
             >
               Previous
@@ -553,9 +530,8 @@ export function DevelopersList() {
               disabled={page >= totalPages}
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
               style={{
-                background: C.surface, border: `1px solid ${C.border}`, borderRadius: 6,
-                color: page >= totalPages ? C.dim : C.muted, padding: '6px 14px', cursor: page >= totalPages ? 'default' : 'pointer',
-                fontSize: 12, fontFamily: C.sans, opacity: page >= totalPages ? 0.5 : 1,
+                background: C.surface, border: `1px solid ${C.border}`,                 color: page >= totalPages ? C.dim : C.muted, padding: '6px 14px', cursor: page >= totalPages ? 'default' : 'pointer',
+                fontSize: 12, fontFamily: C.mono, opacity: page >= totalPages ? 0.5 : 1,
               }}
             >
               Next

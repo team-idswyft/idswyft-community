@@ -1302,7 +1302,7 @@ const DemoPage: React.FC = () => {
   // ── Render Live Capture (stays in parent — refs are tightly coupled) ──
 
   const renderLiveCapture = () => (
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: 24, marginBottom: 20 }}>
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, padding: 24, marginBottom: 20 }}>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
         <h3 style={{ fontFamily: C.mono, fontSize: 14, fontWeight: 600, color: C.text, margin: 0 }}>Live Capture</h3>
         <button
@@ -1327,12 +1327,12 @@ const DemoPage: React.FC = () => {
         <>
           {cameraState === 'prompt' && (
             <div style={{ textAlign: 'center', padding: '32px 0' }}>
-              <CameraIcon style={{ width: 40, height: 40, margin: '0 auto 12px', color: C.cyan }} />
+              <CameraIcon style={{ width: 40, height: 40, margin: '0 auto 12px', color: C.accent }} />
               <h4 style={{ fontSize: 15, fontWeight: 600, color: C.text, marginBottom: 8 }}>Ready for Live Capture</h4>
               <p style={{ color: C.muted, fontSize: 13, marginBottom: 20 }}>We'll use your camera to take a selfie for identity verification.</p>
               <button
                 onClick={initializeCamera}
-                style={{ background: C.cyan, color: C.bg, border: 'none', borderRadius: 8, padding: '10px 24px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
+                style={{ background: C.accent, color: C.bg, border: `1px solid ${C.accent}`, padding: '10px 24px', fontFamily: C.mono, fontWeight: 500, fontSize: 13, cursor: 'pointer' }}
               >
                 Start Camera
               </button>
@@ -1341,21 +1341,21 @@ const DemoPage: React.FC = () => {
 
           {cameraState === 'initializing' && (
             <div style={{ textAlign: 'center', padding: '32px 0' }}>
-              <div className="animate-spin" style={{ width: 40, height: 40, borderRadius: '50%', border: `3px solid ${C.border}`, borderTopColor: C.cyan, margin: '0 auto 12px' }} />
+              <div className="animate-spin" style={{ width: 40, height: 40, borderRadius: '50%', border: `3px solid ${C.border}`, borderTopColor: C.accent, margin: '0 auto 12px' }} />
               <p style={{ color: C.muted, fontSize: 13 }}>Initializing camera...</p>
             </div>
           )}
 
           {cameraState === 'ready' && (
             <div>
-              <div style={{ position: 'relative', background: '#000', borderRadius: 8, overflow: 'hidden', minHeight: 240, height: 320, marginBottom: 16 }}>
+              <div style={{ position: 'relative', background: '#000', overflow: 'hidden', minHeight: 240, height: 320, marginBottom: 16, border: `1px solid ${C.border}` }}>
                 <video
                   ref={videoElementRef}
                   autoPlay
                   playsInline
                   muted
                   controls={false}
-                  style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover', backgroundColor: '#000', borderRadius: 8 }}
+                  style={{ display: 'block', width: '100%', height: '100%', objectFit: 'cover', backgroundColor: '#000' }}
                   onLoadedMetadata={() => {
                     if (videoElementRef.current) {
                       videoElementRef.current.play().catch(err => { console.error('Video play error:', err); });
@@ -1368,13 +1368,13 @@ const DemoPage: React.FC = () => {
                   style={{ display: 'block', position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', pointerEvents: 'none', backgroundColor: 'transparent', zIndex: 20 }}
                 />
                 <div style={{ position: 'absolute', top: 12, right: 12 }}>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: faceDetected ? 'rgba(52,211,153,0.85)' : 'rgba(248,113,113,0.85)', borderRadius: 20, padding: '4px 10px', fontSize: 12, color: '#fff', fontWeight: 500 }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, background: faceDetected ? C.green : C.red, padding: '4px 10px', fontSize: 12, color: '#fff', fontFamily: C.mono, fontWeight: 500 }}>
                     <EyeIcon style={{ width: 14, height: 14 }} />
                     <span>{faceDetected ? 'Face Detected' : 'No Face'}</span>
                   </div>
                 </div>
                 <div style={{ position: 'absolute', bottom: 12, left: 12, right: 12 }}>
-                  <div style={{ background: 'rgba(0,0,0,0.7)', color: '#fff', padding: '8px 12px', borderRadius: 6, textAlign: 'center', fontSize: 12 }}>
+                  <div style={{ background: 'rgba(0,0,0,0.8)', color: '#fff', padding: '8px 12px', textAlign: 'center', fontSize: 12, fontFamily: C.mono }}>
                     {!faceDetected ? 'Position your face within the circle' : 'Great! Click capture when ready'}
                   </div>
                 </div>
@@ -1383,13 +1383,13 @@ const DemoPage: React.FC = () => {
                 <button
                   onClick={captureSelfie}
                   disabled={!faceDetected || isLoading}
-                  style={{ flex: 1, padding: '10px 0', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: !faceDetected || isLoading ? 'not-allowed' : 'pointer', border: 'none', background: !faceDetected || isLoading ? C.surface : C.green, color: !faceDetected || isLoading ? C.dim : C.bg, transition: 'all 0.2s' }}
+                  style={{ flex: 1, padding: '10px 0', fontFamily: C.mono, fontWeight: 500, fontSize: 13, cursor: !faceDetected || isLoading ? 'not-allowed' : 'pointer', border: `1px solid ${!faceDetected || isLoading ? C.border : C.green}`, background: !faceDetected || isLoading ? 'transparent' : C.green, color: !faceDetected || isLoading ? C.dim : C.bg, transition: 'all 0.2s' }}
                 >
                   {isLoading ? 'Capturing...' : 'Capture Selfie'}
                 </button>
                 <button
                   onClick={() => { cleanup(); setShowLiveCapture(false); setUseFallbackCapture(false); }}
-                  style={{ padding: '10px 20px', borderRadius: 8, fontWeight: 600, fontSize: 14, cursor: 'pointer', border: `1px solid ${C.border}`, background: 'transparent', color: C.muted }}
+                  style={{ padding: '10px 20px', fontFamily: C.mono, fontWeight: 500, fontSize: 13, cursor: 'pointer', border: `1px solid ${C.border}`, background: 'transparent', color: C.muted }}
                 >
                   Cancel
                 </button>
@@ -1404,7 +1404,7 @@ const DemoPage: React.FC = () => {
               <p style={{ color: C.muted, fontSize: 13, marginBottom: 20 }}>Unable to access your camera. Please check permissions and try again.</p>
               <button
                 onClick={initializeCamera}
-                style={{ background: C.cyan, color: C.bg, border: 'none', borderRadius: 8, padding: '10px 24px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
+                style={{ background: C.accent, color: C.bg, border: `1px solid ${C.accent}`, padding: '10px 24px', fontFamily: C.mono, fontWeight: 500, fontSize: 13, cursor: 'pointer' }}
               >
                 Try Again
               </button>
@@ -1556,16 +1556,15 @@ const DemoPage: React.FC = () => {
           Try a complete verification with a sandbox key. No signup required.
         </p>
         <div style={{
-          background: 'rgba(34,211,238,0.04)',
-          border: `1px solid rgba(34,211,238,0.12)`,
-          borderRadius: 8,
+          background: C.accentSoft,
+          border: `1px solid ${C.border}`,
           padding: '12px 16px',
           marginBottom: 36,
           display: 'flex',
           alignItems: 'flex-start',
           gap: 10,
         }}>
-          <svg style={{ width: 16, height: 16, color: C.cyan, flexShrink: 0, marginTop: 1 }} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
+          <svg style={{ width: 16, height: 16, color: C.accent, flexShrink: 0, marginTop: 1 }} fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor">
             <path strokeLinecap="round" strokeLinejoin="round" d="M9 12.75L11.25 15 15 9.75m-3-7.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.749c0 5.592 3.824 10.29 9 11.623 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.571-.598-3.751h-.152c-3.196 0-6.1-1.248-8.25-3.285z" />
           </svg>
           <p style={{ color: C.muted, fontSize: 12, lineHeight: 1.5, margin: 0, fontFamily: C.sans }}>
@@ -1574,7 +1573,7 @@ const DemoPage: React.FC = () => {
             within 24 hours. No biometric data is stored beyond the verification session.
           </p>
         </div>
-        <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, padding: isMobile ? 16 : 32 }}>
+        <div style={{ background: C.panel, border: `1px solid ${C.border}`, padding: isMobile ? 16 : 32 }}>
           <ProgressIndicator
             currentStep={(() => {
               if (isAgeOnly) {

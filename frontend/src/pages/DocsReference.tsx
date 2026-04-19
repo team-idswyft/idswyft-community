@@ -30,10 +30,10 @@ export const DocsReference: React.FC = () => {
 
       {/* ══ RATE LIMITS ══════════════════════════════════════════════════ */}
       <SectionAnchor id="rate-limits" />
-      <H2>Rate Limits & Status Codes</H2>
+      <H2 index="01">Rate Limits & Status Codes</H2>
 
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 16, marginBottom: 24 }}>
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '20px 24px' }}>
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '20px 24px' }}>
           <div style={{ fontFamily: C.mono, fontSize: '0.7rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 14 }}>Rate Limits</div>
           {[
             { label: 'Per developer key', value: '1,000 req / hour', note: 'cloud edition — sandbox + production combined' },
@@ -51,7 +51,7 @@ export const DocsReference: React.FC = () => {
           ))}
         </div>
 
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '20px 24px' }}>
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '20px 24px' }}>
           <div style={{ fontFamily: C.mono, fontSize: '0.7rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 14 }}>HTTP Status Codes</div>
           {[
             { code: '200 / 201', color: C.green, desc: 'Success' },
@@ -74,7 +74,7 @@ export const DocsReference: React.FC = () => {
 
       {/* ══ CHANGELOG ═══════════════════════════════════════════════════ */}
       <SectionAnchor id="changelog" />
-      <H2>Changelog</H2>
+      <H2 index="02">Changelog</H2>
       <Lead>
         Notable changes to the Idswyft API. This project uses{' '}
         <a href="https://semver.org" target="_blank" rel="noopener noreferrer" style={{ color: C.cyan, textDecoration: 'none' }}>Semantic Versioning</a>.
@@ -248,7 +248,7 @@ export const DocsReference: React.FC = () => {
           changed: [],
         },
       ].map(release => (
-        <div key={release.version} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, marginBottom: 20, overflow: 'hidden' }}>
+        <div key={release.version} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, marginBottom: 20, overflow: 'hidden' }}>
           <div style={{ padding: '16px 24px', borderBottom: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <Pill color={C.cyan} bg={C.cyanDim}>v{release.version}</Pill>
             <span style={{ fontFamily: C.mono, fontSize: '0.78rem', color: C.dim }}>{release.date}</span>
@@ -302,7 +302,7 @@ export const DocsReference: React.FC = () => {
 
       {/* ══ SUPPORT ══════════════════════════════════════════════════════ */}
       <SectionAnchor id="support" />
-      <H2>Support & Resources</H2>
+      <H2 index="03">Support & Resources</H2>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
         {[
@@ -313,7 +313,7 @@ export const DocsReference: React.FC = () => {
           { icon: '🔧', title: 'GitHub', desc: 'Source code, examples, and issue tracker', href: 'https://github.com/team-idswyft/idswyft-community', cta: 'View on GitHub →' },
           { icon: '✉️', title: 'Email Support', desc: 'Technical support and integration help', href: 'mailto:support@idswyft.app', cta: 'support@idswyft.app' },
         ].map(r => (
-          <div key={r.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <div key={r.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ fontSize: '1.4rem' }}>{r.icon}</div>
             <div style={{ fontFamily: C.sans, fontSize: '0.9rem', fontWeight: 600, color: C.text }}>{r.title}</div>
             <div style={{ fontFamily: C.sans, fontSize: '0.78rem', color: C.muted, lineHeight: 1.55, flex: 1 }}>{r.desc}</div>

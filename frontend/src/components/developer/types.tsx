@@ -103,12 +103,17 @@ export type AuthStep = 'enter_email' | 'verify_otp' | 'complete_registration'
 
 // --- Helper functions ---
 
+/** Escape HTML entities to prevent XSS when rendering via dangerouslySetInnerHTML */
+function escapeHtml(s: string): string {
+  return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+}
+
 /** Syntax-highlight JSON string with theme-consistent colors */
 export function highlightJson(json: string): React.ReactNode[] {
-  return json.split('\n').map((line, i) => {
+  return escapeHtml(json).split('\n').map((line, i) => {
     const highlighted = line
-      .replace(/"([^"]+)"(?=\s*:)/g, `<span style="color:${C.cyan}">"$1"</span>`)
-      .replace(/:\s*"([^"]*)"/g, `: <span style="color:${C.green}">"$1"</span>`)
+      .replace(/&quot;([^&]*)&quot;(?=\s*:)/g, `<span style="color:${C.cyan}">"$1"</span>`)
+      .replace(/:\s*&quot;([^&]*)&quot;/g, `: <span style="color:${C.green}">"$1"</span>`)
       .replace(/:\s*(\d+\.?\d*)/g, `: <span style="color:${C.amber}">$1</span>`)
       .replace(/:\s*(true|false)/g, `: <span style="color:${C.purple}">$1</span>`)
       .replace(/:\s*(null)/g, `: <span style="color:${C.dim}">$1</span>`)
@@ -180,9 +185,9 @@ export function groupDevDeliveries(deliveries: WebhookDeliveryLog[]): DeliveryGr
 
 export const inputStyle: React.CSSProperties = {
   background: C.surface,
-  border: `1px solid ${C.border}`,
+  border: `1px solid ${C.borderStrong}`,
   color: C.text,
-  borderRadius: 6,
+  borderRadius: 0,
   padding: '10px 14px',
   width: '100%',
   fontSize: 14,
@@ -193,9 +198,12 @@ export const inputStyle: React.CSSProperties = {
 
 export const labelStyle: React.CSSProperties = {
   display: 'block',
-  fontSize: 12,
+  fontFamily: C.mono,
+  fontSize: 11,
+  letterSpacing: '0.05em',
+  textTransform: 'uppercase',
   color: C.muted,
-  marginBottom: 6,
+  marginBottom: 8,
   fontWeight: 500,
 }
 

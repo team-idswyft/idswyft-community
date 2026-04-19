@@ -96,7 +96,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
   enableMobileHandoff = false,
   verificationMode,
   ageThreshold,
-  branding,
+  branding: _branding,
 }) => {
   const isAgeOnly = verificationMode === 'age_only';
   const isDocumentOnly = verificationMode === 'document_only';
@@ -144,21 +144,6 @@ const EndUserVerification: React.FC<VerificationProps> = ({
       startVerification();
     }
   }, []);
-
-  // ── Theme ──────────────────────────────────────────────────────────────────
-  const isDark = theme === 'dark';
-  const accentColor = branding?.accent_color || (isDark ? '#22d3ee' : '#3b82f6');
-  const styles = {
-    bg: isDark ? 'bg-[#080c14]' : 'bg-gray-50',
-    cardBg: isDark ? 'bg-[#0b0f19]' : 'bg-white',
-    text: isDark ? 'text-[#dde2ec]' : 'text-gray-900',
-    textSec: isDark ? 'text-[#8896aa]' : 'text-gray-600',
-    border: isDark ? 'border-[rgba(255,255,255,0.07)]' : 'border-gray-200',
-    input: isDark
-      ? 'border-[rgba(255,255,255,0.13)] focus:border-cyan-400 bg-[#0f1420] text-[#dde2ec]'
-      : 'border-gray-300 focus:border-blue-500 text-gray-900',
-    button: isDark ? 'bg-cyan-500 hover:bg-cyan-600 text-white' : 'bg-blue-600 hover:bg-blue-700 text-white',
-  };
 
   // ── API helpers ────────────────────────────────────────────────────────────
   const authHeader: Record<string, string> = sessionToken
@@ -480,41 +465,13 @@ const EndUserVerification: React.FC<VerificationProps> = ({
 
   const renderProgress = () => (
     <div className="mb-8">
-      <div className="relative">
-        <div className={`h-1.5 rounded-full ${isDark ? 'bg-gray-700' : 'bg-gray-200'}`}>
-          <div
-            className="h-1.5 rounded-full transition-all duration-700 ease-out"
-            style={{ width: `${(activeStepIdx / (steps.length - 1)) * 100}%`, background: `linear-gradient(to right, ${accentColor}, ${accentColor})` }}
-          />
-        </div>
-        <div className="flex justify-between absolute -top-1.5 w-full">
-          {steps.map(({ step }, i) => (
-            <div key={step} className="relative">
-              <div className={`w-4 h-4 rounded-full border-2 transition-all duration-300 ${
-                activeStepIdx >= i
-                  ? ''
-                  : isDark ? 'bg-[#0f1420] border-[rgba(255,255,255,0.13)]' : 'bg-white border-gray-300'
-              }`} style={activeStepIdx >= i ? { backgroundColor: accentColor, borderColor: accentColor } : undefined}>
-                {activeStepIdx > i && (
-                  <svg className="w-2.5 h-2.5 text-white absolute top-px left-px" fill="currentColor" viewBox="0 0 20 20">
-                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
-                  </svg>
-                )}
-                {activeStepIdx === i && (
-                  <div className="w-1.5 h-1.5 bg-white rounded-full absolute top-px left-px animate-pulse" />
-                )}
-              </div>
-            </div>
-          ))}
-        </div>
-      </div>
-      <div className="text-center mt-8">
-        <span className="text-sm font-medium" style={{ color: accentColor }}>
-          {steps[activeStepIdx]?.label}
-        </span>
-        <span className={`text-xs ml-2 ${styles.textSec}`}>
-          ({activeStepIdx + 1}/{steps.length})
-        </span>
+      <div className="stepper">
+        {steps.map(({ step, label }, i) => (
+          <div key={step} className={`step ${activeStepIdx === i ? 'active' : activeStepIdx > i ? 'done' : ''}`}>
+            <span className="step-n">{String(i + 1).padStart(2, '0')}</span>
+            <span>{label}</span>
+          </div>
+        ))}
       </div>
     </div>
   );
@@ -526,18 +483,16 @@ const EndUserVerification: React.FC<VerificationProps> = ({
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => void,
     label: string,
   ) => (
-    <div className={`border-2 border-dashed rounded-2xl p-6 text-center transition-all ${isDark ? 'hover:border-cyan-400' : 'hover:border-blue-400'} ${styles.border}`}>
+    <div className="file-upload-zone">
       <input type="file" accept="image/*" onChange={onChange} className="hidden" id={id} />
       <label htmlFor={id} className="cursor-pointer block">
         {previewUrl ? (
-          <img src={previewUrl} alt="Preview" className="max-h-40 mx-auto rounded-xl shadow" />
+          <img src={previewUrl} alt="Preview" className="max-h-40 mx-auto" style={{ border: '1px solid var(--rule)' }} />
         ) : (
           <div className="py-4">
-            <svg className="w-10 h-10 mx-auto mb-3 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-            </svg>
-            <p className={`font-medium ${styles.text}`}>{label}</p>
-            <p className={`text-xs mt-1 ${styles.textSec}`}>JPG, PNG up to 10MB</p>
+            <div className="mono" style={{ fontSize: 24, marginBottom: 12, color: 'var(--mid)' }}>+</div>
+            <p className="font-medium" style={{ color: 'var(--ink)' }}>{label}</p>
+            <p className="mono" style={{ fontSize: 11, marginTop: 4, color: 'var(--soft)', letterSpacing: '0.04em' }}>JPG, PNG up to 10MB</p>
           </div>
         )}
       </label>
@@ -557,14 +512,14 @@ const EndUserVerification: React.FC<VerificationProps> = ({
     const visible = fields.filter(([, v]) => v);
     if (!visible.length) return null;
     return (
-      <div className={`rounded-xl border ${styles.border} p-4 mb-5`}>
-        <p className={`text-xs font-semibold uppercase tracking-wide mb-3 ${styles.textSec}`}>Front ID — Extracted Data</p>
-        <div className="space-y-1.5">
+      <div className="mb-5">
+        <p className="eyebrow" style={{ marginBottom: 8 }}>Front ID -- Extracted Data</p>
+        <div className="result-grid">
           {visible.map(([label, value]) => (
-            <div key={label} className="flex justify-between text-sm">
-              <span className={styles.textSec}>{label}</span>
-              <span className={`font-medium ${styles.text}`}>{value}</span>
-            </div>
+            <React.Fragment key={label}>
+              <div>{label}</div>
+              <div style={{ color: 'var(--ink)' }}>{value}</div>
+            </React.Fragment>
           ))}
         </div>
       </div>
@@ -578,14 +533,9 @@ const EndUserVerification: React.FC<VerificationProps> = ({
       case 1:
         return (
           <div className="text-center py-8">
-            <div className={`w-14 h-14 mx-auto mb-5 bg-gradient-to-br ${isDark ? 'from-cyan-400 to-cyan-500' : 'from-blue-500 to-blue-600'} rounded-full flex items-center justify-center`}>
-              <svg className="w-7 h-7 text-white animate-spin" fill="none" viewBox="0 0 24 24">
-                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
-              </svg>
-            </div>
-            <h2 className={`text-xl font-semibold mb-2 ${styles.text}`}>Starting Verification</h2>
-            <p className={`text-sm ${styles.textSec}`}>Initializing your verification session…</p>
+            <div className="loading-spinner-glass mx-auto mb-5" />
+            <h2 className="text-xl font-semibold mb-2" style={{ color: 'var(--ink)' }}>Starting Verification</h2>
+            <p className="text-sm" style={{ color: 'var(--mid)' }}>Initializing your verification session...</p>
           </div>
         );
 
@@ -594,24 +544,24 @@ const EndUserVerification: React.FC<VerificationProps> = ({
         return (
           <div className="space-y-5">
             <div className="text-center">
-              <h2 className={`text-xl font-semibold mb-1 ${styles.text}`}>
+              <h2 className="text-xl font-semibold mb-1" style={{ color: 'var(--ink)' }}>
                 {isAgeOnly ? 'Upload Your ID' : 'Upload Front of ID'}
               </h2>
-              <p className={`text-sm ${styles.textSec}`}>
+              <p className="text-sm" style={{ color: 'var(--mid)' }}>
                 {isAgeOnly
                   ? 'Upload your government-issued ID to verify your age'
                   : isIdentity
-                    ? 'Take a clear photo of the front of your ID — no back scan needed'
+                    ? 'Take a clear photo of the front of your ID -- no back scan needed'
                     : 'Take a clear photo of the front of your government-issued ID'}
               </p>
             </div>
 
             <div>
-              <label className={`block text-sm font-medium mb-2 ${styles.text}`}>Document Type</label>
+              <label className="form-label">Document Type</label>
               <select
                 value={documentType}
                 onChange={e => setDocumentType(e.target.value)}
-                className={`w-full px-4 py-2.5 rounded-xl border ${styles.input} focus:ring-2 ${isDark ? 'focus:ring-cyan-500' : 'focus:ring-blue-500'} focus:border-transparent transition-all`}
+                className="form-input"
               >
                 {allowedDocumentTypes.includes('national_id') && <option value="national_id">National ID</option>}
                 {allowedDocumentTypes.includes('passport') && <option value="passport">Passport</option>}
@@ -625,17 +575,15 @@ const EndUserVerification: React.FC<VerificationProps> = ({
               <button
                 onClick={uploadFrontDocument}
                 disabled={isLoading}
-                className="w-full py-3.5 px-6 text-white font-medium rounded-xl disabled:opacity-50 transition-all" style={{ backgroundColor: accentColor }}
+                className="btn-accent w-full disabled:opacity-50"
+                style={{ padding: '14px 24px', justifyContent: 'center' }}
               >
                 {isLoading ? (
                   <span className="flex items-center justify-center gap-2">
-                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    Uploading…
+                    <div className="loading-spinner" style={{ width: 16, height: 16 }} />
+                    Uploading...
                   </span>
-                ) : 'Continue →'}
+                ) : 'Continue'}
               </button>
             )}
           </div>
@@ -645,10 +593,10 @@ const EndUserVerification: React.FC<VerificationProps> = ({
       case 3:
         return (
           <div className="text-center py-8">
-            <div className={`animate-spin rounded-full h-10 w-10 border-b-2 ${isDark ? 'border-cyan-400' : 'border-blue-600'} mx-auto mb-5`} />
-            <h2 className={`text-xl font-semibold mb-2 ${styles.text}`}>Reading Your ID</h2>
-            <p className={`text-sm ${styles.textSec}`}>Extracting information from the front of your document…</p>
-            <p className={`text-xs mt-2 ${styles.textSec}`}>Please don't close this window</p>
+            <div className="loading-spinner-glass mx-auto mb-5" />
+            <h2 className="text-xl font-semibold mb-2" style={{ color: 'var(--ink)' }}>Reading Your ID</h2>
+            <p className="text-sm" style={{ color: 'var(--mid)' }}>Extracting information from the front of your document...</p>
+            <p className="mono" style={{ fontSize: 11, marginTop: 8, color: 'var(--soft)', letterSpacing: '0.04em' }}>Please don't close this window</p>
           </div>
         );
 
@@ -657,8 +605,8 @@ const EndUserVerification: React.FC<VerificationProps> = ({
         return (
           <div className="space-y-5">
             <div className="text-center">
-              <h2 className={`text-xl font-semibold mb-1 ${styles.text}`}>Upload Back of ID</h2>
-              <p className={`text-sm ${styles.textSec}`}>We need both sides to cross-validate your identity</p>
+              <h2 className="text-xl font-semibold mb-1" style={{ color: 'var(--ink)' }}>Upload Back of ID</h2>
+              <p className="text-sm" style={{ color: 'var(--mid)' }}>We need both sides to cross-validate your identity</p>
             </div>
 
             {renderOCRSummary()}
@@ -669,17 +617,15 @@ const EndUserVerification: React.FC<VerificationProps> = ({
               <button
                 onClick={uploadBackDocument}
                 disabled={isLoading}
-                className="w-full py-3.5 px-6 text-white font-medium rounded-xl disabled:opacity-50 transition-all" style={{ backgroundColor: accentColor }}
+                className="btn-accent w-full disabled:opacity-50"
+                style={{ padding: '14px 24px', justifyContent: 'center' }}
               >
                 {isLoading ? (
                   <span className="flex items-center justify-center gap-2">
-                    <svg className="animate-spin h-4 w-4" fill="none" viewBox="0 0 24 24">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
-                    </svg>
-                    Uploading…
+                    <div className="loading-spinner" style={{ width: 16, height: 16 }} />
+                    Uploading...
                   </span>
-                ) : 'Continue →'}
+                ) : 'Continue'}
               </button>
             )}
           </div>
@@ -689,14 +635,14 @@ const EndUserVerification: React.FC<VerificationProps> = ({
       case 5:
         return (
           <div className="text-center py-8">
-            <div className={`animate-spin rounded-full h-10 w-10 border-b-2 ${isDark ? 'border-cyan-400' : 'border-blue-600'} mx-auto mb-5`} />
-            <h2 className={`text-xl font-semibold mb-2 ${styles.text}`}>Verifying Your Documents</h2>
-            <p className={`text-sm ${styles.textSec}`}>Cross-checking the front and back of your ID…</p>
-            <div className={`mt-4 text-xs ${styles.textSec} space-y-1`}>
-              <p>✦ Barcode / QR scanning</p>
-              <p>✦ Data cross-validation</p>
-              <p>✦ Authenticity check</p>
-            </div>
+            <div className="loading-spinner-glass mx-auto mb-5" />
+            <h2 className="text-xl font-semibold mb-2" style={{ color: 'var(--ink)' }}>Verifying Your Documents</h2>
+            <p className="text-sm" style={{ color: 'var(--mid)' }}>Cross-checking the front and back of your ID...</p>
+            <ul className="checklist" style={{ marginTop: 16, maxWidth: 240, marginLeft: 'auto', marginRight: 'auto' }}>
+              <li><span className="dot">--</span><span>Barcode / QR scanning</span></li>
+              <li><span className="dot">--</span><span>Data cross-validation</span></li>
+              <li style={{ borderBottom: 'none' }}><span className="dot">--</span><span>Authenticity check</span></li>
+            </ul>
           </div>
         );
 
@@ -722,9 +668,9 @@ const EndUserVerification: React.FC<VerificationProps> = ({
           // Still waiting for live capture result
           return (
             <div className="text-center py-8">
-              <div className={`animate-spin rounded-full h-10 w-10 border-b-2 ${isDark ? 'border-cyan-400' : 'border-blue-600'} mx-auto mb-5`} />
-              <h2 className={`text-xl font-semibold mb-2 ${styles.text}`}>Processing Verification</h2>
-              <p className={`text-sm ${styles.textSec}`}>Analyzing your live photo…</p>
+              <div className="loading-spinner-glass mx-auto mb-5" />
+              <h2 className="text-xl font-semibold mb-2" style={{ color: 'var(--ink)' }}>Processing Verification</h2>
+              <p className="text-sm" style={{ color: 'var(--mid)' }}>Analyzing your live photo...</p>
             </div>
           );
         }
@@ -736,17 +682,20 @@ const EndUserVerification: React.FC<VerificationProps> = ({
 
         return (
           <div className="text-center max-w-sm mx-auto space-y-5">
-            <div className={`text-5xl ${isVerified ? '' : isFailed ? '' : ''}`}>
-              {isVerified ? '✅' : isFailed ? '❌' : '⏳'}
+            <div className={isVerified ? 'result-badge badge-success' : isFailed ? 'result-badge badge-error' : 'result-badge badge-warning'} style={{
+              display: 'inline-flex', padding: '8px 16px', margin: '0 auto',
+              fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
+            }}>
+              {isVerified ? 'VERIFIED' : isFailed ? 'FAILED' : 'REVIEW'}
             </div>
 
             <div>
-              <h2 className={`text-xl font-semibold ${styles.text}`}>
+              <h2 className="text-xl font-semibold" style={{ color: 'var(--ink)' }}>
                 {isAgeOnly
-                  ? isVerified ? 'Age Verified!' : 'Age Verification Failed'
-                  : isVerified ? 'Identity Verified!' : isFailed ? 'Verification Failed' : 'Under Review'}
+                  ? isVerified ? 'Age Verified' : 'Age Verification Failed'
+                  : isVerified ? 'Identity Verified' : isFailed ? 'Verification Failed' : 'Under Review'}
               </h2>
-              <p className={`text-sm mt-1 ${styles.textSec}`}>
+              <p className="text-sm mt-1" style={{ color: 'var(--mid)' }}>
                 {isAgeOnly
                   ? isVerified
                     ? `You meet the minimum age requirement of ${finalResult.age_verification?.age_threshold ?? ageThreshold ?? 18}.`
@@ -760,95 +709,104 @@ const EndUserVerification: React.FC<VerificationProps> = ({
             </div>
 
             {/* Score details */}
-            <div className={`rounded-xl border ${styles.border} p-4 text-left text-sm space-y-2`}>
-              <div className="flex justify-between">
-                <span className={styles.textSec}>Status</span>
-                <span className={`font-semibold capitalize ${isVerified ? 'text-green-600' : isFailed ? 'text-red-600' : 'text-yellow-600'}`}>{status}</span>
+            <div className="result-grid text-left">
+              <div>Status</div>
+              <div>
+                <span className={isVerified ? 'badge-success' : isFailed ? 'badge-error' : 'badge-warning'}
+                  style={{ textTransform: 'capitalize' }}>{status}</span>
               </div>
               {/* Age verification */}
               {finalResult.age_verification && (
                 <>
-                  <div className="flex justify-between">
-                    <span className={styles.textSec}>Age Check</span>
-                    <span className={`font-semibold ${finalResult.age_verification.is_of_age ? 'text-green-600' : 'text-red-500'}`}>
+                  <div>Age Check</div>
+                  <div>
+                    <span className={finalResult.age_verification.is_of_age ? 'badge-success' : 'badge-error'}>
                       {finalResult.age_verification.is_of_age ? 'Passed' : 'Failed'}
                     </span>
                   </div>
-                  <div className="flex justify-between">
-                    <span className={styles.textSec}>Minimum Age</span>
-                    <span className={`font-medium ${styles.text}`}>{finalResult.age_verification.age_threshold}+</span>
-                  </div>
+                  <div>Minimum Age</div>
+                  <div style={{ color: 'var(--ink)' }}>{finalResult.age_verification.age_threshold}+</div>
                 </>
               )}
               {/* Cross-validation: v2 uses overall_score, fall back to weighted_score / v1 flat field */}
               {(finalResult.cross_validation_results?.overall_score ?? finalResult.cross_validation_results?.weighted_score ?? finalResult.cross_validation_score) != null && (
-                <div className="flex justify-between">
-                  <span className={styles.textSec}>Doc Cross-Check</span>
-                  <span className={`font-medium ${styles.text}`}>{Math.round((finalResult.cross_validation_results?.overall_score ?? finalResult.cross_validation_results?.weighted_score ?? finalResult.cross_validation_score) * 100)}%</span>
-                </div>
+                <>
+                  <div>Doc Cross-Check</div>
+                  <div style={{ color: 'var(--ink)' }}>{Math.round((finalResult.cross_validation_results?.overall_score ?? finalResult.cross_validation_results?.weighted_score ?? finalResult.cross_validation_score) * 100)}%</div>
+                </>
               )}
               {finalResult.cross_validation_results?.verdict && (
-                <div className="flex justify-between">
-                  <span className={styles.textSec}>Verdict</span>
-                  <span className={`font-semibold ${finalResult.cross_validation_results.verdict === 'PASS' ? 'text-green-600' : finalResult.cross_validation_results.verdict === 'REJECT' ? 'text-red-500' : 'text-yellow-600'}`}>{finalResult.cross_validation_results.verdict}</span>
-                </div>
+                <>
+                  <div>Verdict</div>
+                  <div>
+                    <span className={finalResult.cross_validation_results.verdict === 'PASS' ? 'badge-success' : finalResult.cross_validation_results.verdict === 'REJECT' ? 'badge-error' : 'badge-warning'}>
+                      {finalResult.cross_validation_results.verdict}
+                    </span>
+                  </div>
+                </>
               )}
               {/* Face match: v2 uses similarity_score, fall back to score / v1 flat field */}
               {(finalResult.face_match_results?.similarity_score ?? finalResult.face_match_results?.score ?? finalResult.face_match_score) != null && (
-                <div className="flex justify-between">
-                  <span className={styles.textSec}>Face Match</span>
-                  <span className={`font-medium ${styles.text}`}>{Math.round((finalResult.face_match_results?.similarity_score ?? finalResult.face_match_results?.score ?? finalResult.face_match_score) * 100)}%</span>
-                </div>
+                <>
+                  <div>Face Match</div>
+                  <div style={{ color: 'var(--ink)' }}>{Math.round((finalResult.face_match_results?.similarity_score ?? finalResult.face_match_results?.score ?? finalResult.face_match_score) * 100)}%</div>
+                </>
               )}
               {/* Liveness: v2 uses liveness_results.score (not liveness_score), fall back to v1 fields */}
               {(finalResult.liveness_results?.score ?? finalResult.liveness_results?.liveness_score ?? finalResult.liveness_score) != null && (
-                <div className="flex justify-between">
-                  <span className={styles.textSec}>Liveness</span>
-                  <span className={`font-medium ${styles.text}`}>
+                <>
+                  <div>Liveness</div>
+                  <div style={{ color: 'var(--ink)' }}>
                     {Math.round((finalResult.liveness_results?.score ?? finalResult.liveness_results?.liveness_score ?? finalResult.liveness_score) * 100)}%
                     {finalResult.liveness_results?.passed != null && (
-                      <span className={`ml-2 text-xs ${finalResult.liveness_results.passed ? 'text-green-600' : 'text-red-500'}`}>
-                        {finalResult.liveness_results.passed ? '✓' : '✗'}
+                      <span className={`ml-2 ${finalResult.liveness_results.passed ? 'badge-success' : 'badge-error'}`}
+                        style={{ fontSize: 10, padding: '1px 6px' }}>
+                        {finalResult.liveness_results.passed ? 'PASS' : 'FAIL'}
                       </span>
                     )}
-                  </span>
-                </div>
+                  </div>
+                </>
               )}
               {/* AML Screening */}
               {finalResult.aml_screening && (
-                <div className="flex justify-between">
-                  <span className={styles.textSec}>AML Screening</span>
-                  <span className={`font-semibold ${finalResult.aml_screening.risk_level === 'clear' ? 'text-green-600' : finalResult.aml_screening.match_found ? 'text-red-500' : 'text-yellow-600'}`}>
-                    {finalResult.aml_screening.risk_level === 'clear' ? 'Clear' : finalResult.aml_screening.risk_level?.replace('_', ' ')}
-                  </span>
-                </div>
+                <>
+                  <div>AML Screening</div>
+                  <div>
+                    <span className={finalResult.aml_screening.risk_level === 'clear' ? 'badge-success' : finalResult.aml_screening.match_found ? 'badge-error' : 'badge-warning'}>
+                      {finalResult.aml_screening.risk_level === 'clear' ? 'Clear' : finalResult.aml_screening.risk_level?.replace('_', ' ')}
+                    </span>
+                  </div>
+                </>
               )}
               {/* Risk Score */}
               {finalResult.risk_score && (
-                <div className="flex justify-between">
-                  <span className={styles.textSec}>Risk Score</span>
-                  <span className={`font-semibold ${finalResult.risk_score.risk_level === 'low' ? 'text-green-600' : finalResult.risk_score.risk_level === 'medium' ? 'text-yellow-600' : 'text-red-500'}`}>
-                    {finalResult.risk_score.overall_score}/100 ({finalResult.risk_score.risk_level})
-                  </span>
-                </div>
+                <>
+                  <div>Risk Score</div>
+                  <div>
+                    <span className={finalResult.risk_score.risk_level === 'low' ? 'badge-success' : finalResult.risk_score.risk_level === 'medium' ? 'badge-warning' : 'badge-error'}>
+                      {finalResult.risk_score.overall_score}/100 ({finalResult.risk_score.risk_level})
+                    </span>
+                  </div>
+                </>
               )}
               {finalResult.confidence_score != null && (
-                <div className="flex justify-between">
-                  <span className={styles.textSec}>Confidence</span>
-                  <span className={`font-medium ${styles.text}`}>{Math.round(finalResult.confidence_score * 100)}%</span>
-                </div>
+                <>
+                  <div>Confidence</div>
+                  <div style={{ color: 'var(--ink)' }}>{Math.round(finalResult.confidence_score * 100)}%</div>
+                </>
               )}
               {/* Rejection details */}
               {finalResult.rejection_reason && (
-                <div className={`mt-2 pt-2 border-t ${styles.border}`}>
-                  <div className="flex justify-between">
-                    <span className={styles.textSec}>Rejection</span>
-                    <span className="font-mono text-xs text-red-500">{finalResult.rejection_reason}</span>
-                  </div>
+                <>
+                  <div>Rejection</div>
+                  <div className="mono" style={{ fontSize: 11, color: 'oklch(0.68 0.17 25)' }}>{finalResult.rejection_reason}</div>
                   {finalResult.rejection_detail && (
-                    <p className={`text-xs mt-1 ${styles.textSec}`}>{finalResult.rejection_detail}</p>
+                    <>
+                      <div>Detail</div>
+                      <div style={{ color: 'var(--mid)', fontSize: 11 }}>{finalResult.rejection_detail}</div>
+                    </>
                   )}
-                </div>
+                </>
               )}
             </div>
 
@@ -856,17 +814,18 @@ const EndUserVerification: React.FC<VerificationProps> = ({
               <button
                 onClick={handleRetry}
                 disabled={retryProcessing}
-                className={`w-full py-3 px-6 bg-gradient-to-r ${isDark ? 'from-cyan-400 to-cyan-500 hover:from-cyan-500 hover:to-cyan-600' : 'from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700'} text-white font-medium rounded-xl disabled:opacity-50 transition-all`}
+                className="btn-accent w-full disabled:opacity-50"
+                style={{ padding: '12px 24px', justifyContent: 'center' }}
               >
-                {retryProcessing ? 'Restarting…' : 'Try Again'}
+                {retryProcessing ? 'Restarting...' : 'Try Again'}
               </button>
             )}
             {isFailed && finalResult.retry_available === false && (
-              <p className={`text-xs ${isDark ? 'text-red-400' : 'text-red-500'}`}>Maximum retry attempts reached.</p>
+              <p className="mono" style={{ fontSize: 11, color: 'oklch(0.68 0.17 25)', letterSpacing: '0.04em' }}>Maximum retry attempts reached.</p>
             )}
 
             {(redirectUrl || onRedirect) && (
-              <p className={`text-xs ${styles.textSec}`}>Redirecting in 3 seconds…</p>
+              <p className="mono" style={{ fontSize: 11, color: 'var(--soft)', letterSpacing: '0.04em' }}>Redirecting in 3 seconds...</p>
             )}
           </div>
         );
@@ -879,24 +838,25 @@ const EndUserVerification: React.FC<VerificationProps> = ({
 
   // ── Root render ────────────────────────────────────────────────────────────
   return (
-    <div className={`min-h-screen ${isDark ? 'bg-[#080c14]' : 'bg-gray-50'} ${className} flex items-center justify-center p-4`}>
+    <div className={`min-h-screen ${className} flex items-center justify-center p-4`} style={{ background: 'var(--paper)' }}>
       <div className="w-full max-w-lg">
-        <div className={`${isDark ? 'bg-[#0b0f19] border-[rgba(255,255,255,0.07)]' : 'bg-white border-gray-200'} rounded-3xl shadow-xl border overflow-hidden`}>
+        <div className="card" style={{ overflow: 'hidden' }}>
           <div className="p-8">
             {showMobileChoice ? (
               <div className="py-4">
-                <h2 className={`text-xl font-bold text-center mb-1 ${styles.text}`}>How would you like to verify?</h2>
-                <p className={`text-sm text-center mb-6 ${styles.textSec}`}>Complete on this device or scan a QR code to use your phone</p>
+                <h2 className="text-xl font-bold text-center mb-1" style={{ color: 'var(--ink)' }}>How would you like to verify?</h2>
+                <p className="text-sm text-center mb-6" style={{ color: 'var(--mid)' }}>Complete on this device or scan a QR code to use your phone</p>
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  <div className={`border ${styles.border} rounded-2xl p-5 flex flex-col items-center text-center gap-3`}>
-                    <div className="text-4xl">💻</div>
+                  <div className="card p-5 flex flex-col items-center text-center gap-3">
+                    <div className="mono" style={{ fontSize: 13, color: 'var(--mid)', letterSpacing: '0.04em' }}>DESKTOP</div>
                     <div>
-                      <h3 className={`font-semibold ${styles.text}`}>Start Here</h3>
-                      <p className={`text-sm ${styles.textSec} mt-1`}>Use your webcam and upload documents on this device</p>
+                      <h3 className="font-semibold" style={{ color: 'var(--ink)' }}>Start Here</h3>
+                      <p className="text-sm mt-1" style={{ color: 'var(--mid)' }}>Use your webcam and upload documents on this device</p>
                     </div>
                     <button
                       onClick={() => { setShowMobileChoice(false); startVerification(); }}
-                      className={`mt-1 w-full py-2.5 px-4 ${isDark ? 'bg-cyan-500 hover:bg-cyan-600' : 'bg-blue-600 hover:bg-blue-700'} text-white rounded-xl text-sm font-medium transition-colors`}
+                      className="btn-accent mt-1 w-full"
+                      style={{ padding: '10px 16px', justifyContent: 'center' }}
                     >
                       Start on This Device
                     </button>

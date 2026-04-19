@@ -42,7 +42,7 @@ export const DocsPage: React.FC = () => {
 
       {/* ══ QUICK START ══════════════════════════════════════════════════ */}
       <SectionAnchor id="quick-start" />
-      <H2>Quick Start</H2>
+      <H2 index="01">Quick Start</H2>
       <Lead>
         The verification flow is a 5-call sequence. Every processing step is asynchronous —
         you submit, then poll <code style={{ fontFamily: C.mono, color: C.cyan, fontSize: '0.82rem' }}>GET /api/v2/verify/:id/status</code> until
@@ -50,7 +50,7 @@ export const DocsPage: React.FC = () => {
       </Lead>
 
       {isCloud && (
-        <div style={{ margin: '24px 0 32px', borderRadius: 12, overflow: 'hidden', border: `1px solid ${C.border}`, background: C.codeBg }}>
+        <div style={{ margin: '24px 0 32px', borderRadius: 0, overflow: 'hidden', border: `1px solid ${C.border}`, background: C.codeBg }}>
           <video
             src="https://qffbflsboayyqvnqwqil.supabase.co/storage/v1/object/public/platform-assets/developer-integration-demo.mp4"
             style={{ width: '100%', aspectRatio: '16/9', display: 'block' }}
@@ -178,10 +178,10 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
 
       {/* ══ AUTHENTICATION ═══════════════════════════════════════════════ */}
       <SectionAnchor id="auth" />
-      <H2>Authentication</H2>
+      <H2 index="02">Authentication</H2>
       <Lead>Every API request must include your API key in the <code style={{ fontFamily: C.mono, color: C.cyan, fontSize: '0.82rem' }}>X-API-Key</code> header. You can generate keys in the Developer Portal.</Lead>
 
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '20px 24px', marginBottom: 16 }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '20px 24px', marginBottom: 16 }}>
         <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap' }}>
           <div>
             <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 6 }}>Base URL</div>
@@ -209,7 +209,7 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
 
       {/* ══ VERIFICATION FLOW ════════════════════════════════════════════ */}
       <SectionAnchor id="flow" />
-      <H2>Verification Flow</H2>
+      <H2 index="03">Verification Flow</H2>
       <Lead>
         Each verification is a session with a unique ID. You move through steps sequentially —
         each step unlocks the next. All heavy processing (OCR, cross-validation, liveness) is
@@ -347,7 +347,7 @@ data = res.json()`} />
           immediately moves to <StatusPill status="failed" /> and live capture is blocked.
         </p>
 
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '14px 18px', marginBottom: 16 }}>
           <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>What cross-validation checks</div>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '6px 24px' }}>
             {['PDF417 / QR barcode decoding', 'ID number consistency (front OCR ↔ barcode)', 'Expiry date matching', 'Issuing authority matching', 'Photo consistency score', 'Security feature detection'].map(s => (
@@ -450,10 +450,10 @@ data = res.json()`} />
               when: 'All production identity verification',
             },
           ].map(t => (
-            <div key={t.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 10, borderTop: `3px solid ${t.color}` }}>
+            <div key={t.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '18px 20px', display: 'flex', flexDirection: 'column', gap: 10, borderTop: `3px solid ${t.color}` }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                 <span style={{ fontFamily: C.mono, fontSize: '0.82rem', fontWeight: 700, color: t.color }}>{t.title}</span>
-                <span style={{ fontFamily: C.mono, fontSize: '0.65rem', fontWeight: 600, padding: '2px 8px', borderRadius: 4, background: `${t.color}18`, color: t.color, border: `1px solid ${t.color}30`, letterSpacing: '0.06em' }}>{t.label}</span>
+                <span style={{ fontFamily: C.mono, fontSize: '0.65rem', fontWeight: 600, padding: '2px 8px', borderRadius: 0, background: `${t.color}18`, color: t.color, border: `1px solid ${t.color}30`, letterSpacing: '0.06em' }}>{t.label}</span>
               </div>
               <p style={{ fontFamily: C.sans, fontSize: '0.78rem', color: C.muted, lineHeight: 1.6, margin: 0 }}>{t.desc}</p>
               <div>
@@ -476,7 +476,7 @@ data = res.json()`} />
         </div>
 
         {/* Client-side requirements */}
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '14px 18px', marginBottom: 16 }}>
           <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>Client-side requirements</div>
           <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '100px 1fr 1fr', gap: '8px 16px' }}>
             {[
@@ -659,7 +659,7 @@ data = res.json()`} />
           cross-validation scores, liveness score, and face match score.
         </p>
 
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '14px 18px', marginBottom: 16 }}>
           <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>Polling conditions</div>
           {[
             { after: 'After Step 2 (front doc)', condition: 'ocr_data is not null', next: 'proceed to Step 3' },

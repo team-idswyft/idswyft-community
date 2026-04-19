@@ -5,6 +5,10 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import { Toaster } from 'react-hot-toast'
 import './index.css'
 import App from './App.tsx'
+import { initTheme } from './theme'
+
+// Initialize theme from localStorage (dark default)
+initTheme()
 
 // Create a client
 const queryClient = new QueryClient({

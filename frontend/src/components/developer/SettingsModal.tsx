@@ -587,18 +587,18 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
         onClick={onClose}
       >
         <div
-          style={{ width: '100%', maxWidth: 1200, height: '80vh', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
+          style={{ width: '100%', maxWidth: 1200, height: '80vh', background: C.panel, border: `1px solid ${C.border}`, borderRadius: 0, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}
           onClick={e => e.stopPropagation()}
         >
           {/* Header */}
-          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px 28px 20px', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '24px 28px 20px', borderBottom: `1px solid ${C.border}`, flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
               <Cog6ToothIcon style={{ width: 18, height: 18, color: C.text }} />
-              <div style={{ fontWeight: 600, fontSize: 16, color: C.text }}>Settings</div>
+              <div style={{ fontFamily: C.mono, fontWeight: 600, fontSize: 14, color: C.text, letterSpacing: '0.02em' }}>Settings</div>
             </div>
             <button
               onClick={onClose}
-              style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: 20, padding: '0 4px' }}
+              style={{ background: 'none', border: `1px solid ${C.border}`, color: C.muted, cursor: 'pointer', fontSize: 13, padding: '4px 10px', borderRadius: 0, fontFamily: C.mono }}
             >
               &times;
             </button>
@@ -608,7 +608,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
           <div style={{ display: 'flex', flex: 1, minHeight: 0 }}>
 
             {/* Sidebar */}
-            <nav style={{ width: 220, flexShrink: 0, background: C.surface, borderRight: `1px solid ${C.border}`, borderRadius: '0 0 0 12px', display: 'flex', flexDirection: 'column', paddingTop: 8 }}>
+            <nav style={{ width: 220, flexShrink: 0, background: C.surface, borderRight: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', paddingTop: 8 }}>
               {/* Main tabs */}
               {tabs.filter(t => !t.bottom).map(tab => {
                 const isActive = activeTab === tab.id
@@ -621,12 +621,12 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                       display: 'flex', alignItems: 'center', gap: 10, height: 40,
                       paddingLeft: isActive ? 13 : 16, paddingRight: 16,
                       background: isActive ? C.surfaceHover : 'transparent',
-                      border: 'none', borderLeftStyle: 'solid', borderLeftWidth: 3,
-                      borderLeftColor: isActive ? C.cyan : 'transparent',
+                      border: 'none', borderLeftStyle: 'solid', borderLeftWidth: 2,
+                      borderLeftColor: isActive ? C.accent : 'transparent',
                       color: isActive ? C.text : C.muted,
-                      fontSize: 13, fontWeight: 500, cursor: 'pointer', width: '100%',
+                      fontSize: 12, fontWeight: 500, cursor: 'pointer', width: '100%',
                       borderRadius: 0, textAlign: 'left',
-                      fontFamily: 'inherit',
+                      fontFamily: C.mono,
                     }}
                     onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = C.surfaceHover }}
                     onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}
@@ -655,12 +655,12 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                       display: 'flex', alignItems: 'center', gap: 10, height: 40,
                       paddingLeft: isActive ? 13 : 16, paddingRight: 16,
                       background: isActive ? C.surfaceHover : 'transparent',
-                      border: 'none', borderLeftStyle: 'solid', borderLeftWidth: 3,
+                      border: 'none', borderLeftStyle: 'solid', borderLeftWidth: 2,
                       borderLeftColor: isActive ? C.red : 'transparent',
                       color: isActive ? C.text : C.muted,
-                      fontSize: 13, fontWeight: 500, cursor: 'pointer', width: '100%',
+                      fontSize: 12, fontWeight: 500, cursor: 'pointer', width: '100%',
                       borderRadius: 0, textAlign: 'left',
-                      fontFamily: 'inherit',
+                      fontFamily: C.mono,
                     }}
                     onMouseEnter={e => { if (!isActive) e.currentTarget.style.background = C.surfaceHover }}
                     onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}
@@ -680,8 +680,8 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
               {activeTab === 'profile' && (
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
-                    <UserCircleIcon style={{ width: 16, height: 16, color: C.cyan }} />
-                    <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>Profile</div>
+                    <UserCircleIcon style={{ width: 16, height: 16, color: C.accent }} />
+                    <div style={{ fontFamily: C.mono, fontWeight: 600, fontSize: 13, color: C.text }}>Profile</div>
                   </div>
 
                   {profileLoading ? (
@@ -763,9 +763,8 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                       <button
                         onClick={saveProfile}
                         disabled={profileSaving || !profileName.trim()}
+                        className="btn-accent"
                         style={{
-                          background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
-                          padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
                           opacity: (profileSaving || !profileName.trim()) ? 0.5 : 1,
                         }}
                       >
@@ -780,8 +779,8 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
               {activeTab === 'team' && (
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <UsersIcon style={{ width: 16, height: 16, color: C.cyan }} />
-                    <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>Team Management</div>
+                    <UsersIcon style={{ width: 16, height: 16, color: C.accent }} />
+                    <div style={{ fontFamily: C.mono, fontWeight: 600, fontSize: 13, color: C.text }}>Team Management</div>
                   </div>
                   <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
                     Invite team members to review and manage your verifications. <strong style={{ color: C.text }}>Organization Admins</strong> can
@@ -816,9 +815,8 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                     <button
                       onClick={inviteReviewer}
                       disabled={reviewerInviting || !reviewerEmail.includes('@')}
+                      className="btn-accent"
                       style={{
-                        background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
-                        padding: '8px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
                         opacity: (reviewerInviting || !reviewerEmail.includes('@')) ? 0.5 : 1,
                         whiteSpace: 'nowrap',
                       }}
@@ -833,7 +831,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                       {reviewers.map(r => (
                         <div key={r.id} style={{
                           display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                          background: C.surface, border: `1px solid ${C.border}`, borderRadius: 6, padding: '8px 12px',
+                          background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '8px 12px',
                           opacity: r.status === 'revoked' ? 0.45 : 1,
                         }}>
                           <div style={{ flex: 1, minWidth: 0 }}>
@@ -850,19 +848,21 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                           <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: 8 }}>
                             {/* Role badge */}
                             <span style={{
-                              fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em',
-                              padding: '2px 6px', borderRadius: 4,
+                              fontFamily: C.mono, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em',
+                              padding: '2px 6px', borderRadius: 0,
                               background: r.role === 'admin' ? 'rgba(167,139,250,0.12)' : 'rgba(136,150,170,0.1)',
                               color: r.role === 'admin' ? '#a78bfa' : C.dim,
+                              border: `1px solid ${r.role === 'admin' ? 'rgba(167,139,250,0.25)' : C.border}`,
                             }}>
                               {r.role === 'admin' ? 'Admin' : 'Reviewer'}
                             </span>
                             {/* Status badge */}
                             <span style={{
-                              fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em',
-                              padding: '2px 6px', borderRadius: 4,
+                              fontFamily: C.mono, fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em',
+                              padding: '2px 6px', borderRadius: 0,
                               background: r.status === 'active' ? 'rgba(34,197,94,0.12)' : r.status === 'invited' ? 'rgba(34,211,238,0.1)' : 'rgba(248,113,113,0.1)',
-                              color: r.status === 'active' ? '#22c55e' : r.status === 'invited' ? C.cyan : C.red,
+                              color: r.status === 'active' ? '#22c55e' : r.status === 'invited' ? C.accent : C.red,
+                              border: `1px solid ${r.status === 'active' ? 'rgba(34,197,94,0.25)' : r.status === 'invited' ? C.cyanBorder : 'rgba(248,113,113,0.25)'}`,
                             }}>
                               {r.status}
                             </span>
@@ -896,8 +896,8 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                       navigator.clipboard.writeText(url).then(() => toast.success('Login link copied'))
                     }}
                     style={{
-                      marginTop: 12, background: 'none', border: `1px solid ${C.border}`,
-                      color: C.muted, borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontSize: 12,
+                      marginTop: 12, background: 'none', border: `1px solid ${C.borderStrong}`,
+                      color: C.muted, borderRadius: 0, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontFamily: C.mono,
                     }}
                   >
                     Copy reviewer login link
@@ -911,8 +911,8 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                   {/* OCR Enhancement (LLM Fallback) */}
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <CodeBracketIcon style={{ width: 16, height: 16, color: C.cyan }} />
-                      <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>OCR Enhancement</div>
+                      <CodeBracketIcon style={{ width: 16, height: 16, color: C.accent }} />
+                      <div style={{ fontFamily: C.mono, fontWeight: 600, fontSize: 13, color: C.text }}>OCR Enhancement</div>
                     </div>
                     <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
                       This is completely optional. Our OCR pipeline extracts document fields using fast heuristics.
@@ -989,9 +989,8 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                               <button
                                 onClick={saveLLMSettings}
                                 disabled={llmSaving || (!llmApiKey && !llmConfigured)}
+                                className="btn-accent"
                                 style={{
-                                  background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
-                                  padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
                                   opacity: (llmSaving || (!llmApiKey && !llmConfigured)) ? 0.5 : 1,
                                 }}
                               >
@@ -1001,10 +1000,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                                 <button
                                   onClick={clearLLMSettings}
                                   disabled={llmSaving}
-                                  style={{
-                                    background: 'none', border: `1px solid ${C.border}`, color: C.muted,
-                                    borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13,
-                                  }}
+                                  className="btn-outline"
                                 >
                                   Remove
                                 </button>
@@ -1022,8 +1018,8 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                   {/* SMS Provider (Phone OTP) */}
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <DevicePhoneMobileIcon style={{ width: 16, height: 16, color: C.cyan }} />
-                      <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>Phone OTP</div>
+                      <DevicePhoneMobileIcon style={{ width: 16, height: 16, color: C.accent }} />
+                      <div style={{ fontFamily: C.mono, fontWeight: 600, fontSize: 13, color: C.text }}>Phone OTP</div>
                     </div>
                     <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
                       Optional. Add your own <strong style={{ color: C.text, fontWeight: 500 }}>Twilio</strong> or <strong style={{ color: C.text, fontWeight: 500 }}>Vonage</strong> credentials
@@ -1103,9 +1099,8 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                               <button
                                 onClick={saveSMSSettings}
                                 disabled={smsSaving || (!smsConfigured && (!smsApiKey || !smsApiSecret || !smsPhoneNumber))}
+                                className="btn-accent"
                                 style={{
-                                  background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
-                                  padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
                                   opacity: (smsSaving || (!smsConfigured && (!smsApiKey || !smsApiSecret || !smsPhoneNumber))) ? 0.5 : 1,
                                 }}
                               >
@@ -1115,10 +1110,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                                 <button
                                   onClick={clearSMSSettings}
                                   disabled={smsSaving}
-                                  style={{
-                                    background: 'none', border: `1px solid ${C.border}`, color: C.muted,
-                                    borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13,
-                                  }}
+                                  className="btn-outline"
                                 >
                                   Remove
                                 </button>
@@ -1136,8 +1128,8 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                   {/* AML / Sanctions Screening */}
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <ShieldExclamationIcon style={{ width: 16, height: 16, color: C.cyan }} />
-                      <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>AML / Sanctions Screening</div>
+                      <ShieldExclamationIcon style={{ width: 16, height: 16, color: C.accent }} />
+                      <div style={{ fontFamily: C.mono, fontWeight: 600, fontSize: 13, color: C.text }}>AML / Sanctions Screening</div>
                     </div>
                     <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
                       Screen extracted names against <strong style={{ color: C.text, fontWeight: 500 }}>OFAC, EU, UN</strong>, and other sanctions lists
@@ -1155,7 +1147,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                             onClick={() => setAmlEnabled(!amlEnabled)}
                             style={{
                               width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
-                              background: amlEnabled ? C.cyan : C.border,
+                              background: amlEnabled ? C.accent : C.border,
                               position: 'relative', transition: 'background 0.2s',
                             }}
                           >
@@ -1180,11 +1172,8 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                         <button
                           onClick={saveAmlSettings}
                           disabled={amlSaving}
-                          style={{
-                            background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
-                            padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                            opacity: amlSaving ? 0.5 : 1,
-                          }}
+                          className="btn-accent"
+                          style={{ opacity: amlSaving ? 0.5 : 1 }}
                         >
                           {amlSaving ? 'Saving...' : 'Save'}
                         </button>
@@ -1198,8 +1187,8 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                   {/* Duplicate Detection */}
                   <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                      <FingerPrintIcon style={{ width: 16, height: 16, color: C.cyan }} />
-                      <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>Duplicate Detection</div>
+                      <FingerPrintIcon style={{ width: 16, height: 16, color: C.accent }} />
+                      <div style={{ fontFamily: C.mono, fontWeight: 600, fontSize: 13, color: C.text }}>Duplicate Detection</div>
                     </div>
                     <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
                       Detect when the same government ID or face appears in multiple verification sessions.
@@ -1218,7 +1207,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                             onClick={() => setDedupEnabled(!dedupEnabled)}
                             style={{
                               width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
-                              background: dedupEnabled ? C.cyan : C.border,
+                              background: dedupEnabled ? C.accent : C.border,
                               position: 'relative', transition: 'background 0.2s',
                             }}
                           >
@@ -1252,11 +1241,8 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                         <button
                           onClick={saveDedupSettings}
                           disabled={dedupSaving}
-                          style={{
-                            background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
-                            padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                            opacity: dedupSaving ? 0.5 : 1,
-                          }}
+                          className="btn-accent"
+                          style={{ opacity: dedupSaving ? 0.5 : 1 }}
                         >
                           {dedupSaving ? 'Saving...' : 'Save'}
                         </button>
@@ -1271,8 +1257,8 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
 
                       <div>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                          <ShieldCheckIcon style={{ width: 16, height: 16, color: C.cyan }} />
-                          <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>Verifiable Credentials</div>
+                          <ShieldCheckIcon style={{ width: 16, height: 16, color: C.accent }} />
+                          <div style={{ fontFamily: C.mono, fontWeight: 600, fontSize: 13, color: C.text }}>Verifiable Credentials</div>
                         </div>
                         <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
                           Issue <strong style={{ color: C.text, fontWeight: 500 }}>W3C Verifiable Credentials</strong> (JWT-VC format)
@@ -1290,7 +1276,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                                 onClick={() => setVcEnabled(!vcEnabled)}
                                 style={{
                                   width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
-                                  background: vcEnabled ? C.cyan : C.border,
+                                  background: vcEnabled ? C.accent : C.border,
                                   position: 'relative', transition: 'background 0.2s',
                                 }}
                               >
@@ -1309,7 +1295,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                             {vcEnabled && (
                               <div style={{ color: C.dim, fontSize: 12, marginBottom: 12, lineHeight: 1.6 }}>
                                 After a verification completes with status <strong style={{ color: C.text }}>verified</strong>,
-                                call <code style={{ color: C.cyan, fontSize: 11 }}>GET /api/v2/verify/:id/credential</code> to
+                                call <code style={{ color: C.accent, fontFamily: C.mono, fontSize: 11 }}>GET /api/v2/verify/:id/credential</code> to
                                 receive a signed JWT-VC.
                               </div>
                             )}
@@ -1317,11 +1303,8 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                             <button
                               onClick={saveVcSettings}
                               disabled={vcSaving}
-                              style={{
-                                background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
-                                padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                                opacity: vcSaving ? 0.5 : 1,
-                              }}
+                              className="btn-accent"
+                              style={{ opacity: vcSaving ? 0.5 : 1 }}
                             >
                               {vcSaving ? 'Saving...' : 'Save'}
                             </button>
@@ -1337,8 +1320,8 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
               {activeTab === 'branding' && (
                 <div>
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-                    <PaintBrushIcon style={{ width: 16, height: 16, color: C.cyan }} />
-                    <div style={{ fontWeight: 600, fontSize: 14, color: C.text }}>Verification Page</div>
+                    <PaintBrushIcon style={{ width: 16, height: 16, color: C.accent }} />
+                    <div style={{ fontFamily: C.mono, fontWeight: 600, fontSize: 13, color: C.text }}>Verification Page</div>
                   </div>
                   <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
                     White-label the hosted verification page with your own branding. End users will see your logo,
@@ -1374,8 +1357,8 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                           type="button"
                           onClick={() => document.getElementById('branding-logo-input')?.click()}
                           style={{
-                            background: C.surface, border: `1px solid ${C.border}`, color: C.muted,
-                            borderRadius: 6, padding: '6px 12px', cursor: 'pointer', fontSize: 12,
+                            background: C.surface, border: `1px solid ${C.borderStrong}`, color: C.muted,
+                            borderRadius: 0, padding: '6px 12px', cursor: 'pointer', fontSize: 12, fontFamily: C.mono,
                             whiteSpace: 'nowrap',
                           }}
                         >
@@ -1412,8 +1395,8 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                         />
                         <div
                           style={{
-                            width: 32, height: 32, borderRadius: 6, flexShrink: 0,
-                            background: /^#[0-9a-fA-F]{6}$/.test(brandAccentColor) ? brandAccentColor : C.cyan,
+                            width: 32, height: 32, borderRadius: 0, flexShrink: 0,
+                            background: /^#[0-9a-fA-F]{6}$/.test(brandAccentColor) ? brandAccentColor : C.accent,
                             border: `1px solid ${C.border}`,
                           }}
                         />
@@ -1427,7 +1410,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
 
                       {/* Live Preview */}
                       <div style={{
-                        background: '#080c14', border: `1px solid ${C.border}`, borderRadius: 10,
+                        background: C.bg, border: `1px solid ${C.border}`, borderRadius: 0,
                         padding: 16, marginBottom: 14,
                       }}>
                         <div style={{ fontSize: 10, color: C.dim, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 10 }}>Preview</div>
@@ -1449,10 +1432,10 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                           <button
                             type="button"
                             style={{
-                              background: /^#[0-9a-fA-F]{6}$/.test(brandAccentColor) ? brandAccentColor : C.cyan,
-                              color: '#080c14', border: 'none', borderRadius: 8,
+                              background: /^#[0-9a-fA-F]{6}$/.test(brandAccentColor) ? brandAccentColor : C.accent,
+                              color: C.bg, border: 'none', borderRadius: 0,
                               padding: '8px 24px', fontSize: 12, fontWeight: 600,
-                              cursor: 'default',
+                              fontFamily: C.mono, cursor: 'default',
                             }}
                           >
                             Scan QR Code
@@ -1470,11 +1453,8 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                         <button
                           onClick={saveBrandingSettings}
                           disabled={brandSaving}
-                          style={{
-                            background: C.cyan, border: 'none', color: C.bg, borderRadius: 6,
-                            padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                            opacity: brandSaving ? 0.5 : 1,
-                          }}
+                          className="btn-accent"
+                          style={{ opacity: brandSaving ? 0.5 : 1 }}
                         >
                           {brandSaving ? 'Saving...' : 'Save'}
                         </button>
@@ -1482,19 +1462,16 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                           <button
                             onClick={clearBrandingSettings}
                             disabled={brandSaving}
-                            style={{
-                              background: 'none', border: `1px solid ${C.border}`, color: C.muted,
-                              borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13,
-                            }}
+                            className="btn-outline"
                           >
                             Clear
                           </button>
                         )}
                       </div>
 
-                      <div style={{ marginTop: 16, padding: '12px 14px', background: C.cyanDim, borderRadius: 8, border: `1px solid ${C.cyanBorder}` }}>
+                      <div style={{ marginTop: 16, padding: '12px 14px', background: C.accentSoft, borderRadius: 0, border: `1px solid ${C.cyanBorder}` }}>
                         <Link to="/developer/page-builder" onClick={onClose}
-                          style={{ color: C.cyan, fontSize: 13, fontWeight: 500, textDecoration: 'none' }}>
+                          style={{ color: C.accent, fontSize: 13, fontFamily: C.mono, fontWeight: 500, textDecoration: 'none' }}>
                           Want more control? Try the Page Builder &rarr;
                         </Link>
                       </div>
@@ -1514,7 +1491,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                     Permanently delete your developer account and all associated data including API keys, webhooks, and verification records. This action cannot be undone.
                   </div>
                   <button
-                    style={{ background: 'none', border: `1px solid ${C.red}`, color: C.red, borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 500 }}
+                    style={{ background: 'none', border: `1px solid ${C.red}`, color: C.red, borderRadius: 0, padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 500, fontFamily: C.mono }}
                     onClick={() => setShowDeleteAccount(true)}
                   >
                     Delete Account
@@ -1534,12 +1511,12 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
           onClick={() => setShowDeleteAccount(false)}
         >
           <div
-            style={{ width: '100%', maxWidth: 440, background: C.panel, border: `1px solid ${C.red}33`, borderRadius: 12, padding: 24 }}
+            style={{ width: '100%', maxWidth: 440, background: C.panel, border: `1px solid ${C.red}33`, borderRadius: 0, padding: 24 }}
             onClick={e => e.stopPropagation()}
           >
             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
               <ExclamationTriangleIcon style={{ width: 20, height: 20, color: C.red }} />
-              <div style={{ fontWeight: 600, fontSize: 16, color: C.red }}>Delete Account</div>
+              <div style={{ fontFamily: C.mono, fontWeight: 600, fontSize: 14, color: C.red }}>Delete Account</div>
             </div>
             <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
               This will permanently delete your developer account and all associated data. Type your email address to confirm.
@@ -1554,13 +1531,14 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
             />
             <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 10 }}>
               <button
-                style={{ background: 'none', border: `1px solid ${C.border}`, color: C.muted, borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13 }}
+                className="btn-outline"
                 onClick={() => { setShowDeleteAccount(false); setDeleteAccountEmail('') }}
               >
                 Cancel
               </button>
               <button
-                style={{ background: C.red, border: 'none', color: '#fff', borderRadius: 6, padding: '8px 18px', cursor: 'pointer', fontSize: 13, fontWeight: 600, opacity: deleteAccountEmail ? 1 : 0.5 }}
+                className="btn-error"
+                style={{ opacity: deleteAccountEmail ? 1 : 0.5 }}
                 onClick={deleteAccount}
                 disabled={!deleteAccountEmail || deleteAccountLoading}
               >

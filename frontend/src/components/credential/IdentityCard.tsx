@@ -220,7 +220,7 @@ export const IdentityCard = forwardRef<HTMLDivElement, IdentityCardProps>(
               <div style={{ textAlign: 'center', flex: 1 }}>
                 <div style={{
                   fontFamily: C.mono, fontSize: 9, fontWeight: 600,
-                  color: C.cyan, letterSpacing: '0.12em', textTransform: 'uppercase',
+                  color: C.accent, letterSpacing: '0.12em', textTransform: 'uppercase',
                 }}>
                   Identity Credential
                 </div>
@@ -296,7 +296,7 @@ export const IdentityCard = forwardRef<HTMLDivElement, IdentityCardProps>(
             <div style={{ marginBottom: 8 }}>
               <div style={labelStyle}>Issuer</div>
               <div style={{
-                fontFamily: C.mono, fontSize: 9, color: C.cyan, lineHeight: 1.3,
+                fontFamily: C.mono, fontSize: 9, color: C.accent, lineHeight: 1.3,
               }}>
                 {issuer || '\u2014'}
               </div>

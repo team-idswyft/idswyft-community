@@ -38,11 +38,11 @@ function highlightJson(obj: unknown): React.ReactNode[] {
 
 // ─── Shared styles ───────────────────────────────────────────
 const card: React.CSSProperties = {
-  background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12,
+  background: 'var(--panel)', border: '1px solid var(--rule)',
   padding: 20, marginBottom: 16, textAlign: 'left',
 };
 const cardLabel: React.CSSProperties = {
-  fontFamily: C.mono, fontSize: 11, fontWeight: 600, color: C.muted,
+  fontFamily: C.mono, fontSize: 11, fontWeight: 500, color: 'var(--mid)',
   marginBottom: 12, letterSpacing: '0.04em', textTransform: 'uppercase',
 };
 
@@ -50,7 +50,8 @@ function Badge({ ok, yes, no }: { ok: boolean; yes: string; no: string }) {
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 4,
-      fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
+      fontSize: 11, fontWeight: 500, padding: '3px 8px',
+      fontFamily: C.mono, letterSpacing: '0.03em',
       background: ok ? C.greenDim : C.redDim,
       color: ok ? C.green : C.red,
       border: `1px solid ${ok ? 'rgba(52,211,153,0.25)' : 'rgba(248,113,113,0.25)'}`,
@@ -62,8 +63,8 @@ function Badge({ ok, yes, no }: { ok: boolean; yes: string; no: string }) {
 
 function Row({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, padding: '4px 0' }}>
-      <span style={{ color: C.muted }}>{label}</span>
+    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13, padding: '6px 0', borderBottom: '1px solid var(--rule)' }}>
+      <span style={{ color: 'var(--mid)' }}>{label}</span>
       {children}
     </div>
   );
@@ -138,7 +139,7 @@ export function VerifyCredentialPage() {
     : false;
 
   return (
-    <div style={{ minHeight: '100vh', background: C.bg, fontFamily: C.sans, color: C.text }}>
+    <div style={{ minHeight: '100vh', background: 'var(--paper)', fontFamily: C.sans, color: 'var(--ink)' }}>
       {/* Spin animation */}
       <style>{`@keyframes vcSpin { to { transform: rotate(360deg) } }`}</style>
 
@@ -147,20 +148,20 @@ export function VerifyCredentialPage() {
         {/* Header */}
         <div style={{ textAlign: 'center', marginBottom: 40 }}>
           <div style={{
-            width: 64, height: 64, borderRadius: '50%',
-            background: C.cyanDim, border: `1px solid ${C.cyanBorder}`,
+            width: 56, height: 56,
+            border: '1px solid var(--accent)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             margin: '0 auto 16px',
           }}>
-            <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={C.cyan} strokeWidth="1.5">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="1.5">
               <path d="M9 12l2 2 4-4" />
               <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z" />
             </svg>
           </div>
-          <h1 style={{ fontSize: 28, fontWeight: 700, marginBottom: 8, letterSpacing: '-0.02em' }}>
+          <h1 style={{ fontSize: 28, fontWeight: 500, fontFamily: C.mono, marginBottom: 8, letterSpacing: '-0.02em' }}>
             Verify a Credential
           </h1>
-          <p style={{ color: C.muted, fontSize: 15, lineHeight: 1.6, maxWidth: 420, margin: '0 auto' }}>
+          <p style={{ color: 'var(--mid)', fontSize: 15, lineHeight: 1.6, maxWidth: 420, margin: '0 auto' }}>
             Paste any Idswyft JWT-VC to verify its authenticity. Signature verification happens entirely in your browser — no API key needed.
           </p>
         </div>
@@ -168,16 +169,14 @@ export function VerifyCredentialPage() {
         {/* ── Verifying spinner ── */}
         {verifying && (
           <div style={{ padding: '48px 0', textAlign: 'center' }}>
-            <div style={{
+            <div className="loading-spinner-glass" style={{
               width: 48, height: 48,
-              border: `2px solid ${C.cyanDim}`, borderTopColor: C.cyan,
-              borderRadius: '50%', animation: 'vcSpin 0.8s linear infinite',
               margin: '0 auto 16px',
             }} />
-            <div style={{ fontFamily: C.mono, fontSize: 12, color: C.cyan, letterSpacing: '0.08em' }}>
+            <div style={{ fontFamily: C.mono, fontSize: 12, color: 'var(--accent-ink)', letterSpacing: '0.08em' }}>
               {stage}
             </div>
-            <p style={{ color: C.dim, fontSize: 11, marginTop: 8 }}>
+            <p style={{ color: 'var(--soft)', fontSize: 11, marginTop: 8 }}>
               Client-side Ed25519 verification
             </p>
           </div>
@@ -197,14 +196,14 @@ export function VerifyCredentialPage() {
                 ].map(s => (
                   <div key={s.n} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                     <div style={{
-                      width: 26, height: 26, borderRadius: 7, flexShrink: 0,
-                      background: C.cyanDim, border: `1px solid rgba(34,211,238,0.12)`,
+                      width: 24, height: 24, flexShrink: 0,
+                      border: '1px solid var(--accent)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontFamily: C.mono, fontSize: 11, color: C.cyan,
+                      fontFamily: C.mono, fontSize: 11, color: 'var(--accent-ink)',
                     }}>{s.n}</div>
                     <div>
-                      <div style={{ fontWeight: 600, fontSize: 13, color: C.text, marginBottom: 2 }}>{s.title}</div>
-                      <div style={{ fontSize: 12, color: C.muted, lineHeight: 1.5 }}>{s.desc}</div>
+                      <div style={{ fontWeight: 600, fontSize: 13, color: 'var(--ink)', marginBottom: 2 }}>{s.title}</div>
+                      <div style={{ fontSize: 12, color: 'var(--mid)', lineHeight: 1.5 }}>{s.desc}</div>
                     </div>
                   </div>
                 ))}
@@ -218,34 +217,32 @@ export function VerifyCredentialPage() {
               placeholder="eyJhbGciOiJFZERTQSIsInR5cCI6IkpXVCJ9..."
               spellCheck={false}
               style={{
-                width: '100%', minHeight: 140, padding: 16, borderRadius: 10,
-                background: C.codeBg, color: C.code, border: `1px solid ${C.border}`,
+                width: '100%', minHeight: 140, padding: 16,
+                background: C.codeBg, color: C.code, border: '1px solid var(--rule-strong)',
                 fontFamily: C.mono, fontSize: 12, lineHeight: 1.6,
                 resize: 'vertical', outline: 'none', boxSizing: 'border-box',
                 transition: 'border-color 0.15s',
               }}
-              onFocus={e => { e.target.style.borderColor = 'rgba(34,211,238,0.4)'; }}
-              onBlur={e => { e.target.style.borderColor = C.border; }}
+              onFocus={e => { e.target.style.borderColor = 'var(--ink)'; }}
+              onBlur={e => { e.target.style.borderColor = 'var(--rule-strong)'; }}
             />
 
             <button
               onClick={() => handleVerify()}
               disabled={!jwtInput.trim()}
+              className="btn"
               style={{
-                width: '100%', padding: 14, borderRadius: 10, border: 'none',
-                background: !jwtInput.trim() ? C.dim : C.cyan,
-                color: !jwtInput.trim() ? C.muted : C.bg,
-                fontFamily: C.sans, fontSize: 15, fontWeight: 700,
-                cursor: !jwtInput.trim() ? 'not-allowed' : 'pointer',
-                marginTop: 14, transition: 'opacity 0.15s',
+                width: '100%', justifyContent: 'center',
+                fontFamily: C.sans, fontSize: 15,
+                marginTop: 14,
               }}
             >
               Verify Credential
             </button>
 
             {/* Subtle link to demo */}
-            <p style={{ textAlign: 'center', marginTop: 20, fontSize: 12, color: C.dim }}>
-              Don't have a credential? <Link to="/demo" style={{ color: C.cyan, textDecoration: 'none' }}>Try the demo</Link> to issue one.
+            <p style={{ textAlign: 'center', marginTop: 20, fontSize: 12, color: 'var(--soft)' }}>
+              Don't have a credential? <Link to="/demo" style={{ color: 'var(--accent-ink)', textDecoration: 'none' }}>Try the demo</Link> to issue one.
             </p>
           </>
         )}
@@ -271,17 +268,17 @@ export function VerifyCredentialPage() {
               {/* Result header badge */}
               <div style={{ textAlign: 'center', marginBottom: 28 }}>
                 <div style={{
-                  width: 60, height: 60, borderRadius: '50%',
+                  width: 56, height: 56,
                   background: headerBg, border: `1px solid ${headerColor}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
                   margin: '0 auto 14px', fontSize: 24, color: headerColor,
                 }}>
                   {headerIcon}
                 </div>
-                <h2 style={{ fontSize: 22, fontWeight: 700, color: C.text, marginBottom: 6 }}>
+                <h2 style={{ fontSize: 22, fontWeight: 500, fontFamily: C.mono, color: 'var(--ink)', marginBottom: 6, letterSpacing: '-0.02em' }}>
                   {headerLabel}
                 </h2>
-                <p style={{ color: C.muted, fontSize: 13, margin: 0, maxWidth: 380, marginLeft: 'auto', marginRight: 'auto' }}>
+                <p style={{ color: 'var(--mid)', fontSize: 13, margin: 0, maxWidth: 380, marginLeft: 'auto', marginRight: 'auto' }}>
                   {headerDesc}
                 </p>
               </div>
@@ -315,11 +312,12 @@ export function VerifyCredentialPage() {
                     <div style={{ display: 'flex', gap: 10, justifyContent: 'center', marginTop: 12 }}>
                       <button
                         onClick={() => cardRef.current && downloadCardPng(cardRef.current)}
+                        className="btn ghost"
                         style={{
-                          background: C.cyanDim, border: `1px solid ${C.cyanBorder}`,
-                          color: C.cyan, borderRadius: 8, padding: '8px 18px',
-                          fontFamily: C.mono, fontWeight: 600, fontSize: 11, cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', gap: 6,
+                          border: '1px solid var(--accent)',
+                          color: 'var(--accent-ink)',
+                          padding: '8px 18px',
+                          fontSize: 11,
                         }}
                       >
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
@@ -327,11 +325,12 @@ export function VerifyCredentialPage() {
                       </button>
                       <button
                         onClick={() => cardRef.current && downloadCardPdf(cardRef.current)}
+                        className="btn ghost"
                         style={{
-                          background: C.cyanDim, border: `1px solid ${C.cyanBorder}`,
-                          color: C.cyan, borderRadius: 8, padding: '8px 18px',
-                          fontFamily: C.mono, fontWeight: 600, fontSize: 11, cursor: 'pointer',
-                          display: 'flex', alignItems: 'center', gap: 6,
+                          border: '1px solid var(--accent)',
+                          color: 'var(--accent-ink)',
+                          padding: '8px 18px',
+                          fontSize: 11,
                         }}
                       >
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
@@ -384,7 +383,7 @@ export function VerifyCredentialPage() {
                   <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                     <Badge ok={statusResult.active} yes="Active" no="Inactive" />
                     {statusResult.reason && !statusResult.active && (
-                      <span style={{ color: C.dim, fontSize: 11, fontFamily: C.mono }}>{statusResult.reason}</span>
+                      <span style={{ color: 'var(--soft)', fontSize: 11, fontFamily: C.mono }}>{statusResult.reason}</span>
                     )}
                   </div>
                 </div>
@@ -395,7 +394,8 @@ export function VerifyCredentialPage() {
                 <div style={card}>
                   <div style={cardLabel}>JWT Header</div>
                   <pre style={{
-                    background: C.codeBg, color: C.code, padding: 14, borderRadius: 8,
+                    background: C.codeBg, color: C.code, padding: 14,
+                    border: '1px solid var(--rule)',
                     fontSize: 11, fontFamily: C.mono, overflowX: 'auto', lineHeight: 1.5, margin: 0,
                   }}>
                     {highlightJson(result.header)}
@@ -408,7 +408,8 @@ export function VerifyCredentialPage() {
                 <div style={card}>
                   <div style={cardLabel}>JWT Payload</div>
                   <pre style={{
-                    background: C.codeBg, color: C.code, padding: 14, borderRadius: 8,
+                    background: C.codeBg, color: C.code, padding: 14,
+                    border: '1px solid var(--rule)',
                     fontSize: 11, fontFamily: C.mono, overflowX: 'auto',
                     maxHeight: 320, overflowY: 'auto', lineHeight: 1.5, margin: 0,
                   }}>
@@ -421,8 +422,9 @@ export function VerifyCredentialPage() {
               <div style={card}>
                 <div style={cardLabel}>Raw JWT</div>
                 <div style={{
-                  background: C.codeBg, padding: 14, borderRadius: 8,
-                  fontSize: 9, fontFamily: C.mono, color: C.dim,
+                  background: C.codeBg, padding: 14,
+                  border: '1px solid var(--rule)',
+                  fontSize: 9, fontFamily: C.mono, color: 'var(--soft)',
                   wordBreak: 'break-all', lineHeight: 1.6, maxHeight: 120, overflowY: 'auto',
                 }}>
                   <span style={{ color: C.cyan }}>{jwtParts[0]}</span>
@@ -439,11 +441,10 @@ export function VerifyCredentialPage() {
                   <button
                     onClick={handleCheckRevocation}
                     disabled={checkingStatus}
+                    className="btn-accent"
                     style={{
-                      background: C.cyanDim, border: `1px solid ${C.cyanBorder}`,
-                      color: C.cyan, borderRadius: 8, padding: '10px 22px',
-                      fontWeight: 600, fontSize: 13, cursor: checkingStatus ? 'not-allowed' : 'pointer',
                       opacity: checkingStatus ? 0.6 : 1,
+                      cursor: checkingStatus ? 'not-allowed' : undefined,
                     }}
                   >
                     {checkingStatus ? 'Checking...' : 'Check Revocation'}
@@ -451,10 +452,10 @@ export function VerifyCredentialPage() {
                 )}
                 <button
                   onClick={handleReset}
+                  className="btn ghost"
                   style={{
-                    background: 'rgba(34,211,238,0.06)', border: '1px solid rgba(34,211,238,0.15)',
-                    color: C.cyan, borderRadius: 8, padding: '10px 22px',
-                    fontWeight: 600, fontSize: 13, cursor: 'pointer',
+                    border: '1px solid var(--rule-strong)',
+                    color: 'var(--ink)',
                   }}
                 >
                   Verify Another
@@ -467,13 +468,14 @@ export function VerifyCredentialPage() {
         {/* Footer note */}
         <div style={{
           textAlign: 'center', marginTop: 48, paddingTop: 24,
-          borderTop: `1px solid ${C.border}`, fontSize: 11, color: C.dim,
+          borderTop: '1px solid var(--rule)', fontSize: 11, color: 'var(--soft)',
+          fontFamily: C.mono, letterSpacing: '0.02em',
         }}>
-          Powered by <a href="https://idswyft.app" style={{ color: C.muted, textDecoration: 'none' }}>Idswyft</a> &middot;{' '}
-          <a href="https://www.w3.org/TR/vc-data-model-2.0/" target="_blank" rel="noopener noreferrer" style={{ color: C.muted, textDecoration: 'none' }}>
+          Powered by <a href="https://idswyft.app" style={{ color: 'var(--mid)', textDecoration: 'none' }}>Idswyft</a> &middot;{' '}
+          <a href="https://www.w3.org/TR/vc-data-model-2.0/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--mid)', textDecoration: 'none' }}>
             W3C Verifiable Credentials
           </a> &middot;{' '}
-          <a href="https://w3c-ccg.github.io/did-method-web/" target="_blank" rel="noopener noreferrer" style={{ color: C.muted, textDecoration: 'none' }}>
+          <a href="https://w3c-ccg.github.io/did-method-web/" target="_blank" rel="noopener noreferrer" style={{ color: 'var(--mid)', textDecoration: 'none' }}>
             DID:web
           </a>
         </div>

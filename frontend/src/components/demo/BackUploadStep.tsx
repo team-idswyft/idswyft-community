@@ -46,7 +46,7 @@ export const BackUploadStep: React.FC<BackUploadStepProps> = ({
         {ocrData && Object.keys(ocrData).length > 0 && (
           <div style={{
             background: C.surface, border: `1px solid ${C.border}`,
-            borderRadius: 8, padding: '12px 14px',
+            padding: '12px 14px',
           }}>
             <div style={{
               fontFamily: C.mono, fontSize: 10, fontWeight: 600,
@@ -109,7 +109,7 @@ export const BackUploadStep: React.FC<BackUploadStepProps> = ({
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               background: C.surface, border: `1px solid ${C.border}`,
-              borderRadius: 8, padding: '10px 14px',
+              padding: '10px 14px',
             }}>
               <div>
                 <p style={{ fontWeight: 500, color: C.text, fontSize: 13, margin: 0 }}>{backFile.name}</p>
@@ -117,7 +117,7 @@ export const BackUploadStep: React.FC<BackUploadStepProps> = ({
               </div>
               <button
                 onClick={() => document.getElementById('demo-back-upload')?.click()}
-                style={{ background: 'none', border: 'none', color: C.cyan, fontSize: 12, cursor: 'pointer', fontFamily: C.mono }}
+                style={{ background: 'none', border: 'none', color: C.accent, fontSize: 12, cursor: 'pointer', fontFamily: C.mono }}
               >
                 Change
               </button>

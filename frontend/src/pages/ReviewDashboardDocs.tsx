@@ -49,7 +49,7 @@ export const ReviewDashboardDocs: React.FC = () => (
 
     {/* ══ OVERVIEW ═════════════════════════════════════════════════════ */}
     <SectionAnchor id="overview" />
-    <H2>Review Dashboard</H2>
+    <H2 index="01">Review Dashboard</H2>
     <Lead>
       The Review Dashboard lets you and your team review, approve, or reject identity verifications
       without writing any code. It's the fastest way to go live — integrate the API, then use the
@@ -63,7 +63,7 @@ export const ReviewDashboardDocs: React.FC = () => (
         { icon: '👥', title: 'Invite Reviewers', desc: 'Give team members access with passwordless OTP login — no shared credentials' },
         { icon: '📊', title: 'Live Stats', desc: 'See total, pending, verified, and failed counts at a glance' },
       ].map(c => (
-        <div key={c.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div key={c.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '20px', display: 'flex', flexDirection: 'column', gap: 8 }}>
           <div style={{ fontSize: '1.4rem' }}>{c.icon}</div>
           <div style={{ fontFamily: C.sans, fontSize: '0.9rem', fontWeight: 600, color: C.text }}>{c.title}</div>
           <div style={{ fontFamily: C.sans, fontSize: '0.78rem', color: C.muted, lineHeight: 1.55 }}>{c.desc}</div>
@@ -82,7 +82,7 @@ export const ReviewDashboardDocs: React.FC = () => (
 
     {/* ══ ACCESS ════════════════════════════════════════════════════════ */}
     <SectionAnchor id="access" />
-    <H2>Getting Access</H2>
+    <H2 index="02">Getting Access</H2>
     <Lead>
       Developers invite team members from the Developer Portal. Team members access the dashboard
       via passwordless OTP — no passwords to manage.
@@ -100,18 +100,18 @@ export const ReviewDashboardDocs: React.FC = () => (
     </div>
 
     <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12, marginBottom: 24, maxWidth: 680 }}>
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '20px' }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', padding: '2px 6px', borderRadius: 4, background: 'rgba(167,139,250,0.12)', color: '#a78bfa' }}>Admin</span>
+          <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', padding: '2px 6px', borderRadius: 0, background: 'rgba(167,139,250,0.12)', color: '#a78bfa' }}>Admin</span>
           <span style={{ fontFamily: C.sans, fontSize: '0.9rem', fontWeight: 600, color: C.text }}>Organization Admin</span>
         </div>
         <div style={{ fontFamily: C.sans, fontSize: '0.78rem', color: C.muted, lineHeight: 1.55 }}>
           Approve, reject, <strong>override</strong> verifications. Access analytics, manage GDPR erasure requests, and manage the reviewer team.
         </div>
       </div>
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '20px' }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '20px' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', padding: '2px 6px', borderRadius: 4, background: 'rgba(136,150,170,0.1)', color: C.muted }}>Reviewer</span>
+          <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', padding: '2px 6px', borderRadius: 0, background: 'rgba(136,150,170,0.1)', color: C.muted }}>Reviewer</span>
           <span style={{ fontFamily: C.sans, fontSize: '0.9rem', fontWeight: 600, color: C.text }}>Reviewer</span>
         </div>
         <div style={{ fontFamily: C.sans, fontSize: '0.78rem', color: C.muted, lineHeight: 1.55 }}>
@@ -141,8 +141,8 @@ export const ReviewDashboardDocs: React.FC = () => (
         { step: '2', text: 'Scroll to "Team Management"' },
         { step: '3', text: 'Enter email, name, select role → Invite' },
       ].map(s => (
-        <div key={s.step} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, flex: '1 1 180px' }}>
-          <div style={{ width: 24, height: 24, borderRadius: '50%', background: C.cyanDim, border: `1px solid ${C.cyanBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: C.mono, fontSize: '0.7rem', fontWeight: 700, color: C.cyan, flexShrink: 0 }}>{s.step}</div>
+        <div key={s.step} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '12px 16px', display: 'flex', alignItems: 'center', gap: 10, flex: '1 1 180px' }}>
+          <div style={{ width: 24, height: 24, borderRadius: 0, background: C.cyanDim, border: `1px solid ${C.cyanBorder}`, display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: C.mono, fontSize: '0.7rem', fontWeight: 700, color: C.cyan, flexShrink: 0 }}>{s.step}</div>
           <span style={{ fontFamily: C.sans, fontSize: '0.82rem', color: C.text }}>{s.text}</span>
         </div>
       ))}
@@ -168,7 +168,7 @@ export const ReviewDashboardDocs: React.FC = () => (
       access level.
     </div>
 
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '20px 24px', marginBottom: 24, maxWidth: 500 }}>
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '20px 24px', marginBottom: 24, maxWidth: 500 }}>
       <div style={{ fontFamily: C.mono, fontSize: '0.72rem', color: C.dim, marginBottom: 12, letterSpacing: '0.06em' }}>OTP LOGIN FLOW</div>
       {[
         'Reviewer navigates to /admin/login',
@@ -187,7 +187,7 @@ export const ReviewDashboardDocs: React.FC = () => (
 
     {/* ══ DASHBOARD ═════════════════════════════════════════════════════ */}
     <SectionAnchor id="dashboard" />
-    <H2>The Dashboard</H2>
+    <H2 index="03">The Dashboard</H2>
     <Lead>
       The dashboard is a single-page view with stats, a filterable table, and an expandable
       detail panel — everything you need to review verifications quickly.
@@ -208,7 +208,7 @@ export const ReviewDashboardDocs: React.FC = () => (
         { label: 'Verified', value: '—', color: C.green },
         { label: 'Failed', value: '—', color: C.red },
       ].map(s => (
-        <div key={s.label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 16px', borderTop: `3px solid ${s.color}` }}>
+        <div key={s.label} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '14px 16px', borderTop: `3px solid ${s.color}` }}>
           <div style={{ fontFamily: C.mono, fontSize: '0.65rem', color: C.muted, letterSpacing: '0.06em', marginBottom: 4 }}>{s.label.toUpperCase()}</div>
           <div style={{ fontFamily: C.mono, fontSize: '1.1rem', fontWeight: 600, color: s.color }}>{s.value}</div>
         </div>
@@ -223,7 +223,7 @@ export const ReviewDashboardDocs: React.FC = () => (
       the detail panel.
     </div>
 
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 24 }}>
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, overflow: 'hidden', marginBottom: 24 }}>
       <div style={{ display: 'grid', gridTemplateColumns: '40px 2fr 2fr 1.5fr 1.5fr 2fr 1fr', gap: 0, padding: '10px 16px', borderBottom: `1px solid ${C.border}`, fontFamily: C.mono, fontSize: '0.7rem', color: C.dim, letterSpacing: '0.04em' }}>
         <span></span><span>ID</span><span>USER ID</span><span>STATUS</span><span>DOC TYPE</span><span>CREATED</span><span>ACTIONS</span>
       </div>
@@ -251,14 +251,14 @@ export const ReviewDashboardDocs: React.FC = () => (
       Use the status tabs above the table to filter by verification state:
     </div>
 
-    <div style={{ display: 'flex', gap: 6, marginBottom: 24, flexWrap: 'wrap' }}>
+    <div style={{ display: 'flex', gap: 0, marginBottom: 24, flexWrap: 'wrap', borderBottom: `1px solid ${C.border}` }}>
       {['All', 'Manual Review', 'Verified', 'Failed', 'Pending'].map(tab => (
-        <span key={tab} style={{
-          fontFamily: C.sans, fontSize: '0.78rem', fontWeight: 500,
-          padding: '6px 14px', borderRadius: 6,
-          background: tab === 'All' ? C.cyanDim : C.surface,
-          color: tab === 'All' ? C.cyan : C.muted,
-          border: `1px solid ${tab === 'All' ? C.cyanBorder : C.border}`,
+        <span key={tab} className={`case-tab${tab === 'All' ? ' active' : ''}`} style={{
+          fontFamily: C.mono, fontSize: '0.78rem', fontWeight: 500,
+          padding: '10px 18px',
+          background: 'transparent',
+          color: tab === 'All' ? C.text : C.muted,
+          borderBottom: tab === 'All' ? `2px solid ${C.text}` : '2px solid transparent',
         }}>{tab}</span>
       ))}
     </div>
@@ -279,7 +279,7 @@ export const ReviewDashboardDocs: React.FC = () => (
         { title: 'Gate Analysis', desc: 'Score bars for OCR, cross-validation, liveness, deepfake, and face match gates' },
         { title: 'Risk Assessment', desc: 'Overall risk score, risk level, contributing factors, and AML screening results' },
       ].map(d => (
-        <div key={d.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 16px' }}>
+        <div key={d.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '14px 16px' }}>
           <div style={{ fontFamily: C.sans, fontSize: '0.82rem', fontWeight: 600, color: C.text, marginBottom: 4 }}>{d.title}</div>
           <div style={{ fontFamily: C.sans, fontSize: '0.75rem', color: C.muted, lineHeight: 1.55 }}>{d.desc}</div>
         </div>
@@ -290,14 +290,14 @@ export const ReviewDashboardDocs: React.FC = () => (
 
     {/* ══ ACTIONS ═══════════════════════════════════════════════════════ */}
     <SectionAnchor id="actions" />
-    <H2>Review Actions</H2>
+    <H2 index="04">Review Actions</H2>
     <Lead>
       Each verification can be approved, rejected, or overridden. All actions require a
       confirmation dialog to prevent accidental decisions.
     </Lead>
 
     <SectionAnchor id="approve" />
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '20px 24px', marginBottom: 16 }}>
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '20px 24px', marginBottom: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
         <div style={{ width: 10, height: 10, borderRadius: '50%', background: C.green }} />
         <span style={{ fontFamily: C.sans, fontSize: '0.95rem', fontWeight: 600, color: C.text }}>Approve</span>
@@ -311,7 +311,7 @@ export const ReviewDashboardDocs: React.FC = () => (
     </div>
 
     <SectionAnchor id="reject" />
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '20px 24px', marginBottom: 16 }}>
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '20px 24px', marginBottom: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
         <div style={{ width: 10, height: 10, borderRadius: '50%', background: C.red }} />
         <span style={{ fontFamily: C.sans, fontSize: '0.95rem', fontWeight: 600, color: C.text }}>Reject</span>
@@ -325,11 +325,11 @@ export const ReviewDashboardDocs: React.FC = () => (
     </div>
 
     <SectionAnchor id="override" />
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '20px 24px', marginBottom: 16 }}>
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '20px 24px', marginBottom: 16 }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 8 }}>
         <div style={{ width: 10, height: 10, borderRadius: '50%', background: C.amber }} />
         <span style={{ fontFamily: C.sans, fontSize: '0.95rem', fontWeight: 600, color: C.text }}>Override</span>
-        <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', padding: '2px 6px', borderRadius: 4, background: 'rgba(167,139,250,0.12)', color: '#a78bfa' }}>Admin Only</span>
+        <span style={{ fontSize: 10, fontWeight: 700, textTransform: 'uppercase', padding: '2px 6px', borderRadius: 0, background: 'rgba(167,139,250,0.12)', color: '#a78bfa' }}>Admin Only</span>
       </div>
       <div style={{ fontFamily: C.sans, fontSize: '0.85rem', color: C.muted, lineHeight: 1.75 }}>
         Lets you set any status — useful for edge cases. For example, overriding a{' '}
@@ -349,13 +349,13 @@ export const ReviewDashboardDocs: React.FC = () => (
 
     {/* ══ STATUS REFERENCE ══════════════════════════════════════════════ */}
     <SectionAnchor id="statuses" />
-    <H2>Status Reference</H2>
+    <H2 index="05">Status Reference</H2>
     <Lead>
       Every verification moves through these states. The dashboard color-codes each status
       for quick visual scanning.
     </Lead>
 
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 24 }}>
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, overflow: 'hidden', marginBottom: 24 }}>
       {[
         { status: 'pending', desc: 'Verification created, waiting for document upload or processing to complete.' },
         { status: 'manual_review', desc: 'Automated checks flagged something — a human needs to review and decide.' },
@@ -373,13 +373,13 @@ export const ReviewDashboardDocs: React.FC = () => (
 
     {/* ══ WEBHOOKS ══════════════════════════════════════════════════════ */}
     <SectionAnchor id="webhooks" />
-    <H2>Webhooks</H2>
+    <H2 index="06">Webhooks</H2>
     <Lead>
       When you approve, reject, or override a verification from the dashboard, a webhook is
       fired to your registered URL — the same events as automated decisions.
     </Lead>
 
-    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 24 }}>
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, overflow: 'hidden', marginBottom: 24 }}>
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 2fr', gap: 0, padding: '10px 16px', borderBottom: `1px solid ${C.border}`, fontFamily: C.mono, fontSize: '0.7rem', color: C.dim, letterSpacing: '0.04em' }}>
         <span>EVENT</span><span>TRIGGER</span><span>PAYLOAD INCLUDES</span>
       </div>

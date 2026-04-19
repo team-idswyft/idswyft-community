@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config/api';
-import { C, injectFonts } from '../theme';
+import { injectFonts } from '../theme';
 import '../styles/patterns.css';
 
 export const AdminLogin: React.FC = () => {
@@ -104,44 +104,40 @@ export const AdminLogin: React.FC = () => {
     return (
       <div style={{
         minHeight: '100vh',
-        background: C.bg,
+        background: 'var(--paper)',
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        fontFamily: C.sans,
+        fontFamily: 'var(--sans)',
       }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{
-            width: 40, height: 40, border: `3px solid ${C.border}`,
-            borderTopColor: C.cyan, borderRadius: '50%',
-            animation: 'spin 0.8s linear infinite',
-            margin: '0 auto 16px',
-          }} />
-          <p style={{ color: C.muted, fontSize: 14 }}>Authenticating...</p>
-          <style>{`@keyframes spin { to { transform: rotate(360deg) } }`}</style>
+          <div className="loading-spinner-glass" style={{ margin: '0 auto 16px' }} />
+          <p style={{ color: 'var(--mid)', fontSize: 14 }}>Authenticating...</p>
         </div>
       </div>
     );
   }
 
+  // v2: use CSS class overrides for inputs/labels (sharp edges, solid borders)
   const inputStyle: React.CSSProperties = {
     width: '100%',
-    background: C.surface,
-    border: `1px solid ${C.border}`,
-    borderRadius: 8,
-    padding: '12px 16px',
-    color: C.text,
+    background: 'var(--panel)',
+    border: '1px solid var(--rule-strong)',
+    borderRadius: 0,
+    padding: '10px 14px',
+    color: 'var(--ink)',
     fontSize: 14,
-    fontFamily: C.sans,
+    fontFamily: 'var(--sans)',
     outline: 'none',
     boxSizing: 'border-box',
-    transition: 'border-color 0.2s',
+    transition: 'border-color 120ms ease',
   };
 
   const labelStyle: React.CSSProperties = {
     display: 'block',
-    color: C.muted,
-    fontSize: 12,
+    color: 'var(--mid)',
+    fontFamily: 'var(--mono)',
+    fontSize: 11,
     fontWeight: 500,
     textTransform: 'uppercase',
     letterSpacing: '0.05em',
@@ -151,24 +147,14 @@ export const AdminLogin: React.FC = () => {
   return (
     <div className="pattern-shield pattern-faint pattern-fade-edges" style={{
       minHeight: '100vh',
-      background: C.bg,
+      background: 'var(--paper)',
       display: 'flex',
       alignItems: 'center',
       justifyContent: 'center',
-      fontFamily: C.sans,
+      fontFamily: 'var(--sans)',
       position: 'relative',
       overflow: 'hidden',
     }}>
-      {/* Subtle radial glow */}
-      <div style={{
-        position: 'absolute',
-        top: '30%', left: '50%',
-        transform: 'translate(-50%, -50%)',
-        width: 600, height: 600,
-        background: `radial-gradient(circle, ${C.cyanDim} 0%, transparent 70%)`,
-        pointerEvents: 'none',
-      }} />
-
       <div style={{
         width: '100%',
         maxWidth: 420,
@@ -184,19 +170,19 @@ export const AdminLogin: React.FC = () => {
             style={{ height: 32, margin: '0 auto 24px' }}
             onError={(e) => { e.currentTarget.style.display = 'none'; }}
           />
-          <div style={{ fontFamily: C.mono, fontSize: 11, color: C.muted, letterSpacing: '0.08em', marginBottom: 8 }}>
+          <div className="eyebrow" style={{ marginBottom: 8 }}>
             idswyft / review-dashboard
           </div>
           <h1 style={{
-            color: C.text,
-            fontFamily: C.mono,
+            color: 'var(--ink)',
+            fontFamily: 'var(--mono)',
             fontSize: 24,
             fontWeight: 600,
             margin: '0 0 8px',
           }}>
             Verification Management
           </h1>
-          <p style={{ color: C.muted, fontSize: 14, margin: 0 }}>
+          <p style={{ color: 'var(--mid)', fontSize: 14, margin: 0 }}>
             {step === 'email'
               ? 'Enter your reviewer email to sign in'
               : `Enter the code sent to ${email}`}
@@ -204,21 +190,12 @@ export const AdminLogin: React.FC = () => {
         </div>
 
         {/* Login card */}
-        <div style={{
-          background: C.panel,
-          border: `1px solid ${C.border}`,
-          borderRadius: 12,
-          padding: 32,
-          backdropFilter: 'blur(20px)',
-        }}>
+        <div className="card" style={{ padding: 32 }}>
           {error && (
-            <div style={{
-              background: C.redDim,
-              border: `1px solid rgba(248,113,113,0.25)`,
-              borderRadius: 8,
+            <div className="badge-error" style={{
+              display: 'block',
               padding: '12px 16px',
               marginBottom: 20,
-              color: C.red,
               fontSize: 13,
             }}>
               {error}
@@ -237,27 +214,20 @@ export const AdminLogin: React.FC = () => {
                   required
                   autoFocus
                   style={inputStyle}
-                  onFocus={(e) => e.currentTarget.style.borderColor = C.cyan}
-                  onBlur={(e) => e.currentTarget.style.borderColor = C.border}
+                  onFocus={(e) => e.currentTarget.style.borderColor = 'var(--ink)'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = 'var(--rule-strong)'}
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={loading}
+                className="btn-accent"
                 style={{
                   width: '100%',
-                  padding: '12px 24px',
-                  background: loading ? C.dim : C.cyan,
-                  color: '#080c14',
-                  border: 'none',
-                  borderRadius: 8,
-                  fontSize: 14,
-                  fontWeight: 600,
-                  fontFamily: C.sans,
+                  justifyContent: 'center',
+                  opacity: loading ? 0.5 : 1,
                   cursor: loading ? 'not-allowed' : 'pointer',
-                  transition: 'opacity 0.2s, transform 0.1s',
-                  opacity: loading ? 0.6 : 1,
                 }}
               >
                 {loading ? 'Sending code...' : 'Send verification code'}
@@ -267,15 +237,14 @@ export const AdminLogin: React.FC = () => {
             <form onSubmit={handleVerifyOtp}>
               {selfHostedCode && (
                 <div style={{
-                  background: 'rgba(34,211,238,0.06)',
-                  border: `1px solid rgba(34,211,238,0.2)`,
-                  borderRadius: 8,
+                  background: 'var(--accent-soft)',
+                  border: '1px solid color-mix(in oklab, var(--accent) 30%, transparent)',
                   padding: '12px 16px',
                   marginBottom: 20,
                   textAlign: 'center',
                 }}>
-                  <div style={{ color: C.muted, fontSize: 12, marginBottom: 4 }}>Self-hosted mode — your code:</div>
-                  <div style={{ color: C.cyan, fontSize: 24, fontWeight: 700, fontFamily: C.mono, letterSpacing: '0.15em' }}>
+                  <div style={{ color: 'var(--mid)', fontSize: 12, marginBottom: 4 }}>Self-hosted mode — your code:</div>
+                  <div style={{ color: 'var(--accent)', fontSize: 24, fontWeight: 700, fontFamily: 'var(--mono)', letterSpacing: '0.15em' }}>
                     {selfHostedCode}
                   </div>
                 </div>
@@ -297,30 +266,23 @@ export const AdminLogin: React.FC = () => {
                     ...inputStyle,
                     textAlign: 'center',
                     fontSize: 24,
-                    fontFamily: C.mono,
+                    fontFamily: 'var(--mono)',
                     letterSpacing: '0.2em',
                   }}
-                  onFocus={(e) => e.currentTarget.style.borderColor = C.cyan}
-                  onBlur={(e) => e.currentTarget.style.borderColor = C.border}
+                  onFocus={(e) => e.currentTarget.style.borderColor = 'var(--ink)'}
+                  onBlur={(e) => e.currentTarget.style.borderColor = 'var(--rule-strong)'}
                 />
               </div>
 
               <button
                 type="submit"
                 disabled={loading || otpCode.length !== 6}
+                className="btn-accent"
                 style={{
                   width: '100%',
-                  padding: '12px 24px',
-                  background: (loading || otpCode.length !== 6) ? C.dim : C.cyan,
-                  color: '#080c14',
-                  border: 'none',
-                  borderRadius: 8,
-                  fontSize: 14,
-                  fontWeight: 600,
-                  fontFamily: C.sans,
+                  justifyContent: 'center',
+                  opacity: (loading || otpCode.length !== 6) ? 0.5 : 1,
                   cursor: (loading || otpCode.length !== 6) ? 'not-allowed' : 'pointer',
-                  transition: 'opacity 0.2s, transform 0.1s',
-                  opacity: (loading || otpCode.length !== 6) ? 0.6 : 1,
                 }}
               >
                 {loading ? 'Verifying...' : 'Verify & Sign In'}
@@ -329,17 +291,11 @@ export const AdminLogin: React.FC = () => {
               <button
                 type="button"
                 onClick={() => { setStep('email'); setOtpCode(''); setError(''); setSelfHostedCode(null); }}
+                className="btn-secondary"
                 style={{
                   width: '100%',
-                  padding: '10px 24px',
+                  justifyContent: 'center',
                   marginTop: 12,
-                  background: 'transparent',
-                  color: C.muted,
-                  border: `1px solid ${C.border}`,
-                  borderRadius: 8,
-                  fontSize: 13,
-                  fontFamily: C.sans,
-                  cursor: 'pointer',
                 }}
               >
                 Use a different email
@@ -353,13 +309,14 @@ export const AdminLogin: React.FC = () => {
           <a
             href="/"
             style={{
-              color: C.muted,
+              color: 'var(--mid)',
               fontSize: 13,
+              fontFamily: 'var(--mono)',
               textDecoration: 'none',
-              transition: 'color 0.2s',
+              transition: 'color 120ms ease',
             }}
-            onMouseEnter={(e) => e.currentTarget.style.color = C.cyan}
-            onMouseLeave={(e) => e.currentTarget.style.color = C.muted}
+            onMouseEnter={(e) => e.currentTarget.style.color = 'var(--ink)'}
+            onMouseLeave={(e) => e.currentTarget.style.color = 'var(--mid)'}
           >
             &larr; Back to Portal
           </a>

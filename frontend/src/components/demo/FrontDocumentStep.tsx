@@ -56,8 +56,8 @@ export const FrontDocumentStep: React.FC<FrontDocumentStepProps> = ({
           value={documentType}
           onChange={(e) => onDocumentTypeChange(e.target.value)}
           style={{
-            width: '100%', padding: '10px 14px', borderRadius: 10,
-            border: `1px solid ${C.cyanBorder}`, background: C.surface,
+            width: '100%', padding: '10px 14px',
+            border: `1px solid ${C.borderStrong}`, background: C.panel,
             color: C.text, fontFamily: C.mono, fontSize: 12, outline: 'none',
           }}
         >
@@ -99,7 +99,7 @@ export const FrontDocumentStep: React.FC<FrontDocumentStepProps> = ({
             <div style={{
               display: 'flex', alignItems: 'center', justifyContent: 'space-between',
               background: C.surface, border: `1px solid ${C.border}`,
-              borderRadius: 8, padding: '10px 14px',
+              padding: '10px 14px',
             }}>
               <div>
                 <p style={{ fontWeight: 500, color: C.text, fontSize: 13, margin: 0 }}>{selectedFile.name}</p>
@@ -107,7 +107,7 @@ export const FrontDocumentStep: React.FC<FrontDocumentStepProps> = ({
               </div>
               <button
                 onClick={() => document.getElementById('demo-front-upload')?.click()}
-                style={{ background: 'none', border: 'none', color: C.cyan, fontSize: 12, cursor: 'pointer', fontFamily: C.mono }}
+                style={{ background: 'none', border: 'none', color: C.accent, fontSize: 12, cursor: 'pointer', fontFamily: C.mono }}
               >
                 Change
               </button>

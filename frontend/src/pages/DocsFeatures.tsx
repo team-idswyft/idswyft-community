@@ -37,7 +37,7 @@ export const DocsFeatures: React.FC = () => {
 
       {/* ══ ANALYSIS ENGINE ═══════════════════════════════════════════════ */}
       <SectionAnchor id="analysis" />
-      <H2>Analysis Engine</H2>
+      <H2 index="01">Analysis Engine</H2>
       <Lead>What the platform extracts and validates from each document and capture. Processing uses algorithmic rules, image forensics, and pre-trained OCR / face-detection models — no custom AI or LLMs.</Lead>
 
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 12, marginBottom: 24 }}>
@@ -47,7 +47,7 @@ export const DocsFeatures: React.FC = () => {
           { title: 'Cross-Validation', color: C.amber, items: ['PDF417 / QR barcode decode', 'Levenshtein distance matching', 'Token-set name similarity', 'Front OCR ↔ back barcode check', 'Date & ID number consistency', 'Weighted field scoring'] },
           { title: 'Liveness & Face Match', color: C.green, items: ['EXIF metadata analysis (20%)', 'JPEG artifact detection (15%)', 'Color histogram analysis (15%)', 'Byte entropy scoring (12%)', 'Pixel variance & edge density', 'Face detection (SSDMobilenetv1)', '128-d face embeddings', 'Cosine similarity scoring'] },
         ].map(col => (
-          <div key={col.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '18px 20px' }}>
+          <div key={col.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '18px 20px' }}>
             <div style={{ fontFamily: C.mono, fontSize: '0.8rem', fontWeight: 600, color: col.color, marginBottom: 12 }}>{col.title}</div>
             {col.items.map(item => (
               <div key={item} style={{ fontFamily: C.sans, fontSize: '0.78rem', color: C.muted, padding: '3px 0', display: 'flex', gap: 8 }}>
@@ -62,7 +62,7 @@ export const DocsFeatures: React.FC = () => {
 
       {/* ══ STATUSES ═════════════════════════════════════════════════════ */}
       <SectionAnchor id="statuses" />
-      <H2>Verification Statuses</H2>
+      <H2 index="02">Verification Statuses</H2>
       <Lead>A verification moves through these statuses sequentially. <strong style={{ color: C.green }}>COMPLETE</strong> and <strong style={{ color: C.red }}>HARD_REJECTED</strong> are terminal states.</Lead>
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 2, marginBottom: 24 }}>
@@ -75,7 +75,7 @@ export const DocsFeatures: React.FC = () => {
           { status: 'COMPLETE', color: C.green, bg: C.greenDim, desc: 'All gates passed. Check final_result for: "verified", "manual_review", or "failed".', terminal: true },
           { status: 'HARD_REJECTED', color: C.red, bg: C.redDim, desc: 'Session rejected by a quality gate. Check rejection_reason for details. Subsequent steps return 409.', terminal: true },
         ].map(s => (
-          <div key={s.status} style={{ display: 'flex', gap: 16, padding: '14px 18px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div key={s.status} style={{ display: 'flex', gap: 16, padding: '14px 18px', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, alignItems: 'flex-start', flexWrap: 'wrap' }}>
             <div style={{ width: 130, flexShrink: 0, display: 'flex', gap: 8, alignItems: 'center' }}>
               <StatusPill status={s.status} />
               {s.terminal && <span style={{ fontFamily: C.mono, fontSize: '0.6rem', color: s.color, letterSpacing: '0.06em' }}>TERMINAL</span>}
@@ -89,7 +89,7 @@ export const DocsFeatures: React.FC = () => {
 
       {/* ══ BATCH API ═════════════════════════════════════════════════════ */}
       <SectionAnchor id="batch" />
-      <H2>Batch Verification</H2>
+      <H2 index="03">Batch Verification</H2>
       <Lead>
         Process hundreds of verifications at once for enterprise onboarding, user migration, or
         periodic re-verification. Items are processed with controlled concurrency (5 concurrent max).
@@ -183,7 +183,7 @@ await sdk.cancelBatch(batch.batch_id);`} />
 
       {/* ══ ADDRESS VERIFICATION ══════════════════════════════════════════ */}
       <SectionAnchor id="address" />
-      <H2>Address Verification</H2>
+      <H2 index="04">Address Verification</H2>
       <Lead>
         Verify proof-of-address documents (utility bills, bank statements, tax documents) and
         cross-reference the name against the verified ID. Requires a completed identity verification first.
@@ -261,7 +261,7 @@ const status = await sdk.getAddressStatus(verificationId);`} />
 
       {/* ══ AML / SANCTIONS SCREENING ══════════════════════════════════ */}
       <SectionAnchor id="aml" />
-      <H2>AML / Sanctions Screening</H2>
+      <H2 index="05">AML / Sanctions Screening</H2>
       <Lead>
         Screen verified identities against global sanctions and watchlists (OFAC SDN, EU, UN).
         AML screening is an opt-in addon — enable it per session by passing{' '}
@@ -275,7 +275,7 @@ const status = await sdk.getAddressStatus(verificationId);`} />
         <code style={{ fontFamily: C.mono }}>aml_screening</code> field of the status response.
       </Callout>
 
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '14px 18px', marginBottom: 16 }}>
         <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>How it works</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 16px' }}>
           {[
@@ -292,7 +292,7 @@ const status = await sdk.getAddressStatus(verificationId);`} />
         </div>
       </div>
 
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '14px 18px', marginBottom: 16 }}>
         <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>Risk levels & outcomes</div>
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 12 }}>
           {[
@@ -300,7 +300,7 @@ const status = await sdk.getAddressStatus(verificationId);`} />
             { level: 'potential_match', score: '0.5 – 0.84', outcome: 'Routed to manual_review', color: C.amber },
             { level: 'confirmed_match', score: '>= 0.85', outcome: 'Hard reject (failed)', color: C.red },
           ].map(r => (
-            <div key={r.level} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 6, padding: 12, borderLeft: `3px solid ${r.color}` }}>
+            <div key={r.level} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 0, padding: 12, borderLeft: `3px solid ${r.color}` }}>
               <div style={{ fontFamily: C.mono, fontSize: '0.75rem', color: r.color, fontWeight: 600, marginBottom: 4 }}>{r.level}</div>
               <div style={{ fontFamily: C.mono, fontSize: '0.7rem', color: C.dim, marginBottom: 6 }}>score {r.score}</div>
               <div style={{ fontFamily: C.sans, fontSize: '0.78rem', color: C.muted, lineHeight: 1.5 }}>{r.outcome}</div>
@@ -380,7 +380,7 @@ if (status.aml_screening?.risk_level === 'clear') {
 
       {/* ══ COMPLIANCE ORCHESTRATION ═══════════════════════════════════ */}
       <SectionAnchor id="compliance" />
-      <H2>Compliance Rules</H2>
+      <H2 index="06">Compliance Rules</H2>
       <Lead>
         Ship your compliance policy as code. Define rules that automatically adjust verification requirements
         based on country, document type, user age, risk score, and custom metadata. The engine evaluates
@@ -394,7 +394,7 @@ if (status.aml_screening?.risk_level === 'clear') {
       </Callout>
 
       {/* How it works */}
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '14px 18px', marginBottom: 16 }}>
         <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>How it works</div>
         <div style={{ display: 'grid', gridTemplateColumns: 'auto 1fr', gap: '6px 16px' }}>
           {[
@@ -413,7 +413,7 @@ if (status.aml_screening?.risk_level === 'clear') {
 
       {/* Condition operators & action fields */}
       <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: 12, marginBottom: 16 }}>
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '18px 20px' }}>
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '18px 20px' }}>
           <div style={{ fontFamily: C.mono, fontSize: '0.8rem', fontWeight: 600, color: C.cyan, marginBottom: 12 }}>Condition Fields</div>
           {[
             { field: 'country', desc: 'ISO country code' },
@@ -429,7 +429,7 @@ if (status.aml_screening?.risk_level === 'clear') {
             </div>
           ))}
         </div>
-        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, padding: '18px 20px' }}>
+        <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '18px 20px' }}>
           <div style={{ fontFamily: C.mono, fontSize: '0.8rem', fontWeight: 600, color: C.green, marginBottom: 12 }}>Action Fields</div>
           {[
             { field: 'set_mode', desc: 'Override to age_only / document_only / identity / full' },
@@ -563,7 +563,7 @@ if (status.aml_screening?.risk_level === 'clear') {
       </EndpointCard>
 
       {/* Operators reference */}
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '14px 18px', marginBottom: 16 }}>
         <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>Operators</div>
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr', gap: '4px 24px' }}>
           {[
@@ -583,7 +583,7 @@ if (status.aml_screening?.risk_level === 'clear') {
       </div>
 
       {/* Common rule patterns */}
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '14px 18px', marginBottom: 16 }}>
         <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>Common patterns</div>
         <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '1fr 1fr 1fr', gap: 12 }}>
           {[
@@ -591,7 +591,7 @@ if (status.aml_screening?.risk_level === 'clear') {
             { title: 'Age gate', color: C.amber, cond: '{ "field": "user_age", "op": "lt", "value": 18 }', action: '{ "force_manual_review": true }' },
             { title: 'Risk escalation', color: C.red, cond: '{ "field": "risk_score", "op": "gte", "value": 0.7 }', action: '{ "require_aml": true, "set_flag": "high_risk" }' },
           ].map(p => (
-            <div key={p.title} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 6, padding: 12, borderLeft: `3px solid ${p.color}` }}>
+            <div key={p.title} style={{ background: 'rgba(0,0,0,0.2)', borderRadius: 0, padding: 12, borderLeft: `3px solid ${p.color}` }}>
               <div style={{ fontFamily: C.mono, fontSize: '0.75rem', color: p.color, fontWeight: 600, marginBottom: 6 }}>{p.title}</div>
               <div style={{ fontFamily: C.mono, fontSize: '0.65rem', color: C.dim, marginBottom: 4 }}>condition:</div>
               <pre style={{ fontFamily: C.mono, fontSize: '0.65rem', color: C.muted, margin: '0 0 6px', whiteSpace: 'pre-wrap', wordBreak: 'break-all' }}>{p.cond}</pre>
@@ -603,7 +603,7 @@ if (status.aml_screening?.risk_level === 'clear') {
       </div>
 
       {/* Other CRUD endpoints summary */}
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: '14px 18px', marginBottom: 16 }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '14px 18px', marginBottom: 16 }}>
         <div style={{ fontFamily: C.mono, fontSize: '0.68rem', color: C.muted, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 12 }}>All compliance endpoints</div>
         <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
           {[
@@ -668,7 +668,7 @@ console.log(result.resolved_action);  // { set_mode: 'full', require_aml: true }
 
       {/* ══ MONITORING ════════════════════════════════════════════════════ */}
       <SectionAnchor id="monitoring" />
-      <H2>Monitoring & Re-verification</H2>
+      <H2 index="07">Monitoring & Re-verification</H2>
       <Lead>
         Schedule automatic re-verification reminders and track document expiry dates.
         Sends webhook notifications when documents are approaching expiry (90/60/30 days) or when

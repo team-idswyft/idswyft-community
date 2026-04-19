@@ -177,8 +177,8 @@ function ScoreBar({ label, score, passed }: { label: string; score: number | nul
           )}
         </span>
       </div>
-      <div style={{ height: 4, borderRadius: 2, background: C.border, overflow: 'hidden' }}>
-        <div style={{ width: `${pct}%`, height: '100%', borderRadius: 2, background: color, transition: 'width 0.3s ease' }} />
+      <div style={{ height: 3, background: 'var(--rule)', overflow: 'hidden' }}>
+        <div style={{ width: `${pct}%`, height: '100%', background: color, transition: 'width 0.3s ease' }} />
       </div>
     </div>
   )
@@ -375,10 +375,9 @@ export function VerificationManagement() {
         padding: '32px 24px', textAlign: 'center',
       }}>
         <div style={{
-          background: C.panel, borderRadius: 16, padding: '48px 32px',
+          background: C.panel, padding: '48px 32px',
           border: `1px solid ${C.border}`, maxWidth: 400,
-          backdropFilter: 'blur(12px)',
-        }}>
+                  }}>
           <ComputerDesktopIcon style={{ width: 48, height: 48, color: C.cyan, margin: '0 auto 20px' }} />
           <h2 style={{ color: C.text, fontSize: 20, fontWeight: 600, margin: '0 0 12px', fontFamily: C.sans }}>
             Desktop Required
@@ -390,8 +389,7 @@ export function VerificationManagement() {
           <button
             onClick={() => navigate(-1)}
             style={{
-              background: 'none', border: `1px solid ${C.border}`, borderRadius: 8,
-              color: C.text, padding: '10px 24px', cursor: 'pointer', fontFamily: C.sans,
+              background: 'none', border: `1px solid ${C.border}`, color: C.text, padding: '10px 24px', cursor: 'pointer', fontFamily: C.sans,
               fontSize: 14, fontWeight: 500, transition: 'border-color 0.2s',
             }}
             onMouseEnter={e => (e.currentTarget.style.borderColor = C.cyan)}
@@ -435,37 +433,25 @@ export function VerificationManagement() {
             {userRole === 'platform' && (
               <button
                 onClick={() => navigate('/admin/developers')}
-                style={{
-                  background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8,
-                  color: C.muted, padding: '8px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-                  fontFamily: C.sans, fontSize: 13, transition: 'all 0.15s',
-                }}
-                onMouseEnter={e => { e.currentTarget.style.borderColor = C.cyanBorder; e.currentTarget.style.color = C.cyan }}
-                onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.muted }}
+                className="btn-secondary"
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 13 }}
               >
                 <UsersIcon style={{ width: 14, height: 14 }} />
                 Developers
               </button>
             )}
             {/* Role badge */}
-            <span style={{
-              fontSize: 10, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em',
-              padding: '4px 8px', borderRadius: 4,
+            <span className="badge" style={{
               background: userRole === 'platform' ? C.purpleDim : userRole === 'admin' ? C.cyanDim : C.surface,
               color: userRole === 'platform' ? C.purple : userRole === 'admin' ? C.cyan : C.muted,
-              border: `1px solid ${userRole === 'platform' ? 'rgba(167,139,250,0.3)' : userRole === 'admin' ? C.cyanBorder : C.border}`,
+              borderColor: userRole === 'platform' ? 'rgba(167,139,250,0.3)' : userRole === 'admin' ? C.cyanBorder : C.border,
             }}>
               {userRole === 'platform' ? 'Platform Admin' : userRole === 'admin' ? 'Org Admin' : 'Reviewer'}
             </span>
             <button
               onClick={() => { fetchVerifications(); fetchStats() }}
-              style={{
-                background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8,
-                color: C.muted, padding: '8px 16px', cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 6,
-                fontFamily: C.sans, fontSize: 13, transition: 'all 0.15s',
-              }}
-              onMouseEnter={e => { e.currentTarget.style.borderColor = C.cyanBorder; e.currentTarget.style.color = C.cyan }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.muted }}
+              className="btn-secondary"
+              style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '8px 16px', fontSize: 13 }}
             >
               <ArrowPathIcon style={{ width: 14, height: 14 }} />
               Refresh
@@ -476,13 +462,10 @@ export function VerificationManagement() {
                 clearCsrfToken()
                 navigate('/admin/login')
               }}
-              style={{
-                background: 'none', border: `1px solid ${C.border}`, borderRadius: 8,
-                color: C.muted, padding: '8px 16px', cursor: 'pointer',
-                fontFamily: C.sans, fontSize: 13, transition: 'all 0.15s',
-              }}
+              className="btn-outline"
+              style={{ padding: '8px 16px', fontSize: 13 }}
               onMouseEnter={e => { e.currentTarget.style.borderColor = C.red; e.currentTarget.style.color = C.red }}
-              onMouseLeave={e => { e.currentTarget.style.borderColor = C.border; e.currentTarget.style.color = C.muted }}
+              onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--rule)'; e.currentTarget.style.color = 'var(--ink)' }}
             >
               Sign Out
             </button>
@@ -499,8 +482,7 @@ export function VerificationManagement() {
             { label: 'Failed', value: stats.failed, color: C.red, bg: C.redDim },
           ].map(s => (
             <div key={s.label} style={{
-              background: C.panel, border: `1px solid ${C.border}`, borderRadius: 10, padding: '16px 20px',
-              backdropFilter: 'blur(12px)',
+              background: C.panel, border: `1px solid ${C.border}`, padding: '16px 20px',
             }}>
               <div style={{ color: C.dim, fontSize: 11, fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 6 }}>
                 {s.label}
@@ -553,9 +535,7 @@ export function VerificationManagement() {
         {/* ── Filter Bar ── */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16,
-          background: C.panel, border: `1px solid ${C.border}`, borderRadius: 10,
-          padding: '12px 16px', backdropFilter: 'blur(12px)',
-        }}>
+          background: C.panel, border: `1px solid ${C.border}`, padding: '12px 16px',         }}>
           <FunnelIcon style={{ width: 16, height: 16, color: C.dim, flexShrink: 0 }} />
 
           {/* Status tabs */}
@@ -570,9 +550,10 @@ export function VerificationManagement() {
                   style={{
                     background: active ? (cfg?.bg || C.surface) : 'transparent',
                     border: `1px solid ${active ? (cfg?.border || C.borderStrong) : 'transparent'}`,
-                    borderRadius: 6, padding: '6px 12px', cursor: 'pointer',
+                    padding: '6px 12px', cursor: 'pointer',
                     color: active ? (cfg?.color || C.text) : C.muted,
-                    fontSize: 12, fontWeight: 500, fontFamily: C.sans,
+                    fontSize: 11, fontWeight: 500, fontFamily: C.mono,
+                    letterSpacing: '0.03em',
                     transition: 'all 0.15s',
                   }}
                 >
@@ -593,8 +574,7 @@ export function VerificationManagement() {
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               style={{
-                background: C.surface, border: `1px solid ${C.border}`, borderRadius: 6,
-                padding: '6px 10px 6px 30px', color: C.text, fontSize: 12, fontFamily: C.mono,
+                background: C.surface, border: `1px solid ${C.border}`,                 padding: '6px 10px 6px 30px', color: C.text, fontSize: 12, fontFamily: C.mono,
                 width: 200, outline: 'none',
               }}
               onFocus={e => e.currentTarget.style.borderColor = C.cyanBorder}
@@ -605,9 +585,7 @@ export function VerificationManagement() {
 
         {/* ── Table ── */}
         <div style={{
-          background: C.panel, border: `1px solid ${C.border}`, borderRadius: 12,
-          overflow: 'auto', backdropFilter: 'blur(12px)',
-        }}>
+          background: C.panel, border: `1px solid ${C.border}`, overflow: 'auto',         }}>
           {/* Table header */}
           <div style={{
             display: 'grid', gridTemplateColumns: '40px 80px 1fr 1fr 140px 130px 140px 200px', minWidth: 1020,
@@ -617,7 +595,7 @@ export function VerificationManagement() {
             {['', 'Preview', 'Verification ID', 'User ID', 'Status', 'Type', 'Created', 'Actions'].map((h, i) => (
               <div key={i} style={{
                 color: C.dim, fontSize: 10, fontWeight: 600, textTransform: 'uppercase',
-                letterSpacing: '0.1em', fontFamily: C.sans,
+                letterSpacing: '0.1em', fontFamily: C.mono,
               }}>
                 {h}
               </div>
@@ -639,8 +617,7 @@ export function VerificationManagement() {
               <XCircleIcon style={{ width: 32, height: 32, color: C.red, margin: '0 auto 12px' }} />
               <div style={{ color: C.red, fontSize: 14, marginBottom: 8 }}>{error}</div>
               <button onClick={fetchVerifications} style={{
-                background: C.redDim, border: `1px solid rgba(248,113,113,0.3)`, borderRadius: 6,
-                color: C.red, padding: '6px 16px', cursor: 'pointer', fontSize: 12, fontFamily: C.sans,
+                background: C.redDim, border: `1px solid rgba(248,113,113,0.3)`, color: C.red, padding: '6px 16px', cursor: 'pointer', fontSize: 12, fontFamily: C.mono,
               }}>
                 Retry
               </button>
@@ -690,11 +667,11 @@ export function VerificationManagement() {
                       <img
                         src={v.document_thumbnail}
                         alt="Doc"
-                        style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 4, border: `1px solid ${C.border}` }}
+                        style={{ width: 32, height: 32, objectFit: 'cover', border: `1px solid ${C.border}` }}
                         onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
                       />
                     ) : (
-                      <div style={{ width: 32, height: 32, borderRadius: 4, background: C.codeBg, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      <div style={{ width: 32, height: 32, background: C.codeBg, border: `1px solid ${C.border}`, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                         <PhotoIcon style={{ width: 14, height: 14, color: C.dim }} />
                       </div>
                     )}
@@ -702,7 +679,7 @@ export function VerificationManagement() {
                       <img
                         src={v.selfie_thumbnail}
                         alt="Live"
-                        style={{ width: 32, height: 32, objectFit: 'cover', borderRadius: 16, border: `1px solid ${C.border}` }}
+                        style={{ width: 32, height: 32, objectFit: 'cover', border: `1px solid ${C.border}` }}
                         onError={e => { (e.target as HTMLImageElement).style.display = 'none' }}
                       />
                     ) : null}
@@ -717,7 +694,7 @@ export function VerificationManagement() {
                       <span style={{
                         marginLeft: 8, fontSize: 9, fontWeight: 600, color: C.purple,
                         background: C.purpleDim, border: `1px solid rgba(167,139,250,0.3)`,
-                        borderRadius: 4, padding: '1px 5px', textTransform: 'uppercase', letterSpacing: '0.05em',
+                        padding: '1px 5px', textTransform: 'uppercase', letterSpacing: '0.05em',
                       }}>
                         Sandbox
                       </span>
@@ -736,7 +713,7 @@ export function VerificationManagement() {
                     <span style={{
                       display: 'inline-flex', alignItems: 'center', gap: 5,
                       background: cfg.bg, border: `1px solid ${cfg.border}`,
-                      borderRadius: 6, padding: '3px 10px',
+                      padding: '3px 10px',
                       color: cfg.color, fontSize: 11, fontWeight: 600,
                     }}>
                       <StatusIcon style={{ width: 12, height: 12 }} />
@@ -761,7 +738,7 @@ export function VerificationManagement() {
                       <span style={{
                         display: 'inline-flex', alignItems: 'center', gap: 4,
                         color: v.status === 'verified' ? C.green : C.red,
-                        fontSize: 11, fontWeight: 600, fontFamily: C.sans,
+                        fontSize: 11, fontWeight: 600, fontFamily: C.mono,
                       }}>
                         {v.status === 'verified' ? (
                           <><CheckCircleIcon style={{ width: 14, height: 14 }} /> Complete</>
@@ -776,9 +753,8 @@ export function VerificationManagement() {
                           onClick={() => setConfirmAction({ verificationId: v.id, decision: 'approve' })}
                           title="Approve"
                           style={{
-                            background: C.greenDim, border: `1px solid rgba(52,211,153,0.3)`, borderRadius: 6,
-                            color: C.green, padding: '4px 8px', cursor: 'pointer', fontSize: 11, fontWeight: 500,
-                            fontFamily: C.sans, transition: 'all 0.15s',
+                            background: C.greenDim, border: `1px solid rgba(52,211,153,0.3)`, color: C.green, padding: '4px 8px', cursor: 'pointer', fontSize: 11, fontWeight: 500,
+                            fontFamily: C.mono, transition: 'all 0.15s',
                           }}
                         >
                           Approve
@@ -787,9 +763,8 @@ export function VerificationManagement() {
                           onClick={() => setConfirmAction({ verificationId: v.id, decision: 'reject' })}
                           title="Reject"
                           style={{
-                            background: C.redDim, border: `1px solid rgba(248,113,113,0.3)`, borderRadius: 6,
-                            color: C.red, padding: '4px 8px', cursor: 'pointer', fontSize: 11, fontWeight: 500,
-                            fontFamily: C.sans, transition: 'all 0.15s',
+                            background: C.redDim, border: `1px solid rgba(248,113,113,0.3)`, color: C.red, padding: '4px 8px', cursor: 'pointer', fontSize: 11, fontWeight: 500,
+                            fontFamily: C.mono, transition: 'all 0.15s',
                           }}
                         >
                           Reject
@@ -801,9 +776,8 @@ export function VerificationManagement() {
                         onClick={() => setConfirmAction({ verificationId: v.id, decision: 'override' })}
                         title="Override status"
                         style={{
-                          background: C.amberDim, border: `1px solid rgba(251,191,36,0.2)`, borderRadius: 6,
-                          color: C.amber, padding: '4px 8px', cursor: 'pointer', fontSize: 11, fontWeight: 500,
-                          fontFamily: C.sans, transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 3,
+                          background: C.amberDim, border: `1px solid rgba(251,191,36,0.2)`, color: C.amber, padding: '4px 8px', cursor: 'pointer', fontSize: 11, fontWeight: 500,
+                          fontFamily: C.mono, transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 3,
                         }}
                       >
                         <ArrowsUpDownIcon style={{ width: 11, height: 11 }} />
@@ -838,8 +812,7 @@ export function VerificationManagement() {
                             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(200px, 1fr))', gap: 12 }}>
                               {detail.documents.map(doc => (
                                 <div key={doc.id} style={{
-                                  background: C.codeBg, border: `1px solid ${C.border}`, borderRadius: 8,
-                                  overflow: 'hidden',
+                                  background: C.codeBg, border: `1px solid ${C.border}`,                                   overflow: 'hidden',
                                 }}>
                                   {doc.url ? (
                                     <img
@@ -866,8 +839,7 @@ export function VerificationManagement() {
                               {/* Selfie */}
                               {detail.selfie_url && (
                                 <div style={{
-                                  background: C.codeBg, border: `1px solid ${C.border}`, borderRadius: 8,
-                                  overflow: 'hidden',
+                                  background: C.codeBg, border: `1px solid ${C.border}`,                                   overflow: 'hidden',
                                 }}>
                                   <img
                                     src={detail.selfie_url}
@@ -884,8 +856,7 @@ export function VerificationManagement() {
                             </div>
                           ) : (
                             <div style={{
-                              background: C.codeBg, border: `1px solid ${C.border}`, borderRadius: 8,
-                              padding: 24, textAlign: 'center',
+                              background: C.codeBg, border: `1px solid ${C.border}`,                               padding: 24, textAlign: 'center',
                             }}>
                               <DocumentTextIcon style={{ width: 24, height: 24, color: C.dim, margin: '0 auto 8px' }} />
                               <div style={{ color: C.dim, fontSize: 12 }}>No documents available</div>
@@ -900,8 +871,7 @@ export function VerificationManagement() {
                           </div>
 
                           <div style={{
-                            background: C.codeBg, border: `1px solid ${C.border}`, borderRadius: 8,
-                            padding: 16,
+                            background: C.codeBg, border: `1px solid ${C.border}`,                             padding: 16,
                           }}>
                             <table style={{ width: '100%', borderCollapse: 'collapse' }}>
                               <tbody>
@@ -950,9 +920,8 @@ export function VerificationManagement() {
                             <button
                               onClick={() => setConfirmAction({ verificationId: v.id, decision: 'approve' })}
                               style={{
-                                flex: 1, background: C.greenDim, border: `1px solid rgba(52,211,153,0.3)`, borderRadius: 8,
-                                color: C.green, padding: '10px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                                fontFamily: C.sans, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                                flex: 1, background: C.greenDim, border: `1px solid rgba(52,211,153,0.3)`, color: C.green, padding: '10px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                                fontFamily: C.mono, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                               }}
                             >
                               <CheckCircleIcon style={{ width: 16, height: 16 }} />
@@ -961,9 +930,8 @@ export function VerificationManagement() {
                             <button
                               onClick={() => setConfirmAction({ verificationId: v.id, decision: 'reject' })}
                               style={{
-                                flex: 1, background: C.redDim, border: `1px solid rgba(248,113,113,0.3)`, borderRadius: 8,
-                                color: C.red, padding: '10px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                                fontFamily: C.sans, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                                flex: 1, background: C.redDim, border: `1px solid rgba(248,113,113,0.3)`, color: C.red, padding: '10px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                                fontFamily: C.mono, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                               }}
                             >
                               <XCircleIcon style={{ width: 16, height: 16 }} />
@@ -973,9 +941,8 @@ export function VerificationManagement() {
                               <button
                                 onClick={() => setConfirmAction({ verificationId: v.id, decision: 'override' })}
                                 style={{
-                                  flex: 1, background: C.amberDim, border: `1px solid rgba(251,191,36,0.2)`, borderRadius: 8,
-                                  color: C.amber, padding: '10px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
-                                  fontFamily: C.sans, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
+                                  flex: 1, background: C.amberDim, border: `1px solid rgba(251,191,36,0.2)`, color: C.amber, padding: '10px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                                  fontFamily: C.mono, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                                 }}
                               >
                                 <ArrowsUpDownIcon style={{ width: 16, height: 16 }} />
@@ -992,8 +959,7 @@ export function VerificationManagement() {
                         const refMap = new Map(refs.map(r => [r.id, r]))
                         return (
                           <div style={{
-                            marginTop: 16, padding: 14, borderRadius: 8,
-                            background: C.amberDim, border: `1px solid rgba(251,191,36,0.3)`,
+                            marginTop: 16, padding: 14,                             background: C.amberDim, border: `1px solid rgba(251,191,36,0.3)`,
                           }}>
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
                               <ExclamationTriangleIcon style={{ width: 18, height: 18, color: C.amber }} />
@@ -1007,11 +973,11 @@ export function VerificationManagement() {
                                 const sc = ref ? getStatusConfig(ref.status) : null
                                 return (
                                   <div key={i} style={{
-                                    background: C.codeBg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 10,
+                                    background: C.codeBg, border: `1px solid ${C.border}`, padding: 10,
                                   }}>
                                     <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: ref ? 8 : 0, fontSize: 12 }}>
                                       <span style={{
-                                        padding: '2px 6px', borderRadius: 4, fontSize: 10, fontWeight: 600,
+                                        padding: '2px 6px', fontSize: 10, fontWeight: 600,
                                         background: flag.type === 'document_phash' ? C.cyanDim : C.purpleDim,
                                         color: flag.type === 'document_phash' ? C.cyan : C.purple,
                                       }}>
@@ -1037,11 +1003,11 @@ export function VerificationManagement() {
                                         <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
                                           {ref.document_thumbnail ? (
                                             <img src={ref.document_thumbnail} alt="Doc" style={{
-                                              width: 36, height: 36, objectFit: 'cover', borderRadius: 4, border: `1px solid ${C.border}`,
+                                              width: 36, height: 36, objectFit: 'cover', border: `1px solid ${C.border}`,
                                             }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
                                           ) : (
                                             <div style={{
-                                              width: 36, height: 36, borderRadius: 4, background: C.bg, border: `1px solid ${C.border}`,
+                                              width: 36, height: 36, background: C.bg, border: `1px solid ${C.border}`,
                                               display: 'flex', alignItems: 'center', justifyContent: 'center',
                                             }}>
                                               <PhotoIcon style={{ width: 14, height: 14, color: C.dim }} />
@@ -1049,7 +1015,7 @@ export function VerificationManagement() {
                                           )}
                                           {ref.selfie_thumbnail && (
                                             <img src={ref.selfie_thumbnail} alt="Live" style={{
-                                              width: 36, height: 36, objectFit: 'cover', borderRadius: 18, border: `1px solid ${C.border}`,
+                                              width: 36, height: 36, objectFit: 'cover', border: `1px solid ${C.border}`,
                                             }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
                                           )}
                                         </div>
@@ -1073,8 +1039,7 @@ export function VerificationManagement() {
                                         <div style={{ textAlign: 'right', flexShrink: 0 }}>
                                           {sc && (
                                             <span style={{
-                                              fontSize: 10, fontWeight: 600, padding: '2px 6px', borderRadius: 4,
-                                              background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`,
+                                              fontSize: 10, fontWeight: 600, padding: '2px 6px',                                               background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`,
                                             }}>
                                               {sc.label}
                                             </span>
@@ -1096,8 +1061,7 @@ export function VerificationManagement() {
                       {/* Also show duplicate flags from debug.duplicates if available */}
                       {detail.debug?.duplicates?.flags && detail.debug.duplicates.flags.length > 0 && !detail.duplicate_flags?.length && (
                         <div style={{
-                          marginTop: 16, padding: 14, borderRadius: 8,
-                          background: C.amberDim, border: `1px solid rgba(251,191,36,0.3)`,
+                          marginTop: 16, padding: 14,                           background: C.amberDim, border: `1px solid rgba(251,191,36,0.3)`,
                         }}>
                           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                             <ExclamationTriangleIcon style={{ width: 18, height: 18, color: C.amber }} />
@@ -1117,7 +1081,7 @@ export function VerificationManagement() {
 
                           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12 }}>
                             {/* Gate Scores */}
-                            <div style={{ background: C.codeBg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 16 }}>
+                            <div style={{ background: C.codeBg, border: `1px solid ${C.border}`, padding: 16 }}>
                               <div style={{ color: C.text, fontSize: 12, fontWeight: 600, marginBottom: 12 }}>Gate Scores</div>
                               <ScoreBar label="OCR Quality" score={detail.debug.gates.ocr.quality_score} />
                               <ScoreBar label="Cross-Validation" score={detail.debug.gates.cross_validation.score} passed={detail.debug.gates.cross_validation.verdict === 'PASS' ? true : detail.debug.gates.cross_validation.verdict === 'REJECT' ? false : null} />
@@ -1133,7 +1097,7 @@ export function VerificationManagement() {
                             </div>
 
                             {/* OCR Extracted Fields */}
-                            <div style={{ background: C.codeBg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 16 }}>
+                            <div style={{ background: C.codeBg, border: `1px solid ${C.border}`, padding: 16 }}>
                               <div style={{ color: C.text, fontSize: 12, fontWeight: 600, marginBottom: 12 }}>OCR Fields (Front)</div>
                               {detail.debug.gates.ocr.fields ? (
                                 <table style={{ width: '100%', borderCollapse: 'collapse' }}>
@@ -1166,7 +1130,7 @@ export function VerificationManagement() {
                             </div>
 
                             {/* Risk & AML */}
-                            <div style={{ background: C.codeBg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 16 }}>
+                            <div style={{ background: C.codeBg, border: `1px solid ${C.border}`, padding: 16 }}>
                               {detail.debug.risk ? (
                                 <>
                                   <div style={{ color: C.text, fontSize: 12, fontWeight: 600, marginBottom: 12 }}>Risk Assessment</div>
@@ -1178,8 +1142,7 @@ export function VerificationManagement() {
                                       {detail.debug.risk.overall_score}
                                     </span>
                                     <span style={{
-                                      fontSize: 10, fontWeight: 600, textTransform: 'uppercase', padding: '2px 6px', borderRadius: 4,
-                                      background: detail.debug.risk.risk_level === 'low' ? C.greenDim : detail.debug.risk.risk_level === 'medium' ? C.amberDim : C.redDim,
+                                      fontSize: 10, fontWeight: 600, textTransform: 'uppercase', padding: '2px 6px',                                       background: detail.debug.risk.risk_level === 'low' ? C.greenDim : detail.debug.risk.risk_level === 'medium' ? C.amberDim : C.redDim,
                                       color: detail.debug.risk.risk_level === 'low' ? C.green : detail.debug.risk.risk_level === 'medium' ? C.amber : C.red,
                                     }}>
                                       {detail.debug.risk.risk_level}
@@ -1205,15 +1168,13 @@ export function VerificationManagement() {
                                   <div style={{ color: C.text, fontSize: 12, fontWeight: 600, marginBottom: 8 }}>AML Screening</div>
                                   <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                                     <span style={{
-                                      fontSize: 10, fontWeight: 600, textTransform: 'uppercase', padding: '2px 6px', borderRadius: 4,
-                                      background: detail.debug.aml.match_found ? C.redDim : C.greenDim,
+                                      fontSize: 10, fontWeight: 600, textTransform: 'uppercase', padding: '2px 6px',                                       background: detail.debug.aml.match_found ? C.redDim : C.greenDim,
                                       color: detail.debug.aml.match_found ? C.red : C.green,
                                     }}>
                                       {detail.debug.aml.match_found ? 'MATCH FOUND' : 'CLEAR'}
                                     </span>
                                     <span style={{
-                                      fontSize: 10, fontWeight: 600, textTransform: 'uppercase', padding: '2px 6px', borderRadius: 4,
-                                      background: detail.debug.aml.risk_level === 'confirmed_match' ? C.redDim
+                                      fontSize: 10, fontWeight: 600, textTransform: 'uppercase', padding: '2px 6px',                                       background: detail.debug.aml.risk_level === 'confirmed_match' ? C.redDim
                                         : detail.debug.aml.risk_level === 'potential_match' ? C.amberDim : C.greenDim,
                                       color: detail.debug.aml.risk_level === 'confirmed_match' ? C.red
                                         : detail.debug.aml.risk_level === 'potential_match' ? C.amber : C.green,
@@ -1294,9 +1255,8 @@ export function VerificationManagement() {
               disabled={page <= 1}
               onClick={() => setPage(p => Math.max(1, p - 1))}
               style={{
-                background: C.surface, border: `1px solid ${C.border}`, borderRadius: 6,
-                color: page <= 1 ? C.dim : C.muted, padding: '6px 14px', cursor: page <= 1 ? 'default' : 'pointer',
-                fontSize: 12, fontFamily: C.sans, opacity: page <= 1 ? 0.5 : 1,
+                background: C.surface, border: `1px solid ${C.border}`, color: page <= 1 ? C.dim : C.muted, padding: '6px 14px', cursor: page <= 1 ? 'default' : 'pointer',
+                fontSize: 12, fontFamily: C.mono, opacity: page <= 1 ? 0.5 : 1,
               }}
             >
               Previous
@@ -1308,9 +1268,8 @@ export function VerificationManagement() {
               disabled={page >= totalPages}
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
               style={{
-                background: C.surface, border: `1px solid ${C.border}`, borderRadius: 6,
-                color: page >= totalPages ? C.dim : C.muted, padding: '6px 14px', cursor: page >= totalPages ? 'default' : 'pointer',
-                fontSize: 12, fontFamily: C.sans, opacity: page >= totalPages ? 0.5 : 1,
+                background: C.surface, border: `1px solid ${C.border}`, color: page >= totalPages ? C.dim : C.muted, padding: '6px 14px', cursor: page >= totalPages ? 'default' : 'pointer',
+                fontSize: 12, fontFamily: C.mono, opacity: page >= totalPages ? 0.5 : 1,
               }}
             >
               Next
@@ -1330,14 +1289,13 @@ export function VerificationManagement() {
       {confirmAction && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 100,
-          background: 'rgba(0,0,0,0.7)', backdropFilter: 'blur(4px)',
+          background: 'rgba(0,0,0,0.7)',
           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }} onClick={() => { if (!actionLoading) { setConfirmAction(null); setActionReason('') } }}>
           <div
             onClick={e => e.stopPropagation()}
             style={{
-              background: C.panel, border: `1px solid ${C.borderStrong}`, borderRadius: 14,
-              padding: 28, width: 440, maxWidth: '90vw',
+              background: C.panel, border: `1px solid ${C.borderStrong}`,               padding: 28, width: 440, maxWidth: '90vw',
               boxShadow: '0 24px 80px rgba(0,0,0,0.5)',
             }}
           >
@@ -1371,7 +1329,7 @@ export function VerificationManagement() {
                   VERIFICATION ID
                 </div>
                 <div style={{
-                  background: C.codeBg, borderRadius: 6, padding: '8px 12px',
+                  background: C.codeBg, padding: '8px 12px',
                   color: C.text, fontSize: 12, fontFamily: C.mono, border: `1px solid ${C.border}`,
                 }}>
                   {confirmAction.verificationId}
@@ -1388,8 +1346,7 @@ export function VerificationManagement() {
                     value={overrideStatus}
                     onChange={e => setOverrideStatus(e.target.value)}
                     style={{
-                      width: '100%', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 6,
-                      padding: '8px 12px', color: C.text, fontSize: 13, fontFamily: C.sans, outline: 'none',
+                      width: '100%', background: C.surface, border: `1px solid ${C.border}`,                       padding: '8px 12px', color: C.text, fontSize: 13, fontFamily: C.sans, outline: 'none',
                       cursor: 'pointer',
                     }}
                   >
@@ -1416,8 +1373,7 @@ export function VerificationManagement() {
                   }
                   rows={3}
                   style={{
-                    width: '100%', background: C.surface, border: `1px solid ${C.border}`, borderRadius: 6,
-                    padding: '8px 12px', color: C.text, fontSize: 13, fontFamily: C.sans, outline: 'none',
+                    width: '100%', background: C.surface, border: `1px solid ${C.border}`,                     padding: '8px 12px', color: C.text, fontSize: 13, fontFamily: C.sans, outline: 'none',
                     resize: 'vertical',
                   }}
                   onFocus={e => e.currentTarget.style.borderColor = C.cyanBorder}
@@ -1431,32 +1387,27 @@ export function VerificationManagement() {
               <button
                 onClick={() => { setConfirmAction(null); setActionReason('') }}
                 disabled={actionLoading}
-                style={{
-                  background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8,
-                  color: C.muted, padding: '10px 20px', cursor: 'pointer', fontSize: 13,
-                  fontFamily: C.sans, fontWeight: 500,
-                }}
+                className="btn-secondary"
+                style={{ padding: '10px 20px', fontSize: 13 }}
               >
                 Cancel
               </button>
               <button
                 onClick={executeAction}
                 disabled={actionLoading}
+                className="btn"
                 style={{
                   background: confirmAction.decision === 'approve' ? C.greenDim
                     : confirmAction.decision === 'reject' ? C.redDim
                     : C.amberDim,
-                  border: `1px solid ${
-                    confirmAction.decision === 'approve' ? 'rgba(52,211,153,0.4)'
+                  borderColor: confirmAction.decision === 'approve' ? 'rgba(52,211,153,0.4)'
                     : confirmAction.decision === 'reject' ? 'rgba(248,113,113,0.4)'
-                    : 'rgba(251,191,36,0.4)'
-                  }`,
-                  borderRadius: 8,
+                    : 'rgba(251,191,36,0.4)',
                   color: confirmAction.decision === 'approve' ? C.green
                     : confirmAction.decision === 'reject' ? C.red
                     : C.amber,
                   padding: '10px 24px', cursor: actionLoading ? 'wait' : 'pointer',
-                  fontSize: 13, fontFamily: C.sans, fontWeight: 600,
+                  fontSize: 13, fontWeight: 600,
                   opacity: actionLoading ? 0.6 : 1,
                 }}
               >
@@ -1476,9 +1427,8 @@ export function VerificationManagement() {
           position: 'fixed', bottom: 24, right: 24, zIndex: 200,
           background: toast.type === 'success' ? C.greenDim : C.redDim,
           border: `1px solid ${toast.type === 'success' ? 'rgba(52,211,153,0.4)' : 'rgba(248,113,113,0.4)'}`,
-          borderRadius: 10, padding: '14px 20px', maxWidth: 400,
-          backdropFilter: 'blur(12px)',
-          boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
+           padding: '14px 20px', maxWidth: 400,
+                    boxShadow: '0 8px 32px rgba(0,0,0,0.3)',
           display: 'flex', alignItems: 'center', gap: 10,
           animation: 'slideUp 0.3s ease-out',
         }}>

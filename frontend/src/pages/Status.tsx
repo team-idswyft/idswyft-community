@@ -13,8 +13,8 @@ export function Status() {
   }, []);
 
   return (
-    <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-      <p style={{ color: '#64748b', fontSize: 14 }}>Redirecting to status page...</p>
+    <div style={{ minHeight: '60vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--paper)' }}>
+      <p style={{ color: 'var(--mid)', fontFamily: 'var(--mono)', fontSize: 13, letterSpacing: '0.04em' }}>Redirecting to status page...</p>
     </div>
   );
 }

@@ -32,7 +32,7 @@ export const DocsSdk: React.FC = () => {
 
       {/* ══ JAVASCRIPT SDK ════════════════════════════════════════════════ */}
       <SectionAnchor id="sdk" />
-      <H2>JavaScript SDK</H2>
+      <H2 index="01">JavaScript SDK</H2>
       <Lead>
         The official <code style={{ fontFamily: C.mono, color: C.cyan, fontSize: '0.82rem' }}>@idswyft/sdk</code> wraps the REST API with TypeScript types,
         automatic error handling, and a real-time event emitter for tracking verification progress without manual polling.
@@ -48,7 +48,7 @@ const sdk = new IdswyftSDK({
   sandbox: false,            // set true for sandbox mode
 });`} />
 
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 16 }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, overflow: 'hidden', marginBottom: 16 }}>
         <div style={{ padding: '12px 20px', borderBottom: `1px solid ${C.border}`, fontFamily: C.mono, fontSize: '0.72rem', color: C.muted, letterSpacing: '0.07em', textTransform: 'uppercase' }}>SDK Methods</div>
         <div style={{ padding: '8px 20px' }}>
           {[
@@ -71,8 +71,8 @@ const sdk = new IdswyftSDK({
         </div>
       </div>
 
-      <h3 style={{ fontFamily: C.mono, fontSize: '1rem', fontWeight: 600, color: C.text, margin: '32px 0 8px' }}>
-        <span style={{ color: C.green, fontWeight: 400 }}>→</span> Real-Time Events with <code style={{ color: C.cyan }}>watch()</code>
+      <h3 style={{ fontFamily: C.sans, fontSize: '1rem', fontWeight: 700, color: C.text, margin: '32px 0 8px', display: 'flex', alignItems: 'center', gap: 8 }}>
+        <span className="eyebrow" style={{ fontFamily: C.mono, fontSize: '0.68rem', fontWeight: 500, color: C.muted, letterSpacing: '0.08em' }}>--</span> Real-Time Events with <code style={{ color: C.cyan, fontFamily: C.mono }}>watch()</code>
       </h3>
       <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
         Instead of writing polling loops, use <code style={{ fontFamily: C.mono, color: C.cyan }}>watch()</code> to get
@@ -110,7 +110,7 @@ watcher.on('*', (event) => analytics.track(event.type));
 // Clean up when done
 watcher.destroy();`} />
 
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 16 }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, overflow: 'hidden', marginBottom: 16 }}>
         <div style={{ padding: '12px 20px', borderBottom: `1px solid ${C.border}`, fontFamily: C.mono, fontSize: '0.72rem', color: C.muted, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Event Types</div>
         <div style={{ padding: '8px 20px' }}>
           <FieldRow name="status_changed" type="event" req={false} desc="Fires on any status transition (e.g. AWAITING_FRONT → AWAITING_BACK)" />
@@ -121,7 +121,7 @@ watcher.destroy();`} />
         </div>
       </div>
 
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 16 }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, overflow: 'hidden', marginBottom: 16 }}>
         <div style={{ padding: '12px 20px', borderBottom: `1px solid ${C.border}`, fontFamily: C.mono, fontSize: '0.72rem', color: C.muted, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Watch Options</div>
         <div style={{ padding: '8px 20px' }}>
           <FieldRow name="interval" type="number" req={false} desc="Polling interval in ms (default: 2000)" />
@@ -133,7 +133,7 @@ watcher.destroy();`} />
 
       {/* ══ EMBED COMPONENT ═══════════════════════════════════════════════ */}
       <SectionAnchor id="embed" />
-      <H2>Embed Component</H2>
+      <H2 index="02">Embed Component</H2>
       <Lead>
         Drop a complete verification UI into your app with zero frontend code.{' '}
         <code style={{ fontFamily: C.mono, color: C.cyan, fontSize: '0.82rem' }}>IdswyftEmbed</code> creates an iframe
@@ -155,7 +155,7 @@ watcher.destroy();`} />
             features: ['Fits your container', 'Custom width/height', 'No overlay or backdrop', 'Stays in page flow'],
           },
         ].map(opt => (
-          <div key={opt.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, padding: '24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
+          <div key={opt.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '24px', display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <span style={{ fontFamily: C.sans, fontWeight: 700, fontSize: '1rem', color: C.text }}>{opt.title}</span>
               <Pill color={opt.tag.color} bg={opt.tag.bg}>{opt.tag.label}</Pill>
@@ -211,7 +211,7 @@ embed.open(sessionToken, {
   onComplete: (result) => showSuccessMessage(result),
 });`} />
 
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 16 }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, overflow: 'hidden', marginBottom: 16 }}>
         <div style={{ padding: '12px 20px', borderBottom: `1px solid ${C.border}`, fontFamily: C.mono, fontSize: '0.72rem', color: C.muted, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Embed Options</div>
         <div style={{ padding: '8px 20px' }}>
           <FieldRow name="mode" type="'modal' | 'inline'" req={false} desc="UI mode. Default: 'modal'" />
@@ -224,7 +224,7 @@ embed.open(sessionToken, {
         </div>
       </div>
 
-      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 16 }}>
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, overflow: 'hidden', marginBottom: 16 }}>
         <div style={{ padding: '12px 20px', borderBottom: `1px solid ${C.border}`, fontFamily: C.mono, fontSize: '0.72rem', color: C.muted, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Callbacks</div>
         <div style={{ padding: '8px 20px' }}>
           <FieldRow name="onComplete" type="(result) => void" req={false} desc="Verification succeeded. Result includes verificationId, status, finalResult." />

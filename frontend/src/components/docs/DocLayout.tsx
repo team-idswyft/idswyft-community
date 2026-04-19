@@ -67,7 +67,7 @@ export const DocLayout: React.FC<DocLayoutProps> = ({ slug, nav, children }) => 
     <div className="pattern-wave pattern-faint pattern-fade-edges pattern-full" style={{ fontFamily: C.sans, background: C.bg, color: C.text, margin: '-24px -24px 0', minHeight: '100vh', overflowX: 'hidden' }}>
 
       {/* ── Header bar ── */}
-      <div style={{ borderBottom: `1px solid ${C.border}`, padding: '18px 32px', display: 'flex', alignItems: 'center', gap: 16, position: 'sticky', top: 0, background: `${C.bg}ee`, backdropFilter: 'blur(8px)', zIndex: 10 }}>
+      <div style={{ borderBottom: `1px solid ${C.border}`, padding: '18px 32px', display: 'flex', alignItems: 'center', gap: 16, position: 'sticky', top: 0, background: C.bg, zIndex: 10 }}>
         <div>
           <span style={{ fontFamily: C.mono, fontSize: '1.05rem', fontWeight: 600, color: C.text }}>
             <span style={{ color: C.cyan }}>idswyft</span>
@@ -81,7 +81,7 @@ export const DocLayout: React.FC<DocLayoutProps> = ({ slug, nav, children }) => 
             style={{
               fontFamily: C.mono, fontSize: '0.72rem', fontWeight: 500,
               color: C.muted, textDecoration: 'none',
-              padding: '4px 10px', borderRadius: 6,
+              padding: '4px 10px', borderRadius: 0,
               border: `1px solid ${C.border}`,
               transition: 'color 0.15s, border-color 0.15s',
             }}

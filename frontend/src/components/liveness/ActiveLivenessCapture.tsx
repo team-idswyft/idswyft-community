@@ -134,11 +134,11 @@ export function ActiveLivenessCapture({
       width: '100%',
       maxWidth: 520,
       margin: '0 auto',
-      background: '#040d1a',
-      borderRadius: 16,
+      background: 'var(--paper)',
+      border: '1px solid var(--rule)',
       overflow: 'hidden',
-      fontFamily: "'Syne', sans-serif",
-      color: '#e8f4f8',
+      fontFamily: 'var(--sans)',
+      color: 'var(--ink)',
     }}>
       <style>{LIVENESS_CSS}</style>
 
@@ -159,7 +159,6 @@ export function ActiveLivenessCapture({
             height: '100%',
             objectFit: 'cover',
             transform: 'scaleX(-1)',
-            borderRadius: 16,
           }}
         />
         <canvas ref={canvasRef} style={{ display: 'none' }} />
@@ -319,23 +318,17 @@ export function ActiveLivenessCapture({
 // ─── Injected CSS ──────────────────────────────────────
 
 const LIVENESS_CSS = `
-@import url('https://fonts.googleapis.com/css2?family=Syne:wght@400;600;700;800&family=JetBrains+Mono:wght@400;500&display=swap');
-
-/* ── Ambient Glow ── */
+/* ── Ambient Glow (removed for v2 -- kept as invisible placeholder) ── */
 .lv-glow {
-  position: absolute; border-radius: 50%; pointer-events: none; z-index: 0;
+  position: absolute; pointer-events: none; z-index: 0; display: none;
 }
-.lv-glow-tl {
-  top: -80px; left: -80px; width: 240px; height: 240px;
-  background: radial-gradient(circle, rgba(0,212,180,0.05) 0%, transparent 70%);
-}
+.lv-glow-tl { display: none; }
 
 /* ── Scan Line ── */
 .lv-scan {
   position: absolute; left: 18%; right: 18%;
-  height: 1.5px; z-index: 3; pointer-events: none;
-  background: linear-gradient(90deg, transparent, #00d4b4, transparent);
-  box-shadow: 0 0 8px #00d4b4;
+  height: 1px; z-index: 3; pointer-events: none;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
   animation: lv-fscan 2s ease-in-out infinite;
 }
 .lv-scan--fast { animation-duration: 0.9s; }
@@ -353,104 +346,96 @@ const LIVENESS_CSS = `
 /* ── Cancel Pill ── */
 .lv-cancel {
   position: absolute; top: 12px; left: 12px; z-index: 10;
-  padding: 6px 14px; border-radius: 20px;
-  border: 1px solid rgba(0,212,180,0.15);
-  background: rgba(4,13,26,0.7);
-  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
-  color: #4a6a7a;
-  font-family: 'JetBrains Mono', monospace;
+  padding: 6px 14px;
+  border: 1px solid var(--rule);
+  background: var(--panel);
+  color: var(--mid);
+  font-family: var(--mono);
   font-size: 11px; letter-spacing: 0.07em;
   cursor: pointer; transition: all 0.2s;
 }
-.lv-cancel:hover { border-color: #00d4b4; color: #00d4b4; }
+.lv-cancel:hover { border-color: var(--ink); color: var(--ink); }
 
-/* ── Instruction Bar (Glassmorphism) ── */
+/* ── Instruction Bar (solid panel) ── */
 .lv-bar {
   position: absolute; bottom: 0; left: 0; right: 0; z-index: 6;
   padding: 14px 20px 18px;
-  background: rgba(4,13,26,0.88);
-  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
-  border-top: 1px solid rgba(0,212,180,0.15);
+  background: var(--panel);
+  border-top: 1px solid var(--rule);
   display: flex; flex-direction: column; align-items: center; gap: 8px;
 }
 .lv-bar-text {
   margin: 0;
-  font-family: 'Syne', sans-serif;
-  font-size: 15px; font-weight: 700; letter-spacing: -0.01em;
-  text-shadow: 0 1px 8px rgba(0,0,0,0.5);
+  font-family: var(--sans);
+  font-size: 15px; font-weight: 600; letter-spacing: -0.01em;
 }
 .lv-bar-error {
   margin: 0;
-  font-family: 'JetBrains Mono', monospace;
+  font-family: var(--mono);
   font-size: 11px; color: #ff3b5c; letter-spacing: 0.04em;
 }
 
 /* ── Progress Dots ── */
 .lv-dots { display: flex; gap: 6px; justify-content: center; }
 .lv-dot {
-  width: 6px; height: 6px; border-radius: 50%;
+  width: 6px; height: 6px;
   transition: all 0.3s cubic-bezier(.4,0,.2,1);
 }
 .lv-dot--done {
-  background: #00d4b4; box-shadow: 0 0 6px rgba(0,212,180,0.5);
+  background: var(--accent);
 }
 .lv-dot--active {
-  background: #00ffdf; width: 18px; border-radius: 3px;
-  box-shadow: 0 0 8px rgba(0,255,223,0.5);
+  background: var(--accent); width: 18px;
 }
-.lv-dot--pending { background: rgba(74,106,122,0.3); }
+.lv-dot--pending { background: var(--rule); }
 
 /* ── Tip Bar ── */
 .lv-tip {
   display: flex; align-items: center; gap: 8px;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 10px; color: rgba(232,244,248,0.45);
+  font-family: var(--mono);
+  font-size: 10px; color: var(--soft);
   letter-spacing: 0.06em;
 }
 .lv-tip-dot {
-  width: 5px; height: 5px; border-radius: 50%;
-  background: #00d4b4; flex-shrink: 0;
+  width: 5px; height: 5px;
+  background: var(--accent); flex-shrink: 0;
 }
 
 /* ── Retry Button ── */
 .lv-btn-retry {
-  margin-top: 2px; padding: 10px 28px; border-radius: 12px; border: none;
-  background: #00d4b4; color: #040d1a;
-  font-family: 'Syne', sans-serif;
-  font-size: 14px; font-weight: 700;
+  margin-top: 2px; padding: 10px 28px; border: 1px solid var(--ink);
+  background: var(--ink); color: var(--paper);
+  font-family: var(--mono);
+  font-size: 13px; font-weight: 500;
   letter-spacing: 0.05em; text-transform: uppercase;
   cursor: pointer; position: relative; overflow: hidden;
   transition: all 0.18s;
 }
-.lv-btn-retry::after {
-  content: ''; position: absolute; inset: 0;
-  background: linear-gradient(135deg, rgba(255,255,255,0.14) 0%, transparent 50%);
-}
-.lv-btn-retry:hover { background: #00ffdf; transform: translateY(-1px); }
+.lv-btn-retry:hover { transform: translateY(-1px); }
 
 /* ── Processing Overlay ── */
 .lv-processing {
   position: absolute; inset: 0; z-index: 20;
   display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px;
-  background: rgba(4,13,26,0.92);
-  backdrop-filter: blur(12px); -webkit-backdrop-filter: blur(12px);
+  background: var(--panel);
+  border: 1px solid var(--rule);
 }
 .lv-processing-spinner {
   width: 48px; height: 48px; border-radius: 50%;
-  border: 3px solid rgba(0,212,180,0.15);
-  border-top-color: #00d4b4;
+  border: 3px solid var(--rule);
+  border-top-color: var(--accent);
   animation: lv-spin 0.8s linear infinite;
 }
 .lv-processing-text {
   margin: 0;
-  font-family: 'Syne', sans-serif;
-  font-size: 16px; font-weight: 700; color: #e8f4f8;
+  font-family: var(--sans);
+  font-size: 16px; font-weight: 600; color: var(--ink);
   letter-spacing: -0.01em;
 }
 .lv-processing-sub {
   margin: 0;
-  font-family: 'JetBrains Mono', monospace;
-  font-size: 11px; color: rgba(232,244,248,0.45);
+  font-family: var(--mono);
+  font-size: 11px; color: var(--soft);
   letter-spacing: 0.04em;
 }
 

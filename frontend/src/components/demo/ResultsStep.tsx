@@ -4,7 +4,7 @@ import type { VerificationRequest } from './types';
 
 // ─── JSON syntax highlighting ───────────────────────────────────
 const jsonTokenColors = {
-  key: C.cyan,
+  key: C.accent,
   string: C.green,
   number: C.amber,
   boolean: C.purple,
@@ -80,8 +80,8 @@ const ScoreBar = ({ value, max = 1, color, label, detail }: { value: number | nu
         <span style={{ color: C.muted }}>{label}</span>
         <span style={{ color, fontWeight: 600, fontFamily: C.mono }}>{pct}%</span>
       </div>
-      <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-        <div style={{ height: '100%', width: `${pct}%`, borderRadius: 3, background: color, transition: 'width 0.6s ease' }} />
+      <div style={{ height: 3, background: C.border, overflow: 'hidden' }}>
+        <div style={{ height: '100%', width: `${pct}%`, background: color, transition: 'width 0.6s ease' }} />
       </div>
       {detail && <div style={{ fontSize: 10, color: C.dim, marginTop: 2 }}>{detail}</div>}
     </div>
@@ -94,7 +94,8 @@ const Badge = ({ passed, label }: { passed: boolean | null | undefined; label?: 
   return (
     <span style={{
       display: 'inline-flex', alignItems: 'center', gap: 4,
-      fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
+      fontSize: 11, fontWeight: 600, padding: '2px 8px',
+      fontFamily: C.mono, letterSpacing: '0.03em',
       background: passed ? C.greenDim : C.redDim,
       color: passed ? C.green : C.red,
       border: `1px solid ${passed ? 'rgba(52,211,153,0.25)' : 'rgba(248,113,113,0.25)'}`,
@@ -134,7 +135,7 @@ export const ResultsStep: React.FC<ResultsStepProps> = ({
 
   // Card style
   const cardStyle: React.CSSProperties = {
-    background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 16, marginBottom: 12, textAlign: 'left',
+    background: C.panel, border: `1px solid ${C.border}`, padding: 16, marginBottom: 12, textAlign: 'left',
   };
   const cardTitle: React.CSSProperties = {
     fontFamily: C.mono, fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 10, letterSpacing: '0.04em', textTransform: 'uppercase' as const,
@@ -144,7 +145,7 @@ export const ResultsStep: React.FC<ResultsStepProps> = ({
     <div style={{ padding: '8px 0' }}>
       {/* Status Header */}
       <div style={{ textAlign: 'center', marginBottom: 24 }}>
-        <div style={{ width: 56, height: 56, borderRadius: '50%', background: statusBg, border: `1px solid ${statusTone}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 22, color: statusTone }}>
+        <div style={{ width: 56, height: 56, background: statusBg, border: `1px solid ${statusTone}`, display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px', fontSize: 22, color: statusTone }}>
           {statusIcon}
         </div>
         <h2 style={{ fontSize: 20, fontWeight: 600, color: C.text, marginBottom: 4 }}>{statusLabel}</h2>
@@ -160,7 +161,7 @@ export const ResultsStep: React.FC<ResultsStepProps> = ({
               </>}
         </p>
         {verificationRequest?.rejection_reason && (
-          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8, padding: '4px 12px', borderRadius: 6, background: C.redDim, border: `1px solid rgba(248,113,113,0.2)` }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 6, marginTop: 8, padding: '4px 12px', background: C.redDim, border: `1px solid rgba(248,113,113,0.2)` }}>
             <span style={{ color: C.red, fontSize: 11, fontFamily: C.mono, fontWeight: 600 }}>{verificationRequest.rejection_reason}</span>
           </div>
         )}
@@ -308,7 +309,7 @@ export const ResultsStep: React.FC<ResultsStepProps> = ({
           <div style={cardTitle}>Risk Score</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <div style={{
-              width: 52, height: 52, borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
+              width: 52, height: 52, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
               fontSize: 18, fontWeight: 700, fontFamily: C.mono,
               background: risk.risk_level === 'low' ? C.greenDim : risk.risk_level === 'medium' ? C.amberDim : C.redDim,
               border: `2px solid ${risk.risk_level === 'low' ? C.green : risk.risk_level === 'medium' ? C.amber : C.red}`,
@@ -321,13 +322,13 @@ export const ResultsStep: React.FC<ResultsStepProps> = ({
                 <span style={{ color: C.text, fontSize: 13, fontWeight: 600, textTransform: 'capitalize' }}>{risk.risk_level} Risk</span>
                 <span style={{ color: C.dim, fontSize: 11, fontFamily: C.mono }}>0{'\u2013'}100 scale</span>
               </div>
-              <div style={{ height: 6, borderRadius: 3, background: 'rgba(255,255,255,0.06)', overflow: 'hidden' }}>
-                <div style={{ height: '100%', width: `${risk.overall_score}%`, borderRadius: 3, background: risk.risk_level === 'low' ? C.green : risk.risk_level === 'medium' ? C.amber : C.red, transition: 'width 0.6s ease' }} />
+              <div style={{ height: 3, background: C.border, overflow: 'hidden' }}>
+                <div style={{ height: '100%', width: `${risk.overall_score}%`, background: risk.risk_level === 'low' ? C.green : risk.risk_level === 'medium' ? C.amber : C.red, transition: 'width 0.6s ease' }} />
               </div>
               {risk.risk_factors && risk.risk_factors.length > 0 && (
                 <div style={{ marginTop: 6, display: 'flex', gap: 4, flexWrap: 'wrap' }}>
                   {risk.risk_factors.map((f, i) => (
-                    <span key={i} style={{ fontSize: 10, padding: '1px 6px', borderRadius: 4, background: 'rgba(255,255,255,0.05)', color: C.dim, fontFamily: C.mono }}>
+                    <span key={i} style={{ fontSize: 10, padding: '1px 6px', background: C.surface, border: `1px solid ${C.border}`, color: C.dim, fontFamily: C.mono }}>
                       {f.factor}
                     </span>
                   ))}
@@ -342,9 +343,9 @@ export const ResultsStep: React.FC<ResultsStepProps> = ({
       <div style={{ ...cardStyle, marginBottom: 20 }}>
         <div style={cardTitle}>Raw API Response</div>
         <p style={{ color: C.dim, fontSize: 11, margin: '0 0 8px' }}>
-          This is the exact JSON your server receives from <code style={{ color: C.cyan, background: C.codeBg, padding: '1px 4px', borderRadius: 3, fontSize: 10 }}>GET /api/v2/verify/:id/status</code>
+          This is the exact JSON your server receives from <code style={{ color: C.accent, background: C.codeBg, padding: '1px 4px', fontSize: 10 }}>GET /api/v2/verify/:id/status</code>
         </p>
-        <pre style={{ background: C.codeBg, color: C.code, padding: 12, borderRadius: 6, fontSize: 10, fontFamily: C.mono, overflowX: 'auto', maxHeight: 300, overflowY: 'auto', lineHeight: 1.5, margin: 0 }}>
+        <pre style={{ background: C.codeBg, color: C.code, padding: 12, border: `1px solid ${C.borderStrong}`, fontSize: 10, fontFamily: C.mono, overflowX: 'auto', maxHeight: 300, overflowY: 'auto', lineHeight: 1.5, margin: 0 }}>
           {highlightJson(verificationRequest)}
         </pre>
       </div>
@@ -356,9 +357,9 @@ export const ResultsStep: React.FC<ResultsStepProps> = ({
             onClick={onRetry}
             disabled={retryProcessing}
             style={{
-              background: retryProcessing ? 'rgba(34,211,238,0.4)' : C.cyan,
-              color: '#080c14', border: 'none', borderRadius: 8,
-              padding: '10px 32px', fontWeight: 600, fontSize: 14,
+              background: retryProcessing ? 'transparent' : C.accent,
+              color: retryProcessing ? C.muted : C.bg, border: `1px solid ${C.accent}`,
+              padding: '10px 32px', fontFamily: C.mono, fontWeight: 500, fontSize: 13,
               cursor: retryProcessing ? 'not-allowed' : 'pointer',
               opacity: retryProcessing ? 0.6 : 1,
             }}
@@ -379,8 +380,8 @@ export const ResultsStep: React.FC<ResultsStepProps> = ({
           <button
             onClick={onGoToCredential}
             style={{
-              background: C.cyan, color: C.bg, border: 'none', borderRadius: 8,
-              padding: '10px 24px', fontWeight: 600, fontSize: 14, cursor: 'pointer',
+              background: C.accent, color: C.bg, border: `1px solid ${C.accent}`,
+              padding: '10px 24px', fontFamily: C.mono, fontWeight: 500, fontSize: 13, cursor: 'pointer',
               display: 'flex', alignItems: 'center', gap: 8,
             }}
           >
@@ -393,13 +394,13 @@ export const ResultsStep: React.FC<ResultsStepProps> = ({
         )}
         <button
           onClick={onGoToAddress}
-          style={{ background: C.purple, color: '#fff', border: 'none', borderRadius: 8, padding: '10px 24px', fontWeight: 600, fontSize: 14, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
+          style={{ background: C.purple, color: '#fff', border: `1px solid ${C.purple}`, padding: '10px 24px', fontFamily: C.mono, fontWeight: 500, fontSize: 13, cursor: 'pointer', display: 'flex', alignItems: 'center', gap: 8 }}
         >
           Try Address Verification
         </button>
         <button
           onClick={onStartNew}
-          style={{ background: 'transparent', color: C.muted, border: `1px solid ${C.border}`, borderRadius: 8, padding: '10px 24px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
+          style={{ background: 'transparent', color: C.muted, border: `1px solid ${C.border}`, padding: '10px 24px', fontFamily: C.mono, fontWeight: 500, fontSize: 13, cursor: 'pointer' }}
         >
           Start New Demo
         </button>

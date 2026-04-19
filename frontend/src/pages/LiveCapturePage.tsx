@@ -1,6 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { API_BASE_URL } from '../config/api';
+import { C } from '../theme';
 import { ActiveLivenessCapture } from '../components/liveness/ActiveLivenessCapture';
 import type { LivenessMetadata } from '../hooks/useActiveLiveness';
 import {
@@ -594,43 +595,40 @@ export const LiveCapturePage: React.FC = () => {
   };
 
   const drawFaceOverlay = (ctx: CanvasRenderingContext2D, width: number, height: number, faceDetected: boolean) => {
-    // Draw face detection indicator
+    // v2: dashed oval with accent color
     const centerX = width / 2;
     const centerY = height / 2;
-    const radius = Math.min(width, height) * 0.25;
-    
-    ctx.strokeStyle = faceDetected ? '#10B981' : '#EF4444';
-    ctx.lineWidth = 3;
-    ctx.setLineDash(faceDetected ? [] : [10, 10]);
-    
+    const radiusX = Math.min(width, height) * 0.22;
+    const radiusY = radiusX * 1.35; // taller oval for face shape
+
+    ctx.strokeStyle = faceDetected ? C.green : C.red;
+    ctx.lineWidth = 2;
+    ctx.setLineDash([8, 6]);
+
     ctx.beginPath();
-    ctx.arc(centerX, centerY, radius, 0, 2 * Math.PI);
+    ctx.ellipse(centerX, centerY, radiusX, radiusY, 0, 0, 2 * Math.PI);
     ctx.stroke();
-    
-    // Draw status text with better positioning
-    ctx.fillStyle = faceDetected ? '#10B981' : '#EF4444';
-    ctx.font = '14px Arial';
+    ctx.setLineDash([]);
+
+    // Status text — mono font
+    ctx.fillStyle = faceDetected ? C.green : C.red;
+    ctx.font = '12px JetBrains Mono, monospace';
     ctx.textAlign = 'center';
-    const statusText = faceDetected ? 'Face Detected' : 'Position Face in Frame';
+    const statusText = faceDetected ? 'FACE DETECTED' : 'POSITION FACE IN FRAME';
     ctx.fillText(
       statusText,
       centerX,
-      centerY + radius + 25
+      centerY + radiusY + 22
     );
-    
-    // Draw liveness indicators
+
+    // Liveness indicators — mono font
     if (faceDetected && livenessScore > 0) {
-      ctx.font = '12px Arial';
-      ctx.fillStyle = '#10B981';
+      ctx.font = '11px JetBrains Mono, monospace';
+      ctx.fillStyle = C.green;
       ctx.fillText(
-        `Liveness: ${Math.round(livenessScore * 100)}%`,
+        `LIVENESS ${Math.round(livenessScore * 100)}%  |  STABILITY ${Math.round(faceStability * 100)}%`,
         centerX,
-        centerY + radius + 50
-      );
-      ctx.fillText(
-        `Stability: ${Math.round(faceStability * 100)}%`,
-        centerX,
-        centerY + radius + 65
+        centerY + radiusY + 40
       );
     }
   };
@@ -846,21 +844,22 @@ export const LiveCapturePage: React.FC = () => {
   // Render session expired
   if (sessionExpired) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-red-50 via-white to-red-50 flex items-center justify-center">
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-4">
-          <div className="text-center">
-            <ExclamationTriangleIcon className="w-16 h-16 text-red-500 mx-auto mb-4" />
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">Session Expired</h2>
-            <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6 px-2">
-              Your live capture session has expired. Please start a new verification.
-            </p>
-            <button
-              onClick={() => navigate('/verify')}
-              className="w-full bg-blue-600 text-white py-3 px-6 rounded-xl hover:bg-blue-700 transition text-sm sm:text-base min-h-[48px]"
-            >
-              Start New Verification
-            </button>
-          </div>
+      <div style={{ minHeight: '100vh', background: 'var(--paper)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--sans)' }}>
+        <div className="card" style={{ maxWidth: 440, width: '100%', margin: '0 16px', padding: 32, textAlign: 'center' }}>
+          <ExclamationTriangleIcon style={{ width: 48, height: 48, color: C.red, margin: '0 auto 16px' }} />
+          <h2 style={{ color: 'var(--ink)', fontFamily: 'var(--mono)', fontSize: 20, fontWeight: 600, margin: '0 0 8px' }}>
+            Session Expired
+          </h2>
+          <p style={{ color: 'var(--mid)', fontSize: 14, margin: '0 0 24px' }}>
+            Your live capture session has expired. Please start a new verification.
+          </p>
+          <button
+            onClick={() => navigate('/verify')}
+            className="btn-accent"
+            style={{ width: '100%', justifyContent: 'center', minHeight: 48 }}
+          >
+            Start New Verification
+          </button>
         </div>
       </div>
     );
@@ -873,149 +872,96 @@ export const LiveCapturePage: React.FC = () => {
     const isVerified = finalResults.status === 'verified';
     const isFailed = finalResults.status === 'failed';
     const isManualReview = finalResults.status === 'manual_review';
-    
-    // Determine background and icon colors based on status
-    let bgGradient = 'from-green-50 via-white to-green-50';
-    let iconColor = 'text-green-500';
-    let statusColor = 'text-blue-600';
-    
-    if (isVerified) {
-      bgGradient = 'from-green-50 via-white to-green-50';
-      iconColor = 'text-green-500';
-      statusColor = 'text-green-600';
-    } else if (isFailed) {
-      bgGradient = 'from-red-50 via-white to-red-50';
-      iconColor = 'text-red-500';
-      statusColor = 'text-red-600';
-    } else if (isManualReview) {
-      bgGradient = 'from-yellow-50 via-white to-yellow-50';
-      iconColor = 'text-yellow-500';
-      statusColor = 'text-yellow-600';
-    } else if (isProcessing) {
-      bgGradient = 'from-blue-50 via-white to-blue-50';
-      iconColor = 'text-blue-500';
-      statusColor = 'text-blue-600';
-    }
-    
+
+    // v2: status-driven accent color
+    let statusClr: string = C.blue;
+    if (isVerified) statusClr = C.green;
+    else if (isFailed) statusClr = C.red;
+    else if (isManualReview) statusClr = C.amber;
+
+    const resultRow = (label: string, value: string, color: string) => (
+      <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px dashed var(--rule)' }}>
+        <span style={{ color: 'var(--mid)', fontFamily: 'var(--mono)', fontSize: 12 }}>{label}</span>
+        <span style={{ color, fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 600 }}>{value}</span>
+      </div>
+    );
+
     return (
-      <div className={`min-h-screen bg-gradient-to-br ${bgGradient} flex items-center justify-center`}>
-        <div className="bg-white rounded-2xl shadow-xl p-8 max-w-md w-full mx-4">
-          <div className="text-center">
-            {/* Icon with conditional rendering for processing spinner */}
-            <div className="w-16 h-16 mx-auto mb-4 relative">
-              {isProcessing ? (
-                <div className="w-16 h-16 rounded-full border-4 border-blue-200 border-t-blue-600 animate-spin"></div>
-              ) : (
-                <CheckCircleIcon className={`w-16 h-16 ${iconColor}`} />
-              )}
-            </div>
+      <div style={{ minHeight: '100vh', background: 'var(--paper)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: 'var(--sans)' }}>
+        <div className="card" style={{ maxWidth: 440, width: '100%', margin: '0 16px', padding: 32, textAlign: 'center' }}>
+          {/* Icon / spinner */}
+          <div style={{ width: 48, height: 48, margin: '0 auto 16px', position: 'relative' }}>
+            {isProcessing ? (
+              <div style={{ width: 48, height: 48, border: `2px solid var(--rule)`, borderTopColor: statusClr, animation: 'spin 1s linear infinite' }} />
+            ) : (
+              <CheckCircleIcon style={{ width: 48, height: 48, color: statusClr }} />
+            )}
+          </div>
 
-            <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-2">
-              {isProcessing ? 'Processing...' : 'Capture Complete!'}
-            </h2>
-            
-            <p className="text-sm sm:text-base text-gray-600 mb-4 px-2">
-              {isProcessing 
-                ? 'Please wait while we verify your identity. This may take a few moments...'
-                : isVerified 
-                  ? 'Your identity has been successfully verified.'
-                  : isFailed 
-                    ? 'Verification failed. Please try again.'
-                    : isManualReview 
-                      ? 'Your verification is under manual review.'
-                      : 'Your live capture has been successfully processed.'
-              }
-            </p>
-            
-            <div className="bg-gray-50 rounded-xl p-4 mb-6 text-left">
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Status:</span>
-                  <div className="flex items-center">
-                    <span className={`font-semibold ${statusColor}`}>
-                      {isProcessing && !verificationResults ? 'processing' : finalResults.status}
-                    </span>
-                    {isProcessing && (
-                      <div className="ml-2 w-4 h-4 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin"></div>
-                    )}
-                  </div>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Liveness Check:</span>
-                  <span className={`font-semibold ${captureResult.liveness_check_enabled ? 'text-green-600' : 'text-gray-600'}`}>
-                    {captureResult.liveness_check_enabled ? 'Enabled' : 'Disabled'}
-                  </span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-600">Face Matching:</span>
-                  <span className={`font-semibold ${captureResult.face_matching_enabled ? 'text-green-600' : 'text-gray-600'}`}>
-                    {captureResult.face_matching_enabled ? 'Enabled' : 'Disabled'}
-                  </span>
-                </div>
-                
-                {/* Show additional verification details when available */}
-                {verificationResults && (
-                  <>
-                    {verificationResults.face_match_score !== undefined && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Face Match:</span>
-                        <span className="font-semibold text-green-600">
-                          {Math.round(verificationResults.face_match_score * 100)}%
-                        </span>
-                      </div>
-                    )}
-                    {verificationResults.liveness_score !== undefined && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Liveness Score:</span>
-                        <span className="font-semibold text-green-600">
-                          {Math.round(verificationResults.liveness_score * 100)}%
-                        </span>
-                      </div>
-                    )}
-                    {verificationResults.confidence_score !== undefined && (
-                      <div className="flex justify-between">
-                        <span className="text-gray-600">Confidence:</span>
-                        <span className="font-semibold text-green-600">
-                          {Math.round(verificationResults.confidence_score * 100)}%
-                        </span>
-                      </div>
-                    )}
-                  </>
-                )}
+          <h2 style={{ color: 'var(--ink)', fontFamily: 'var(--mono)', fontSize: 20, fontWeight: 600, margin: '0 0 8px' }}>
+            {isProcessing ? 'Processing...' : 'Capture Complete'}
+          </h2>
+
+          <p style={{ color: 'var(--mid)', fontSize: 14, margin: '0 0 20px' }}>
+            {isProcessing
+              ? 'Please wait while we verify your identity.'
+              : isVerified
+                ? 'Your identity has been successfully verified.'
+                : isFailed
+                  ? 'Verification failed. Please try again.'
+                  : isManualReview
+                    ? 'Your verification is under manual review.'
+                    : 'Your live capture has been successfully processed.'
+            }
+          </p>
+
+          {/* Results table */}
+          <div style={{ background: 'var(--panel)', border: '1px solid var(--rule)', padding: 16, marginBottom: 24, textAlign: 'left' }}>
+            {resultRow('Status', isProcessing && !verificationResults ? 'processing' : finalResults.status, statusClr)}
+            {resultRow('Liveness Check', captureResult.liveness_check_enabled ? 'Enabled' : 'Disabled', captureResult.liveness_check_enabled ? C.green : 'var(--mid)')}
+            {resultRow('Face Matching', captureResult.face_matching_enabled ? 'Enabled' : 'Disabled', captureResult.face_matching_enabled ? C.green : 'var(--mid)')}
+
+            {verificationResults && (
+              <>
+                {verificationResults.face_match_score !== undefined &&
+                  resultRow('Face Match', `${Math.round(verificationResults.face_match_score * 100)}%`, C.green)}
+                {verificationResults.liveness_score !== undefined &&
+                  resultRow('Liveness Score', `${Math.round(verificationResults.liveness_score * 100)}%`, C.green)}
+                {verificationResults.confidence_score !== undefined &&
+                  resultRow('Confidence', `${Math.round(verificationResults.confidence_score * 100)}%`, C.green)}
+              </>
+            )}
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+            {!isProcessing ? (
+              <button
+                onClick={goToResults}
+                className="btn-accent"
+                style={{ width: '100%', justifyContent: 'center', minHeight: 48 }}
+              >
+                View Full Results
+              </button>
+            ) : (
+              <div style={{ background: 'var(--accent-soft)', border: '1px solid color-mix(in oklab, var(--accent) 30%, transparent)', padding: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10 }}>
+                <div style={{ width: 16, height: 16, border: '2px solid var(--rule)', borderTopColor: 'var(--accent)', animation: 'spin 1s linear infinite' }} />
+                <span style={{ color: 'var(--accent-ink)', fontFamily: 'var(--mono)', fontSize: 12 }}>
+                  {isPolling ? 'Checking verification status...' : 'Processing verification...'}
+                </span>
               </div>
-            </div>
+            )}
 
-            <div className="space-y-3">
-              {!isProcessing ? (
+            {error && (
+              <div style={{ background: C.redDim, border: `1px solid ${C.red}`, padding: 16 }}>
+                <p style={{ color: C.red, fontFamily: 'var(--mono)', fontSize: 12, margin: '0 0 8px' }}>{error}</p>
                 <button
                   onClick={goToResults}
-                  className="w-full bg-blue-600 text-white py-3 px-6 rounded-xl hover:bg-blue-700 transition text-sm sm:text-base min-h-[48px]"
+                  style={{ color: 'var(--accent-ink)', fontFamily: 'var(--mono)', fontSize: 12, background: 'none', border: 'none', cursor: 'pointer', textDecoration: 'underline', padding: 0 }}
                 >
-                  View Full Results
+                  Check results manually
                 </button>
-              ) : (
-                <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
-                  <div className="flex items-center justify-center">
-                    <div className="w-5 h-5 border-2 border-blue-200 border-t-blue-600 rounded-full animate-spin mr-3"></div>
-                    <span className="text-blue-700 text-sm">
-                      {isPolling ? 'Checking verification status...' : 'Processing verification...'}
-                    </span>
-                  </div>
-                </div>
-              )}
-              
-              {error && (
-                <div className="bg-red-50 border border-red-200 rounded-xl p-4">
-                  <p className="text-red-700 text-sm">{error}</p>
-                  <button
-                    onClick={goToResults}
-                    className="mt-2 text-blue-600 hover:text-blue-700 text-sm underline"
-                  >
-                    Check results manually
-                  </button>
-                </div>
-              )}
-            </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1058,17 +1004,22 @@ export const LiveCapturePage: React.FC = () => {
 
   // Main camera interface
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-white to-purple-50">
-      <div className="max-w-4xl mx-auto p-3 sm:p-6">
+    <div style={{ minHeight: '100vh', background: 'var(--paper)', fontFamily: 'var(--sans)' }}>
+      <div style={{ maxWidth: 720, margin: '0 auto', padding: '24px 16px' }}>
         {/* Header */}
-        <div className="text-center mb-4 sm:mb-8">
-          <h1 className="text-2xl sm:text-4xl font-bold text-gray-900 mb-2 sm:mb-4">Live Identity Verification</h1>
-          <p className="text-base sm:text-xl text-gray-600 px-4 sm:px-0">Complete your verification with live face capture</p>
+        <div style={{ textAlign: 'center', marginBottom: 24 }}>
+          <div className="eyebrow" style={{ marginBottom: 8 }}>idswyft / live-capture</div>
+          <h1 style={{ color: 'var(--ink)', fontFamily: 'var(--mono)', fontSize: 24, fontWeight: 600, margin: '0 0 8px' }}>
+            Live Identity Verification
+          </h1>
+          <p style={{ color: 'var(--mid)', fontSize: 14, margin: 0 }}>
+            Complete your verification with live face capture
+          </p>
         </div>
 
-        {/* Active Liveness — primary path */}
+        {/* Active Liveness -- primary path */}
         {!useFallbackCapture && !captureResult && (
-          <div className="mb-6">
+          <div style={{ marginBottom: 24 }}>
             <ActiveLivenessCapture
               onComplete={handleActiveLivenessComplete}
               onCancel={() => navigate('/verify')}
@@ -1078,58 +1029,59 @@ export const LiveCapturePage: React.FC = () => {
         )}
 
         {/* Fallback: legacy OpenCV camera interface */}
-        {useFallbackCapture && <div className="bg-white rounded-2xl shadow-xl overflow-hidden">
+        {useFallbackCapture && <div className="card" style={{ padding: 0, overflow: 'hidden' }}>
           {/* Canvas for camera - always present but conditionally visible */}
           {cameraState === 'ready' && (
-            <div className="relative bg-black">
+            <div className="capture-frame" style={{ position: 'relative', background: '#000' }}>
               <canvas
                 ref={canvasRef}
                 width={640}
                 height={480}
-                className="w-full h-64 sm:h-96 object-cover"
-                style={{ maxHeight: window.innerWidth < 640 ? '256px' : '384px' }}
+                style={{ width: '100%', height: 'auto', maxHeight: 384, objectFit: 'cover', display: 'block' }}
               />
+              <div className="corners" />
             </div>
           )}
-          
+
           {/* Hidden canvas for initialization when not ready */}
           {cameraState !== 'ready' && (
             <canvas
               ref={canvasRef}
               width={640}
               height={480}
-              className="hidden"
+              style={{ display: 'none' }}
             />
           )}
-          
+
           {/* Camera Permission Prompt */}
           {cameraState === 'prompt' && (
-            <div className="p-4 sm:p-8 text-center">
-              <CameraIcon className="w-12 h-12 sm:w-16 sm:h-16 text-blue-500 mx-auto mb-4 sm:mb-6" />
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">Camera Access Required</h2>
-              <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6 px-2">
+            <div style={{ padding: 32, textAlign: 'center' }}>
+              <CameraIcon style={{ width: 48, height: 48, color: 'var(--accent)', margin: '0 auto 20px' }} />
+              <h2 style={{ color: 'var(--ink)', fontFamily: 'var(--mono)', fontSize: 20, fontWeight: 600, margin: '0 0 8px' }}>
+                Camera Access Required
+              </h2>
+              <p style={{ color: 'var(--mid)', fontSize: 14, margin: '0 0 24px' }}>
                 We need access to your camera for live identity verification using Face-API technology.
               </p>
               <button
                 onClick={initializeCamera}
                 disabled={!opencvReady || loading}
-                className="bg-blue-600 text-white py-3 px-6 sm:py-4 sm:px-8 rounded-xl hover:bg-blue-700 disabled:bg-gray-400 transition flex items-center justify-center mx-auto text-sm sm:text-base min-h-[48px]"
+                className="btn-accent"
+                style={{ margin: '0 auto', minHeight: 48, justifyContent: 'center' }}
               >
                 {!opencvReady ? (
                   <>
-                    <ArrowPathIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2 animate-spin" />
-                    <span className="hidden sm:inline">Loading Face-API...</span>
-                    <span className="sm:hidden">Loading...</span>
+                    <ArrowPathIcon style={{ width: 16, height: 16 }} className="animate-spin" />
+                    Loading Face-API...
                   </>
                 ) : loading ? (
                   <>
-                    <ArrowPathIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2 animate-spin" />
-                    <span className="hidden sm:inline">Initializing Camera...</span>
-                    <span className="sm:hidden">Starting...</span>
+                    <ArrowPathIcon style={{ width: 16, height: 16 }} className="animate-spin" />
+                    Initializing Camera...
                   </>
                 ) : (
                   <>
-                    <CameraIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                    <CameraIcon style={{ width: 16, height: 16 }} />
                     Enable Camera
                   </>
                 )}
@@ -1139,124 +1091,116 @@ export const LiveCapturePage: React.FC = () => {
 
           {/* Camera Error */}
           {cameraState === 'error' && (
-            <div className="p-4 sm:p-8 text-center">
-              <ExclamationTriangleIcon className="w-12 h-12 sm:w-16 sm:h-16 text-red-500 mx-auto mb-4 sm:mb-6" />
-              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 mb-3 sm:mb-4">Camera Access Failed</h2>
-              <p className="text-sm sm:text-base text-gray-600 mb-4 sm:mb-6 px-2">{error}</p>
-              <div className="space-y-3">
-                <button
-                  onClick={retryCamera}
-                  className="bg-blue-600 text-white py-3 px-6 rounded-xl hover:bg-blue-700 transition text-sm sm:text-base min-h-[48px]"
-                >
-                  Try Again
-                </button>
-              </div>
+            <div style={{ padding: 32, textAlign: 'center' }}>
+              <ExclamationTriangleIcon style={{ width: 48, height: 48, color: C.red, margin: '0 auto 20px' }} />
+              <h2 style={{ color: 'var(--ink)', fontFamily: 'var(--mono)', fontSize: 20, fontWeight: 600, margin: '0 0 8px' }}>
+                Camera Access Failed
+              </h2>
+              <p style={{ color: 'var(--mid)', fontSize: 14, margin: '0 0 24px' }}>{error}</p>
+              <button
+                onClick={retryCamera}
+                className="btn-secondary"
+                style={{ margin: '0 auto', minHeight: 48, justifyContent: 'center' }}
+              >
+                Try Again
+              </button>
             </div>
           )}
 
           {/* Live Camera Feed */}
           {cameraState === 'ready' && sessionData && (
-            <div className="relative">
-              {/* Challenge Info */}
-              <div className="bg-gradient-to-r from-blue-600 to-purple-600 p-4 sm:p-6 text-white">
-                <div className="flex flex-col sm:flex-row items-center justify-center sm:space-x-4 mb-4">
-                  <div className="p-2 sm:p-3 bg-white/20 rounded-full mb-2 sm:mb-0">
-                    <EyeIcon className="w-6 h-6 sm:w-8 sm:h-8" />
+            <div style={{ position: 'relative' }}>
+              {/* Challenge Info -- v2 prompt-tag style header */}
+              <div style={{ background: 'var(--panel)', borderBottom: '1px solid var(--rule)', padding: '16px 20px' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+                  <div style={{ width: 36, height: 36, border: '1px solid var(--rule)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                    <EyeIcon style={{ width: 20, height: 20, color: 'var(--accent)' }} />
                   </div>
-                  <div className="text-center sm:text-left">
-                    <h3 className="text-lg sm:text-xl font-bold">Liveness Challenge</h3>
-                    <p className="text-sm sm:text-base text-blue-100 mt-1">{sessionData.liveness_challenge.instruction}</p>
+                  <div>
+                    <h3 style={{ color: 'var(--ink)', fontFamily: 'var(--mono)', fontSize: 14, fontWeight: 600, margin: 0 }}>Liveness Challenge</h3>
+                    <p style={{ color: 'var(--mid)', fontSize: 13, margin: '2px 0 0' }}>{sessionData.liveness_challenge.instruction}</p>
                   </div>
                 </div>
 
-                {/* Face Detection Status Indicator */}
-                <div className={`flex flex-col items-center justify-center space-y-2 p-3 sm:p-4 rounded-xl mb-4 ${
-                  faceDetected 
-                    ? 'bg-green-500/20 border border-green-400/30' 
-                    : 'bg-red-500/20 border border-red-400/30'
-                }`}>
-                  <div className="flex items-center space-x-2 sm:space-x-3">
-                    <div className={`w-2 h-2 sm:w-3 sm:h-3 rounded-full ${
-                      faceDetected ? 'bg-green-400 animate-pulse' : 'bg-red-400'
-                    }`}></div>
-                    <span className={`text-xs sm:text-sm font-medium text-center ${
-                      faceDetected ? 'text-green-100' : 'text-red-100'
-                    }`}>
-                      {faceDetected 
-                        ? '✓ Face Detected - Ready' 
-                        : '⚠ No Face Detected'
-                      }
+                {/* Face Detection Status Indicator -- v2 solid border badge */}
+                <div style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 6,
+                  padding: 12,
+                  background: faceDetected ? C.greenDim : C.redDim,
+                  border: `1px solid ${faceDetected ? C.green : C.red}`,
+                  marginBottom: countdown !== null ? 12 : 0,
+                }}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                    <div style={{ width: 6, height: 6, background: faceDetected ? C.green : C.red, flexShrink: 0 }} />
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 500, color: faceDetected ? C.green : C.red, textTransform: 'uppercase', letterSpacing: '0.04em' }}>
+                      {faceDetected ? 'Face Detected -- Ready' : 'No Face Detected'}
                     </span>
                   </div>
                   {!faceDetected && (
-                    <div className="text-xs text-red-200 text-center px-2">
-                      Position Your Face in Frame
-                    </div>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--mid)' }}>
+                      Position your face in frame
+                    </span>
                   )}
                   {faceDetected && (
-                    <div className="flex flex-col sm:flex-row space-y-1 sm:space-y-0 sm:space-x-4 text-xs text-green-200 text-center">
+                    <div style={{ display: 'flex', gap: 16, fontFamily: 'var(--mono)', fontSize: 11, color: C.green }}>
                       <span>Liveness: {Math.round(livenessScore * 100)}%</span>
                       <span>Stability: {Math.round(faceStability * 100)}%</span>
                     </div>
                   )}
                 </div>
-                
+
                 {countdown !== null && (
-                  <div className="text-center">
-                    <div className="text-3xl sm:text-4xl font-bold mb-2">{countdown}</div>
-                    <p className="text-sm sm:text-base text-blue-100">Get ready...</p>
+                  <div style={{ textAlign: 'center' }}>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: 36, fontWeight: 700, color: 'var(--ink)' }}>{countdown}</div>
+                    <p style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--mid)', margin: 0 }}>Get ready...</p>
                   </div>
                 )}
               </div>
 
-
               {/* Controls */}
-              <div className="p-4 sm:p-6 bg-gray-50">
-                <div className="flex flex-col sm:flex-row items-center justify-between mb-4 space-y-2 sm:space-y-0">
-                  <div className="text-xs sm:text-sm text-gray-600">
+              <div style={{ padding: '16px 20px', borderTop: '1px solid var(--rule)' }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
+                  <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--mid)', textTransform: 'uppercase', letterSpacing: '0.04em' }}>
                     Attempts: {captureAttempts}/3
-                  </div>
+                  </span>
                   {sessionData && (
-                    <div className="text-xs sm:text-sm text-gray-600 text-center sm:text-right">
-                      <span className="hidden sm:inline">Session expires: </span>
-                      <span className="sm:hidden">Expires: </span>
-                      {new Date(sessionData.expires_at).toLocaleTimeString()}
-                    </div>
+                    <span style={{ fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--mid)' }}>
+                      Expires: {new Date(sessionData.expires_at).toLocaleTimeString()}
+                    </span>
                   )}
                 </div>
 
-                <div className="text-center">
+                <div style={{ textAlign: 'center' }}>
                   {challengeState === 'waiting' && (
                     <button
                       onClick={startChallenge}
                       disabled={!faceDetected || loading || livenessScore < 0.4 || faceStability < 0.5}
-                      className="bg-green-600 text-white py-3 px-6 sm:py-4 sm:px-8 rounded-xl hover:bg-green-700 disabled:bg-gray-400 transition flex items-center justify-center mx-auto text-sm sm:text-base min-h-[48px] w-full sm:w-auto max-w-xs"
+                      className="btn-accent"
+                      style={{ width: '100%', justifyContent: 'center', minHeight: 48, maxWidth: 320, margin: '0 auto' }}
                     >
                       {!faceDetected ? (
                         <>
-                          <ExclamationTriangleIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                          <span className="hidden sm:inline">Position Your Face</span>
-                          <span className="sm:hidden">Position Face</span>
+                          <ExclamationTriangleIcon style={{ width: 16, height: 16 }} />
+                          Position Your Face
                         </>
                       ) : loading ? (
                         <>
-                          <ArrowPathIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2 animate-spin" />
+                          <ArrowPathIcon style={{ width: 16, height: 16 }} className="animate-spin" />
                           Processing...
                         </>
                       ) : livenessScore < 0.4 ? (
                         <>
-                          <ExclamationTriangleIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
-                          <span className="hidden sm:inline">Improve Lighting</span>
-                          <span className="sm:hidden">More Light</span>
+                          <ExclamationTriangleIcon style={{ width: 16, height: 16 }} />
+                          Improve Lighting
                         </>
                       ) : faceStability < 0.5 ? (
                         <>
-                          <ExclamationTriangleIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                          <ExclamationTriangleIcon style={{ width: 16, height: 16 }} />
                           Hold Steady
                         </>
                       ) : (
                         <>
-                          <CameraIcon className="w-4 h-4 sm:w-5 sm:h-5 mr-2" />
+                          <CameraIcon style={{ width: 16, height: 16 }} />
                           Start Capture
                         </>
                       )}
@@ -1264,11 +1208,11 @@ export const LiveCapturePage: React.FC = () => {
                   )}
 
                   {challengeState === 'active' && (
-                    <div className="text-center px-2">
-                      <div className="text-base sm:text-lg font-semibold text-gray-900 mb-2">
+                    <div style={{ textAlign: 'center' }}>
+                      <div style={{ fontFamily: 'var(--mono)', fontSize: 14, fontWeight: 600, color: 'var(--ink)', marginBottom: 4 }}>
                         Performing challenge...
                       </div>
-                      <div className="text-sm text-gray-600">
+                      <div style={{ fontSize: 13, color: 'var(--mid)' }}>
                         {sessionData.liveness_challenge.instruction}
                       </div>
                     </div>
@@ -1280,44 +1224,49 @@ export const LiveCapturePage: React.FC = () => {
 
           {/* Error Display */}
           {error && cameraState !== 'error' && (
-            <div className="p-3 sm:p-4 bg-red-50 border border-red-200 rounded-lg m-3 sm:m-6">
-              <div className="flex">
-                <XMarkIcon className="w-4 h-4 sm:w-5 sm:h-5 text-red-400 mr-2 mt-0.5 flex-shrink-0" />
-                <p className="text-red-700 text-xs sm:text-sm">{error}</p>
-              </div>
+            <div style={{ padding: '12px 20px', background: C.redDim, borderTop: `1px solid ${C.red}`, display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+              <XMarkIcon style={{ width: 16, height: 16, color: C.red, flexShrink: 0, marginTop: 1 }} />
+              <p style={{ color: C.red, fontFamily: 'var(--mono)', fontSize: 12, margin: 0 }}>{error}</p>
             </div>
           )}
         </div>}
 
-        {/* Instructions */}
-        <div className="mt-4 sm:mt-8 bg-blue-50 rounded-xl p-4 sm:p-6">
-          <h3 className="text-base sm:text-lg font-semibold text-blue-900 mb-3 sm:mb-4">📱 Face-API Live Capture</h3>
-          <ul className="text-blue-800 space-y-2 text-sm sm:text-base">
-            <li className="flex items-start">
-              <span className="text-blue-500 mr-2 mt-1 flex-shrink-0">•</span>
-              <span>Uses Face-API for reliable camera processing</span>
+        {/* Instructions -- v2 checklist style */}
+        <div style={{ marginTop: 24, border: '1px solid var(--rule)', background: 'var(--panel)', padding: '20px 24px' }}>
+          <h3 style={{ fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 600, color: 'var(--mid)', textTransform: 'uppercase', letterSpacing: '0.05em', margin: '0 0 16px' }}>
+            Live Capture Instructions
+          </h3>
+          <ul className="checklist">
+            <li>
+              <span className="dot">--</span>
+              <span style={{ color: 'var(--ink)', fontSize: 13 }}>Uses Face-API for reliable camera processing</span>
+              <span className="status" />
             </li>
-            <li className="flex items-start">
-              <span className="text-blue-500 mr-2 mt-1 flex-shrink-0">•</span>
-              <span>Ensure good lighting on your face</span>
+            <li>
+              <span className="dot">--</span>
+              <span style={{ color: 'var(--ink)', fontSize: 13 }}>Ensure good lighting on your face</span>
+              <span className="status" />
             </li>
-            <li className="flex items-start">
-              <span className="text-blue-500 mr-2 mt-1 flex-shrink-0">•</span>
-              <span>Position your face in the center of frame</span>
+            <li>
+              <span className="dot">--</span>
+              <span style={{ color: 'var(--ink)', fontSize: 13 }}>Position your face in the center of frame</span>
+              <span className="status" />
             </li>
-            <li className="flex items-start">
-              <span className="text-blue-500 mr-2 mt-1 flex-shrink-0">•</span>
-              <span>Wait for green indicator showing face detection</span>
+            <li>
+              <span className="dot">--</span>
+              <span style={{ color: 'var(--ink)', fontSize: 13 }}>Wait for green indicator showing face detection</span>
+              <span className="status" />
             </li>
           </ul>
-          
+
           {debugInfo && (
-            <div className="mt-4 p-3 bg-gray-100 rounded-lg">
-              <p className="text-xs sm:text-sm text-gray-600">Status: {debugInfo}</p>
+            <div style={{ marginTop: 16, padding: 12, background: 'var(--paper)', border: '1px solid var(--rule)' }}>
+              <p style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--mid)', margin: 0 }}>Status: {debugInfo}</p>
               {cameraState === 'ready' && (
                 <button
                   onClick={retryCamera}
-                  className="mt-2 px-3 py-2 text-xs sm:text-sm bg-blue-500 text-white rounded hover:bg-blue-600 min-h-[36px]"
+                  className="btn-secondary"
+                  style={{ marginTop: 8, minHeight: 36 }}
                 >
                   Restart Camera
                 </button>

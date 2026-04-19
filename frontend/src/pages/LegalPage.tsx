@@ -26,8 +26,8 @@ const SectionHeading = ({ id, children }: { id: string; children: React.ReactNod
     style={{
       fontFamily: C.mono,
       fontSize: '1.35rem',
-      fontWeight: 700,
-      color: C.cyan,
+      fontWeight: 600,
+      color: 'var(--accent-ink)',
       marginBottom: 8,
       paddingTop: 80, // offset for fixed nav
       marginTop: -60,
@@ -39,13 +39,13 @@ const SectionHeading = ({ id, children }: { id: string; children: React.ReactNod
 );
 
 const SubHeading = ({ children }: { children: React.ReactNode }) => (
-  <h3 style={{ fontFamily: C.mono, fontSize: '0.95rem', fontWeight: 600, color: C.text, marginTop: 28, marginBottom: 8 }}>
+  <h3 style={{ fontFamily: C.mono, fontSize: '0.95rem', fontWeight: 500, color: 'var(--ink)', marginTop: 28, marginBottom: 8 }}>
     {children}
   </h3>
 );
 
 const P = ({ children }: { children: React.ReactNode }) => (
-  <p style={{ fontFamily: C.sans, fontSize: '0.9rem', color: C.muted, lineHeight: 1.75, marginBottom: 14 }}>
+  <p style={{ fontFamily: C.sans, fontSize: '0.9rem', color: 'var(--mid)', lineHeight: 1.75, marginBottom: 14 }}>
     {children}
   </p>
 );
@@ -53,7 +53,7 @@ const P = ({ children }: { children: React.ReactNode }) => (
 const UL = ({ items }: { items: string[] }) => (
   <ul style={{ paddingLeft: 20, marginBottom: 14 }}>
     {items.map((item, i) => (
-      <li key={i} style={{ fontFamily: C.sans, fontSize: '0.9rem', color: C.muted, lineHeight: 1.75, marginBottom: 4, listStyleType: 'disc' }}>
+      <li key={i} style={{ fontFamily: C.sans, fontSize: '0.9rem', color: 'var(--mid)', lineHeight: 1.75, marginBottom: 4, listStyleType: 'disc' }}>
         {item}
       </li>
     ))}
@@ -61,7 +61,7 @@ const UL = ({ items }: { items: string[] }) => (
 );
 
 const Divider = () => (
-  <hr style={{ border: 'none', borderTop: `1px solid ${C.border}`, margin: '48px 0' }} />
+  <hr style={{ border: 'none', borderTop: '1px solid var(--rule)', margin: '48px 0' }} />
 );
 
 const LAST_UPDATED = 'March 22, 2026';
@@ -79,7 +79,7 @@ function TabBar() {
   const active = hash?.slice(1) || 'privacy';
 
   return (
-    <div style={{ display: 'flex', gap: 4, background: C.surface, borderRadius: 10, padding: 4, marginBottom: 40 }}>
+    <div style={{ display: 'flex', gap: 0, border: '1px solid var(--rule)', marginBottom: 40 }}>
       {sections.map(({ id, label }) => {
         const isActive = active === id;
         return (
@@ -90,16 +90,16 @@ function TabBar() {
               flex: 1,
               textAlign: 'center',
               padding: '10px 16px',
-              borderRadius: 8,
               fontFamily: C.mono,
               fontSize: '0.75rem',
-              fontWeight: 600,
+              fontWeight: 500,
               letterSpacing: '0.04em',
               textDecoration: 'none',
-              transition: 'all 0.2s',
-              background: isActive ? C.surfaceHover : 'transparent',
-              color: isActive ? C.cyan : C.muted,
-              border: isActive ? `1px solid ${C.cyanBorder}` : '1px solid transparent',
+              transition: 'border-color 0.15s',
+              background: isActive ? 'var(--panel)' : 'transparent',
+              color: isActive ? 'var(--accent-ink)' : 'var(--mid)',
+              borderBottom: isActive ? '2px solid var(--ink)' : '2px solid transparent',
+              borderRight: '1px solid var(--rule)',
             }}
           >
             {label}
@@ -120,22 +120,15 @@ export function LegalPage() {
       <div className="max-w-3xl mx-auto px-4 sm:px-6">
         {/* Header */}
         <div style={{ marginBottom: 12 }}>
-          <span style={{
-            fontFamily: C.mono,
-            fontSize: '0.65rem',
-            fontWeight: 600,
-            letterSpacing: '0.1em',
-            color: C.cyan,
-            textTransform: 'uppercase',
-          }}>
+          <span className="eyebrow" style={{ color: 'var(--accent-ink)' }}>
             idswyft / legal
           </span>
         </div>
         <h1 style={{
           fontFamily: C.mono,
           fontSize: '2rem',
-          fontWeight: 700,
-          color: C.text,
+          fontWeight: 500,
+          color: 'var(--ink)',
           marginBottom: 8,
           letterSpacing: '-0.02em',
         }}>
@@ -192,7 +185,7 @@ export function LegalPage() {
         <SubHeading>Your Rights</SubHeading>
         <P>
           You may request access to, correction of, or deletion of your personal data at any time by
-          contacting us at <a href="mailto:privacy@idswyft.app" style={{ color: C.cyan, textDecoration: 'none' }}>privacy@idswyft.app</a>.
+          contacting us at <a href="mailto:privacy@idswyft.app" style={{ color: 'var(--accent-ink)', textDecoration: 'none' }}>privacy@idswyft.app</a>.
           For GDPR-specific rights, see the GDPR Compliance section below.
         </P>
 
@@ -229,7 +222,7 @@ export function LegalPage() {
         <P>
           We strive for high availability but do not guarantee uninterrupted service. Scheduled
           maintenance windows will be communicated in advance. Our system status is available at{' '}
-          <a href="/status" style={{ color: C.cyan, textDecoration: 'none' }}>idswyft.app/status</a>.
+          <a href="/status" style={{ color: 'var(--accent-ink)', textDecoration: 'none' }}>idswyft.app/status</a>.
         </P>
 
         <SubHeading>4. Verification Accuracy</SubHeading>
@@ -292,8 +285,8 @@ export function LegalPage() {
         <SubHeading>Data Processing Roles</SubHeading>
         <P>
           When you (the developer/organization) use Idswyft to verify your users' identities, you act
-          as the <strong style={{ color: C.text }}>Data Controller</strong> and Idswyft acts as the{' '}
-          <strong style={{ color: C.text }}>Data Processor</strong>. We process data solely on your
+          as the <strong style={{ color: 'var(--ink)' }}>Data Controller</strong> and Idswyft acts as the{' '}
+          <strong style={{ color: 'var(--ink)' }}>Data Processor</strong>. We process data solely on your
           instructions and in accordance with our Data Processing Agreement (DPA).
         </P>
 
@@ -309,7 +302,7 @@ export function LegalPage() {
         ]} />
         <P>
           To exercise these rights, contact us at{' '}
-          <a href="mailto:gdpr@idswyft.app" style={{ color: C.cyan, textDecoration: 'none' }}>gdpr@idswyft.app</a>.
+          <a href="mailto:gdpr@idswyft.app" style={{ color: 'var(--accent-ink)', textDecoration: 'none' }}>gdpr@idswyft.app</a>.
           We respond to all requests within 30 days.
         </P>
 
@@ -330,13 +323,13 @@ export function LegalPage() {
         <P>
           We offer a pre-signed DPA to all customers processing EEA personal data through our platform.
           To request a copy, contact{' '}
-          <a href="mailto:legal@idswyft.app" style={{ color: C.cyan, textDecoration: 'none' }}>legal@idswyft.app</a>.
+          <a href="mailto:legal@idswyft.app" style={{ color: 'var(--accent-ink)', textDecoration: 'none' }}>legal@idswyft.app</a>.
         </P>
 
         <SubHeading>Data Protection Officer</SubHeading>
         <P>
           For GDPR-related inquiries, you may contact our Data Protection team at{' '}
-          <a href="mailto:dpo@idswyft.app" style={{ color: C.cyan, textDecoration: 'none' }}>dpo@idswyft.app</a>.
+          <a href="mailto:dpo@idswyft.app" style={{ color: 'var(--accent-ink)', textDecoration: 'none' }}>dpo@idswyft.app</a>.
         </P>
 
         <SubHeading>CCPA (California)</SubHeading>
@@ -345,23 +338,22 @@ export function LegalPage() {
           including the right to know what personal information is collected, the right to delete, and
           the right to opt out of the sale of personal information. We do not sell personal information.
           To exercise your CCPA rights, contact{' '}
-          <a href="mailto:privacy@idswyft.app" style={{ color: C.cyan, textDecoration: 'none' }}>privacy@idswyft.app</a>.
+          <a href="mailto:privacy@idswyft.app" style={{ color: 'var(--accent-ink)', textDecoration: 'none' }}>privacy@idswyft.app</a>.
         </P>
 
         {/* Bottom spacer + contact */}
         <Divider />
         <div style={{
-          background: C.surface,
-          border: `1px solid ${C.border}`,
-          borderRadius: 12,
+          background: 'var(--panel)',
+          border: '1px solid var(--rule)',
           padding: '24px 28px',
         }}>
-          <h3 style={{ fontFamily: C.mono, fontSize: '0.85rem', fontWeight: 600, color: C.text, marginBottom: 8 }}>
+          <h3 style={{ fontFamily: C.mono, fontSize: '0.85rem', fontWeight: 500, color: 'var(--ink)', marginBottom: 8 }}>
             Questions?
           </h3>
           <P>
             If you have questions about this legal documentation, contact us at{' '}
-            <a href="mailto:legal@idswyft.app" style={{ color: C.cyan, textDecoration: 'none' }}>legal@idswyft.app</a>.
+            <a href="mailto:legal@idswyft.app" style={{ color: 'var(--accent-ink)', textDecoration: 'none' }}>legal@idswyft.app</a>.
           </P>
         </div>
       </div>

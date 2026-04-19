@@ -6,33 +6,18 @@ import SelfieCameraCapture from '../components/SelfieCameraCapture';
 import { ActiveLivenessCapture } from '../components/liveness/ActiveLivenessCapture';
 import type { LivenessMetadata } from '../hooks/useActiveLiveness';
 
-// ─── Design system CSS ─────────────────────────────────────────────────────
+// ─── Design system CSS (v2 — technical editorial) ─────────────────────────
 const css = `
-:root {
-  --navy:   #040d1a;
-  --navy2:  #071428;
-  --teal:   #00d4b4;
-  --teal2:  #00ffdf;
-  --white:  #e8f4f8;
-  --muted:  #4a6a7a;
-  --border: rgba(0,212,180,0.15);
-  --glass:  rgba(0,212,180,0.04);
-}
-
-@keyframes segPulse  { 0%,100%{opacity:0.5} 50%{opacity:1} }
-@keyframes scan      { 0%{top:10px;opacity:0} 8%{opacity:1} 92%{opacity:1} 100%{top:calc(100% - 10px);opacity:0} }
+@keyframes segPulse  { 0%,100%{opacity:0.4} 50%{opacity:1} }
+@keyframes scan      { 0%{top:12px;opacity:0} 8%{opacity:1} 92%{opacity:1} 100%{top:calc(100% - 12px);opacity:0} }
 @keyframes spin      { to{transform:rotate(360deg)} }
-@keyframes blink     { 0%,100%{opacity:1} 50%{opacity:0.35} }
+@keyframes blink     { 0%,100%{opacity:1} 50%{opacity:0.3} }
 @keyframes fscan     { 0%{top:18%;opacity:0} 8%{opacity:1} 92%{opacity:1} 100%{top:88%;opacity:0} }
 @keyframes dotsDrift { from{background-position:0 0} to{background-position:18px 18px} }
-@keyframes gPulse    { 0%,100%{box-shadow:0 0 18px rgba(0,212,180,0.18),inset 0 0 18px rgba(0,212,180,0.04)} 50%{box-shadow:0 0 36px rgba(0,212,180,0.36),inset 0 0 28px rgba(0,212,180,0.09)} }
-@keyframes sPulse    { 0%,100%{box-shadow:0 0 32px rgba(0,212,180,0.18)} 50%{box-shadow:0 0 64px rgba(0,212,180,0.38)} }
-@keyframes fadeUp    { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:translateY(0)} }
+@keyframes fadeIn    { from{opacity:0;transform:translateY(8px)} to{opacity:1;transform:translateY(0)} }
 @keyframes slideIn   { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
-@keyframes focusPulse { 0%,100%{opacity:0.6} 50%{opacity:1} }
-@keyframes shutterFlash { 0%{opacity:0} 10%{opacity:0.8} 100%{opacity:0} }
 
-.mv-fade-up { animation: fadeUp 0.38s ease both; }
+.mv-fade-up { animation: fadeIn 0.32s ease both; }
 `;
 
 // ─── Step definitions ───────────────────────────────────────────────────────
@@ -49,57 +34,51 @@ const SCREENS: Screen[] = ['front', 'back', 'checking', 'live', 'done'];
 
 // ─── Sub-Components ─────────────────────────────────────────────────────────
 
-/* Step progress tracker */
+/* Step progress tracker — v2 stepper pattern (border-top segments) */
 const StepTracker: React.FC<{ activeIdx: number; labels?: string[] }> = ({ activeIdx, labels = FULL_STEP_LABELS }) => (
-  <div style={{ padding: '12px 24px 0' }}>
-    <div style={{ display: 'flex', gap: 6 }}>
-      {labels.map((_, i) => {
-        const state = i < activeIdx ? 'done' : i === activeIdx ? 'active' : 'pending';
-        return (
-          <div key={i} style={{ flex: 1, height: 3, borderRadius: 2, position: 'relative',
-            background: state === 'done' ? 'var(--teal)' : 'rgba(74,106,122,0.2)',
-            boxShadow: state === 'done' ? '0 0 6px rgba(0,212,180,0.4)' : 'none',
+  <div style={{ padding: '12px 24px 0', display: 'grid', gridTemplateColumns: `repeat(${labels.length}, 1fr)`, gap: 8, fontFamily: 'var(--mono)', fontSize: 9 }}>
+    {labels.map((label, i) => {
+      const state = i < activeIdx ? 'done' : i === activeIdx ? 'active' : 'pending';
+      return (
+        <div key={i} style={{ position: 'relative' }}>
+          {/* Segment bar */}
+          <div style={{
+            height: 2, width: '100%', marginBottom: 8,
+            background: state === 'done' ? 'var(--accent)' : state === 'active' ? 'var(--ink)' : 'var(--rule)',
           }}>
             {state === 'active' && (
-              <div style={{ position: 'absolute', inset: 0, borderRadius: 2,
-                background: 'linear-gradient(90deg, var(--teal), transparent)',
+              <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 2,
+                background: 'var(--ink)',
                 animation: 'segPulse 1.8s ease-in-out infinite',
               }} />
             )}
           </div>
-        );
-      })}
-    </div>
-    <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 8 }}>
-      {labels.map((label, i) => {
-        const state = i < activeIdx ? 'done' : i === activeIdx ? 'active' : 'pending';
-        return (
-          <span key={i} style={{
-            fontFamily: "'JetBrains Mono', monospace", fontSize: 9, fontWeight: 400,
+          {/* Label */}
+          <span style={{
             textTransform: 'uppercase', letterSpacing: '0.06em',
-            color: state === 'done' ? 'var(--teal)' : state === 'active' ? 'var(--white)' : 'rgba(74,106,122,0.5)',
+            color: state === 'done' ? 'var(--accent-ink)' : state === 'active' ? 'var(--ink)' : 'var(--mid)',
           }}>{label}</span>
-        );
-      })}
-    </div>
+        </div>
+      );
+    })}
   </div>
 );
 
-/* Tip bar */
+/* Tip bar — v2 prompt-tag style */
 const TipBar: React.FC<{ text: string }> = ({ text }) => (
   <div style={{
     display: 'flex', alignItems: 'center', gap: 8,
-    background: 'var(--glass)', border: '1px solid var(--border)',
-    borderRadius: 10, padding: '9px 13px',
-    fontSize: 12, fontFamily: "'JetBrains Mono', monospace",
-    color: 'rgba(232,244,248,0.55)', flexShrink: 0,
+    background: 'var(--accent-soft)', border: '1px solid var(--rule)',
+    padding: '9px 13px',
+    fontSize: 12, fontFamily: 'var(--mono)',
+    color: 'var(--mid)', flexShrink: 0,
   }}>
-    <div style={{ width: 5, height: 5, borderRadius: '50%', background: 'var(--teal)', flexShrink: 0 }} />
+    <div style={{ width: 5, height: 5, background: 'var(--accent)', flexShrink: 0 }} />
     {text}
   </div>
 );
 
-/* Primary button */
+/* Primary button — v2 .btn style (square, mono font, solid accent) */
 const PrimaryBtn: React.FC<{
   children: React.ReactNode; onClick: () => void; disabled?: boolean;
 }> = ({ children, onClick, disabled }) => (
@@ -107,14 +86,14 @@ const PrimaryBtn: React.FC<{
     onClick={onClick}
     disabled={disabled}
     style={{
-      width: '100%', padding: 17, borderRadius: 14, border: 'none',
-      background: disabled ? 'rgba(0,212,180,0.35)' : 'var(--teal)',
-      color: 'var(--navy)',
-      fontFamily: "'Syne', sans-serif", fontSize: 15, fontWeight: 700,
-      letterSpacing: '0.05em', textTransform: 'uppercase',
+      width: '100%', padding: '14px 20px', border: '1px solid var(--accent)',
+      background: disabled ? 'var(--accent-soft)' : 'var(--accent)',
+      color: disabled ? 'var(--mid)' : 'var(--paper)',
+      fontFamily: 'var(--mono)', fontSize: 13, fontWeight: 500,
+      letterSpacing: '0.04em', textTransform: 'uppercase',
       cursor: disabled ? 'not-allowed' : 'pointer',
       position: 'relative', overflow: 'hidden',
-      transition: 'all 0.18s', flexShrink: 0,
+      transition: 'transform 120ms ease, opacity 120ms ease', flexShrink: 0,
       opacity: disabled ? 0.5 : 1,
     }}
   >
@@ -122,49 +101,51 @@ const PrimaryBtn: React.FC<{
   </button>
 );
 
-/* ID Card Viewfinder */
+/* ID Card Viewfinder — v2 capture-frame (solid border, accent corner marks) */
 const IDViewfinder: React.FC<{
   variant: 'front' | 'back'; processing: boolean; processingLabel: string;
   previewUrl?: string | null;
 }> = ({ variant, processing, processingLabel, previewUrl }) => {
+  // Corner marks: position + which two borders to show (sharp, no radius)
   const corners = [
-    { top: 10, left: 10, bw: '2px 0 0 2px', br: '4px 0 0 0' },
-    { top: 10, right: 10, bw: '2px 2px 0 0', br: '0 4px 0 0' },
-    { bottom: 10, left: 10, bw: '0 0 2px 2px', br: '0 0 0 4px' },
-    { bottom: 10, right: 10, bw: '0 2px 2px 0', br: '0 0 4px 0' },
+    { top: 12, left: 12, bw: '2px 0 0 2px' },
+    { top: 12, right: 12, bw: '2px 2px 0 0' },
+    { bottom: 12, left: 12, bw: '0 0 2px 2px' },
+    { bottom: 12, right: 12, bw: '0 2px 2px 0' },
   ];
 
   return (
     <div style={{
-      width: '100%', aspectRatio: '1.586', borderRadius: 18,
-      background: '#020a14', position: 'relative', overflow: 'hidden',
+      width: '100%', aspectRatio: '1.586',
+      border: '1px solid var(--ink)', background: 'var(--panel)',
+      position: 'relative', overflow: 'hidden',
       flexShrink: 0, marginBottom: 18,
     }}>
       {/* Inner card mock or preview image */}
       {previewUrl ? (
         <img src={previewUrl} alt="Document preview" style={{
-          position: 'absolute', inset: 16, borderRadius: 10,
+          position: 'absolute', inset: 16,
           objectFit: 'cover', width: 'calc(100% - 32px)', height: 'calc(100% - 32px)',
         }} />
       ) : (
         <div style={{
-          position: 'absolute', inset: 16, borderRadius: 10,
-          background: 'linear-gradient(135deg, #0c2033, #152d45)', padding: '13px 15px',
+          position: 'absolute', inset: 16,
+          background: 'var(--rule)', padding: '13px 15px',
           display: 'flex', flexDirection: 'column', justifyContent: 'space-between',
         }}>
           {variant === 'front' ? (
             <>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                <div style={{ width: 30, height: 22, borderRadius: 4, background: 'linear-gradient(135deg, #c8a84b, #e8c96a)', opacity: 0.75 }} />
-                <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'rgba(255,255,255,0.06)' }} />
+                <div style={{ width: 30, height: 22, background: 'var(--mid)', opacity: 0.35 }} />
+                <div style={{ width: 38, height: 38, borderRadius: '50%', background: 'var(--rule-strong, var(--rule))', opacity: 0.3 }} />
               </div>
               <div>
-                <div style={{ height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.1)', width: '62%', marginBottom: 8 }} />
-                <div style={{ height: 5, borderRadius: 3, background: 'rgba(255,255,255,0.1)', width: '42%' }} />
+                <div style={{ height: 5, background: 'var(--soft)', opacity: 0.25, width: '62%', marginBottom: 8 }} />
+                <div style={{ height: 5, background: 'var(--soft)', opacity: 0.25, width: '42%' }} />
               </div>
               <div>
-                <div style={{ height: 4, borderRadius: 2, background: 'rgba(0,212,180,0.18)', width: '90%', marginBottom: 4 }} />
-                <div style={{ height: 4, borderRadius: 2, background: 'rgba(0,212,180,0.18)', width: '85%' }} />
+                <div style={{ height: 4, background: 'var(--accent)', opacity: 0.15, width: '90%', marginBottom: 4 }} />
+                <div style={{ height: 4, background: 'var(--accent)', opacity: 0.15, width: '85%' }} />
               </div>
             </>
           ) : (
@@ -173,15 +154,14 @@ const IDViewfinder: React.FC<{
                 {Array.from({ length: 16 }).map((_, i) => (
                   <div key={i} style={{
                     height: i % 4 === 0 ? 6 : i % 2 === 0 ? 4 : 3,
-                    borderRadius: 1,
-                    background: 'rgba(0,212,180,0.22)',
+                    background: 'var(--accent)', opacity: 0.18,
                     width: `${48 + Math.abs(Math.sin(i * 1.3)) * 38}%`,
                   }} />
                 ))}
               </div>
               <div style={{ marginTop: 8 }}>
                 {[0, 1, 2].map(i => (
-                  <div key={i} style={{ height: 4, borderRadius: 2, background: 'rgba(0,212,180,0.18)', width: `${90 - i * 5}%`, marginBottom: 4 }} />
+                  <div key={i} style={{ height: 4, background: 'var(--accent)', opacity: 0.15, width: `${90 - i * 5}%`, marginBottom: 4 }} />
                 ))}
               </div>
             </>
@@ -189,12 +169,12 @@ const IDViewfinder: React.FC<{
         </div>
       )}
 
-      {/* Corner markers */}
+      {/* Corner marks — accent color, sharp edges */}
       {corners.map((c, i) => (
         <div key={i} style={{
           position: 'absolute', width: 22, height: 22,
-          borderStyle: 'solid', borderColor: 'var(--teal)',
-          borderWidth: c.bw, borderRadius: c.br,
+          borderStyle: 'solid', borderColor: 'var(--accent)',
+          borderWidth: c.bw,
           ...(c.top !== undefined && { top: c.top }),
           ...(c.bottom !== undefined && { bottom: c.bottom }),
           ...(c.left !== undefined && { left: c.left }),
@@ -205,9 +185,8 @@ const IDViewfinder: React.FC<{
       {/* Scan line */}
       {!processing && (
         <div style={{
-          position: 'absolute', left: 10, right: 10, height: 2,
-          background: 'linear-gradient(90deg, transparent, var(--teal), transparent)',
-          boxShadow: '0 0 10px var(--teal)',
+          position: 'absolute', left: 12, right: 12, height: 1,
+          background: 'var(--accent)',
           animation: 'scan 2s ease-in-out infinite',
         }} />
       )}
@@ -215,18 +194,18 @@ const IDViewfinder: React.FC<{
       {/* Processing overlay */}
       {processing && (
         <div style={{
-          position: 'absolute', inset: 0, background: 'rgba(4,13,26,0.88)',
-          backdropFilter: 'blur(3px)', borderRadius: 18,
+          position: 'absolute', inset: 0, background: 'rgba(11,11,13,0.88)',
+          backdropFilter: 'blur(3px)',
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12,
         }}>
           <div style={{
-            width: 46, height: 46, border: '2px solid rgba(0,212,180,0.15)',
-            borderTopColor: 'var(--teal)', borderRadius: '50%',
+            width: 46, height: 46, border: '2px solid var(--rule)',
+            borderTopColor: 'var(--accent)', borderRadius: '50%',
             animation: 'spin 0.8s linear infinite',
           }} />
           <span style={{
-            fontFamily: "'JetBrains Mono', monospace", fontSize: 11,
-            color: 'var(--teal)', letterSpacing: '0.18em',
+            fontFamily: 'var(--mono)', fontSize: 11,
+            color: 'var(--accent)', letterSpacing: '0.18em',
             animation: 'blink 1.4s ease infinite',
           }}>{processingLabel}</span>
         </div>
@@ -235,23 +214,17 @@ const IDViewfinder: React.FC<{
   );
 };
 
-/* Ambient glow */
+/* Ambient decoration — v2: subtle rule-colored lines instead of glow */
 const AmbientGlow: React.FC = () => (
   <>
     <div style={{
-      position: 'absolute', top: -60, left: -60, width: 240, height: 240,
-      borderRadius: '50%', pointerEvents: 'none',
-      background: 'radial-gradient(circle, rgba(0,212,180,0.05), transparent 70%)',
-    }} />
-    <div style={{
-      position: 'absolute', bottom: -40, right: -40, width: 200, height: 200,
-      borderRadius: '50%', pointerEvents: 'none',
-      background: 'radial-gradient(circle, rgba(0,212,180,0.04), transparent 70%)',
+      position: 'absolute', top: 0, left: 24, right: 24, height: 1,
+      pointerEvents: 'none', background: 'var(--rule)', opacity: 0.5,
     }} />
   </>
 );
 
-/* Oval Face Viewfinder (spec: 188×228 oval with dot grid, ghost, scan line) */
+/* Oval Face Viewfinder — v2: dashed oval with accent color */
 const OvalFaceViewfinder: React.FC<{
   processing: boolean; previewUrl?: string | null;
 }> = ({ processing, previewUrl }) => {
@@ -259,7 +232,7 @@ const OvalFaceViewfinder: React.FC<{
   return (
     <div style={{
       width: 188, height: 228, borderRadius: ovalRadius,
-      background: '#020a14', position: 'relative', overflow: 'hidden',
+      background: 'var(--panel)', position: 'relative', overflow: 'hidden',
       margin: '0 auto 22px', flexShrink: 0,
     }}>
       {/* Selfie preview when captured */}
@@ -274,8 +247,8 @@ const OvalFaceViewfinder: React.FC<{
       {!previewUrl && (
         <div style={{
           position: 'absolute', inset: 0,
-          backgroundImage: 'radial-gradient(circle, rgba(0,212,180,0.12) 1px, transparent 1px)',
-          backgroundSize: '18px 18px', opacity: 0.6,
+          backgroundImage: 'radial-gradient(circle, var(--soft) 1px, transparent 1px)',
+          backgroundSize: '18px 18px', opacity: 0.3,
           animation: 'dotsDrift 4s linear infinite',
         }} />
       )}
@@ -284,8 +257,8 @@ const OvalFaceViewfinder: React.FC<{
       {!previewUrl && (
         <div style={{
           position: 'absolute', bottom: -4, left: '50%', transform: 'translateX(-50%)',
-          width: 90, height: 120, opacity: 0.07,
-          background: 'linear-gradient(to bottom, transparent, var(--white))',
+          width: 90, height: 120, opacity: 0.06,
+          background: 'linear-gradient(to bottom, transparent, var(--ink))',
           clipPath: 'polygon(35% 0%,65% 0%,80% 28%,82% 58%,92% 70%,100% 100%,0% 100%,8% 70%,18% 58%,20% 28%)',
         }} />
       )}
@@ -293,34 +266,33 @@ const OvalFaceViewfinder: React.FC<{
       {/* Horizontal scan line */}
       {!processing && !previewUrl && (
         <div style={{
-          position: 'absolute', left: 0, right: 0, height: 1.5,
-          background: 'linear-gradient(90deg, transparent, var(--teal), transparent)',
+          position: 'absolute', left: 0, right: 0, height: 1,
+          background: 'var(--accent)',
           animation: 'fscan 1.9s ease-in-out infinite',
         }} />
       )}
 
-      {/* Pulsing oval border */}
+      {/* Dashed oval border — accent color */}
       <div style={{
         position: 'absolute', inset: 0, borderRadius: ovalRadius,
-        border: '2px solid var(--teal)',
-        animation: processing ? 'none' : 'gPulse 2.2s ease infinite',
+        border: '2px dashed var(--accent)',
       }} />
 
       {/* Processing overlay */}
       {processing && (
         <div style={{
-          position: 'absolute', inset: 0, background: 'rgba(4,13,26,0.88)',
+          position: 'absolute', inset: 0, background: 'rgba(11,11,13,0.88)',
           backdropFilter: 'blur(3px)', borderRadius: ovalRadius,
           display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 10,
         }}>
           <div style={{
-            width: 46, height: 46, border: '2px solid rgba(0,212,180,0.15)',
-            borderTopColor: 'var(--teal)', borderRadius: '50%',
+            width: 46, height: 46, border: '2px solid var(--rule)',
+            borderTopColor: 'var(--accent)', borderRadius: '50%',
             animation: 'spin 0.8s linear infinite',
           }} />
           <span style={{
-            fontFamily: "'JetBrains Mono', monospace", fontSize: 11,
-            color: 'var(--teal)', letterSpacing: '0.18em',
+            fontFamily: 'var(--mono)', fontSize: 11,
+            color: 'var(--accent)', letterSpacing: '0.18em',
             animation: 'blink 1.4s ease infinite',
           }}>CHECKING</span>
         </div>
@@ -354,18 +326,17 @@ const LivenessCues: React.FC<{ hidden?: boolean }> = ({ hidden }) => {
         return (
           <div key={i} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
             <div style={{
-              width: 40, height: 40, borderRadius: '50%',
+              width: 40, height: 40,
               display: 'flex', alignItems: 'center', justifyContent: 'center',
               fontSize: 17,
-              background: isActive ? 'rgba(0,212,180,0.1)' : 'rgba(255,255,255,0.03)',
-              border: `1.5px solid ${isActive ? 'var(--teal)' : 'rgba(255,255,255,0.07)'}`,
-              boxShadow: isActive ? '0 0 12px rgba(0,212,180,0.2)' : 'none',
+              background: isActive ? 'var(--accent-soft)' : 'var(--panel)',
+              border: `1px solid ${isActive ? 'var(--accent)' : 'var(--rule)'}`,
               transition: 'all 0.3s ease',
             }}>{cue.emoji}</div>
             <span style={{
-              fontFamily: "'JetBrains Mono', monospace", fontSize: 9,
+              fontFamily: 'var(--mono)', fontSize: 9,
               letterSpacing: '0.06em',
-              color: isActive ? 'var(--teal)' : 'var(--muted)',
+              color: isActive ? 'var(--accent-ink)' : 'var(--mid)',
               transition: 'color 0.3s ease',
             }}>{cue.label}</span>
           </div>
@@ -967,12 +938,12 @@ const MobileVerificationPage: React.FC = () => {
     if (!ok && mountedRef.current) setPatchFailed(true);
   };
 
-  // ─── Shared styles ────────────────────────────────────────────────────
+  // ─── Shared styles — v2 tokens ──────────────────────────────────────
   const shellStyle: React.CSSProperties = {
     minHeight: '100dvh', width: '100%',
-    background: 'var(--navy)',
-    fontFamily: "'Syne', sans-serif",
-    color: 'var(--white)',
+    background: 'var(--paper)',
+    fontFamily: 'var(--sans)',
+    color: 'var(--ink)',
     position: 'relative',
     overflow: 'hidden',
     display: 'flex', flexDirection: 'column',
@@ -988,17 +959,17 @@ const MobileVerificationPage: React.FC = () => {
   if (loading) {
     return (
       <div style={shellStyle}>
-        <style>{css}{brandingAccent && /^#[0-9a-fA-F]{6}$/.test(brandingAccent) ? `:root { --teal: ${brandingAccent}; --teal2: ${brandingAccent}; }` : ''}</style>
+        <style>{css}{brandingAccent && /^#[0-9a-fA-F]{6}$/.test(brandingAccent) ? `:root { --accent: ${brandingAccent}; --accent-ink: ${brandingAccent}; }` : ''}</style>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
           <div style={{
-            width: 56, height: 56, border: '2.5px solid rgba(0,212,180,0.12)',
-            borderTopColor: 'var(--teal)', borderRadius: '50%',
+            width: 56, height: 56, border: '2px solid var(--rule)',
+            borderTopColor: 'var(--accent)', borderRadius: '50%',
             animation: 'spin 1s linear infinite',
           }} />
           <span style={{
-            fontFamily: "'JetBrains Mono', monospace", fontSize: 12,
-            color: 'var(--muted)', letterSpacing: '0.08em',
-          }}>Preparing your session…</span>
+            fontFamily: 'var(--mono)', fontSize: 12,
+            color: 'var(--mid)', letterSpacing: '0.08em',
+          }}>Preparing your session...</span>
         </div>
       </div>
     );
@@ -1011,16 +982,16 @@ const MobileVerificationPage: React.FC = () => {
         <style>{css}</style>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: '0 32px', gap: 16, textAlign: 'center' }}>
           <div style={{
-            width: 72, height: 72, borderRadius: '50%',
-            border: '2px solid rgba(239,68,68,0.3)',
-            background: 'rgba(239,68,68,0.08)',
+            width: 72, height: 72,
+            border: '1px solid var(--flag)',
+            background: 'var(--flag-soft)',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
-            fontSize: 32,
+            fontSize: 32, color: 'var(--flag)',
           }}>!</div>
-          <h2 style={{ fontFamily: "'Syne', sans-serif", fontSize: 22, fontWeight: 800, letterSpacing: '-0.025em', lineHeight: 1.12 }}>
+          <h2 style={{ fontFamily: 'var(--sans)', fontSize: 22, fontWeight: 700, letterSpacing: '-0.025em', lineHeight: 1.12 }}>
             Unable to Load
           </h2>
-          <p style={{ fontFamily: "'JetBrains Mono', monospace", fontSize: 13, color: 'var(--muted)', lineHeight: 1.55 }}>
+          <p style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--mid)', lineHeight: 1.55 }}>
             {error}
           </p>
         </div>
@@ -1031,7 +1002,7 @@ const MobileVerificationPage: React.FC = () => {
   // ─── Verification flow ────────────────────────────────────────────────
   return (
     <div style={shellStyle}>
-      <style>{css}{brandingAccent && /^#[0-9a-fA-F]{6}$/.test(brandingAccent) ? `:root { --teal: ${brandingAccent}; --teal2: ${brandingAccent}; }` : ''}</style>
+      <style>{css}{brandingAccent && /^#[0-9a-fA-F]{6}$/.test(brandingAccent) ? `:root { --accent: ${brandingAccent}; --accent-ink: ${brandingAccent}; }` : ''}</style>
 
       {/* Branding logo header */}
       {brandingLogo && (
@@ -1044,15 +1015,15 @@ const MobileVerificationPage: React.FC = () => {
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
         padding: '16px 24px 10px',
-        fontFamily: "'JetBrains Mono', monospace", fontSize: 11,
+        fontFamily: 'var(--mono)', fontSize: 11,
       }}>
-        <span style={{ color: 'var(--muted)' }}>
+        <span style={{ color: 'var(--mid)' }}>
           {new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </span>
-        <span style={{ color: 'var(--teal)', letterSpacing: '0.1em', fontSize: 10, textTransform: 'uppercase' }}>
+        <span style={{ color: 'var(--accent)', letterSpacing: '0.1em', fontSize: 10, textTransform: 'uppercase' }}>
           Secure Session
         </span>
-        <span style={{ color: 'var(--muted)' }}>
+        <span style={{ color: 'var(--mid)' }}>
           {/* Signal dots */}
           <span style={{ opacity: 1 }}>●</span>
           <span style={{ opacity: 0.7 }}>●</span>
@@ -1089,19 +1060,19 @@ const MobileVerificationPage: React.FC = () => {
             <AmbientGlow />
 
             <span style={{
-              fontFamily: "'JetBrains Mono', monospace", fontSize: 10, fontWeight: 400,
-              textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--teal)',
+              fontFamily: 'var(--mono)', fontSize: 10, fontWeight: 400,
+              textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--accent)',
               marginBottom: 8,
             }}>{isAgeOnly ? 'Step 1 of 1 — Upload ID'
               : isIdentity ? 'Step 1 of 4 — Front of ID'
               : isDocumentOnly ? 'Step 1 of 4 — Front of ID'
               : 'Step 1 of 5 — Front of ID'}</span>
 
-            <h1 style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.12, letterSpacing: '-0.025em', marginBottom: 8 }}>
+            <h1 style={{ fontSize: 26, fontWeight: 700, lineHeight: 1.12, letterSpacing: '-0.025em', marginBottom: 8 }}>
               {isAgeOnly ? <>Upload your ID<br />to verify your age</> : <>Scan the front<br />of your ID</>}
             </h1>
 
-            <p style={{ fontSize: 13, fontWeight: 400, color: 'var(--muted)', lineHeight: 1.55, marginBottom: 16 }}>
+            <p style={{ fontSize: 13, fontWeight: 400, color: 'var(--mid)', lineHeight: 1.55, marginBottom: 16 }}>
               {isAgeOnly
                 ? `We'll check your date of birth to confirm you are ${ageThreshold ?? 18}+. No other data is stored.`
                 : 'Position your ID card and take a clear photo. Make sure all four corners are visible and the text is clear.'}
@@ -1113,9 +1084,9 @@ const MobileVerificationPage: React.FC = () => {
                 value={documentType}
                 onChange={e => setDocumentType(e.target.value)}
                 style={{
-                  width: '100%', padding: '10px 14px', borderRadius: 10,
-                  border: '1px solid var(--border)', background: 'var(--navy2)',
-                  color: 'var(--white)', fontFamily: "'JetBrains Mono', monospace",
+                  width: '100%', padding: '10px 14px',
+                  border: '1px solid var(--rule)', background: 'var(--panel)',
+                  color: 'var(--ink)', fontFamily: 'var(--mono)',
                   fontSize: 12, outline: 'none',
                 }}
               >
@@ -1148,7 +1119,7 @@ const MobileVerificationPage: React.FC = () => {
             )}
 
             {stepError && (
-              <p style={{ marginTop: 10, fontSize: 12, color: '#ef4444', fontFamily: "'JetBrains Mono', monospace", textAlign: 'center' }}>
+              <p style={{ marginTop: 10, fontSize: 12, color: 'var(--flag)', fontFamily: 'var(--mono)', textAlign: 'center' }}>
                 {stepError}
               </p>
             )}
@@ -1161,16 +1132,16 @@ const MobileVerificationPage: React.FC = () => {
             <AmbientGlow />
 
             <span style={{
-              fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
-              textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--teal)',
+              fontFamily: 'var(--mono)', fontSize: 10,
+              textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--accent)',
               marginBottom: 8,
             }}>{isDocumentOnly ? 'Step 2 of 4 — Back of ID' : 'Step 2 of 5 — Back of ID'}</span>
 
-            <h1 style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.12, letterSpacing: '-0.025em', marginBottom: 8 }}>
+            <h1 style={{ fontSize: 26, fontWeight: 700, lineHeight: 1.12, letterSpacing: '-0.025em', marginBottom: 8 }}>
               Now flip it over<br />and scan the back
             </h1>
 
-            <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.55, marginBottom: 16 }}>
+            <p style={{ fontSize: 13, color: 'var(--mid)', lineHeight: 1.55, marginBottom: 16 }}>
               Keep the same conditions — good lighting, flat surface. The barcode on the back must be fully visible.
             </p>
 
@@ -1197,7 +1168,7 @@ const MobileVerificationPage: React.FC = () => {
             )}
 
             {stepError && (
-              <p style={{ marginTop: 10, fontSize: 12, color: '#ef4444', fontFamily: "'JetBrains Mono', monospace", textAlign: 'center' }}>
+              <p style={{ marginTop: 10, fontSize: 12, color: 'var(--flag)', fontFamily: 'var(--mono)', textAlign: 'center' }}>
                 {stepError}
               </p>
             )}
@@ -1212,8 +1183,8 @@ const MobileVerificationPage: React.FC = () => {
             <AmbientGlow />
 
             <span style={{
-              fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
-              textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--teal)',
+              fontFamily: 'var(--mono)', fontSize: 10,
+              textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--accent)',
               marginBottom: 24,
             }}>{isDocumentOnly
               ? (skipBack ? 'Step 2 of 3 — Verification' : 'Step 3 of 4 — Verification')
@@ -1221,33 +1192,32 @@ const MobileVerificationPage: React.FC = () => {
               : 'Step 3 of 5 — Verification'}</span>
 
             <div style={{
-              width: 80, height: 80, border: '2.5px solid rgba(0,212,180,0.12)',
-              borderTopColor: 'var(--teal)', borderRadius: '50%',
-              boxShadow: '0 0 30px rgba(0,212,180,0.1)',
+              width: 80, height: 80, border: '2px solid var(--rule)',
+              borderTopColor: 'var(--accent)', borderRadius: '50%',
               animation: 'spin 1s linear infinite', marginBottom: 18,
             }} />
 
-            <p style={{ fontFamily: "'Syne', sans-serif", fontSize: 16, fontWeight: 700, marginBottom: 6 }}>
+            <p style={{ fontFamily: 'var(--sans)', fontSize: 16, fontWeight: 700, marginBottom: 6 }}>
               {checkingMsg}
             </p>
             <p style={{
-              fontFamily: "'JetBrains Mono', monospace", fontSize: 11, color: 'var(--muted)',
+              fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--mid)',
               letterSpacing: '0.08em',
             }}>This only takes a moment</p>
 
             <div style={{ display: 'flex', gap: 8, marginTop: 24, flexWrap: 'wrap', justifyContent: 'center' }}>
               {['Document read', 'Details matched', 'Security checks'].map(tag => (
                 <span key={tag} style={{
-                  padding: '5px 10px', borderRadius: 20,
-                  background: 'rgba(0,212,180,0.06)', border: '1px solid rgba(0,212,180,0.12)',
-                  fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
-                  color: 'var(--teal)', opacity: 0.7,
+                  padding: '5px 10px',
+                  background: 'var(--accent-soft)', border: '1px solid var(--rule)',
+                  fontFamily: 'var(--mono)', fontSize: 10,
+                  color: 'var(--accent-ink)',
                 }}>{tag}</span>
               ))}
             </div>
 
             {stepError && (
-              <p style={{ marginTop: 16, fontSize: 12, color: '#ef4444', fontFamily: "'JetBrains Mono', monospace" }}>
+              <p style={{ marginTop: 16, fontSize: 12, color: 'var(--flag)', fontFamily: 'var(--mono)' }}>
                 {stepError}
               </p>
             )}
@@ -1260,19 +1230,19 @@ const MobileVerificationPage: React.FC = () => {
             <AmbientGlow />
 
             <span style={{
-              fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
-              textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--teal)',
+              fontFamily: 'var(--mono)', fontSize: 10,
+              textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--accent)',
               marginBottom: 8,
             }}>{(isIdentity || skipBack) ? 'Step 3 of 4 — Live Photo' : 'Step 4 of 5 — Live Photo'}</span>
 
             {/* Active liveness (primary path) */}
             {!useFallbackSelfie && !selfieFile && !showSelfieCamera ? (
               <>
-                <h1 style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.12, letterSpacing: '-0.025em', marginBottom: 8 }}>
+                <h1 style={{ fontSize: 26, fontWeight: 700, lineHeight: 1.12, letterSpacing: '-0.025em', marginBottom: 8 }}>
                   Liveness check
                 </h1>
 
-                <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.55, marginBottom: 12 }}>
+                <p style={{ fontSize: 13, color: 'var(--mid)', lineHeight: 1.55, marginBottom: 12 }}>
                   Follow the on-screen instructions — look at the camera and turn your head when prompted.
                 </p>
 
@@ -1298,11 +1268,11 @@ const MobileVerificationPage: React.FC = () => {
             ) : (
               /* Fallback: legacy selfie capture */
               <>
-                <h1 style={{ fontSize: 26, fontWeight: 800, lineHeight: 1.12, letterSpacing: '-0.025em', marginBottom: 8 }}>
+                <h1 style={{ fontSize: 26, fontWeight: 700, lineHeight: 1.12, letterSpacing: '-0.025em', marginBottom: 8 }}>
                   Take a quick<br />selfie
                 </h1>
 
-                <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.55, marginBottom: 12 }}>
+                <p style={{ fontSize: 13, color: 'var(--mid)', lineHeight: 1.55, marginBottom: 12 }}>
                   We need to confirm your identity matches your ID. Look directly at the camera in a well-lit area.
                 </p>
 
@@ -1336,7 +1306,7 @@ const MobileVerificationPage: React.FC = () => {
             )}
 
             {stepError && (
-              <p style={{ marginTop: 10, fontSize: 12, color: '#ef4444', fontFamily: "'JetBrains Mono', monospace", textAlign: 'center' }}>
+              <p style={{ marginTop: 10, fontSize: 12, color: 'var(--flag)', fontFamily: 'var(--mono)', textAlign: 'center' }}>
                 {stepError}
               </p>
             )}
@@ -1373,14 +1343,14 @@ const MobileVerificationPage: React.FC = () => {
               /* Still polling for result */
               <>
                 <div style={{
-                  width: 80, height: 80, border: '2.5px solid rgba(0,212,180,0.12)',
-                  borderTopColor: 'var(--teal)', borderRadius: '50%',
+                  width: 80, height: 80, border: '2px solid var(--rule)',
+                  borderTopColor: 'var(--accent)', borderRadius: '50%',
                   animation: 'spin 1s linear infinite', marginBottom: 18,
                 }} />
                 <p style={{ fontSize: 16, fontWeight: 700, marginBottom: 6 }}>Processing your verification…</p>
                 <p style={{
-                  fontFamily: "'JetBrains Mono', monospace", fontSize: 11,
-                  color: 'var(--muted)', letterSpacing: '0.08em',
+                  fontFamily: 'var(--mono)', fontSize: 11,
+                  color: 'var(--mid)', letterSpacing: '0.08em',
                 }}>{isDocumentOnly ? 'Finalizing your verification' : 'Analyzing your live photo'}</p>
               </>
             ) : (() => {
@@ -1414,26 +1384,26 @@ const MobileVerificationPage: React.FC = () => {
                     ];
                 return (
                   <>
-                    {/* Success ring */}
+                    {/* Success indicator */}
                     <div style={{
-                      width: 112, height: 112, borderRadius: '50%',
-                      border: '2px solid var(--teal)', background: 'rgba(0,212,180,0.07)',
+                      width: 112, height: 112,
+                      border: '2px solid var(--accent)', background: 'var(--accent-soft)',
                       display: 'flex', alignItems: 'center', justifyContent: 'center',
-                      fontSize: 44, animation: 'sPulse 2.4s ease infinite',
+                      fontSize: 44, color: 'var(--accent)',
                       marginBottom: 20,
                     }}>✓</div>
 
                     <span style={{
-                      fontFamily: "'JetBrains Mono', monospace", fontSize: 10,
-                      textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--teal)',
+                      fontFamily: 'var(--mono)', fontSize: 10,
+                      textTransform: 'uppercase', letterSpacing: '0.12em', color: 'var(--accent)',
                       marginBottom: 8,
                     }}>{isAgeOnly ? 'Age verified' : isDocumentOnly ? 'Document verified' : 'Verification complete'}</span>
 
-                    <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: '-0.025em', marginBottom: 8 }}>
+                    <h1 style={{ fontSize: 28, fontWeight: 700, letterSpacing: '-0.025em', marginBottom: 8 }}>
                       You're all set
                     </h1>
 
-                    <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.55, marginBottom: 24 }}>
+                    <p style={{ fontSize: 13, color: 'var(--mid)', lineHeight: 1.55, marginBottom: 24 }}>
                       {isAgeOnly
                         ? 'Your age has been verified. You can close this tab and return to your desktop.'
                         : isDocumentOnly
@@ -1446,22 +1416,22 @@ const MobileVerificationPage: React.FC = () => {
                       {checklist.map((item, i) => (
                         <div key={i} style={{
                           display: 'flex', alignItems: 'center', gap: 11,
-                          background: 'rgba(0,212,180,0.04)', border: '1px solid rgba(0,212,180,0.1)',
-                          borderRadius: 11, padding: '11px 14px',
+                          background: 'var(--accent-soft)', border: '1px solid var(--rule)',
+                          padding: '11px 14px',
                           animation: `slideIn 0.3s ease ${i * 90}ms both`,
                         }}>
-                          <span style={{ color: 'var(--teal)', fontSize: 14, flexShrink: 0 }}>✓</span>
-                          <span style={{ fontSize: 13, color: 'rgba(232,244,248,0.72)' }}>{item}</span>
+                          <span style={{ color: 'var(--accent)', fontSize: 14, flexShrink: 0 }}>✓</span>
+                          <span style={{ fontSize: 13, color: 'var(--ink)' }}>{item}</span>
                         </div>
                       ))}
                     </div>
 
                     {patchFailed && (
                       <p style={{
-                        marginTop: 16, fontSize: 11, color: 'rgba(245,158,11,0.8)',
-                        fontFamily: "'JetBrains Mono', monospace",
-                        background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.15)',
-                        borderRadius: 8, padding: '8px 12px',
+                        marginTop: 16, fontSize: 11, color: 'var(--flag)',
+                        fontFamily: 'var(--mono)',
+                        background: 'var(--flag-soft)', border: '1px solid var(--rule)',
+                        padding: '8px 12px',
                       }}>
                         Note: We couldn't notify your desktop automatically. Please refresh it to see your result.
                       </p>
@@ -1474,22 +1444,22 @@ const MobileVerificationPage: React.FC = () => {
               return (
                 <>
                   <div style={{
-                    width: 112, height: 112, borderRadius: '50%',
-                    border: `2px solid ${isFailed ? 'rgba(239,68,68,0.4)' : 'rgba(245,158,11,0.4)'}`,
-                    background: isFailed ? 'rgba(239,68,68,0.07)' : 'rgba(245,158,11,0.07)',
+                    width: 112, height: 112,
+                    border: `1px solid ${isFailed ? 'var(--flag)' : 'var(--flag)'}`,
+                    background: isFailed ? 'var(--flag-soft)' : 'var(--flag-soft)',
                     display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 44, marginBottom: 20,
+                    fontSize: 44, color: 'var(--flag)', marginBottom: 20,
                   }}>
-                    {isFailed ? '✕' : '⏳'}
+                    {isFailed ? '✕' : '?'}
                   </div>
 
-                  <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: '-0.025em', marginBottom: 8 }}>
+                  <h1 style={{ fontSize: 24, fontWeight: 700, letterSpacing: '-0.025em', marginBottom: 8 }}>
                     {isFailed
                       ? isAgeOnly ? 'Age Verification Failed' : isDocumentOnly ? 'Document Verification Failed' : 'Verification Failed'
                       : 'Under Review'}
                   </h1>
 
-                  <p style={{ fontSize: 13, color: 'var(--muted)', lineHeight: 1.55, marginBottom: 16 }}>
+                  <p style={{ fontSize: 13, color: 'var(--mid)', lineHeight: 1.55, marginBottom: 16 }}>
                     {isFailed
                       ? isAgeOnly
                         ? (finalResult.message || 'Age verification could not be completed.')
@@ -1506,8 +1476,8 @@ const MobileVerificationPage: React.FC = () => {
                   )}
                   {isFailed && finalResult.retry_available === false && (
                     <p style={{
-                      marginTop: 16, fontSize: 11, color: 'rgba(239,68,68,0.8)',
-                      fontFamily: "'JetBrains Mono', monospace",
+                      marginTop: 16, fontSize: 11, color: 'var(--flag)',
+                      fontFamily: 'var(--mono)',
                     }}>
                       Maximum retry attempts reached.
                     </p>
@@ -1515,10 +1485,10 @@ const MobileVerificationPage: React.FC = () => {
 
                   {patchFailed && (
                     <p style={{
-                      fontSize: 11, color: 'rgba(245,158,11,0.8)',
-                      fontFamily: "'JetBrains Mono', monospace",
-                      background: 'rgba(245,158,11,0.08)', border: '1px solid rgba(245,158,11,0.15)',
-                      borderRadius: 8, padding: '8px 12px',
+                      fontSize: 11, color: 'var(--flag)',
+                      fontFamily: 'var(--mono)',
+                      background: 'var(--flag-soft)', border: '1px solid var(--rule)',
+                      padding: '8px 12px',
                     }}>
                       Note: We couldn't notify your desktop automatically. Please refresh it to see your result.
                     </p>

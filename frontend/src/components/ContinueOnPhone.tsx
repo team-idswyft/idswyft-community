@@ -173,18 +173,18 @@ export const ContinueOnPhone: React.FC<ContinueOnPhoneProps> = ({
   // ── IDLE ──
   if (state === 'idle') {
     return (
-      <div style={{ background: 'rgba(34,211,238,0.06)', border: '1px solid rgba(34,211,238,0.3)', borderRadius: 10, padding: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', height: '100%', justifyContent: 'center', gap: 10 }}>
+      <div style={{ background: 'var(--accent-soft)', border: '1px solid color-mix(in oklab, var(--accent) 30%, transparent)', padding: 20, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', height: '100%', justifyContent: 'center', gap: 10 }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          <span style={{ fontSize: 13, color: '#dde2ec', fontWeight: 600 }}>Continue on Phone</span>
-          <span style={{ fontSize: 10, background: 'rgba(34,211,238,0.15)', color: '#22d3ee', padding: '2px 8px', borderRadius: 99, fontWeight: 600 }}>Recommended</span>
+          <span style={{ fontSize: 13, color: 'var(--ink)', fontWeight: 600, fontFamily: 'var(--sans)' }}>Continue on Phone</span>
+          <span style={{ fontSize: 10, background: 'var(--accent-soft)', color: 'var(--accent-ink)', padding: '2px 8px', fontWeight: 600, fontFamily: 'var(--mono)', border: '1px solid color-mix(in oklab, var(--accent) 30%, transparent)' }}>Recommended</span>
         </div>
-        <p style={{ fontSize: 12, color: '#8896aa', lineHeight: 1.5 }}>
+        <p style={{ fontSize: 12, color: 'var(--mid)', lineHeight: 1.5, fontFamily: 'var(--sans)' }}>
           Better camera quality for liveness and document capture.
         </p>
         <button
           onClick={generateQR}
           disabled={(!sessionToken && (!apiKey.trim() || !userId.trim())) || isGenerating}
-          style={{ background: '#22d3ee', color: '#080c14', border: 'none', borderRadius: 8, padding: '9px 0', width: '100%', fontWeight: 600, fontSize: 13, cursor: (!sessionToken && (!apiKey.trim() || !userId.trim())) || isGenerating ? 'not-allowed' : 'pointer', opacity: (!sessionToken && (!apiKey.trim() || !userId.trim())) || isGenerating ? 0.5 : 1 }}
+          style={{ background: 'var(--ink)', color: 'var(--paper)', border: '1px solid var(--ink)', padding: '10px 0', width: '100%', fontWeight: 500, fontSize: 13, fontFamily: 'var(--mono)', cursor: (!sessionToken && (!apiKey.trim() || !userId.trim())) || isGenerating ? 'not-allowed' : 'pointer', opacity: (!sessionToken && (!apiKey.trim() || !userId.trim())) || isGenerating ? 0.5 : 1 }}
         >
           {isGenerating ? 'Generating\u2026' : 'Generate QR Code'}
         </button>
@@ -199,32 +199,32 @@ export const ContinueOnPhone: React.FC<ContinueOnPhoneProps> = ({
   if (state === 'waiting') {
     const isLocalhost = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1';
     return (
-      <div className="border-2 border-blue-200 bg-blue-50 rounded-2xl p-6 flex flex-col items-center text-center gap-3">
+      <div style={{ border: '1px solid var(--rule)', background: 'var(--panel)', padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 12 }}>
         {isLocalhost && (
-          <div className="w-full bg-amber-50 border border-amber-300 rounded-xl px-3 py-2 text-xs text-amber-800 text-left">
+          <div style={{ width: '100%', background: 'var(--flag-soft)', border: '1px solid var(--rule)', padding: '8px 12px', fontSize: 12, color: 'var(--ink)', textAlign: 'left', fontFamily: 'var(--mono)' }}>
             <strong>Local dev tip:</strong> Open this page at{' '}
-            <span className="font-mono font-medium">
+            <span style={{ fontWeight: 500 }}>
               http://{window.location.hostname === 'localhost' ? '192.168.x.x' : window.location.hostname}:{window.location.port}/demo
             </span>{' '}
             (your LAN IP) so the QR code works on your phone.
           </div>
         )}
-        <p className="text-sm font-medium text-gray-700">Scan with your phone camera</p>
-        <div className="bg-white p-3 rounded-xl shadow-sm">
+        <p style={{ fontSize: 14, fontWeight: 500, color: 'var(--ink)', fontFamily: 'var(--sans)' }}>Scan with your phone camera</p>
+        <div style={{ background: '#ffffff', padding: 12 }}>
           {mobileUrl && <QRCode value={mobileUrl} size={180} />}
         </div>
         {mobileUrl && (
-          <p className="text-[10px] text-gray-400 break-all max-w-[220px]">{mobileUrl}</p>
+          <p style={{ fontSize: 10, color: 'var(--soft)', wordBreak: 'break-all', maxWidth: 220, fontFamily: 'var(--mono)' }}>{mobileUrl}</p>
         )}
-        <div className="flex items-center gap-2 text-sm text-gray-500">
-          <span className="w-2 h-2 bg-blue-500 rounded-full animate-pulse flex-shrink-0" />
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 13, color: 'var(--mid)', fontFamily: 'var(--mono)' }}>
+          <span style={{ width: 8, height: 8, background: 'var(--accent)', flexShrink: 0 }} className="animate-pulse" />
           <span>Waiting for phone…</span>
-          <span className="font-mono text-blue-600 font-medium">{fmt(timeLeft)}</span>
+          <span style={{ color: 'var(--accent-ink)', fontWeight: 500 }}>{fmt(timeLeft)}</span>
         </div>
         <a
           href="#"
           onClick={(e) => { e.preventDefault(); cancel(); }}
-          className="text-xs text-gray-400 hover:text-gray-600 underline underline-offset-2"
+          style={{ fontSize: 12, color: 'var(--soft)', textDecoration: 'underline', fontFamily: 'var(--mono)' }}
         >
           Cancel — use this device instead
         </a>
@@ -242,55 +242,55 @@ export const ContinueOnPhone: React.FC<ContinueOnPhoneProps> = ({
   const cfg = statusMap[result?.status ?? ''] ?? statusMap.manual_review;
 
   return (
-    <div className="border border-gray-200 rounded-2xl p-6 flex flex-col items-center text-center gap-2">
-      <div className={`text-5xl font-bold ${cfg.color}`}>{cfg.icon}</div>
-      <h3 className={`font-semibold text-lg ${cfg.color}`}>{cfg.label}</h3>
-      <p className="text-sm text-gray-500">Completed on mobile device</p>
-      <div className="w-full mt-2 text-left text-sm space-y-1.5">
+    <div style={{ border: '1px solid var(--rule)', background: 'var(--panel)', padding: 24, display: 'flex', flexDirection: 'column', alignItems: 'center', textAlign: 'center', gap: 8 }}>
+      <div style={{ fontSize: 36, fontWeight: 700, color: cfg.color === 'text-emerald-600' ? 'var(--accent-ink)' : cfg.color === 'text-red-500' ? '#f87171' : 'var(--flag)' }}>{cfg.icon}</div>
+      <h3 style={{ fontWeight: 600, fontSize: 18, fontFamily: 'var(--sans)', color: cfg.color === 'text-emerald-600' ? 'var(--accent-ink)' : cfg.color === 'text-red-500' ? '#f87171' : 'var(--flag)' }}>{cfg.label}</h3>
+      <p style={{ fontSize: 13, color: 'var(--mid)', fontFamily: 'var(--sans)' }}>Completed on mobile device</p>
+      <div style={{ width: '100%', marginTop: 8, textAlign: 'left', fontSize: 13, fontFamily: 'var(--mono)' }}>
         {result?.confidence_score != null && (
-          <div className="flex justify-between">
-            <span className="text-gray-500">Confidence</span>
-            <span className="font-medium text-gray-700">{Math.round(result.confidence_score * 100)}%</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px dashed var(--rule)' }}>
+            <span style={{ color: 'var(--mid)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Confidence</span>
+            <span style={{ fontWeight: 500, color: 'var(--ink)' }}>{Math.round(result.confidence_score * 100)}%</span>
           </div>
         )}
         {(result?.face_match_results?.similarity_score ?? result?.face_match_score) != null && (
-          <div className="flex justify-between">
-            <span className="text-gray-500">Face Match</span>
-            <span className="font-medium text-gray-700">{Math.round((result?.face_match_results?.similarity_score ?? result?.face_match_score ?? 0) * 100)}%</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px dashed var(--rule)' }}>
+            <span style={{ color: 'var(--mid)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Face Match</span>
+            <span style={{ fontWeight: 500, color: 'var(--ink)' }}>{Math.round((result?.face_match_results?.similarity_score ?? result?.face_match_score ?? 0) * 100)}%</span>
           </div>
         )}
         {(result?.liveness_results?.score ?? result?.liveness_score) != null && (
-          <div className="flex justify-between">
-            <span className="text-gray-500">Liveness</span>
-            <span className="font-medium text-gray-700">{Math.round((result?.liveness_results?.score ?? result?.liveness_score ?? 0) * 100)}%</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px dashed var(--rule)' }}>
+            <span style={{ color: 'var(--mid)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Liveness</span>
+            <span style={{ fontWeight: 500, color: 'var(--ink)' }}>{Math.round((result?.liveness_results?.score ?? result?.liveness_score ?? 0) * 100)}%</span>
           </div>
         )}
         {(result?.cross_validation_results?.overall_score) != null && (
-          <div className="flex justify-between">
-            <span className="text-gray-500">Cross-Validation</span>
-            <span className="font-medium text-gray-700">{Math.round(result.cross_validation_results.overall_score * 100)}%</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px dashed var(--rule)' }}>
+            <span style={{ color: 'var(--mid)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Cross-Validation</span>
+            <span style={{ fontWeight: 500, color: 'var(--ink)' }}>{Math.round(result.cross_validation_results.overall_score * 100)}%</span>
           </div>
         )}
         {result?.aml_screening && (
-          <div className="flex justify-between">
-            <span className="text-gray-500">AML Screening</span>
-            <span className={`font-semibold ${result.aml_screening.risk_level === 'clear' ? 'text-green-600' : 'text-red-500'}`}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px dashed var(--rule)' }}>
+            <span style={{ color: 'var(--mid)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>AML Screening</span>
+            <span style={{ fontWeight: 500, color: result.aml_screening.risk_level === 'clear' ? 'var(--accent-ink)' : '#f87171' }}>
               {result.aml_screening.risk_level === 'clear' ? 'Clear' : result.aml_screening.risk_level?.replace('_', ' ')}
             </span>
           </div>
         )}
         {result?.risk_score && (
-          <div className="flex justify-between">
-            <span className="text-gray-500">Risk Score</span>
-            <span className={`font-semibold ${result.risk_score.risk_level === 'low' ? 'text-green-600' : result.risk_score.risk_level === 'medium' ? 'text-yellow-600' : 'text-red-500'}`}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '6px 0', borderBottom: '1px dashed var(--rule)' }}>
+            <span style={{ color: 'var(--mid)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Risk Score</span>
+            <span style={{ fontWeight: 500, color: result.risk_score.risk_level === 'low' ? 'var(--accent-ink)' : result.risk_score.risk_level === 'medium' ? 'var(--flag)' : '#f87171' }}>
               {result.risk_score.overall_score}/100
             </span>
           </div>
         )}
         {result?.rejection_reason && (
-          <div className="flex justify-between pt-1.5 border-t border-gray-200">
-            <span className="text-gray-500">Rejection</span>
-            <span className="font-mono text-xs text-red-500">{result.rejection_reason}</span>
+          <div style={{ display: 'flex', justifyContent: 'space-between', padding: '8px 0 0', borderTop: '1px solid var(--rule)', marginTop: 4 }}>
+            <span style={{ color: 'var(--mid)', fontSize: 11, textTransform: 'uppercase', letterSpacing: '0.04em' }}>Rejection</span>
+            <span style={{ fontSize: 12, color: '#f87171' }}>{result.rejection_reason}</span>
           </div>
         )}
       </div>

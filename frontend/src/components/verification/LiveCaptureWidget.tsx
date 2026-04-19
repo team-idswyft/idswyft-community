@@ -22,7 +22,7 @@ export const LiveCaptureWidget: React.FC<LiveCaptureWidgetProps> = ({
   verificationId,
   onComplete,
   onError,
-  theme = 'light',
+  theme: _theme = 'light',
 }) => {
   const authHeader: Record<string, string> = sessionToken
     ? { 'X-Session-Token': sessionToken }
@@ -46,10 +46,6 @@ export const LiveCaptureWidget: React.FC<LiveCaptureWidgetProps> = ({
   const [loading, setLoading] = useState(false);
   const [captureAttempts, setCaptureAttempts] = useState(0);
   const [useFallbackCapture, setUseFallbackCapture] = useState(false);
-
-  const isDark = theme === 'dark';
-  const textClass = isDark ? 'text-white' : 'text-gray-900';
-  const subtextClass = isDark ? 'text-gray-300' : 'text-gray-600';
 
   // OpenCV init
   useEffect(() => {
@@ -339,14 +335,12 @@ export const LiveCaptureWidget: React.FC<LiveCaptureWidgetProps> = ({
   if (challengeState === 'completed') {
     return (
       <div className="text-center py-6">
-        <div className="w-12 h-12 mx-auto mb-4 bg-green-100 rounded-full flex items-center justify-center">
-          <svg className="w-6 h-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-          </svg>
+        <div className="badge-success" style={{ margin: '0 auto 16px', display: 'inline-flex', padding: '8px 16px', fontFamily: 'var(--mono)', fontSize: 12, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
+          CAPTURED
         </div>
-        <h3 className={`text-lg font-semibold ${textClass}`}>Photo Captured</h3>
-        <p className={`text-sm mt-1 ${subtextClass}`}>Processing your verification…</p>
-        <div className="mt-4 animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600 mx-auto" />
+        <h3 className="text-lg font-semibold" style={{ color: 'var(--ink)' }}>Photo Captured</h3>
+        <p className="text-sm mt-1" style={{ color: 'var(--mid)' }}>Processing your verification...</p>
+        <div className="loading-spinner-glass mx-auto mt-4" />
       </div>
     );
   }
@@ -356,8 +350,8 @@ export const LiveCaptureWidget: React.FC<LiveCaptureWidgetProps> = ({
     return (
       <div className="space-y-4">
         <div className="text-center">
-          <h2 className={`text-xl font-semibold mb-1 ${textClass}`}>Live Photo Capture</h2>
-          <p className={`text-sm ${subtextClass}`}>Follow the on-screen instructions to verify your identity</p>
+          <h2 className="text-xl font-semibold mb-1" style={{ color: 'var(--ink)' }}>Live Photo Capture</h2>
+          <p className="text-sm" style={{ color: 'var(--mid)' }}>Follow the on-screen instructions to verify your identity</p>
         </div>
         <ActiveLivenessCapture
           onComplete={handleActiveLivenessComplete}
@@ -372,13 +366,14 @@ export const LiveCaptureWidget: React.FC<LiveCaptureWidgetProps> = ({
   return (
     <div className="space-y-4">
       <div className="text-center">
-        <h2 className={`text-xl font-semibold mb-1 ${textClass}`}>Live Photo Capture</h2>
-        <p className={`text-sm ${subtextClass}`}>We need a live selfie to verify your identity</p>
+        <h2 className="text-xl font-semibold mb-1" style={{ color: 'var(--ink)' }}>Live Photo Capture</h2>
+        <p className="text-sm" style={{ color: 'var(--mid)' }}>We need a live photo to verify your identity</p>
       </div>
 
       {/* Camera area */}
-      <div className={`rounded-2xl overflow-hidden border-2 ${isDark ? 'border-gray-600 bg-gray-900' : 'border-gray-200 bg-gray-100'}`}>
-        {/* Canvas — always mounted for ref stability */}
+      <div className="capture-frame" style={{ overflow: 'hidden' }}>
+        <div className="corners" />
+        {/* Canvas -- always mounted for ref stability */}
         <canvas
           ref={canvasRef}
           width={640}
@@ -389,34 +384,35 @@ export const LiveCaptureWidget: React.FC<LiveCaptureWidgetProps> = ({
 
         {cameraState === 'prompt' && (
           <div className="p-8 text-center">
-            <div className="text-5xl mb-4">📷</div>
-            <h3 className={`font-semibold mb-2 ${textClass}`}>Camera Access Required</h3>
-            <p className={`text-sm mb-5 ${subtextClass}`}>
-              We need your camera to capture a live selfie for identity verification.
+            <div className="mono" style={{ fontSize: 13, color: 'var(--mid)', letterSpacing: '0.04em', marginBottom: 16 }}>CAMERA</div>
+            <h3 className="font-semibold mb-2" style={{ color: 'var(--ink)' }}>Camera Access Required</h3>
+            <p className="text-sm mb-5" style={{ color: 'var(--mid)' }}>
+              We need your camera to capture a live photo for identity verification.
             </p>
             <button
               onClick={initializeCamera}
               disabled={!opencvReady || loading}
-              className="px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 disabled:opacity-50 transition-all font-medium"
+              className="btn-accent disabled:opacity-50"
+              style={{ padding: '12px 24px' }}
             >
-              {!opencvReady ? 'Loading…' : loading ? 'Starting Camera…' : 'Enable Camera'}
+              {!opencvReady ? 'Loading...' : loading ? 'Starting Camera...' : 'Enable Camera'}
             </button>
           </div>
         )}
 
         {cameraState === 'initializing' && (
           <div className="p-8 text-center">
-            <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-blue-600 mx-auto mb-4" />
-            <p className={`text-sm ${subtextClass}`}>Starting camera…</p>
+            <div className="loading-spinner-glass mx-auto mb-4" />
+            <p className="text-sm" style={{ color: 'var(--mid)' }}>Starting camera...</p>
           </div>
         )}
 
         {cameraState === 'error' && (
           <div className="p-8 text-center">
-            <div className="text-4xl mb-3">⚠️</div>
-            <h3 className={`font-semibold mb-2 ${textClass}`}>Camera Failed</h3>
-            <p className={`text-sm mb-4 ${subtextClass}`}>{error}</p>
-            <button onClick={retry} className="px-5 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-all text-sm font-medium">
+            <div className="badge-error" style={{ display: 'inline-flex', marginBottom: 12, fontFamily: 'var(--mono)', fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase' }}>ERROR</div>
+            <h3 className="font-semibold mb-2" style={{ color: 'var(--ink)' }}>Camera Failed</h3>
+            <p className="text-sm mb-4" style={{ color: 'var(--mid)' }}>{error}</p>
+            <button onClick={retry} className="btn-accent" style={{ padding: '10px 20px' }}>
               Try Again
             </button>
           </div>
@@ -425,13 +421,11 @@ export const LiveCaptureWidget: React.FC<LiveCaptureWidgetProps> = ({
 
       {/* Face detection status */}
       {cameraState === 'ready' && (
-        <div className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-sm ${
-          faceDetected ? 'bg-green-50 border border-green-200' : 'bg-amber-50 border border-amber-200'
-        }`}>
-          <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${faceDetected ? 'bg-green-500 animate-pulse' : 'bg-amber-400'}`} />
-          <span className={faceDetected ? 'text-green-800' : 'text-amber-800'}>
+        <div className={faceDetected ? 'badge-success' : 'badge-warning'}
+          style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 14px', width: '100%' }}>
+          <span className="mono" style={{ fontSize: 11 }}>
             {faceDetected
-              ? `Face detected · Liveness ${Math.round(livenessScore * 100)}% · Stability ${Math.round(faceStability * 100)}%`
+              ? `Face detected / Liveness ${Math.round(livenessScore * 100)}% / Stability ${Math.round(faceStability * 100)}%`
               : 'Position your face in the center of the frame'}
           </span>
         </div>
@@ -440,16 +434,16 @@ export const LiveCaptureWidget: React.FC<LiveCaptureWidgetProps> = ({
       {/* Countdown */}
       {countdown !== null && (
         <div className="text-center">
-          <div className="text-5xl font-bold text-blue-600">{countdown}</div>
-          <p className={`text-sm mt-1 ${subtextClass}`}>Hold still…</p>
+          <div className="mono" style={{ fontSize: 48, fontWeight: 700, color: 'var(--accent)' }}>{countdown}</div>
+          <p className="text-sm mt-1" style={{ color: 'var(--mid)' }}>Hold still...</p>
         </div>
       )}
 
       {/* Error */}
       {error && cameraState !== 'error' && (
-        <div className="flex items-start gap-2 px-4 py-3 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
-          <span className="flex-shrink-0">⚠️</span>
-          <span>{error}</span>
+        <div className="badge-error" style={{ display: 'flex', alignItems: 'flex-start', gap: 8, padding: '10px 14px', width: '100%' }}>
+          <span className="mono" style={{ fontSize: 11, flexShrink: 0 }}>ERR</span>
+          <span style={{ fontSize: 13 }}>{error}</span>
         </div>
       )}
 
@@ -460,31 +454,31 @@ export const LiveCaptureWidget: React.FC<LiveCaptureWidgetProps> = ({
             <button
               onClick={startChallenge}
               disabled={!faceDetected || loading || livenessScore < 0.4 || faceStability < 0.5}
-              className="w-full py-3.5 px-4 bg-green-600 text-white font-medium rounded-xl hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+              className="btn-accent w-full disabled:opacity-50 disabled:cursor-not-allowed"
+              style={{ padding: '14px 16px', justifyContent: 'center' }}
             >
               {loading ? (
-                <><div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white" /> Processing…</>
+                <><div className="loading-spinner" style={{ width: 16, height: 16 }} /> Processing...</>
               ) : !faceDetected ? (
                 'Position Your Face First'
               ) : livenessScore < 0.4 || faceStability < 0.5 ? (
                 'Improve Lighting & Hold Steady'
               ) : (
-                <><span>📸</span> Capture Photo</>
+                'Capture Photo'
               )}
             </button>
           )}
 
           {challengeState === 'active' && (
-            <div className={`text-center py-3 text-sm font-medium ${subtextClass}`}>
-              Look directly at the camera and blink twice…
+            <div className="text-center py-3 text-sm font-medium" style={{ color: 'var(--mid)' }}>
+              Look directly at the camera and blink twice...
             </div>
           )}
 
           <button
             onClick={retry}
-            className={`w-full py-2.5 px-4 text-sm rounded-xl border transition-all ${
-              isDark ? 'border-gray-600 text-gray-300 hover:bg-gray-700' : 'border-gray-200 text-gray-600 hover:bg-gray-50'
-            }`}
+            className="btn-outline w-full"
+            style={{ padding: '10px 16px', justifyContent: 'center' }}
           >
             Restart Camera
           </button>
@@ -492,10 +486,10 @@ export const LiveCaptureWidget: React.FC<LiveCaptureWidgetProps> = ({
       )}
 
       {/* Instructions */}
-      <ul className={`text-xs ${subtextClass} space-y-1 pl-1`}>
-        <li>• Ensure good lighting — avoid backlighting</li>
-        <li>• Center your face in the frame and hold still</li>
-        <li>• Wait for the green "Face Detected" indicator before capturing</li>
+      <ul className="checklist" style={{ fontSize: 12 }}>
+        <li><span className="dot">--</span><span>Ensure good lighting -- avoid backlighting</span></li>
+        <li><span className="dot">--</span><span>Center your face in the frame and hold still</span></li>
+        <li style={{ borderBottom: 'none' }}><span className="dot">--</span><span>Wait for the "Face detected" indicator before capturing</span></li>
       </ul>
     </div>
   );

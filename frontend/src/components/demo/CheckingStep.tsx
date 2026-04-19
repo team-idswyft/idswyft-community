@@ -40,9 +40,8 @@ export const CheckingStep: React.FC<CheckingStepProps> = ({ stepError, onRetry, 
       {/* Spinner */}
       <div style={{
         width: 80, height: 80,
-        border: `2.5px solid ${C.cyanDim}`,
-        borderTopColor: C.cyan, borderRadius: '50%',
-        boxShadow: '0 0 30px rgba(34,211,238,0.1)',
+        border: `2.5px solid ${C.accentSoft}`,
+        borderTopColor: C.accent, borderRadius: '50%',
         animation: 'dSpin 1s linear infinite',
         marginBottom: 18,
       }} />
@@ -66,10 +65,10 @@ export const CheckingStep: React.FC<CheckingStepProps> = ({ stepError, onRetry, 
       <div style={{ display: 'flex', gap: 8, marginTop: 24, flexWrap: 'wrap', justifyContent: 'center' }}>
         {TAGS.map(tag => (
           <span key={tag} style={{
-            padding: '5px 10px', borderRadius: 20,
-            background: C.cyanDim, border: `1px solid ${C.cyanBorder}`,
+            padding: '5px 10px',
+            background: C.accentSoft, border: `1px solid ${C.border}`,
             fontFamily: C.mono, fontSize: 10,
-            color: C.cyan, opacity: 0.7,
+            color: C.accent, opacity: 0.7,
           }}>{tag}</span>
         ))}
       </div>

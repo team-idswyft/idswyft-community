@@ -80,7 +80,7 @@ export function buildDemoCredential(verificationId: string): { jwt: string; jti:
 
 // Reuse JSON syntax highlighting from ResultsStep
 const jsonTokenColors = {
-  key: C.cyan,
+  key: C.accent,
   string: C.green,
   number: C.amber,
   boolean: C.purple,
@@ -132,7 +132,7 @@ function decodeJwtPart(part: string): any {
 }
 
 const cardStyle: React.CSSProperties = {
-  background: C.surface, border: `1px solid ${C.border}`, borderRadius: 8, padding: 16, marginBottom: 12, textAlign: 'left',
+  background: C.panel, border: `1px solid ${C.border}`, padding: 16, marginBottom: 12, textAlign: 'left',
 };
 const cardTitle: React.CSSProperties = {
   fontFamily: C.mono, fontSize: 11, fontWeight: 600, color: C.muted, marginBottom: 10, letterSpacing: '0.04em', textTransform: 'uppercase',
@@ -222,13 +222,13 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
       <div style={{ padding: '8px 0' }}>
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <div style={{
-            width: 56, height: 56, borderRadius: '50%',
-            background: 'rgba(34, 211, 238, 0.08)',
-            border: '1px solid rgba(34, 211, 238, 0.2)',
+            width: 56, height: 56,
+            background: C.accentSoft,
+            border: `1px solid ${C.accent}`,
             display: 'flex', alignItems: 'center', justifyContent: 'center',
             margin: '0 auto 12px',
           }}>
-            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={C.cyan} strokeWidth="1.5">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={C.accent} strokeWidth="1.5">
               <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" />
               <path d="M9 12l2 2 4-4" />
             </svg>
@@ -240,7 +240,7 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
             Preview a W3C Verifiable Credential (JWT-VC) for this verification.
           </p>
           <p style={{ color: C.dim, fontSize: 11, margin: 0 }}>
-            Demo mode: the JWT is generated locally for illustration. In production, Idswyft signs it with Ed25519 via <code style={{ fontFamily: C.mono, color: C.cyan }}>POST /verify/:id/credential</code>.
+            Demo mode: the JWT is generated locally for illustration. In production, Idswyft signs it with Ed25519 via <code style={{ fontFamily: C.mono, color: C.accent }}>POST /verify/:id/credential</code>.
           </p>
         </div>
 
@@ -255,10 +255,10 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
             ].map(item => (
               <div key={item.step} style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                 <div style={{
-                  width: 24, height: 24, borderRadius: 6, flexShrink: 0,
-                  background: 'rgba(34, 211, 238, 0.06)', border: '1px solid rgba(34, 211, 238, 0.12)',
+                  width: 24, height: 24, flexShrink: 0,
+                  background: C.accentSoft, border: `1px solid ${C.border}`,
                   display: 'flex', alignItems: 'center', justifyContent: 'center',
-                  fontFamily: C.mono, fontSize: 10, color: C.cyan,
+                  fontFamily: C.mono, fontSize: 10, color: C.accent,
                 }}>{item.step}</div>
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 13, color: C.text, marginBottom: 2 }}>{item.label}</div>
@@ -271,8 +271,8 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
 
         {error && (
           <div style={{
-            background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.2)',
-            borderRadius: 8, padding: '10px 14px', marginBottom: 12,
+            background: C.redDim, border: `1px solid rgba(248,113,113,0.2)`,
+            padding: '10px 14px', marginBottom: 12,
             fontSize: 12, color: C.red, fontFamily: C.mono,
           }}>
             {error}
@@ -282,9 +282,9 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
         <button
           onClick={fetchCredential}
           style={{
-            width: '100%', padding: 14, borderRadius: 10, border: 'none',
-            background: C.cyan, color: C.bg,
-            fontFamily: C.sans, fontSize: 14, fontWeight: 700,
+            width: '100%', padding: 14, border: `1px solid ${C.accent}`,
+            background: C.accent, color: C.bg,
+            fontFamily: C.mono, fontSize: 13, fontWeight: 500,
             cursor: 'pointer', marginBottom: 12,
           }}
         >
@@ -294,13 +294,13 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
         <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
           <button onClick={onBack} style={{
             background: 'transparent', color: C.muted, border: `1px solid ${C.border}`,
-            borderRadius: 8, padding: '8px 20px', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+            padding: '8px 20px', fontFamily: C.mono, fontWeight: 500, fontSize: 13, cursor: 'pointer',
           }}>
             Back to Results
           </button>
           <button onClick={onStartNew} style={{
             background: 'transparent', color: C.muted, border: `1px solid ${C.border}`,
-            borderRadius: 8, padding: '8px 20px', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+            padding: '8px 20px', fontFamily: C.mono, fontWeight: 500, fontSize: 13, cursor: 'pointer',
           }}>
             Start New Demo
           </button>
@@ -314,12 +314,12 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
     return (
       <div style={{ padding: '40px 0', textAlign: 'center' }}>
         <div style={{
-          width: 46, height: 46, border: `2px solid rgba(34,211,238,0.15)`,
-          borderTopColor: C.cyan, borderRadius: '50%',
+          width: 46, height: 46, border: `2px solid ${C.accentSoft}`,
+          borderTopColor: C.accent, borderRadius: '50%',
           animation: 'dSpin 0.8s linear infinite',
           margin: '0 auto 16px',
         }} />
-        <div style={{ fontFamily: C.mono, fontSize: 12, color: C.cyan, letterSpacing: '0.08em' }}>
+        <div style={{ fontFamily: C.mono, fontSize: 12, color: C.accent, letterSpacing: '0.08em' }}>
           BUILDING CREDENTIAL...
         </div>
         <p style={{ color: C.dim, fontSize: 11, marginTop: 8 }}>
@@ -335,9 +335,9 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
       {/* Header */}
       <div style={{ textAlign: 'center', marginBottom: 24 }}>
         <div style={{
-          width: 56, height: 56, borderRadius: '50%',
-          background: revoked ? 'rgba(248,113,113,0.08)' : C.greenDim,
-          border: `1px solid ${revoked ? 'rgba(248,113,113,0.3)' : C.green}`,
+          width: 56, height: 56,
+          background: revoked ? C.redDim : C.greenDim,
+          border: `1px solid ${revoked ? C.red : C.green}`,
           display: 'flex', alignItems: 'center', justifyContent: 'center',
           margin: '0 auto 12px', fontSize: 22,
           color: revoked ? C.red : C.green,
@@ -350,10 +350,10 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
           </h2>
           <span style={{
             fontSize: 9, fontFamily: C.mono, fontWeight: 700,
-            padding: '2px 8px', borderRadius: 10, letterSpacing: '0.1em',
-            background: 'rgba(251, 191, 36, 0.1)',
-            color: '#fbbf24',
-            border: '1px solid rgba(251, 191, 36, 0.25)',
+            padding: '2px 8px', letterSpacing: '0.1em',
+            background: C.amberDim,
+            color: C.amber,
+            border: `1px solid rgba(251, 191, 36, 0.25)`,
           }}>DEMO</span>
         </div>
         <p style={{ color: C.muted, fontSize: 13, margin: 0 }}>
@@ -384,8 +384,8 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
             <button
               onClick={() => cardRef.current && downloadCardPng(cardRef.current)}
               style={{
-                background: C.cyanDim, border: `1px solid ${C.cyanBorder}`,
-                color: C.cyan, borderRadius: 8, padding: '8px 18px',
+                background: C.accentSoft, border: `1px solid ${C.border}`,
+                color: C.accent, padding: '8px 18px',
                 fontFamily: C.mono, fontWeight: 600, fontSize: 11, cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: 6,
               }}
@@ -396,8 +396,8 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
             <button
               onClick={() => cardRef.current && downloadCardPdf(cardRef.current)}
               style={{
-                background: C.cyanDim, border: `1px solid ${C.cyanBorder}`,
-                color: C.cyan, borderRadius: 8, padding: '8px 18px',
+                background: C.accentSoft, border: `1px solid ${C.border}`,
+                color: C.accent, padding: '8px 18px',
                 fontFamily: C.mono, fontWeight: 600, fontSize: 11, cursor: 'pointer',
                 display: 'flex', alignItems: 'center', gap: 6,
               }}
@@ -417,7 +417,7 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
             {Object.entries(vcClaims).map(([key, value]) => (
               <div key={key} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', fontSize: 13 }}>
                 <span style={{ color: C.muted, fontFamily: C.mono, fontSize: 11 }}>{key}</span>
-                <span style={{ color: C.cyan, fontFamily: C.mono, fontSize: 12 }}>{String(value)}</span>
+                <span style={{ color: C.accent, fontFamily: C.mono, fontSize: 12 }}>{String(value)}</span>
               </div>
             ))}
           </div>
@@ -438,7 +438,7 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ color: C.muted }}>Issuer DID</span>
-            <span style={{ color: C.cyan, fontFamily: C.mono, fontSize: 10 }}>{payload?.iss || 'N/A'}</span>
+            <span style={{ color: C.accent, fontFamily: C.mono, fontSize: 10 }}>{payload?.iss || 'N/A'}</span>
           </div>
           <div style={{ display: 'flex', justifyContent: 'space-between' }}>
             <span style={{ color: C.muted }}>Type</span>
@@ -455,7 +455,7 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
       <div style={cardStyle}>
         <div style={cardTitle}>JWT Header</div>
         <pre style={{
-          background: C.codeBg, color: C.code, padding: 12, borderRadius: 6,
+          background: C.codeBg, color: C.code, padding: 12, border: `1px solid ${C.borderStrong}`,
           fontSize: 10, fontFamily: C.mono, overflowX: 'auto', lineHeight: 1.5, margin: 0,
         }}>
           {highlightJson(header)}
@@ -466,7 +466,7 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
       <div style={cardStyle}>
         <div style={cardTitle}>JWT Payload (decoded)</div>
         <pre style={{
-          background: C.codeBg, color: C.code, padding: 12, borderRadius: 6,
+          background: C.codeBg, color: C.code, padding: 12, border: `1px solid ${C.borderStrong}`,
           fontSize: 10, fontFamily: C.mono, overflowX: 'auto', maxHeight: 300, overflowY: 'auto', lineHeight: 1.5, margin: 0,
         }}>
           {highlightJson(payload)}
@@ -478,19 +478,19 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
           <div style={cardTitle as any}>Raw JWT</div>
           <button onClick={copyJwt} style={{
-            background: 'rgba(34,211,238,0.06)', border: `1px solid rgba(34,211,238,0.15)`,
-            borderRadius: 6, padding: '4px 10px', cursor: 'pointer',
-            fontFamily: C.mono, fontSize: 10, color: C.cyan,
+            background: C.accentSoft, border: `1px solid ${C.border}`,
+            padding: '4px 10px', cursor: 'pointer',
+            fontFamily: C.mono, fontSize: 10, color: C.accent,
           }}>
             {copied ? 'Copied!' : 'Copy'}
           </button>
         </div>
         <div style={{
-          background: C.codeBg, padding: 12, borderRadius: 6,
+          background: C.codeBg, padding: 12, border: `1px solid ${C.borderStrong}`,
           fontSize: 9, fontFamily: C.mono, color: C.dim,
           wordBreak: 'break-all', lineHeight: 1.6, maxHeight: 120, overflowY: 'auto',
         }}>
-          <span style={{ color: C.cyan }}>{jwtParts[0]}</span>
+          <span style={{ color: C.accent }}>{jwtParts[0]}</span>
           <span style={{ color: C.dim }}>.</span>
           <span style={{ color: C.green }}>{jwtParts[1]}</span>
           <span style={{ color: C.dim }}>.</span>
@@ -508,7 +508,8 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{
               display: 'inline-flex', alignItems: 'center', gap: 4,
-              fontSize: 11, fontWeight: 600, padding: '2px 8px', borderRadius: 10,
+              fontSize: 11, fontWeight: 600, padding: '2px 8px',
+              fontFamily: C.mono, letterSpacing: '0.03em',
               background: statusResult.active ? C.greenDim : C.redDim,
               color: statusResult.active ? C.green : C.red,
               border: `1px solid ${statusResult.active ? 'rgba(52,211,153,0.25)' : 'rgba(248,113,113,0.25)'}`,
@@ -524,8 +525,8 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
 
       {error && (
         <div style={{
-          background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.2)',
-          borderRadius: 8, padding: '10px 14px', marginBottom: 12,
+          background: C.redDim, border: `1px solid rgba(248,113,113,0.2)`,
+          padding: '10px 14px', marginBottom: 12,
           fontSize: 12, color: C.red, fontFamily: C.mono,
         }}>
           {error}
@@ -538,9 +539,9 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
           onClick={checkStatus}
           disabled={checkingStatus}
           style={{
-            background: 'rgba(34,211,238,0.06)', border: `1px solid rgba(34,211,238,0.15)`,
-            color: C.cyan, borderRadius: 8, padding: '10px 20px',
-            fontWeight: 600, fontSize: 13, cursor: checkingStatus ? 'not-allowed' : 'pointer',
+            background: C.accentSoft, border: `1px solid ${C.border}`,
+            color: C.accent, padding: '10px 20px',
+            fontFamily: C.mono, fontWeight: 500, fontSize: 13, cursor: checkingStatus ? 'not-allowed' : 'pointer',
             opacity: checkingStatus ? 0.6 : 1,
           }}
         >
@@ -551,9 +552,9 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
             onClick={revokeCredential}
             disabled={revoking}
             style={{
-              background: 'rgba(248,113,113,0.06)', border: '1px solid rgba(248,113,113,0.2)',
-              color: C.red, borderRadius: 8, padding: '10px 20px',
-              fontWeight: 600, fontSize: 13, cursor: revoking ? 'not-allowed' : 'pointer',
+              background: C.redDim, border: `1px solid rgba(248,113,113,0.2)`,
+              color: C.red, padding: '10px 20px',
+              fontFamily: C.mono, fontWeight: 500, fontSize: 13, cursor: revoking ? 'not-allowed' : 'pointer',
               opacity: revoking ? 0.6 : 1,
             }}
           >
@@ -563,9 +564,9 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
         <button
           onClick={() => { setEmailOpen(!emailOpen); setSendResult(null); }}
           style={{
-            background: 'rgba(168,85,247,0.06)', border: '1px solid rgba(168,85,247,0.15)',
-            color: '#a855f7', borderRadius: 8, padding: '10px 20px',
-            fontWeight: 600, fontSize: 13, cursor: 'pointer',
+            background: C.purpleDim, border: `1px solid rgba(168,85,247,0.15)`,
+            color: C.purple, padding: '10px 20px',
+            fontFamily: C.mono, fontWeight: 500, fontSize: 13, cursor: 'pointer',
             display: 'flex', alignItems: 'center', gap: 6,
           }}
         >
@@ -588,7 +589,7 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
               onChange={e => setSendEmail(e.target.value)}
               placeholder="recipient@example.com"
               style={{
-                flex: 1, padding: '8px 12px', borderRadius: 6,
+                flex: 1, padding: '8px 12px',
                 background: C.codeBg, border: `1px solid ${C.border}`,
                 color: C.text, fontFamily: C.mono, fontSize: 12,
                 outline: 'none',
@@ -599,8 +600,8 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
               onClick={sendCredentialEmail}
               disabled={sending || !sendEmail.trim()}
               style={{
-                background: C.cyan, color: C.bg, border: 'none',
-                borderRadius: 6, padding: '8px 16px', fontWeight: 700,
+                background: C.accent, color: C.bg, border: `1px solid ${C.accent}`,
+                padding: '8px 16px', fontFamily: C.mono, fontWeight: 500,
                 fontSize: 12, cursor: sending || !sendEmail.trim() ? 'not-allowed' : 'pointer',
                 opacity: sending || !sendEmail.trim() ? 0.5 : 1,
                 whiteSpace: 'nowrap',
@@ -631,13 +632,13 @@ export const CredentialStep: React.FC<CredentialStepProps> = ({
       <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
         <button onClick={onBack} style={{
           background: 'transparent', color: C.muted, border: `1px solid ${C.border}`,
-          borderRadius: 8, padding: '8px 20px', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+          padding: '8px 20px', fontFamily: C.mono, fontWeight: 500, fontSize: 13, cursor: 'pointer',
         }}>
           Back to Results
         </button>
         <button onClick={onStartNew} style={{
           background: 'transparent', color: C.muted, border: `1px solid ${C.border}`,
-          borderRadius: 8, padding: '8px 20px', fontWeight: 600, fontSize: 13, cursor: 'pointer',
+          padding: '8px 20px', fontFamily: C.mono, fontWeight: 500, fontSize: 13, cursor: 'pointer',
         }}>
           Start New Demo
         </button>

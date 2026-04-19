@@ -11,7 +11,7 @@ import '../styles/patterns.css';
 const Pill = ({ children, color, bg }: { children: React.ReactNode; color: string; bg: string }) => (
   <span style={{
     fontFamily: C.mono, fontSize: '0.65rem', fontWeight: 600,
-    letterSpacing: '0.06em', padding: '2px 8px', borderRadius: 4,
+    letterSpacing: '0.06em', padding: '2px 8px', borderRadius: 0,
     background: bg, color, border: `1px solid ${color}30`,
   }}>{children}</span>
 );
@@ -49,7 +49,7 @@ const mdComponents: Components = {
     return (
       <code style={{
         fontFamily: C.mono, fontSize: '0.82rem', color: C.code,
-        background: C.codeBg, padding: '2px 6px', borderRadius: 4,
+        background: C.codeBg, padding: '2px 6px', borderRadius: 0,
         border: `1px solid ${C.border}`,
       }}>{children}</code>
     );
@@ -57,7 +57,7 @@ const mdComponents: Components = {
   pre: ({ children }) => (
     <pre style={{
       fontFamily: C.mono, fontSize: '0.82rem', color: C.code,
-      background: C.codeBg, padding: '16px 20px', borderRadius: 8,
+      background: C.codeBg, padding: '16px 20px', borderRadius: 0,
       border: `1px solid ${C.border}`, overflowX: 'auto',
       margin: '0 0 16px', lineHeight: 1.6,
     }}>{children}</pre>
@@ -66,7 +66,7 @@ const mdComponents: Components = {
     <div style={{ overflowX: 'auto', margin: '0 0 16px' }}>
       <table style={{
         width: '100%', borderCollapse: 'collapse', fontFamily: C.sans, fontSize: '0.85rem',
-        border: `1px solid ${C.border}`, borderRadius: 8,
+        border: `1px solid ${C.border}`, borderRadius: 0,
       }}>{children}</table>
     </div>
   ),
@@ -89,7 +89,7 @@ const mdComponents: Components = {
   blockquote: ({ children }) => (
     <blockquote style={{
       borderLeft: `3px solid ${C.cyan}`, margin: '0 0 16px', padding: '12px 20px',
-      background: C.cyanDim, borderRadius: '0 6px 6px 0', color: C.muted,
+      background: C.cyanDim, borderRadius: 0, color: C.muted,
     }}>{children}</blockquote>
   ),
   ul: ({ children }) => (
@@ -159,7 +159,7 @@ export const MarkdownDocsPage: React.FC = () => {
       <div style={{
         borderBottom: `1px solid ${C.border}`, padding: '18px 32px',
         display: 'flex', alignItems: 'center', gap: 16,
-        position: 'sticky', top: 0, background: `${C.bg}ee`, backdropFilter: 'blur(8px)', zIndex: 10,
+        position: 'sticky', top: 0, background: C.bg, zIndex: 10,
       }}>
         <div>
           <span style={{ fontFamily: C.mono, fontSize: '1.05rem', fontWeight: 600, color: C.text }}>
@@ -177,7 +177,7 @@ export const MarkdownDocsPage: React.FC = () => {
             style={{
               fontFamily: C.mono, fontSize: '0.72rem', fontWeight: 500,
               color: C.muted, textDecoration: 'none',
-              padding: '4px 10px', borderRadius: 6,
+              padding: '4px 10px',
               border: `1px solid ${C.border}`,
               display: 'flex', alignItems: 'center', gap: 4,
               transition: 'color 0.15s, border-color 0.15s',
@@ -196,7 +196,7 @@ export const MarkdownDocsPage: React.FC = () => {
             style={{
               fontFamily: C.mono, fontSize: '0.72rem', fontWeight: 500,
               color: C.muted, textDecoration: 'none',
-              padding: '4px 10px', borderRadius: 6,
+              padding: '4px 10px',
               border: `1px solid ${C.border}`,
               display: 'flex', alignItems: 'center', gap: 4,
               transition: 'color 0.15s, border-color 0.15s',
@@ -236,7 +236,7 @@ export const MarkdownDocsPage: React.FC = () => {
               style={{
                 fontFamily: C.mono, fontSize: '0.82rem', fontWeight: 500,
                 color: C.cyan, background: C.cyanDim,
-                border: `1px solid ${C.cyanBorder}`, borderRadius: 6,
+                border: `1px solid ${C.cyanBorder}`, borderRadius: 0,
                 padding: '8px 20px', cursor: 'pointer',
                 transition: 'background 0.15s',
               }}

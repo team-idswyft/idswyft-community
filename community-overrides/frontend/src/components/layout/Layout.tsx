@@ -26,17 +26,17 @@ export function Layout({ children }: LayoutProps) {
   }
 
   // ─────────────────────────────────────────
-  // Community edition: no navbar, minimal footer
+  // Community edition: no navbar, minimal footer (v2 styling)
   // ─────────────────────────────────────────
   const pathname = location.pathname
   const showBackNav = pathname !== '/' && pathname !== '/developer' && pathname !== '/setup'
 
   return (
-    <div className="min-h-screen bg-[#080c14] flex flex-col">
+    <div className="min-h-screen flex flex-col" style={{ background: 'var(--paper)', color: 'var(--ink)' }}>
       <main className="flex-1">
         {showBackNav && (
-          <div style={{ borderBottom: '1px solid rgba(255,255,255,0.07)', padding: '10px 24px' }}>
-            <Link to="/" style={{ color: '#8896aa', fontSize: 13, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
+          <div style={{ borderBottom: '1px solid var(--rule)', padding: '10px 24px' }}>
+            <Link to="/" className="mono" style={{ color: 'var(--mid)', fontSize: 12.5, textDecoration: 'none', display: 'inline-flex', alignItems: 'center', gap: 6 }}>
               &#8592; Dev Portal
             </Link>
           </div>
@@ -44,26 +44,28 @@ export function Layout({ children }: LayoutProps) {
         {children}
       </main>
 
-      <footer style={{ background: '#0b0f19', borderTop: '1px solid rgba(255,255,255,0.07)' }}>
+      <footer style={{ background: 'var(--panel)', borderTop: '1px solid var(--rule)' }}>
         <div className="max-w-7xl mx-auto py-8 px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
             <a href="https://idswyft.app" target="_blank" rel="noopener noreferrer"
-              className="flex items-center gap-3 hover:opacity-80 transition-opacity" style={{ textDecoration: 'none' }}>
+              className="flex items-center gap-3 hover:opacity-80 transition-opacity">
               <img src="/idswyft-logo.png" alt="Idswyft" className="h-6 w-auto" />
-              <span style={{ color: '#4a5568', fontSize: 13 }}>Powered by Idswyft</span>
+              <span className="mono" style={{ color: 'var(--soft)', fontSize: 12 }}>Powered by Idswyft</span>
             </a>
             <div className="flex items-center gap-6">
-              <Link to="/" style={{ color: '#8896aa', fontSize: 13 }}
-                className="hover:text-white transition-colors">Dev Portal</Link>
-              <Link to="/docs" style={{ color: '#8896aa', fontSize: 13 }}
-                className="hover:text-white transition-colors">Docs</Link>
-              <Link to="/demo" style={{ color: '#8896aa', fontSize: 13 }}
-                className="hover:text-white transition-colors">Demo</Link>
-              <Link to="/verify-credential" style={{ color: '#8896aa', fontSize: 13 }}
-                className="hover:text-white transition-colors">Verify Credential</Link>
+              {[
+                { label: 'Dev Portal', href: '/' },
+                { label: 'Docs', href: '/docs' },
+                { label: 'Demo', href: '/demo' },
+                { label: 'Verify Credential', href: '/verify-credential' },
+              ].map(({ label, href }) => (
+                <Link key={label} to={href}
+                  className="mono hover:opacity-100 transition-opacity"
+                  style={{ color: 'var(--mid)', fontSize: 12 }}>{label}</Link>
+              ))}
               <a href={getGitHubUrl()} target="_blank" rel="noopener noreferrer"
-                style={{ color: '#8896aa', fontSize: 13 }}
-                className="hover:text-white transition-colors">GitHub</a>
+                className="mono hover:opacity-100 transition-opacity"
+                style={{ color: 'var(--mid)', fontSize: 12 }}>GitHub</a>
             </div>
           </div>
         </div>
