@@ -158,8 +158,8 @@ describe('computeRiskScore', () => {
     expect(result.overall_score).toBeLessThanOrEqual(100);
   });
 
-  it('base weights sum approximately to 0.94 (optional signals add up to ~1.08)', () => {
-    // Base 6 signals only (no age_estimation, no velocity_analysis)
+  it('base weights sum approximately to 0.94 (optional signals add up to ~1.15)', () => {
+    // Base 6 signals only (no age_estimation, no velocity_analysis, no geo_analysis)
     const state = makeState({
       front_extraction: { ocr_confidence: 0.5, face_confidence: 0.5, ocr: {} } as any,
       face_match: { similarity_score: 0.5, passed: true } as any,
@@ -310,5 +310,96 @@ describe('computeRiskScore', () => {
     const signals = result.risk_factors.map(f => f.signal);
     expect(signals).toContain('age_discrepancy');
     expect(signals).toContain('velocity');
+  });
+
+  it('includes geo_risk factor when geo_analysis has flags', () => {
+    const state = makeState({
+      front_extraction: { ocr_confidence: 0.90, face_confidence: 0.85, ocr: {} } as any,
+      face_match: { similarity_score: 0.85, passed: true } as any,
+      cross_validation: { overall_score: 0.90 } as any,
+      geo_analysis: {
+        ip_country: 'NG',
+        ip_region: '',
+        ip_city: 'Lagos',
+        document_country: 'US',
+        is_tor: false,
+        is_datacenter: false,
+        flags: ['country_mismatch'],
+        score: 70,
+      },
+    });
+
+    const result = computeRiskScore(state);
+    const geoFactor = result.risk_factors.find(f => f.signal === 'geo_risk');
+    expect(geoFactor).toBeDefined();
+    expect(geoFactor!.score).toBe(70);
+    expect(geoFactor!.weight).toBe(0.07);
+    expect(geoFactor!.detail).toContain('country_mismatch');
+  });
+
+  it('omits geo_risk factor when geo_analysis has score 0', () => {
+    const state = makeState({
+      front_extraction: { ocr_confidence: 0.90, face_confidence: 0.85, ocr: {} } as any,
+      face_match: { similarity_score: 0.85, passed: true } as any,
+      cross_validation: { overall_score: 0.90 } as any,
+      geo_analysis: {
+        ip_country: 'US',
+        ip_region: 'CA',
+        ip_city: 'San Francisco',
+        document_country: 'US',
+        is_tor: false,
+        is_datacenter: false,
+        flags: [],
+        score: 0,
+      },
+    });
+
+    const result = computeRiskScore(state);
+    const signals = result.risk_factors.map(f => f.signal);
+    expect(signals).not.toContain('geo_risk');
+  });
+
+  it('omits geo_risk factor when geo_analysis is null', () => {
+    const state = makeState({
+      front_extraction: { ocr_confidence: 0.90, face_confidence: 0.85, ocr: {} } as any,
+      face_match: { similarity_score: 0.85, passed: true } as any,
+      cross_validation: { overall_score: 0.90 } as any,
+      geo_analysis: null,
+    });
+
+    const result = computeRiskScore(state);
+    const signals = result.risk_factors.map(f => f.signal);
+    expect(signals).not.toContain('geo_risk');
+  });
+
+  it('includes all optional signals when all present (age + velocity + geo)', () => {
+    const state = makeState({
+      front_extraction: { ocr_confidence: 0.90, face_confidence: 0.85, ocr: {} } as any,
+      face_match: { similarity_score: 0.85, passed: true } as any,
+      cross_validation: { overall_score: 0.90 } as any,
+      age_estimation: {
+        document_face_age: 30, live_face_age: 45,
+        declared_age: 30, age_discrepancy: 15,
+      },
+      velocity_analysis: {
+        ip_verifications_1h: 6, ip_verifications_24h: 11,
+        user_verifications_24h: 4, avg_step_duration_ms: 500,
+        fastest_step_ms: 500,
+        flags: ['rapid_ip_reuse', 'burst_activity', 'high_user_frequency', 'bot_like_timing'],
+        score: 80,
+      },
+      geo_analysis: {
+        ip_country: 'NG', ip_region: '', ip_city: 'Lagos',
+        document_country: 'US', is_tor: false, is_datacenter: false,
+        flags: ['country_mismatch'], score: 70,
+      },
+    });
+
+    const result = computeRiskScore(state);
+    expect(result.risk_factors.length).toBe(9); // 6 base + age + velocity + geo
+    const signals = result.risk_factors.map(f => f.signal);
+    expect(signals).toContain('age_discrepancy');
+    expect(signals).toContain('velocity');
+    expect(signals).toContain('geo_risk');
   });
 });

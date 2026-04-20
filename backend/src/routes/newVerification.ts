@@ -42,6 +42,7 @@ import { createAMLProviders } from '@/providers/aml/index.js';
 import { screenAll } from '@/providers/aml/multiScreen.js';
 import { computeRiskScore } from '@/services/riskScoring.js';
 import { analyzeVelocity } from '@/services/velocityAnalysis.js';
+import { analyzeGeoRisk } from '@/services/geoAnalysis.js';
 import { broadcastStatusChange } from '@/services/realtime.js';
 import { saveSessionState, loadSessionState } from '@/services/sessionPersistence.js';
 
@@ -146,6 +147,7 @@ async function hydrateSession(verificationId: string, isSandbox: boolean, develo
     aml_screening: (savedState as any).aml_screening ?? null,
     age_estimation: (savedState as any).age_estimation ?? null,
     velocity_analysis: (savedState as any).velocity_analysis ?? null,
+    geo_analysis: (savedState as any).geo_analysis ?? null,
     created_at: savedState.created_at,
     completed_at: savedState.completed_at,
   } : {
@@ -1739,7 +1741,7 @@ router.post('/:verification_id/live-capture',
     (session as any).deps.processLiveCapture = async () => liveResult;
     const stepResult = await session.submitLiveCapture(req.file.buffer);
 
-    // ─── Velocity Analysis (non-sandbox only) ─────────────────
+    // ─── Velocity + Geo Analysis (non-sandbox only) ───────────
     if (stepResult.passed && !isSandbox) {
       try {
         const { data: vrRow } = await supabase.from('verification_requests')
@@ -1757,14 +1759,22 @@ router.post('/:verification_id/live-capture',
         );
         session.setVelocityAnalysis(velocityResult);
 
-        // Route high-velocity sessions to manual_review
-        if (velocityResult.flags.length > 0) {
+        // Geo analysis (reuses vrRow.client_ip — no extra DB query)
+        const documentCountry = session.getState().front_extraction?.ocr?.issuing_country ?? null;
+        const geoResult = await analyzeGeoRisk(vrRow?.client_ip ?? null, documentCountry);
+        session.setGeoAnalysis(geoResult);
+
+        // Consolidate review reasons so later writes don't overwrite earlier ones
+        const reviewReasons: string[] = [];
+        if (velocityResult.flags.length > 0) reviewReasons.push(`Velocity flags: ${velocityResult.flags.join(', ')}`);
+        if (geoResult.flags.length > 0) reviewReasons.push(`Geo flags: ${geoResult.flags.join(', ')}`);
+        if (reviewReasons.length > 0) {
           await supabase.from('verification_requests').update({
-            manual_review_reason: `Velocity flags: ${velocityResult.flags.join(', ')}`,
+            manual_review_reason: reviewReasons.join('; '),
           }).eq('id', verification_id);
         }
       } catch (err) {
-        logger.warn('Velocity analysis failed (non-blocking):', err);
+        logger.warn('Velocity/geo analysis failed (non-blocking):', err);
       }
     }
 
@@ -1801,10 +1811,12 @@ router.post('/:verification_id/live-capture',
     const state = session.getState();
     let dbStatus: string;
     const hasVelocityFlags = (state.velocity_analysis?.flags?.length ?? 0) > 0;
+    const hasGeoFlags = (state.geo_analysis?.flags?.length ?? 0) > 0;
     const needsManualReview = state.cross_validation?.verdict === 'REVIEW'
       || !!state.face_match?.skipped_reason
       || complianceForceReview
       || hasVelocityFlags
+      || hasGeoFlags
       || (liveDedupFlags.length > 0 && !liveDedupBlocked);
     if (liveDedupBlocked) {
       dbStatus = 'failed';
@@ -1886,6 +1898,7 @@ router.post('/:verification_id/live-capture',
       deepfake_check: liveResult.deepfake_check ?? null,
       age_estimation: state.age_estimation ?? null,
       velocity_analysis: state.velocity_analysis ?? null,
+      geo_analysis: state.geo_analysis ?? null,
       final_result: mapped.final_result,
       rejection_reason: state.rejection_reason,
       rejection_detail: state.rejection_detail,
@@ -1896,7 +1909,9 @@ router.post('/:verification_id/live-capture',
           ? `Face match skipped: ${state.face_match.skipped_reason}`
           : hasVelocityFlags
             ? `Velocity flags: ${state.velocity_analysis!.flags.join(', ')}`
-            : null,
+            : hasGeoFlags
+              ? `Geo flags: ${state.geo_analysis!.flags.join(', ')}`
+              : null,
       ...(liveDedupBlocked && { final_result: 'failed' }),
       ...(liveDedupFlags.length > 0 && { duplicate_flags: liveDedupFlags }),
       message: liveDedupBlocked
@@ -2118,6 +2133,7 @@ router.get('/:verification_id/status',
       aml_screening: state.aml_screening ?? null,
       age_estimation: state.age_estimation ?? null,
       velocity_analysis: state.velocity_analysis ?? null,
+      geo_analysis: state.geo_analysis ?? null,
       risk_score: riskScore,
       compliance_flags: (vrMeta?.addons as any)?.compliance_flags ?? null,
       duplicate_flags: (verification as any).duplicate_flags ?? null,
@@ -2134,7 +2150,8 @@ router.get('/:verification_id/status',
       manual_review_reason: (verification as any).manual_review_reason
         || (state.cross_validation?.verdict === 'REVIEW' ? 'Cross-validation requires review' : null)
         || (state.face_match?.skipped_reason ? `Face match skipped: ${state.face_match.skipped_reason}` : null)
-        || ((state.velocity_analysis?.flags?.length ?? 0) > 0 ? `Velocity flags: ${state.velocity_analysis!.flags.join(', ')}` : null),
+        || ((state.velocity_analysis?.flags?.length ?? 0) > 0 ? `Velocity flags: ${state.velocity_analysis!.flags.join(', ')}` : null)
+        || ((state.geo_analysis?.flags?.length ?? 0) > 0 ? `Geo flags: ${state.geo_analysis!.flags.join(', ')}` : null),
       ...(mapped.final_result === 'failed' && {
         retry_available: ((verification as any).retry_count ?? 0) < 3,
         retry_count: (verification as any).retry_count ?? 0,

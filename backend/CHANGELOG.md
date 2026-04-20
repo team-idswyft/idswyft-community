@@ -5,6 +5,11 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.44] - 2026-04-20
+
+### Added
+- **IP geolocation risk** — analyzes verification IP addresses to detect geographic fraud signals: country mismatch (IP vs document issuing country), Tor exit nodes, datacenter/VPN IPs (AWS, GCP, Azure, etc.), and high-risk jurisdictions; flags (`country_mismatch`, `tor_exit_node`, `datacenter_ip`, `high_risk_country`) contribute 7% weight to composite risk score; flagged sessions route to `manual_review`; Tor exit list auto-refreshes every 24 hours; sandbox verifications excluded
+
 ## [1.8.43] - 2026-04-20
 
 ### Added

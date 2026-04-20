@@ -28,6 +28,7 @@ import type {
   FlowConfig,
   AgeEstimationResult,
   VelocityAnalysisResult,
+  GeoAnalysisResult,
 } from '@idswyft/shared';
 
 /**
@@ -95,6 +96,7 @@ export interface SessionHydration {
   } | null;
   age_estimation?: AgeEstimationResult | null;
   velocity_analysis?: VelocityAnalysisResult | null;
+  geo_analysis?: GeoAnalysisResult | null;
   created_at?: string;
   completed_at?: string | null;
 }
@@ -123,6 +125,7 @@ export class VerificationSession {
       aml_screening: (hydration?.aml_screening as any) ?? null,
       age_estimation: hydration?.age_estimation ?? null,
       velocity_analysis: hydration?.velocity_analysis ?? null,
+      geo_analysis: hydration?.geo_analysis ?? null,
       created_at: hydration?.created_at ?? now,
       updated_at: now,
       completed_at: hydration?.completed_at ?? null,
@@ -497,5 +500,10 @@ export class VerificationSession {
       flags: result.flags,
       score: result.score,
     };
+  }
+
+  /** Store geo analysis result in session state. */
+  setGeoAnalysis(result: GeoAnalysisResult): void {
+    this.state.geo_analysis = { ...result };
   }
 }

@@ -652,6 +652,18 @@ data = res.json()`} />
     "score": 0                    // 0-100, highest flag score
   },
 
+  // IP geolocation risk:
+  "geo_analysis": {
+    "ip_country": "US",           // ISO alpha-2 from IP lookup
+    "ip_region": "CA",
+    "ip_city": "San Francisco",
+    "document_country": "US",     // from front document OCR
+    "is_tor": false,
+    "is_datacenter": false,
+    "flags": [],                  // e.g. ["country_mismatch", "tor_exit_node"]
+    "score": 0                    // 0-100, highest flag score
+  },
+
   // Final auto-decision:
   "final_result": "verified"      // "verified" | "manual_review" | "failed"
 }`} />
@@ -781,6 +793,18 @@ data = res.json()`} />
     "user_verifications_24h": 1,
     "avg_step_duration_ms": 8500,
     "fastest_step_ms": 5200,
+    "flags": [],
+    "score": 0
+  },
+
+  // ── IP geolocation risk ────────────────────────────────────────
+  "geo_analysis": {
+    "ip_country": "US",
+    "ip_region": "CA",
+    "ip_city": "San Francisco",
+    "document_country": "US",
+    "is_tor": false,
+    "is_datacenter": false,
     "flags": [],
     "score": 0
   },

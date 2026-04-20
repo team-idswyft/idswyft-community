@@ -1216,6 +1216,41 @@ The \`velocity_analysis\` object appears in both the live-capture response and t
 
 ---
 
+## IP Geolocation Risk
+
+Idswyft analyzes the IP address captured at verification initialization to detect geographic fraud signals. Geo analysis runs during the live-capture step (non-sandbox only) and contributes to the composite risk score.
+
+The \`geo_analysis\` object appears in both the live-capture response and the status endpoint:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| ip_country | string \\| null | ISO 3166-1 alpha-2 country code from IP geolocation |
+| ip_region | string \\| null | Region/state code |
+| ip_city | string \\| null | City name |
+| document_country | string \\| null | Issuing country from front document OCR |
+| is_tor | boolean | Whether the IP is a known Tor exit relay |
+| is_datacenter | boolean | Whether the IP belongs to a known cloud/VPN provider |
+| flags | string[] | Array of geo risk flags triggered |
+| score | number | Geo risk score (0–100), highest flag score wins |
+
+### Geo Risk Flags
+
+| Flag | Trigger Condition | Score |
+|------|------------------|-------|
+| \`tor_exit_node\` | IP is in the Tor exit relay list | 90 |
+| \`country_mismatch\` | IP country differs from document issuing country | 70 |
+| \`datacenter_ip\` | IP belongs to a known cloud provider (AWS, GCP, Azure, etc.) | 50 |
+| \`high_risk_country\` | IP resolves to a sanctioned/high-fraud jurisdiction | 40 |
+
+**Key design decisions:**
+- Score is the **maximum** individual flag score, not cumulative
+- Geo risk is a **risk signal** (7% weight in composite score) — it never independently hard-rejects
+- Sessions with geo flags route to \`manual_review\` for human evaluation
+- Sandbox verifications are excluded from geo analysis
+- The Tor exit list is cached for 24 hours and refreshes in the background
+
+---
+
 ## Identity Vault
 
 Tokenized identity storage. Store verified identity data encrypted at rest, reference it via opaque tokens. No PII leaves Idswyft.

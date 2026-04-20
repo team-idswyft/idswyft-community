@@ -6,7 +6,7 @@
 
 ## Overview
 
-Idswyft provides a REST API for identity verification. Developers integrate via API key (`X-API-Key: ik_...`) to run a 5-step pipeline: front document OCR, back document barcode/MRZ, cross-validation, liveness detection, and face matching. Face age estimation cross-checks apparent age against DOB as a fraud signal. Velocity checks detect fraud patterns (rapid IP reuse, bot-like timing, burst activity) and route flagged sessions to manual review. AML/sanctions screening and PEP (Politically Exposed Persons) screening are available as configurable add-ons. All decisions are deterministic — no LLMs in the decision pipeline.
+Idswyft provides a REST API for identity verification. Developers integrate via API key (`X-API-Key: ik_...`) to run a 5-step pipeline: front document OCR, back document barcode/MRZ, cross-validation, liveness detection, and face matching. Face age estimation cross-checks apparent age against DOB as a fraud signal. Velocity checks detect fraud patterns (rapid IP reuse, bot-like timing, burst activity) and route flagged sessions to manual review. IP geolocation risk detects country mismatches, Tor exit nodes, datacenter/VPN IPs, and high-risk jurisdictions. AML/sanctions screening and PEP (Politically Exposed Persons) screening are available as configurable add-ons. All decisions are deterministic — no LLMs in the decision pipeline.
 
 Self-hostable via Docker Compose (4 containers) or available as managed cloud at idswyft.app.
 

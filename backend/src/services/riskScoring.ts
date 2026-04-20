@@ -150,6 +150,17 @@ export function computeRiskScore(state: SessionState): RiskScore {
     });
   }
 
+  // ── Geo Risk (weight: 0.07, optional) ──────────────────
+  const geo = state.geo_analysis;
+  if (geo && geo.score > 0) {
+    factors.push({
+      signal: 'geo_risk',
+      score: geo.score,
+      weight: 0.07,
+      detail: `Geo flags: ${geo.flags.join(', ') || 'none'}`,
+    });
+  }
+
   // ── Weighted average ─────────────────────────────────────
   let weightedSum = 0;
   let totalWeight = 0;

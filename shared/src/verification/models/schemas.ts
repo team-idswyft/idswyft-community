@@ -273,6 +273,24 @@ export interface VelocityAnalysisResult {
   score: number;
 }
 
+// --- Geo Risk Analysis Result ---
+export type GeoRiskFlag =
+  | 'country_mismatch'    // IP country != document issuing country
+  | 'tor_exit_node'       // IP is a known Tor exit relay
+  | 'datacenter_ip'       // IP belongs to a cloud/VPN provider
+  | 'high_risk_country';  // IP in elevated-fraud jurisdiction
+
+export interface GeoAnalysisResult {
+  ip_country: string | null;       // ISO 3166-1 alpha-2
+  ip_region: string | null;
+  ip_city: string | null;
+  document_country: string | null; // From front extraction issuing_country
+  is_tor: boolean;
+  is_datacenter: boolean;
+  flags: GeoRiskFlag[];
+  score: number;                   // 0-100, higher = more suspicious
+}
+
 // --- Session State ---
 export interface SessionState {
   session_id: string;
@@ -289,6 +307,7 @@ export interface SessionState {
   aml_screening: AMLScreeningSessionResult | null;
   age_estimation: AgeEstimationResult | null;
   velocity_analysis: VelocityAnalysisResult | null;
+  geo_analysis: GeoAnalysisResult | null;
   created_at: string;
   updated_at: string;
   completed_at: string | null;

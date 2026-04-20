@@ -78,6 +78,8 @@ export type {
   AgeEstimationResult,
   VelocityAnalysisResult,
   VelocityFlag,
+  GeoAnalysisResult,
+  GeoRiskFlag,
   VerificationStatusType,
   RejectionReasonType,
   AMLScreeningSessionResult,
