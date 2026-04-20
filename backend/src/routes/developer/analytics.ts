@@ -213,7 +213,7 @@ router.get('/verifications/:verificationId',
     // Ownership check: verification must belong to this developer
     const { data: verification, error: verErr } = await supabase
       .from('verification_requests')
-      .select('id, is_sandbox, duplicate_flags, verification_mode, manual_review_reason, status, addons, retry_count')
+      .select('id, is_sandbox, duplicate_flags, verification_mode, manual_review_reason, status')
       .eq('id', verificationId)
       .eq('developer_id', developer.id)
       .single();
