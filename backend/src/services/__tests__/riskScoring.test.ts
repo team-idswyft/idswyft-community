@@ -158,7 +158,8 @@ describe('computeRiskScore', () => {
     expect(result.overall_score).toBeLessThanOrEqual(100);
   });
 
-  it('weights sum approximately to 1.0', () => {
+  it('base weights sum approximately to 0.94 (optional signals add up to ~1.08)', () => {
+    // Base 6 signals only (no age_estimation, no velocity_analysis)
     const state = makeState({
       front_extraction: { ocr_confidence: 0.5, face_confidence: 0.5, ocr: {} } as any,
       face_match: { similarity_score: 0.5, passed: true } as any,
@@ -167,7 +168,7 @@ describe('computeRiskScore', () => {
 
     const result = computeRiskScore(state);
     const totalWeight = result.risk_factors.reduce((sum, f) => sum + f.weight, 0);
-    expect(totalWeight).toBeCloseTo(1.0, 1);
+    expect(totalWeight).toBeCloseTo(0.94, 1);
   });
 
   it('includes age_discrepancy factor when age estimation is present', () => {
@@ -192,7 +193,7 @@ describe('computeRiskScore', () => {
     expect(result.risk_factors.length).toBe(7);
     const ageFactor = result.risk_factors.find(f => f.signal === 'age_discrepancy')!;
     expect(ageFactor.score).toBe(0); // discrepancy < 5
-    expect(ageFactor.weight).toBe(0.08);
+    expect(ageFactor.weight).toBe(0.06);
   });
 
   it('scores age_discrepancy by tier: 30 for 5-9yr, 60 for 10-14yr, 100 for 15+yr', () => {
@@ -224,5 +225,90 @@ describe('computeRiskScore', () => {
     const signals = result.risk_factors.map(f => f.signal);
     expect(signals).not.toContain('age_discrepancy');
     expect(result.risk_factors.length).toBe(6);
+  });
+
+  it('includes velocity factor when velocity_analysis has flags', () => {
+    const state = makeState({
+      front_extraction: { ocr_confidence: 0.90, face_confidence: 0.85, ocr: {} } as any,
+      face_match: { similarity_score: 0.85, passed: true } as any,
+      cross_validation: { overall_score: 0.90 } as any,
+      velocity_analysis: {
+        ip_verifications_1h: 6,
+        ip_verifications_24h: 6,
+        user_verifications_24h: 0,
+        avg_step_duration_ms: 5000,
+        fastest_step_ms: 3000,
+        flags: ['rapid_ip_reuse'],
+        score: 70,
+      },
+    });
+
+    const result = computeRiskScore(state);
+    const velocityFactor = result.risk_factors.find(f => f.signal === 'velocity');
+    expect(velocityFactor).toBeDefined();
+    expect(velocityFactor!.score).toBe(70);
+    expect(velocityFactor!.weight).toBe(0.08);
+    expect(velocityFactor!.detail).toContain('rapid_ip_reuse');
+  });
+
+  it('omits velocity factor when velocity_analysis has score 0', () => {
+    const state = makeState({
+      front_extraction: { ocr_confidence: 0.90, face_confidence: 0.85, ocr: {} } as any,
+      face_match: { similarity_score: 0.85, passed: true } as any,
+      cross_validation: { overall_score: 0.90 } as any,
+      velocity_analysis: {
+        ip_verifications_1h: 0,
+        ip_verifications_24h: 0,
+        user_verifications_24h: 0,
+        avg_step_duration_ms: null,
+        fastest_step_ms: null,
+        flags: [],
+        score: 0,
+      },
+    });
+
+    const result = computeRiskScore(state);
+    const signals = result.risk_factors.map(f => f.signal);
+    expect(signals).not.toContain('velocity');
+  });
+
+  it('omits velocity factor when velocity_analysis is null', () => {
+    const state = makeState({
+      front_extraction: { ocr_confidence: 0.90, face_confidence: 0.85, ocr: {} } as any,
+      face_match: { similarity_score: 0.85, passed: true } as any,
+      cross_validation: { overall_score: 0.90 } as any,
+      velocity_analysis: null,
+    });
+
+    const result = computeRiskScore(state);
+    const signals = result.risk_factors.map(f => f.signal);
+    expect(signals).not.toContain('velocity');
+  });
+
+  it('includes both velocity and age_discrepancy when both present', () => {
+    const state = makeState({
+      front_extraction: { ocr_confidence: 0.90, face_confidence: 0.85, ocr: {} } as any,
+      face_match: { similarity_score: 0.85, passed: true } as any,
+      cross_validation: { overall_score: 0.90 } as any,
+      age_estimation: {
+        document_face_age: 30, live_face_age: 45,
+        declared_age: 30, age_discrepancy: 15,
+      },
+      velocity_analysis: {
+        ip_verifications_1h: 6,
+        ip_verifications_24h: 11,
+        user_verifications_24h: 4,
+        avg_step_duration_ms: 500,
+        fastest_step_ms: 500,
+        flags: ['rapid_ip_reuse', 'burst_activity', 'high_user_frequency', 'bot_like_timing'],
+        score: 80,
+      },
+    });
+
+    const result = computeRiskScore(state);
+    expect(result.risk_factors.length).toBe(8); // 6 base + age + velocity
+    const signals = result.risk_factors.map(f => f.signal);
+    expect(signals).toContain('age_discrepancy');
+    expect(signals).toContain('velocity');
   });
 });

@@ -1171,7 +1171,7 @@ The \`age_estimation\` object appears in both the live-capture response and the 
 | declared_age | number \\| null | Calculated age from DOB in OCR data |
 | age_discrepancy | number \\| null | Absolute difference between live_face_age and declared_age |
 
-Age discrepancy contributes 8% weight to the composite risk score (factor: \`age_discrepancy\`):
+Age discrepancy contributes 6% weight to the composite risk score (factor: \`age_discrepancy\`):
 
 | Discrepancy | Risk Score |
 |-------------|-----------|
@@ -1179,6 +1179,40 @@ Age discrepancy contributes 8% weight to the composite risk score (factor: \`age
 | 5–9 years | 30 |
 | 10–14 years | 60 |
 | 15+ years | 100 |
+
+---
+
+## Velocity / Fraud Detection
+
+Idswyft automatically analyzes verification velocity to detect fraud patterns such as rapid resubmissions, bot-like step timing, and multi-IP abuse. Velocity checks run during the live-capture step (non-sandbox only) and contribute to the composite risk score.
+
+The \`velocity_analysis\` object appears in both the live-capture response and the status endpoint:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| ip_verifications_1h | number | Verifications from the same IP in the last hour |
+| ip_verifications_24h | number | Verifications from the same IP in the last 24 hours |
+| user_verifications_24h | number | Verifications from the same user in the last 24 hours |
+| avg_step_duration_ms | number \\| null | Average time between verification steps (ms) |
+| fastest_step_ms | number \\| null | Fastest single step completion time (ms) |
+| flags | string[] | Array of velocity flags triggered |
+| score | number | Velocity risk score (0–100), highest flag score wins |
+
+### Velocity Flags
+
+| Flag | Trigger Condition | Score |
+|------|------------------|-------|
+| \`rapid_ip_reuse\` | >5 verifications from the same IP in 1 hour | 70 |
+| \`burst_activity\` | >10 verifications from the same IP in 24 hours | 50 |
+| \`high_user_frequency\` | >3 verifications from the same user in 24 hours | 40 |
+| \`bot_like_timing\` | Any verification step completed in under 2 seconds | 80 |
+
+**Key design decisions:**
+- Score is the **maximum** individual flag score, not cumulative — avoids over-penalizing legitimate retries
+- Velocity is a **risk signal** (8% weight in composite score) — it never independently hard-rejects
+- Sessions with velocity flags route to \`manual_review\` for human evaluation
+- Sandbox verifications are excluded from velocity counts and analysis
+- The current verification is excluded from its own velocity counts (no self-match)
 
 ---
 

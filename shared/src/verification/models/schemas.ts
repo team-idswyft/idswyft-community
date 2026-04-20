@@ -256,6 +256,23 @@ export interface AgeEstimationResult {
   age_discrepancy: number | null;
 }
 
+// --- Velocity Analysis Result ---
+export type VelocityFlag =
+  | 'rapid_ip_reuse'        // >5 verifications from same IP in 1 hour
+  | 'high_user_frequency'   // >3 verifications from same user in 24 hours
+  | 'bot_like_timing'       // Step completion faster than 2 seconds
+  | 'burst_activity';       // >10 verifications from same IP in 24 hours
+
+export interface VelocityAnalysisResult {
+  ip_verifications_1h: number;
+  ip_verifications_24h: number;
+  user_verifications_24h: number;
+  avg_step_duration_ms: number | null;
+  fastest_step_ms: number | null;
+  flags: VelocityFlag[];
+  score: number;
+}
+
 // --- Session State ---
 export interface SessionState {
   session_id: string;
@@ -271,6 +288,7 @@ export interface SessionState {
   deepfake_check: { isReal: boolean; realProbability: number; fakeProbability: number } | null;
   aml_screening: AMLScreeningSessionResult | null;
   age_estimation: AgeEstimationResult | null;
+  velocity_analysis: VelocityAnalysisResult | null;
   created_at: string;
   updated_at: string;
   completed_at: string | null;

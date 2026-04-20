@@ -641,6 +641,17 @@ data = res.json()`} />
     "age_discrepancy": 0          // |live_face_age - declared_age|
   },
 
+  // Velocity analysis (fraud detection):
+  "velocity_analysis": {
+    "ip_verifications_1h": 1,     // same IP in last hour
+    "ip_verifications_24h": 2,    // same IP in last 24 hours
+    "user_verifications_24h": 1,  // same user in last 24 hours
+    "avg_step_duration_ms": 8500, // avg time between steps
+    "fastest_step_ms": 5200,      // fastest single step
+    "flags": [],                  // e.g. ["rapid_ip_reuse", "bot_like_timing"]
+    "score": 0                    // 0-100, highest flag score
+  },
+
   // Final auto-decision:
   "final_result": "verified"      // "verified" | "manual_review" | "failed"
 }`} />
@@ -761,6 +772,17 @@ data = res.json()`} />
     "live_face_age": 35,           // estimated from live capture
     "declared_age": 35,            // calculated from DOB
     "age_discrepancy": 0           // |live_face_age - declared_age|
+  },
+
+  // ── Velocity analysis (fraud detection) ─────────────────────
+  "velocity_analysis": {
+    "ip_verifications_1h": 1,
+    "ip_verifications_24h": 2,
+    "user_verifications_24h": 1,
+    "avg_step_duration_ms": 8500,
+    "fastest_step_ms": 5200,
+    "flags": [],
+    "score": 0
   },
 
   // ── Final decision ───────────────────────────────────────────

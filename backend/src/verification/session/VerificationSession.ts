@@ -27,6 +27,7 @@ import type {
   SessionState,
   FlowConfig,
   AgeEstimationResult,
+  VelocityAnalysisResult,
 } from '@idswyft/shared';
 
 /**
@@ -93,6 +94,7 @@ export interface SessionHydration {
     screened_at: string;
   } | null;
   age_estimation?: AgeEstimationResult | null;
+  velocity_analysis?: VelocityAnalysisResult | null;
   created_at?: string;
   completed_at?: string | null;
 }
@@ -120,6 +122,7 @@ export class VerificationSession {
       deepfake_check: hydration?.deepfake_check ?? null,
       aml_screening: (hydration?.aml_screening as any) ?? null,
       age_estimation: hydration?.age_estimation ?? null,
+      velocity_analysis: hydration?.velocity_analysis ?? null,
       created_at: hydration?.created_at ?? now,
       updated_at: now,
       completed_at: hydration?.completed_at ?? null,
@@ -480,6 +483,19 @@ export class VerificationSession {
       live_face_age: liveFaceAge != null ? Math.round(liveFaceAge) : null,
       declared_age: declaredAge,
       age_discrepancy: ageDiscrepancy,
+    };
+  }
+
+  /** Store velocity analysis result in session state. */
+  setVelocityAnalysis(result: VelocityAnalysisResult): void {
+    this.state.velocity_analysis = {
+      ip_verifications_1h: result.ip_verifications_1h,
+      ip_verifications_24h: result.ip_verifications_24h,
+      user_verifications_24h: result.user_verifications_24h,
+      avg_step_duration_ms: result.avg_step_duration_ms,
+      fastest_step_ms: result.fastest_step_ms,
+      flags: result.flags,
+      score: result.score,
     };
   }
 }

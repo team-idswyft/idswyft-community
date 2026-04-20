@@ -5,6 +5,11 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.43] - 2026-04-20
+
+### Added
+- **Velocity checks** — fraud velocity detection analyzes IP reuse, user frequency, and step timing to detect bots and rapid resubmissions; flags (`rapid_ip_reuse`, `burst_activity`, `high_user_frequency`, `bot_like_timing`) contribute 8% weight to composite risk score; flagged sessions route to `manual_review`; sandbox verifications excluded from analysis
+
 ## [1.8.42] - 2026-04-20
 
 ### Added

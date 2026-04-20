@@ -76,6 +76,8 @@ export type {
   GateResult,
   SessionState,
   AgeEstimationResult,
+  VelocityAnalysisResult,
+  VelocityFlag,
   VerificationStatusType,
   RejectionReasonType,
   AMLScreeningSessionResult,

@@ -29,37 +29,37 @@ export interface RiskScore {
 export function computeRiskScore(state: SessionState): RiskScore {
   const factors: RiskFactor[] = [];
 
-  // ── OCR Confidence (weight: 0.18) ────────────────────────
+  // ── OCR Confidence (weight: 0.17) ────────────────────────
   const ocrConf = state.front_extraction?.ocr_confidence ?? 0;
   const ocrRisk = Math.round((1 - ocrConf) * 100);
   factors.push({
     signal: 'ocr_confidence',
     score: ocrRisk,
-    weight: 0.18,
+    weight: 0.17,
     detail: `OCR confidence: ${(ocrConf * 100).toFixed(0)}%`,
   });
 
-  // ── Face Match Score (weight: 0.22) ──────────────────────
+  // ── Face Match Score (weight: 0.21) ──────────────────────
   const faceScore = state.face_match?.similarity_score ?? 0;
   const faceRisk = Math.round((1 - faceScore) * 100);
   factors.push({
     signal: 'face_match',
     score: faceRisk,
-    weight: 0.22,
+    weight: 0.21,
     detail: `Face match similarity: ${(faceScore * 100).toFixed(0)}%`,
   });
 
-  // ── Cross-Validation Score (weight: 0.18) ────────────────
+  // ── Cross-Validation Score (weight: 0.17) ────────────────
   const crossScore = state.cross_validation?.overall_score ?? 0;
   const crossRisk = Math.round((1 - crossScore) * 100);
   factors.push({
     signal: 'cross_validation',
     score: crossRisk,
-    weight: 0.18,
+    weight: 0.17,
     detail: `Cross-validation score: ${(crossScore * 100).toFixed(0)}%`,
   });
 
-  // ── Liveness Score (weight: 0.17) ────────────────────────
+  // ── Liveness Score (weight: 0.16) ────────────────────────
   // The actual liveness score (from EnhancedHeuristicProvider) is computed in
   // extractLiveCapture() but only returned in LiveCaptureResult — it's not
   // persisted on SessionState. Using front_extraction.face_confidence as a
@@ -69,11 +69,11 @@ export function computeRiskScore(state: SessionState): RiskScore {
   factors.push({
     signal: 'liveness_proxy',
     score: livenessRisk,
-    weight: 0.17,
+    weight: 0.16,
     detail: `Face detection confidence: ${(faceConf * 100).toFixed(0)}%`,
   });
 
-  // ── Document Expiry (weight: 0.15) ──────────────────────
+  // ── Document Expiry (weight: 0.14) ──────────────────────
   const expiryDate = state.front_extraction?.ocr?.expiry_date;
   let expiryRisk = 0;
   if (expiryDate) {
@@ -95,11 +95,11 @@ export function computeRiskScore(state: SessionState): RiskScore {
   factors.push({
     signal: 'document_expiry',
     score: expiryRisk,
-    weight: 0.15,
+    weight: 0.14,
     detail: expiryDate ? `Expires: ${expiryDate}` : 'No expiry date detected',
   });
 
-  // ── AML Screening (weight: 0.10) ────────────────────────
+  // ── AML Screening (weight: 0.09) ────────────────────────
   const aml = state.aml_screening;
   let amlRisk = 0;
   let amlDetail = 'AML screening not performed';
@@ -118,11 +118,11 @@ export function computeRiskScore(state: SessionState): RiskScore {
   factors.push({
     signal: 'aml_screening',
     score: amlRisk,
-    weight: 0.10,
+    weight: 0.09,
     detail: amlDetail,
   });
 
-  // ── Age Discrepancy (weight: 0.08) ────────────────────
+  // ── Age Discrepancy (weight: 0.06, optional) ────────────
   const ageEst = state.age_estimation;
   if (ageEst && ageEst.age_discrepancy != null) {
     const disc = ageEst.age_discrepancy;
@@ -134,8 +134,19 @@ export function computeRiskScore(state: SessionState): RiskScore {
     factors.push({
       signal: 'age_discrepancy',
       score: ageRisk,
-      weight: 0.08,
+      weight: 0.06,
       detail: `Age discrepancy: ${disc} years (estimated ${ageEst.live_face_age ?? '?'}, declared ${ageEst.declared_age ?? '?'})`,
+    });
+  }
+
+  // ── Velocity (weight: 0.08, optional) ───────────────────
+  const velocity = state.velocity_analysis;
+  if (velocity && velocity.score > 0) {
+    factors.push({
+      signal: 'velocity',
+      score: velocity.score,
+      weight: 0.08,
+      detail: `Velocity flags: ${velocity.flags.join(', ') || 'none'}`,
     });
   }
 

@@ -41,6 +41,7 @@ import type {
 import { createAMLProviders } from '@/providers/aml/index.js';
 import { screenAll } from '@/providers/aml/multiScreen.js';
 import { computeRiskScore } from '@/services/riskScoring.js';
+import { analyzeVelocity } from '@/services/velocityAnalysis.js';
 import { broadcastStatusChange } from '@/services/realtime.js';
 import { saveSessionState, loadSessionState } from '@/services/sessionPersistence.js';
 
@@ -144,6 +145,7 @@ async function hydrateSession(verificationId: string, isSandbox: boolean, develo
     deepfake_check: (savedState as any).deepfake_check ?? null,
     aml_screening: (savedState as any).aml_screening ?? null,
     age_estimation: (savedState as any).age_estimation ?? null,
+    velocity_analysis: (savedState as any).velocity_analysis ?? null,
     created_at: savedState.created_at,
     completed_at: savedState.completed_at,
   } : {
@@ -194,6 +196,21 @@ async function hydrateSession(verificationId: string, isSandbox: boolean, develo
   }
 
   return createSession(isSandbox, hydration, addons, developerAmlEnabled, flow);
+}
+
+/** Record a step completion timestamp in the verification_requests row. */
+async function recordStepTimestamp(verificationId: string, step: 'front' | 'back' | 'live'): Promise<void> {
+  try {
+    const { data } = await supabase.from('verification_requests')
+      .select('step_timestamps').eq('id', verificationId).single();
+    const timestamps = { ...(data?.step_timestamps || {}), [step]: new Date().toISOString() };
+    await supabase.from('verification_requests')
+      .update({ step_timestamps: timestamps }).eq('id', verificationId);
+  } catch (err) {
+    logger.warn('Failed to record step timestamp (non-blocking)', {
+      verificationId, step, error: err instanceof Error ? err.message : 'Unknown',
+    });
+  }
 }
 
 // ─── Developer LLM config lookup ────────────────────────────────
@@ -872,10 +889,12 @@ router.post('/initialize',
       addons: Object.keys(resolvedAddons).length > 0 ? resolvedAddons as Record<string, unknown> : undefined,
     });
 
-    // Set session start timestamp, verification mode, age threshold, and compliance overrides
+    // Set session start timestamp, verification mode, age threshold, client IP, and compliance overrides
     const { error: updateError } = await supabase.from('verification_requests').update({
       session_started_at: new Date().toISOString(),
       verification_mode: resolvedMode,
+      client_ip: req.ip || req.socket?.remoteAddress || null,
+      step_timestamps: { init: new Date().toISOString() },
       ...(resolvedAgeThreshold !== null && { age_threshold: resolvedAgeThreshold }),
       ...((resolvedAddons as any).compliance_force_manual_review && {
         manual_review_reason: 'Compliance rule: force_manual_review',
@@ -1055,6 +1074,8 @@ router.post('/re-verify',
       verification_mode: mode,
       session_started_at: new Date().toISOString(),
       issuing_country: parentVerification.issuing_country,
+      client_ip: req.ip || req.socket?.remoteAddress || null,
+      step_timestamps: { init: new Date().toISOString() },
     }).eq('id', verificationRecord.id);
 
     // Create session — either at AWAITING_LIVE (with face embedding) or AWAITING_FRONT (refresh)
@@ -1228,6 +1249,7 @@ router.post('/:verification_id/front-document',
     }
 
     await saveSessionState(verification_id, session.getState());
+    recordStepTimestamp(verification_id, 'front'); // fire-and-forget
 
     // ─── Duplicate Detection (front document + face) ─────────
     let dedupFlags: DuplicateFlag[] = [];
@@ -1480,6 +1502,7 @@ router.post('/:verification_id/back-document',
     (session as any).deps.extractBack = async () => backResult;
     const stepResult = await session.submitBack(req.file.buffer);
     await saveSessionState(verification_id, session.getState());
+    recordStepTimestamp(verification_id, 'back'); // fire-and-forget
 
     // Update main DB record
     const state = session.getState();
@@ -1715,6 +1738,36 @@ router.post('/:verification_id/live-capture',
 
     (session as any).deps.processLiveCapture = async () => liveResult;
     const stepResult = await session.submitLiveCapture(req.file.buffer);
+
+    // ─── Velocity Analysis (non-sandbox only) ─────────────────
+    if (stepResult.passed && !isSandbox) {
+      try {
+        const { data: vrRow } = await supabase.from('verification_requests')
+          .select('client_ip, user_id, step_timestamps')
+          .eq('id', verification_id).single();
+
+        // Record live step timestamp before analysis
+        const liveTs = new Date().toISOString();
+        const stepTs = { ...(vrRow?.step_timestamps || {}), live: liveTs };
+        await supabase.from('verification_requests')
+          .update({ step_timestamps: stepTs }).eq('id', verification_id);
+
+        const velocityResult = await analyzeVelocity(
+          (req as any).developer.id, vrRow?.user_id, vrRow?.client_ip || null, verification_id, stepTs,
+        );
+        session.setVelocityAnalysis(velocityResult);
+
+        // Route high-velocity sessions to manual_review
+        if (velocityResult.flags.length > 0) {
+          await supabase.from('verification_requests').update({
+            manual_review_reason: `Velocity flags: ${velocityResult.flags.join(', ')}`,
+          }).eq('id', verification_id);
+        }
+      } catch (err) {
+        logger.warn('Velocity analysis failed (non-blocking):', err);
+      }
+    }
+
     await saveSessionState(verification_id, session.getState());
 
     // ─── Duplicate Detection (live capture face) ─────────────
@@ -1747,9 +1800,11 @@ router.post('/:verification_id/live-capture',
     // Update main DB record
     const state = session.getState();
     let dbStatus: string;
+    const hasVelocityFlags = (state.velocity_analysis?.flags?.length ?? 0) > 0;
     const needsManualReview = state.cross_validation?.verdict === 'REVIEW'
       || !!state.face_match?.skipped_reason
       || complianceForceReview
+      || hasVelocityFlags
       || (liveDedupFlags.length > 0 && !liveDedupBlocked);
     if (liveDedupBlocked) {
       dbStatus = 'failed';
@@ -1830,11 +1885,18 @@ router.post('/:verification_id/live-capture',
       },
       deepfake_check: liveResult.deepfake_check ?? null,
       age_estimation: state.age_estimation ?? null,
+      velocity_analysis: state.velocity_analysis ?? null,
       final_result: mapped.final_result,
       rejection_reason: state.rejection_reason,
       rejection_detail: state.rejection_detail,
       failure_reason: state.rejection_detail,
-      manual_review_reason: state.cross_validation?.verdict === 'REVIEW' ? 'Cross-validation requires review' : state.face_match?.skipped_reason ? `Face match skipped: ${state.face_match.skipped_reason}` : null,
+      manual_review_reason: state.cross_validation?.verdict === 'REVIEW'
+        ? 'Cross-validation requires review'
+        : state.face_match?.skipped_reason
+          ? `Face match skipped: ${state.face_match.skipped_reason}`
+          : hasVelocityFlags
+            ? `Velocity flags: ${state.velocity_analysis!.flags.join(', ')}`
+            : null,
       ...(liveDedupBlocked && { final_result: 'failed' }),
       ...(liveDedupFlags.length > 0 && { duplicate_flags: liveDedupFlags }),
       message: liveDedupBlocked
@@ -2055,6 +2117,7 @@ router.get('/:verification_id/status',
       deepfake_check: state.deepfake_check ?? null,
       aml_screening: state.aml_screening ?? null,
       age_estimation: state.age_estimation ?? null,
+      velocity_analysis: state.velocity_analysis ?? null,
       risk_score: riskScore,
       compliance_flags: (vrMeta?.addons as any)?.compliance_flags ?? null,
       duplicate_flags: (verification as any).duplicate_flags ?? null,
@@ -2070,7 +2133,8 @@ router.get('/:verification_id/status',
       failure_reason: state.rejection_detail,
       manual_review_reason: (verification as any).manual_review_reason
         || (state.cross_validation?.verdict === 'REVIEW' ? 'Cross-validation requires review' : null)
-        || (state.face_match?.skipped_reason ? `Face match skipped: ${state.face_match.skipped_reason}` : null),
+        || (state.face_match?.skipped_reason ? `Face match skipped: ${state.face_match.skipped_reason}` : null)
+        || ((state.velocity_analysis?.flags?.length ?? 0) > 0 ? `Velocity flags: ${state.velocity_analysis!.flags.join(', ')}` : null),
       ...(mapped.final_result === 'failed' && {
         retry_available: ((verification as any).retry_count ?? 0) < 3,
         retry_count: (verification as any).retry_count ?? 0,
