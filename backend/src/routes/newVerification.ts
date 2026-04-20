@@ -49,6 +49,7 @@ import { saveSessionState, loadSessionState } from '@/services/sessionPersistenc
 import { VerificationSession } from '@/verification/session/VerificationSession.js';
 import type { SessionDeps, SessionHydration, AgeVerificationResult } from '@/verification/session/VerificationSession.js';
 import { computeFaceMatch } from '@/verification/face/faceMatchService.js';
+import { mapStatusForResponse, buildVerificationResponse } from '@/verification/statusReader.js';
 import { SessionFlowError } from '@/verification/exceptions.js';
 import { WebhookService } from '@/services/webhook.js';
 import { storeVaultEntry, extractIdentityData } from '@/services/vaultService.js';
@@ -543,87 +544,7 @@ async function extractLiveCapture(
   };
 }
 
-// ─── Status mapping for backward compatibility ──────────────────
-
-// ─── Step maps per flow ──────────────────────────────────────────
-const STEP_MAPS: Record<string, Record<string, number>> = {
-  full: {
-    AWAITING_FRONT: 1, FRONT_PROCESSING: 1,
-    AWAITING_BACK: 2, BACK_PROCESSING: 2,
-    CROSS_VALIDATING: 3,
-    AWAITING_LIVE: 4, LIVE_PROCESSING: 4,
-    FACE_MATCHING: 5,
-    COMPLETE: 5, HARD_REJECTED: 0,
-  },
-  document_only: {
-    AWAITING_FRONT: 1, FRONT_PROCESSING: 1,
-    AWAITING_BACK: 2, BACK_PROCESSING: 2,
-    CROSS_VALIDATING: 3,
-    COMPLETE: 3, HARD_REJECTED: 0,
-  },
-  identity: {
-    AWAITING_FRONT: 1, FRONT_PROCESSING: 1,
-    AWAITING_LIVE: 2, LIVE_PROCESSING: 2,
-    FACE_MATCHING: 3,
-    COMPLETE: 3, HARD_REJECTED: 0,
-  },
-  liveness_only: {
-    AWAITING_LIVE: 1, LIVE_PROCESSING: 1,
-    FACE_MATCHING: 1,
-    COMPLETE: 1, HARD_REJECTED: 0,
-  },
-  age_only: {
-    AWAITING_FRONT: 1, FRONT_PROCESSING: 1,
-    COMPLETE: 1, HARD_REJECTED: 0,
-  },
-};
-
-/** Map new 10-state VerificationStatus to old response format */
-function mapStatusForResponse(state: Readonly<SessionState>, flow: FlowConfig = FLOW_PRESETS.full): {
-  status: string;
-  current_step: number;
-  total_steps: number;
-  final_result: string | null;
-} {
-  const stepMap = STEP_MAPS[flow.preset] ?? STEP_MAPS.full;
-
-  let finalResult: string | null = null;
-  if (state.current_step === VerificationStatus.COMPLETE) {
-    if (flow.preset === 'age_only') {
-      finalResult = 'verified';
-    } else if (flow.preset === 'document_only') {
-      // Document-only: final result based on cross-validation verdict alone
-      // Passports skip cross-validation (single-sided) — verified if Gate 1 passed
-      if (!state.cross_validation) {
-        finalResult = 'verified';
-      } else {
-        const crossValVerdict = state.cross_validation.verdict;
-        finalResult = crossValVerdict === 'REVIEW' ? 'manual_review'
-          : crossValVerdict === 'REJECT' ? 'failed'
-          : 'verified';
-      }
-    } else if (flow.preset === 'identity') {
-      // Identity: no crossval, result based on face match only
-      const needsReview = !!state.face_match?.skipped_reason;
-      finalResult = needsReview ? 'manual_review' : 'verified';
-    } else {
-      // full / liveness_only: standard logic
-      // Passports skip cross-validation, so only face match matters
-      const needsReview = (state.cross_validation ? state.cross_validation.verdict === 'REVIEW' : false)
-        || !!state.face_match?.skipped_reason;
-      finalResult = needsReview ? 'manual_review' : 'verified';
-    }
-  } else if (state.current_step === VerificationStatus.HARD_REJECTED) {
-    finalResult = 'failed';
-  }
-
-  return {
-    status: state.current_step,
-    current_step: stepMap[state.current_step] ?? 0,
-    total_steps: flow.totalSteps,
-    final_result: finalResult,
-  };
-}
+// ─── Status mapping — delegated to statusReader.ts ──────────────────
 
 // ─── Webhook trigger helper ──────────────────────────────
 
@@ -2087,78 +2008,38 @@ router.get('/:verification_id/status',
       .single();
     const vrMode = (vrMeta?.verification_mode as VerificationMode) || 'full';
     const flow = FLOW_PRESETS[vrMode] ?? INLINE_FLOW_FALLBACKS[vrMode] ?? FLOW_PRESETS.full;
-    const isAgeOnly = vrMode === 'age_only';
 
     const session = await hydrateSession(verification_id, isSandbox);
     const state = session.getState();
-    const mapped = mapStatusForResponse(state, flow);
 
     // Fetch risk score from DB (computed after live capture)
-    let riskScore: { overall_score: number; risk_level: string; risk_factors: any[] } | null = null;
     const { data: riskRow } = await supabase
       .from('verification_risk_scores')
       .select('overall_score, risk_level, risk_factors')
       .eq('verification_request_id', verification_id)
       .single();
-    if (riskRow) {
-      riskScore = {
-        overall_score: riskRow.overall_score,
-        risk_level: riskRow.risk_level,
-        risk_factors: riskRow.risk_factors ?? [],
-      };
-    }
+    const riskScore = riskRow ? {
+      overall_score: riskRow.overall_score,
+      risk_level: riskRow.risk_level,
+      risk_factors: riskRow.risk_factors ?? [],
+    } : null;
 
-    // For age_only, include age_verification from session state metadata
-    const ageVerification: AgeVerificationResult | undefined = isAgeOnly
-      ? (state as any).age_verification ?? undefined
-      : undefined;
-
-    res.json({
-      success: true,
-      verification_id,
-      verification_mode: vrMode,
-      status: mapped.status,
-      current_step: mapped.current_step,
-      total_steps: mapped.total_steps,
-      ...(ageVerification && { age_verification: ageVerification }),
-      front_document_uploaded: !!state.front_extraction,
-      back_document_uploaded: !!state.back_extraction,
-      live_capture_uploaded: !!state.face_match,
-      ocr_data: isAgeOnly ? undefined : (state.front_extraction?.ocr ?? null),
-      barcode_data: state.back_extraction?.qr_payload ?? null,
-      cross_validation_results: state.cross_validation ?? null,
-      face_match_results: state.face_match ?? null,
-      liveness_results: state.liveness ?? null,
-      deepfake_check: state.deepfake_check ?? null,
-      aml_screening: state.aml_screening ?? null,
-      age_estimation: state.age_estimation ?? null,
-      velocity_analysis: state.velocity_analysis ?? null,
-      geo_analysis: state.geo_analysis ?? null,
-      risk_score: riskScore,
-      compliance_flags: (vrMeta?.addons as any)?.compliance_flags ?? null,
-      duplicate_flags: (verification as any).duplicate_flags ?? null,
-      barcode_extraction_failed: state.back_extraction ? !state.back_extraction.qr_payload : null,
-      documents_match: state.cross_validation ? !state.cross_validation.has_critical_failure : null,
-      face_match_passed: state.face_match?.passed ?? null,
-      liveness_passed: state.liveness?.passed ?? null,
-      final_result: ['verified', 'failed', 'manual_review'].includes((verification as any).status)
-        ? (verification as any).status   // DB status is authoritative (includes compliance overrides)
-        : mapped.final_result,
-      rejection_reason: state.rejection_reason,
-      rejection_detail: state.rejection_detail,
-      failure_reason: state.rejection_detail,
-      manual_review_reason: (verification as any).manual_review_reason
-        || (state.cross_validation?.verdict === 'REVIEW' ? 'Cross-validation requires review' : null)
-        || (state.face_match?.skipped_reason ? `Face match skipped: ${state.face_match.skipped_reason}` : null)
-        || ((state.velocity_analysis?.flags?.length ?? 0) > 0 ? `Velocity flags: ${state.velocity_analysis!.flags.join(', ')}` : null)
-        || ((state.geo_analysis?.flags?.length ?? 0) > 0 ? `Geo flags: ${state.geo_analysis!.flags.join(', ')}` : null),
-      ...(mapped.final_result === 'failed' && {
-        retry_available: ((verification as any).retry_count ?? 0) < 3,
-        retry_count: (verification as any).retry_count ?? 0,
-      }),
-      created_at: state.created_at,
-      updated_at: state.updated_at,
+    const response = buildVerificationResponse({
+      verificationId: verification_id,
+      state,
+      verification: {
+        status: (verification as any).status,
+        verification_mode: vrMode,
+        is_sandbox: isSandbox,
+        duplicate_flags: (verification as any).duplicate_flags,
+        addons: vrMeta?.addons,
+        retry_count: (verification as any).retry_count,
+        manual_review_reason: (verification as any).manual_review_reason,
+      },
+      riskScore,
+      flow,
     });
+    res.json(response);
   })
 );
 

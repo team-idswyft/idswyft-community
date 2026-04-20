@@ -7,7 +7,9 @@ import { catchAsync, ValidationError, NotFoundError, AuthenticationError } from 
 import { validate } from '@/middleware/validate.js';
 import { logger } from '@/utils/logger.js';
 import rateLimit from 'express-rate-limit';
-import { loadSessionState, mapStatusForResponse, fetchRiskScore } from '@/verification/statusReader.js';
+import { loadSessionState, fetchRiskScore, buildVerificationResponse } from '@/verification/statusReader.js';
+import { FLOW_PRESETS } from '@idswyft/shared';
+import type { VerificationMode } from '@idswyft/shared';
 import {
   getConversionFunnel,
   getGateRejectionBreakdown,
@@ -211,7 +213,7 @@ router.get('/verifications/:verificationId',
     // Ownership check: verification must belong to this developer
     const { data: verification, error: verErr } = await supabase
       .from('verification_requests')
-      .select('id, is_sandbox, duplicate_flags, verification_mode, manual_review_reason, status')
+      .select('id, is_sandbox, duplicate_flags, verification_mode, manual_review_reason, status, addons, retry_count')
       .eq('id', verificationId)
       .eq('developer_id', developer.id)
       .single();
@@ -219,6 +221,10 @@ router.get('/verifications/:verificationId',
     if (verErr || !verification) {
       throw new NotFoundError('Verification not found or does not belong to this developer');
     }
+
+    // Resolve flow early so it's available for the "no state" fallback too.
+    // No INLINE_FLOW_FALLBACKS needed here — analytics runs on same image as API, shared pkg always current.
+    const flow = FLOW_PRESETS[(verification as any).verification_mode as VerificationMode] ?? FLOW_PRESETS.full;
 
     // Load session state from verification_contexts
     const state = await loadSessionState(verificationId);
@@ -230,50 +236,21 @@ router.get('/verifications/:verificationId',
         verification_id: verificationId,
         status: 'pending',
         current_step: 0,
-        total_steps: 5,
+        total_steps: flow.totalSteps,
         message: 'Verification session has been created but no documents have been submitted yet.',
       });
     }
 
-    const mapped = mapStatusForResponse(state);
     const riskScore = await fetchRiskScore(verificationId);
 
-    res.json({
-      success: true,
-      verification_id: verificationId,
-      verification_mode: (verification as any).verification_mode ?? null,
-      is_sandbox: verification.is_sandbox ?? false,
-      status: mapped.status,
-      current_step: mapped.current_step,
-      total_steps: mapped.total_steps,
-      front_document_uploaded: !!state.front_extraction,
-      back_document_uploaded: !!state.back_extraction,
-      live_capture_uploaded: !!state.face_match,
-      ocr_data: state.front_extraction?.ocr ?? null,
-      barcode_data: state.back_extraction?.qr_payload ?? null,
-      cross_validation_results: state.cross_validation ?? null,
-      face_match_results: state.face_match ?? null,
-      liveness_results: state.liveness ?? null,
-      deepfake_check: (state as any).deepfake_check ?? null,
-      aml_screening: state.aml_screening ?? null,
-      risk_score: riskScore,
-      duplicate_flags: (verification as any).duplicate_flags ?? null,
-      barcode_extraction_failed: state.back_extraction ? !state.back_extraction.qr_payload : null,
-      documents_match: state.cross_validation ? !state.cross_validation.has_critical_failure : null,
-      face_match_passed: state.face_match?.passed ?? null,
-      liveness_passed: state.liveness?.passed ?? null,
-      final_result: ['verified', 'failed', 'manual_review'].includes((verification as any).status)
-        ? (verification as any).status
-        : mapped.final_result,
-      rejection_reason: state.rejection_reason,
-      rejection_detail: state.rejection_detail,
-      failure_reason: state.rejection_detail,
-      manual_review_reason: (verification as any).manual_review_reason
-        || (state.cross_validation?.verdict === 'REVIEW' ? 'Cross-validation requires review' : null)
-        || (state.face_match?.skipped_reason ? `Face match skipped: ${state.face_match.skipped_reason}` : null),
-      created_at: state.created_at,
-      updated_at: state.updated_at,
+    const response = buildVerificationResponse({
+      verificationId,
+      state,
+      verification: verification as any,
+      riskScore,
+      flow,
     });
+    res.json(response);
   })
 );
 
