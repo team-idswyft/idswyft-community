@@ -1147,6 +1147,30 @@ Lists checked: OFAC SDN, EU Sanctions, UN Sanctions (depends on configured provi
 
 ---
 
+## Face Age Estimation
+
+Idswyft automatically estimates the apparent age from both the document photo and the live capture using the \`@vladmandic/face-api\` age/gender model. This is a **risk signal only** — it never causes pass/fail gate decisions.
+
+The \`age_estimation\` object appears in both the live-capture response and the status endpoint:
+
+| Field | Type | Description |
+|-------|------|-------------|
+| document_face_age | number \\| null | Estimated age from document photo (rounded to integer) |
+| live_face_age | number \\| null | Estimated age from live capture (rounded to integer) |
+| declared_age | number \\| null | Calculated age from DOB in OCR data |
+| age_discrepancy | number \\| null | Absolute difference between live_face_age and declared_age |
+
+Age discrepancy contributes 8% weight to the composite risk score (factor: \`age_discrepancy\`):
+
+| Discrepancy | Risk Score |
+|-------------|-----------|
+| < 5 years | 0 |
+| 5–9 years | 30 |
+| 10–14 years | 60 |
+| 15+ years | 100 |
+
+---
+
 ## Identity Vault
 
 Tokenized identity storage. Store verified identity data encrypted at rest, reference it via opaque tokens. No PII leaves Idswyft.

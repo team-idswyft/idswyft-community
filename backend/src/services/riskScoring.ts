@@ -122,6 +122,23 @@ export function computeRiskScore(state: SessionState): RiskScore {
     detail: amlDetail,
   });
 
+  // ── Age Discrepancy (weight: 0.08) ────────────────────
+  const ageEst = state.age_estimation;
+  if (ageEst && ageEst.age_discrepancy != null) {
+    const disc = ageEst.age_discrepancy;
+    let ageRisk: number;
+    if (disc < 5) ageRisk = 0;
+    else if (disc < 10) ageRisk = 30;
+    else if (disc < 15) ageRisk = 60;
+    else ageRisk = 100;
+    factors.push({
+      signal: 'age_discrepancy',
+      score: ageRisk,
+      weight: 0.08,
+      detail: `Age discrepancy: ${disc} years (estimated ${ageEst.live_face_age ?? '?'}, declared ${ageEst.declared_age ?? '?'})`,
+    });
+  }
+
   // ── Weighted average ─────────────────────────────────────
   let weightedSum = 0;
   let totalWeight = 0;

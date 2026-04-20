@@ -80,6 +80,8 @@ export interface FaceBufferDetectionResult {
   embedding: Float32Array;
   landmarks: Array<{ x: number; y: number }>;
   boundingBox: { x: number; y: number; width: number; height: number };
+  age?: number;
+  gender?: string;
 }
 
 export class FaceRecognitionService {
@@ -103,6 +105,7 @@ export class FaceRecognitionService {
         await faceapi.nets.ssdMobilenetv1.loadFromDisk(MODELS_DIR);
         await faceapi.nets.faceLandmark68Net.loadFromDisk(MODELS_DIR);
         await faceapi.nets.faceRecognitionNet.loadFromDisk(MODELS_DIR);
+        await faceapi.nets.ageGenderNet.loadFromDisk(MODELS_DIR);
 
         this.initialized = true;
         const backend = (faceapi.tf as any).getBackend?.() ?? 'unknown';
@@ -173,7 +176,8 @@ export class FaceRecognitionService {
         const result = await faceapi
           .detectSingleFace(tensor as any, new faceapi.SsdMobilenetv1Options({ minConfidence: 0.3 }))
           .withFaceLandmarks()
-          .withFaceDescriptor();
+          .withFaceDescriptor()
+          .withAgeAndGender();
 
         if (!result) return null;
 
@@ -194,6 +198,8 @@ export class FaceRecognitionService {
             width: box.width,
             height: box.height,
           },
+          age: result.age,
+          gender: result.gender,
         };
       } finally {
         tensor.dispose();

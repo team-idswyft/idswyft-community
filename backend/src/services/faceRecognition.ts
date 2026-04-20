@@ -94,6 +94,8 @@ export interface FaceBufferDetectionResult {
   embedding: Float32Array;
   landmarks: Array<{ x: number; y: number }>;
   boundingBox: { x: number; y: number; width: number; height: number };
+  age?: number;
+  gender?: string;
 }
 
 export class FaceRecognitionService {

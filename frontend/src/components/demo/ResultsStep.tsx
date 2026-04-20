@@ -132,6 +132,7 @@ export const ResultsStep: React.FC<ResultsStepProps> = ({
   const lv = verificationRequest?.liveness_results;
   const aml = verificationRequest?.aml_screening;
   const risk = verificationRequest?.risk_score;
+  const ageEst = verificationRequest?.age_estimation;
 
   // Card style
   const cardStyle: React.CSSProperties = {
@@ -260,6 +261,42 @@ export const ResultsStep: React.FC<ResultsStepProps> = ({
             <span style={{ color: C.dim, fontSize: 12 }}>Not completed</span>
           )}
         </div>
+
+        {/* Age Estimation */}
+        {ageEst && (
+        <div style={cardStyle}>
+          <div style={cardTitle}>Age Estimation</div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 6, fontSize: 13 }}>
+            {ageEst.live_face_age != null && (
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: C.muted }}>Estimated Age</span>
+                <span style={{ color: C.text, fontWeight: 600, fontFamily: C.mono }}>{ageEst.live_face_age}</span>
+              </div>
+            )}
+            {ageEst.declared_age != null && (
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: C.muted }}>Declared Age (DOB)</span>
+                <span style={{ color: C.text, fontWeight: 600, fontFamily: C.mono }}>{ageEst.declared_age}</span>
+              </div>
+            )}
+            {ageEst.document_face_age != null && (
+              <div style={{ display: 'flex', justifyContent: 'space-between' }}>
+                <span style={{ color: C.muted }}>Document Photo Age</span>
+                <span style={{ color: C.dim, fontFamily: C.mono, fontSize: 11 }}>{ageEst.document_face_age}</span>
+              </div>
+            )}
+            {ageEst.age_discrepancy != null && (
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 4, paddingTop: 6, borderTop: `1px solid ${C.border}` }}>
+                <span style={{ color: C.muted }}>Discrepancy</span>
+                <Badge
+                  passed={ageEst.age_discrepancy < 5}
+                  label={`${ageEst.age_discrepancy} year${ageEst.age_discrepancy !== 1 ? 's' : ''}`}
+                />
+              </div>
+            )}
+          </div>
+        </div>
+        )}
 
         {/* Liveness */}
         <div style={cardStyle}>

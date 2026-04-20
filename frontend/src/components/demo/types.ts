@@ -58,6 +58,12 @@ export interface VerificationRequest {
     lists_checked?: string[];
     screened_at?: string;
   } | null;
+  age_estimation?: {
+    document_face_age: number | null;
+    live_face_age: number | null;
+    declared_age: number | null;
+    age_discrepancy: number | null;
+  } | null;
   risk_score?: {
     overall_score?: number;
     risk_level?: string;

@@ -26,6 +26,7 @@ import type {
   GateResult,
   SessionState,
   FlowConfig,
+  AgeEstimationResult,
 } from '@idswyft/shared';
 
 /**
@@ -91,6 +92,7 @@ export interface SessionHydration {
     screened_dob: string | null;
     screened_at: string;
   } | null;
+  age_estimation?: AgeEstimationResult | null;
   created_at?: string;
   completed_at?: string | null;
 }
@@ -117,6 +119,7 @@ export class VerificationSession {
       liveness: hydration?.liveness ?? null,
       deepfake_check: hydration?.deepfake_check ?? null,
       aml_screening: (hydration?.aml_screening as any) ?? null,
+      age_estimation: hydration?.age_estimation ?? null,
       created_at: hydration?.created_at ?? now,
       updated_at: now,
       completed_at: hydration?.completed_at ?? null,
@@ -339,6 +342,9 @@ export class VerificationSession {
       return this.hardReject(gate5);
     }
 
+    // Compute age estimation from face age + DOB
+    this.computeAgeEstimation(liveResult);
+
     // Auto-trigger Gate 6: AML/Sanctions Screening (optional)
     if (this.deps.screenAML && this.state.front_extraction?.ocr) {
       try {
@@ -449,5 +455,31 @@ export class VerificationSession {
       age--;
     }
     return age;
+  }
+
+  /** Compute age estimation from document face, live face, and declared DOB. */
+  private computeAgeEstimation(liveResult: LiveCaptureResult): void {
+    const documentFaceAge = this.state.front_extraction?.face_age ?? null;
+    const liveFaceAge = liveResult.face_age ?? null;
+
+    let declaredAge: number | null = null;
+    const dobStr = this.state.front_extraction?.ocr?.date_of_birth;
+    if (dobStr) {
+      const dob = this.parseDOB(dobStr);
+      if (dob) declaredAge = this.calculateAge(dob);
+    }
+
+    // Compute discrepancy: use live face age vs declared age (most reliable comparison)
+    let ageDiscrepancy: number | null = null;
+    if (liveFaceAge != null && declaredAge != null) {
+      ageDiscrepancy = Math.abs(Math.round(liveFaceAge) - declaredAge);
+    }
+
+    this.state.age_estimation = {
+      document_face_age: documentFaceAge != null ? Math.round(documentFaceAge) : null,
+      live_face_age: liveFaceAge != null ? Math.round(liveFaceAge) : null,
+      declared_age: declaredAge,
+      age_discrepancy: ageDiscrepancy,
+    };
   }
 }

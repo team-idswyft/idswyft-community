@@ -83,6 +83,8 @@ export const FrontExtractionResultSchema = z.object({
   ocr_confidence: confidence,
   mrz_from_front: z.array(z.string()).nullable(),
   authenticity: DocumentAuthenticitySchema,
+  face_age: z.number().optional(),
+  face_gender: z.string().optional(),
 });
 
 export type FrontExtractionResult = z.infer<typeof FrontExtractionResultSchema>;
@@ -163,6 +165,8 @@ export const LiveCaptureResultSchema = z.object({
     realProbability: z.number().min(0).max(1),
     fakeProbability: z.number().min(0).max(1),
   }).optional(),
+  face_age: z.number().optional(),
+  face_gender: z.string().optional(),
 });
 
 export type LiveCaptureResult = z.infer<typeof LiveCaptureResultSchema>;
@@ -244,6 +248,14 @@ export function applyPassportOverride(flow: FlowConfig, detectedDocType?: string
   return flow;
 }
 
+// --- Age Estimation Result ---
+export interface AgeEstimationResult {
+  document_face_age: number | null;
+  live_face_age: number | null;
+  declared_age: number | null;
+  age_discrepancy: number | null;
+}
+
 // --- Session State ---
 export interface SessionState {
   session_id: string;
@@ -258,6 +270,7 @@ export interface SessionState {
   liveness: { passed: boolean; score: number } | null;
   deepfake_check: { isReal: boolean; realProbability: number; fakeProbability: number } | null;
   aml_screening: AMLScreeningSessionResult | null;
+  age_estimation: AgeEstimationResult | null;
   created_at: string;
   updated_at: string;
   completed_at: string | null;

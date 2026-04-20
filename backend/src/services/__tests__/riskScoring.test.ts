@@ -169,4 +169,60 @@ describe('computeRiskScore', () => {
     const totalWeight = result.risk_factors.reduce((sum, f) => sum + f.weight, 0);
     expect(totalWeight).toBeCloseTo(1.0, 1);
   });
+
+  it('includes age_discrepancy factor when age estimation is present', () => {
+    const state = makeState({
+      front_extraction: {
+        ocr_confidence: 0.90, face_confidence: 0.85,
+        ocr: { expiry_date: '2029-01-01' },
+      } as any,
+      face_match: { similarity_score: 0.85, passed: true } as any,
+      cross_validation: { overall_score: 0.90 } as any,
+      age_estimation: {
+        document_face_age: 32,
+        live_face_age: 35,
+        declared_age: 34,
+        age_discrepancy: 1,
+      },
+    });
+
+    const result = computeRiskScore(state);
+    const signals = result.risk_factors.map(f => f.signal);
+    expect(signals).toContain('age_discrepancy');
+    expect(result.risk_factors.length).toBe(7);
+    const ageFactor = result.risk_factors.find(f => f.signal === 'age_discrepancy')!;
+    expect(ageFactor.score).toBe(0); // discrepancy < 5
+    expect(ageFactor.weight).toBe(0.08);
+  });
+
+  it('scores age_discrepancy by tier: 30 for 5-9yr, 60 for 10-14yr, 100 for 15+yr', () => {
+    const makeAgeState = (discrepancy: number) => makeState({
+      front_extraction: { ocr_confidence: 0.90, face_confidence: 0.85, ocr: {} } as any,
+      face_match: { similarity_score: 0.85, passed: true } as any,
+      cross_validation: { overall_score: 0.90 } as any,
+      age_estimation: {
+        document_face_age: 30, live_face_age: 30 + discrepancy,
+        declared_age: 30, age_discrepancy: discrepancy,
+      },
+    });
+
+    expect(computeRiskScore(makeAgeState(3)).risk_factors.find(f => f.signal === 'age_discrepancy')!.score).toBe(0);
+    expect(computeRiskScore(makeAgeState(7)).risk_factors.find(f => f.signal === 'age_discrepancy')!.score).toBe(30);
+    expect(computeRiskScore(makeAgeState(12)).risk_factors.find(f => f.signal === 'age_discrepancy')!.score).toBe(60);
+    expect(computeRiskScore(makeAgeState(20)).risk_factors.find(f => f.signal === 'age_discrepancy')!.score).toBe(100);
+  });
+
+  it('omits age_discrepancy factor when age_estimation is null', () => {
+    const state = makeState({
+      front_extraction: { ocr_confidence: 0.90, face_confidence: 0.85, ocr: {} } as any,
+      face_match: { similarity_score: 0.85, passed: true } as any,
+      cross_validation: { overall_score: 0.90 } as any,
+      age_estimation: null,
+    });
+
+    const result = computeRiskScore(state);
+    const signals = result.risk_factors.map(f => f.signal);
+    expect(signals).not.toContain('age_discrepancy');
+    expect(result.risk_factors.length).toBe(6);
+  });
 });

@@ -88,12 +88,16 @@ router.post('/front', upload.single('file'), async (req: Request, res: Response)
     let faceConfidence = 0;
     let faceEmbedding: number[] | null = null;
     let faceBoundingBox: { x: number; y: number; width: number; height: number } | null = null;
+    let faceAge: number | undefined;
+    let faceGender: string | undefined;
     try {
       const faceResult = await faceRecognitionService.detectFaceFromBuffer(imageBuffer);
       if (faceResult) {
         faceConfidence = faceResult.confidence;
         faceEmbedding = Array.from(faceResult.embedding);
         faceBoundingBox = faceResult.boundingBox;
+        faceAge = faceResult.age;
+        faceGender = faceResult.gender;
       }
     } catch {
       faceConfidence = 0;
@@ -165,6 +169,8 @@ router.post('/front', upload.single('file'), async (req: Request, res: Response)
       ocr_confidence: avgConfidence,
       mrz_from_front: mrzFromFront,
       authenticity,
+      face_age: faceAge,
+      face_gender: faceGender,
     };
 
     logger.info('Front extraction complete', {
@@ -327,12 +333,16 @@ router.post('/live', upload.single('file'), async (req: Request, res: Response) 
     let faceConfidence = 0;
     let faceEmbedding: number[] | null = null;
     let faceBBox: { x: number; y: number; width: number; height: number } | null = null;
+    let liveFaceAge: number | undefined;
+    let liveFaceGender: string | undefined;
     try {
       const faceResult = await faceRecognitionService.detectFaceFromBuffer(selfieBuffer);
       if (faceResult) {
         faceConfidence = faceResult.confidence;
         faceEmbedding = Array.from(faceResult.embedding);
         faceBBox = faceResult.boundingBox;
+        liveFaceAge = faceResult.age;
+        liveFaceGender = faceResult.gender;
       }
     } catch {
       faceConfidence = 0;
@@ -401,6 +411,8 @@ router.post('/live', upload.single('file'), async (req: Request, res: Response) 
       liveness_passed: livenessPassed,
       liveness_score: livenessScore,
       deepfake_check,
+      face_age: liveFaceAge,
+      face_gender: liveFaceGender,
     };
 
     logger.info('Live extraction complete', {

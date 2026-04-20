@@ -10,6 +10,7 @@ export type {
   FaceMatchResult,
   GateResult,
   SessionState,
+  AgeEstimationResult,
   VerificationStatusType,
   RejectionReasonType,
 } from './schemas.js';
