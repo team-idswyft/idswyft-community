@@ -476,7 +476,7 @@ export function HomePageV2() {
                 fontSize: 18, color: 'var(--mid)', maxWidth: '52ch',
                 lineHeight: 1.5, margin: '0 0 28px',
               }}>
-                One SDK. Document checks, liveness, biometric matching, and sanctions screening —
+                One SDK. Document checks, liveness, biometric matching, fraud prevention, and sanctions screening —
                 deterministic results in under 800&nbsp;ms. Drop it in on a Tuesday, ship it by Friday.
               </p>
 
@@ -507,7 +507,7 @@ export function HomePageV2() {
               </div>
 
               {/* Hero-meta stats strip */}
-              <div className="v2-reveal" style={{
+              <div className="v2-reveal hero-stats" style={{
                 display: 'flex', gap: 28, marginTop: 36,
                 fontFamily: C.mono, fontSize: 12, color: 'var(--mid)',
                 paddingTop: 20, borderTop: '1px solid var(--rule)',
@@ -689,6 +689,24 @@ export function HomePageV2() {
                 title: 'SDK & Webhooks',
                 body: 'npm install @idswyft/sdk — drop-in TypeScript SDK with React component, real-time event watcher, and iframe embed. Webhook callbacks on status changes.',
                 statBold: '3 lines', statLabel: 'to integrate',
+              },
+              {
+                n: '07 / fraud',
+                title: 'Fraud Prevention',
+                body: 'Velocity checks detect rapid-fire bot submissions and IP reuse. IP geolocation flags Tor exit nodes, datacenter proxies, and country mismatches against the document origin.',
+                statBold: '4', statLabel: 'fraud signals',
+              },
+              {
+                n: '08 / compliance',
+                title: 'PEP & Age Screening',
+                body: 'Screen extracted names against Politically Exposed Persons databases via OpenSanctions. Cross-check apparent face age against declared DOB to catch identity borrowing.',
+                statBold: 'PEP', statLabel: '+ age check',
+              },
+              {
+                n: '09 / auditable',
+                title: 'Deterministic Decisions',
+                body: 'Every verification decision is fully reproducible. Same inputs, same result. No LLM in the decision path — only checksums, exact matching, and fixed thresholds.',
+                statBold: '100%', statLabel: 'reproducible',
               },
             ].map((feat, i) => (
               <div key={feat.n} className="feat" style={{
@@ -1063,7 +1081,7 @@ export function HomePageV2() {
         </div>
 
         {/* Bottom tech specs */}
-        <div className="v2-reveal" style={{
+        <div className="v2-reveal vc-tech-grid" style={{
           display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 0,
           marginTop: 56, border: '1px solid var(--rule)',
         }}>
@@ -1290,7 +1308,7 @@ export function HomePageV2() {
           }
           const c = cases[activeCase]
           return (
-            <div style={{
+            <div className="case-content-grid" style={{
               display: 'grid', gridTemplateColumns: '1.4fr 1fr', gap: 40, padding: '16px 0 0', minHeight: 320,
             }}>
               {/* LEFT: copy + stats */}
@@ -1415,7 +1433,7 @@ export function HomePageV2() {
         borderTop: '1px solid var(--rule)', padding: '80px 0',
         background: 'radial-gradient(ellipse at 70% 0%, color-mix(in oklab, var(--accent) 14%, transparent) 0%, transparent 55%), var(--paper)',
       }}>
-        <div className="wrap" style={{
+        <div className="wrap cta-grid" style={{
           display: 'grid', gridTemplateColumns: '1.2fr 1fr', gap: 40, alignItems: 'end',
         }}>
           {/* LEFT */}
@@ -1450,7 +1468,7 @@ export function HomePageV2() {
           </div>
 
           {/* RIGHT */}
-          <div style={{
+          <div className="cta-specs" style={{
             fontFamily: C.mono, fontSize: 12, color: 'var(--mid)',
             borderLeft: '1px solid var(--rule)', paddingLeft: 32,
           }}>
