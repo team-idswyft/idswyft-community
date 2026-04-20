@@ -5,6 +5,11 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.42] - 2026-04-20
+
+### Added
+- **PEP screening** — screens against Politically Exposed Persons databases via OpenSanctions `/match/peps` endpoint; PEP matches always produce `potential_match` (never `confirmed_match`) since PEP status is a risk signal for enhanced due diligence; configure with `AML_PROVIDER=pep` or combine with sanctions via `AML_PROVIDER=opensanctions,pep`
+
 ## [1.8.41] - 2026-04-19
 
 ### Changed

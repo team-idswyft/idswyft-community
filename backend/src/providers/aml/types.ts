@@ -14,7 +14,7 @@ export interface AMLMatch {
   /** Match confidence score (0-1) */
   score: number;
   /** Reason the match was flagged */
-  match_type: 'name' | 'name_dob' | 'name_nationality';
+  match_type: 'name' | 'name_dob' | 'name_nationality' | 'pep';
 }
 
 export interface AMLScreeningResult {

@@ -227,7 +227,7 @@ print(r['ocr_data']['name'])              # "Jane Smith"`}
           <FieldRow name="user_id" type="UUID string" req={true} desc="Your unique identifier for the user being verified." />
           <FieldRow name="sandbox" type="boolean" req={false} desc="Set true to use sandbox mode. Defaults to false." />
           <FieldRow name="addons" type="object" req={false} desc="Optional add-on features to enable for this session." />
-          <FieldRow name="addons.aml_screening" type="boolean" req={false} desc="Enable AML/sanctions screening against OFAC, EU & UN lists. Runs automatically after identity verification completes." />
+          <FieldRow name="addons.aml_screening" type="boolean" req={false} desc="Enable AML/sanctions screening against OFAC, EU & UN lists. PEP screening also available via AML_PROVIDER=pep. Runs automatically after identity verification completes." />
         </div>
         <CodeTabs tab={tab} onChange={setTab}
           curl={`curl -X POST ${apiUrl}/api/v2/verify/initialize \\
@@ -745,13 +745,14 @@ data = res.json()`} />
     "score": 0.96
   },
 
-  // ── AML / Sanctions (when addons.aml_screening is enabled) ──
+  // ── AML / Sanctions / PEP (when AML_PROVIDER is configured) ──
   "aml_screening": {
     "risk_level": "clear",           // "clear" | "potential_match" | "confirmed_match"
     "match_found": false,
     "match_count": 0,
-    "lists_checked": ["us_ofac_sdn", "eu_sanctions", "un_sanctions"],
+    "lists_checked": ["us_ofac_sdn", "eu_sanctions", "un_sanctions", "opensanctions-pep"],
     "screened_at": "2026-03-06T12:05:28Z"
+    // PEP matches include match_type: "pep", list_source: "opensanctions-pep"
   },
 
   // ── Age estimation (risk signal, never pass/fail) ─────────

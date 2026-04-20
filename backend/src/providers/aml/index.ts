@@ -1,6 +1,7 @@
 import type { AMLProvider } from './types.js';
 import { OpenSanctionsProvider } from './OpenSanctionsProvider.js';
 import { OfflineListProvider } from './OfflineListProvider.js';
+import { PEPProvider } from './PEPProvider.js';
 import { loadOFACFromFile, loadOFACFromURL } from './ofacLoader.js';
 import { logger } from '@/utils/logger.js';
 
@@ -42,6 +43,9 @@ export function createAMLProviders(): AMLProvider[] {
         providers.push(offlineProvider);
         break;
       }
+      case 'pep':
+        providers.push(new PEPProvider());
+        break;
       case 'none':
         // Explicit disable — return empty
         return [];
@@ -52,4 +56,5 @@ export function createAMLProviders(): AMLProvider[] {
 
 export { OpenSanctionsProvider } from './OpenSanctionsProvider.js';
 export { OfflineListProvider } from './OfflineListProvider.js';
+export { PEPProvider } from './PEPProvider.js';
 export type { AMLProvider, AMLScreeningInput, AMLScreeningResult, AMLMatch, AMLRiskLevel } from './types.js';

@@ -1127,9 +1127,11 @@ GET  /api/v2/verify/:id/address-status      — Get address verification status
 AML screening runs automatically on all non-sandbox verifications when the \`AML_PROVIDER\` environment variable is set (e.g., \`opensanctions\`, \`offline\`, or comma-separated for multiple providers). Screening happens after face matching (Gate 6) and results are persisted to the \`aml_screenings\` table.
 
 **Configuration:**
-- \`AML_PROVIDER=opensanctions\` — OpenSanctions API
+- \`AML_PROVIDER=opensanctions\` — OpenSanctions API (sanctions lists)
+- \`AML_PROVIDER=pep\` — OpenSanctions PEP database (Politically Exposed Persons)
 - \`AML_PROVIDER=offline\` — local offline list
-- \`AML_PROVIDER=opensanctions,offline\` — both run in parallel, results merged
+- \`AML_PROVIDER=opensanctions,pep\` — sanctions + PEP screening in parallel, results merged
+- \`AML_PROVIDER=opensanctions,pep,offline\` — all three providers in parallel
 - Developers can opt out via \`aml_enabled: false\` on their developer record
 - Per-session override: \`addons.aml_screening: false\` disables for that session
 
@@ -1144,6 +1146,15 @@ The \`aml_screening\` field in the status response includes: \`risk_level\`, \`m
 AML contributes 10% weight to the composite risk score (factor: \`aml_screening\`).
 
 Lists checked: OFAC SDN, EU Sanctions, UN Sanctions (depends on configured provider).
+
+### PEP (Politically Exposed Persons) Screening
+
+The \`pep\` provider screens names against the OpenSanctions PEP database — heads of state, senior government officials, their family members, and close associates. PEP matches always produce \`potential_match\` (never \`confirmed_match\`) because PEP status is a risk signal for enhanced due diligence, not evidence of wrongdoing.
+
+- Endpoint: OpenSanctions \`/match/peps\`
+- Uses the same \`OPENSANCTIONS_API_KEY\` as the sanctions provider
+- PEP matches include \`match_type: "pep"\` and \`list_source: "opensanctions-pep"\` to distinguish from sanctions hits
+- Combine with sanctions: \`AML_PROVIDER=opensanctions,pep\` — both run in parallel
 
 ---
 
