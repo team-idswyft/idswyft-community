@@ -633,6 +633,14 @@ data = res.json()`} />
     "liveness_mode": "head_turn"  // "passive" | "head_turn"
   },
 
+  // Age estimation (risk signal, never pass/fail):
+  "age_estimation": {
+    "document_face_age": 33,      // estimated from document photo
+    "live_face_age": 35,          // estimated from live capture
+    "declared_age": 35,           // calculated from DOB
+    "age_discrepancy": 0          // |live_face_age - declared_age|
+  },
+
   // Final auto-decision:
   "final_result": "verified"      // "verified" | "manual_review" | "failed"
 }`} />
@@ -744,6 +752,14 @@ data = res.json()`} />
     "match_count": 0,
     "lists_checked": ["us_ofac_sdn", "eu_sanctions", "un_sanctions"],
     "screened_at": "2026-03-06T12:05:28Z"
+  },
+
+  // ── Age estimation (risk signal, never pass/fail) ─────────
+  "age_estimation": {
+    "document_face_age": 33,       // estimated from document photo
+    "live_face_age": 35,           // estimated from live capture
+    "declared_age": 35,            // calculated from DOB
+    "age_discrepancy": 0           // |live_face_age - declared_age|
   },
 
   // ── Final decision ───────────────────────────────────────────
