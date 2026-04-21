@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { C } from '../../theme';
 import { IDViewfinder, TipBar, StepLabel, DemoPrimaryBtn, AmbientGlow } from './DemoShared';
 import type { VerificationRequest } from './types';
@@ -22,6 +22,7 @@ export const BackUploadStep: React.FC<BackUploadStepProps> = ({
   onBackFileSelect,
   onUpload,
 }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   const ocrData = verificationRequest?.ocr_data;
 
   return (
@@ -90,16 +91,16 @@ export const BackUploadStep: React.FC<BackUploadStepProps> = ({
 
         {/* Hidden file input */}
         <input
+          ref={fileInputRef}
           type="file"
           accept="image/jpeg,image/png,image/webp"
           onChange={onBackFileSelect}
           style={{ display: 'none' }}
-          id="demo-back-upload"
         />
 
         {!backFile ? (
           <DemoPrimaryBtn
-            onClick={() => document.getElementById('demo-back-upload')?.click()}
+            onClick={() => fileInputRef.current?.click()}
             disabled={isLoading}
           >
             Choose Back Photo
@@ -116,7 +117,7 @@ export const BackUploadStep: React.FC<BackUploadStepProps> = ({
                 <p style={{ color: C.dim, fontSize: 11, margin: '2px 0 0' }}>{(backFile.size / 1024 / 1024).toFixed(2)} MB</p>
               </div>
               <button
-                onClick={() => document.getElementById('demo-back-upload')?.click()}
+                onClick={() => fileInputRef.current?.click()}
                 style={{ background: 'none', border: 'none', color: C.accent, fontSize: 12, cursor: 'pointer', fontFamily: C.mono }}
               >
                 Change

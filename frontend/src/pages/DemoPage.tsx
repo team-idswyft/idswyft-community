@@ -892,6 +892,7 @@ const DemoPage: React.FC = () => {
           if (status === 'hard_rejected' || status === 'failed') {
             stopOCRPolling();
             toast.error(data.rejection_reason || data.failure_reason || 'Document verification failed');
+            setCurrentStep(7); // Advance to Results so user sees retry/new demo options
             return;
           }
 

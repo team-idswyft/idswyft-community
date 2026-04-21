@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import { C } from '../../theme';
 import { IDViewfinder, TipBar, StepLabel, DemoPrimaryBtn, AmbientGlow } from './DemoShared';
 
@@ -27,6 +27,7 @@ export const FrontDocumentStep: React.FC<FrontDocumentStepProps> = ({
   onDocumentTypeChange,
   onUpload,
 }) => {
+  const fileInputRef = useRef<HTMLInputElement>(null);
   return (
     <div className="demo-fade-up" style={{ padding: '8px 0', position: 'relative' }}>
       <AmbientGlow />
@@ -80,16 +81,16 @@ export const FrontDocumentStep: React.FC<FrontDocumentStepProps> = ({
 
         {/* Hidden file input */}
         <input
+          ref={fileInputRef}
           type="file"
           accept="image/jpeg,image/png,application/pdf"
           onChange={onFileSelect}
           style={{ display: 'none' }}
-          id="demo-front-upload"
         />
 
         {!selectedFile ? (
           <DemoPrimaryBtn
-            onClick={() => document.getElementById('demo-front-upload')?.click()}
+            onClick={() => fileInputRef.current?.click()}
             disabled={isLoading || !documentType}
           >
             {!documentType ? 'Select document type first' : 'Choose Front Photo'}
@@ -106,7 +107,7 @@ export const FrontDocumentStep: React.FC<FrontDocumentStepProps> = ({
                 <p style={{ color: C.dim, fontSize: 11, margin: '2px 0 0' }}>{(selectedFile.size / 1024 / 1024).toFixed(2)} MB</p>
               </div>
               <button
-                onClick={() => document.getElementById('demo-front-upload')?.click()}
+                onClick={() => fileInputRef.current?.click()}
                 style={{ background: 'none', border: 'none', color: C.accent, fontSize: 12, cursor: 'pointer', fontFamily: C.mono }}
               >
                 Change

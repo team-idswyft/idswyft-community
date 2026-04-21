@@ -16,6 +16,7 @@ export function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) 
   const [loading, setLoading] = useState(false)
   const [resendCooldown, setResendCooldown] = useState(0)
   const [githubConfigured, setGithubConfigured] = useState(false)
+  const [emailError, setEmailError] = useState('')
   const [isReturning] = useState(() => localStorage.getItem('idswyft:has-session') === 'true')
 
   const markReturning = () => localStorage.setItem('idswyft:has-session', 'true')
@@ -77,13 +78,24 @@ export function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) 
   }, [resendCooldown])
 
   const sendOtp = async () => {
+    const trimmed = email.trim()
+    if (!trimmed) {
+      setEmailError('Please enter your email address')
+      return
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(trimmed)) {
+      setEmailError('Please enter a valid email address')
+      return
+    }
+    setEmailError('')
+    setEmail(trimmed)
     setLoading(true)
     try {
       const res = await fetch(`${API_BASE_URL}/api/auth/developer/otp/send`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...csrfHeader() },
         credentials: 'include',
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: trimmed }),
       })
       const data = await res.json()
       if (!res.ok) throw new Error(data.message || 'Failed to send code')
@@ -238,7 +250,8 @@ export function AuthGate({ onAuth }: { onAuth: (token: string, apiKey?: string) 
             <form onSubmit={e => { e.preventDefault(); sendOtp() }} style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
               <div>
                 <label style={labelStyle}>Email</label>
-                <input style={inputStyle} type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="you@example.com" required autoFocus />
+                <input style={{ ...inputStyle, ...(emailError ? { borderColor: C.red } : {}) }} type="email" value={email} onChange={e => { setEmail(e.target.value); setEmailError('') }} placeholder="you@example.com" required autoFocus />
+                {emailError && <p style={{ color: C.red, fontSize: 12, margin: '4px 0 0' }}>{emailError}</p>}
               </div>
               <button
                 type="submit"

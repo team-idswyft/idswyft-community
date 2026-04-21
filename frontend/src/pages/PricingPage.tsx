@@ -311,13 +311,15 @@ export function PricingPage() {
                   rel="noopener noreferrer"
                   className="btn ghost"
                   style={{
-                    display: 'block',
+                    display: 'flex',
                     textAlign: 'center',
                     textDecoration: 'none',
                     background: 'transparent',
                     border: '1px solid var(--rule-strong)',
                     color: 'var(--ink)',
                     justifyContent: 'center',
+                    width: '100%',
+                    boxSizing: 'border-box',
                   }}
                 >
                   {tier.cta.label}
