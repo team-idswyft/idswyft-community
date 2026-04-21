@@ -23,7 +23,7 @@
     "file-type": "^19.6.0",
     "image-size": "^1.0.2",
     "mrz": "^5.0.2",
-    "multer": "^1.4.5-lts.1",
+    "multer": "^2.1.1",
     "onnxruntime-node": "^1.24.3",
     "parse-usdl": "^3.2.0",
     "pixelmatch": "^4.0.2",
