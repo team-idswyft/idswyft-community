@@ -5,6 +5,11 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.45] - 2026-04-21
+
+### Fixed
+- **Address verification OCR routing** — address document OCR now routes through the engine worker (`POST /extract/ocr`) instead of directly importing `ppu-paddle-ocr` in the API container, which crashed on Railway staging; falls back to local OCR in dev mode when `ENGINE_URL` is not set
+
 ## [1.8.44] - 2026-04-20
 
 ### Added
