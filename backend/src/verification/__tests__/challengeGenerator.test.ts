@@ -1,0 +1,87 @@
+import { describe, it, expect } from 'vitest';
+import { generateVoiceChallenge, verifyChallengeTranscription } from '../voice/challengeGenerator.js';
+
+describe('generateVoiceChallenge', () => {
+  it('returns space-separated digits of requested length', () => {
+    const challenge = generateVoiceChallenge(6);
+    const parts = challenge.split(' ');
+    expect(parts).toHaveLength(6);
+    for (const p of parts) {
+      expect(Number(p)).toBeGreaterThanOrEqual(0);
+      expect(Number(p)).toBeLessThanOrEqual(9);
+    }
+  });
+
+  it('defaults to 6 digits', () => {
+    const challenge = generateVoiceChallenge();
+    expect(challenge.split(' ')).toHaveLength(6);
+  });
+
+  it('respects custom length', () => {
+    expect(generateVoiceChallenge(3).split(' ')).toHaveLength(3);
+    expect(generateVoiceChallenge(10).split(' ')).toHaveLength(10);
+  });
+
+  it('produces different challenges (non-deterministic)', () => {
+    // Run multiple times — should not always be identical
+    const challenges = new Set<string>();
+    for (let i = 0; i < 20; i++) {
+      challenges.add(generateVoiceChallenge(6));
+    }
+    expect(challenges.size).toBeGreaterThan(1);
+  });
+});
+
+describe('verifyChallengeTranscription', () => {
+  it('matches exact digit strings', () => {
+    expect(verifyChallengeTranscription('3 7 1 9 0 5', '3 7 1 9 0 5')).toBe(true);
+  });
+
+  it('matches when spaces differ', () => {
+    expect(verifyChallengeTranscription('371905', '3 7 1 9 0 5')).toBe(true);
+  });
+
+  it('matches with commas and punctuation', () => {
+    expect(verifyChallengeTranscription('3, 7, 1, 9, 0, 5', '3 7 1 9 0 5')).toBe(true);
+  });
+
+  it('matches spoken number words', () => {
+    expect(verifyChallengeTranscription('three seven one nine zero five', '3 7 1 9 0 5')).toBe(true);
+  });
+
+  it('handles "oh" as zero', () => {
+    expect(verifyChallengeTranscription('three seven one nine oh five', '3 7 1 9 0 5')).toBe(true);
+  });
+
+  it('handles "o" as zero', () => {
+    expect(verifyChallengeTranscription('three seven one nine o five', '3 7 1 9 0 5')).toBe(true);
+  });
+
+  it('handles mixed words and digits', () => {
+    expect(verifyChallengeTranscription('three 7 one 9 0 five', '3 7 1 9 0 5')).toBe(true);
+  });
+
+  it('is case-insensitive', () => {
+    expect(verifyChallengeTranscription('Three SEVEN One', '3 7 1')).toBe(true);
+  });
+
+  it('rejects wrong digits', () => {
+    expect(verifyChallengeTranscription('3 7 1 9 0 6', '3 7 1 9 0 5')).toBe(false);
+  });
+
+  it('rejects missing digits', () => {
+    expect(verifyChallengeTranscription('3 7 1 9 0', '3 7 1 9 0 5')).toBe(false);
+  });
+
+  it('rejects extra digits', () => {
+    expect(verifyChallengeTranscription('3 7 1 9 0 5 2', '3 7 1 9 0 5')).toBe(false);
+  });
+
+  it('rejects completely wrong input', () => {
+    expect(verifyChallengeTranscription('hello world', '3 7 1 9 0 5')).toBe(false);
+  });
+
+  it('rejects empty transcription', () => {
+    expect(verifyChallengeTranscription('', '3 7 1 9 0 5')).toBe(false);
+  });
+});

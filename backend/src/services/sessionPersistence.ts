@@ -13,6 +13,8 @@ export async function saveSessionState(verificationId: string, state: Readonly<S
   if (isTerminal) {
     if (sanitized.front_extraction) sanitized.front_extraction.face_embedding = null;
     if (sanitized.live_capture) sanitized.live_capture.face_embedding = null;
+    // Voice embeddings are never stored in session state (only on the engine side),
+    // but strip the voice_match result's internal data for defense-in-depth.
   }
 
   const context = {

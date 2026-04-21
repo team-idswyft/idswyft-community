@@ -1,7 +1,7 @@
 /**
  * VerificationSession — Strict State Machine
  *
- * Enforces the 5-step verification flow with hard rejection gates.
+ * Enforces the verification flow with hard rejection gates.
  * Steps cannot be skipped or re-ordered. HARD_REJECTED is terminal.
  *
  * Single-sided documents (passports) dynamically skip back document +
@@ -10,7 +10,9 @@
  * Flow:
  *   AWAITING_FRONT → submitFront → Gate1 → AWAITING_BACK (or AWAITING_LIVE for passports)
  *   AWAITING_BACK  → submitBack  → Gate2 → auto: crossValidate → Gate3 → AWAITING_LIVE
- *   AWAITING_LIVE  → submitLiveCapture → Gate4 → auto: faceMatch → Gate5 → COMPLETE
+ *   AWAITING_LIVE  → submitLiveCapture → Gate4 → auto: faceMatch → Gate5 → Gate6(AML)
+ *                   → COMPLETE (or AWAITING_VOICE if voice auth enabled)
+ *   AWAITING_VOICE → submitVoiceCapture → Gate7 → COMPLETE
  */
 
 import { randomUUID } from 'crypto';
@@ -23,6 +25,7 @@ import type {
   CrossValidationResult,
   LiveCaptureResult,
   FaceMatchResult,
+  VoiceMatchResult,
   GateResult,
   SessionState,
   FlowConfig,
@@ -43,6 +46,7 @@ import { evaluateGate3 } from '../gates/gate3-crossValidation.js';
 import { evaluateGate4 } from '../gates/gate4-liveCapture.js';
 import { evaluateGate5 } from '../gates/gate5-faceMatch.js';
 import { evaluateGate6 } from '../gates/gate6-amlScreening.js';
+import { evaluateGate7 } from '../gates/gate7-voiceMatch.js';
 import { crossValidate } from '../cross-validator/engine.js';
 import type { AMLScreeningResult } from '@/providers/aml/types.js';
 
@@ -69,6 +73,10 @@ export interface SessionDeps {
   faceMatchThreshold?: number;
   /** Optional AML screening — returns null if disabled */
   screenAML?: (fullName: string, dob?: string | null, nationality?: string | null) => Promise<AMLScreeningResult | null>;
+  /** Whether voice authentication is enabled for this developer */
+  voiceAuthEnabled?: boolean;
+  /** Voice match similarity threshold (0.55 production, 0.50 sandbox) */
+  voiceMatchThreshold?: number;
 }
 
 /** Optional initial state for hydrating a session from DB */
@@ -97,6 +105,7 @@ export interface SessionHydration {
   age_estimation?: AgeEstimationResult | null;
   velocity_analysis?: VelocityAnalysisResult | null;
   geo_analysis?: GeoAnalysisResult | null;
+  voice_match?: VoiceMatchResult | null;
   created_at?: string;
   completed_at?: string | null;
 }
@@ -126,6 +135,7 @@ export class VerificationSession {
       age_estimation: hydration?.age_estimation ?? null,
       velocity_analysis: hydration?.velocity_analysis ?? null,
       geo_analysis: hydration?.geo_analysis ?? null,
+      voice_match: hydration?.voice_match ?? null,
       created_at: hydration?.created_at ?? now,
       updated_at: now,
       completed_at: hydration?.completed_at ?? null,
@@ -387,6 +397,35 @@ export class VerificationSession {
         // AML failure should not block verification — log and continue
         this.state.aml_screening = null;
       }
+    }
+
+    // Voice auth enabled → pause for voice capture instead of completing
+    if (this.deps.voiceAuthEnabled) {
+      this.transition(VerificationStatus.AWAITING_VOICE);
+      return this.passResult();
+    }
+
+    this.transition(VerificationStatus.COMPLETE);
+    this.state.completed_at = new Date().toISOString();
+    return this.passResult();
+  }
+
+  /**
+   * Step 6 — Submit voice capture (audio recording of spoken challenge digits).
+   * Must be called when current_step === AWAITING_VOICE.
+   *
+   * @param voiceMatch  Pre-computed VoiceMatchResult (from the route handler which
+   *                    calls the engine and challengeGenerator)
+   */
+  async submitVoiceCapture(voiceMatch: VoiceMatchResult): Promise<StepResult> {
+    this.assertStep(VerificationStatus.AWAITING_VOICE);
+    this.transition(VerificationStatus.VOICE_MATCHING);
+
+    this.state.voice_match = voiceMatch;
+
+    const gate7 = evaluateGate7(voiceMatch);
+    if (!gate7.passed) {
+      return this.hardReject(gate7);
     }
 
     this.transition(VerificationStatus.COMPLETE);

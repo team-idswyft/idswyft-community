@@ -161,6 +161,20 @@ export function computeRiskScore(state: SessionState): RiskScore {
     });
   }
 
+  // ── Voice Match (weight: 0.05, optional) ──────────────
+  const voice = state.voice_match;
+  if (voice && !voice.skipped_reason) {
+    const voiceRisk = voice.passed ? 0 : (voice.challenge_verified ? 60 : 100);
+    factors.push({
+      signal: 'voice_match',
+      score: voiceRisk,
+      weight: 0.05,
+      detail: voice.passed
+        ? `Voice match: ${(voice.similarity_score * 100).toFixed(0)}% similarity`
+        : `Voice match failed: similarity ${(voice.similarity_score * 100).toFixed(0)}%`,
+    });
+  }
+
   // ── Weighted average ─────────────────────────────────────
   let weightedSum = 0;
   let totalWeight = 0;

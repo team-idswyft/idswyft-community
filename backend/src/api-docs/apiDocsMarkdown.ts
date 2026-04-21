@@ -1251,6 +1251,80 @@ The \`geo_analysis\` object appears in both the live-capture response and the st
 
 ---
 
+## Voice Authentication (Optional)
+
+Speaker verification adds an optional Gate 7 after face matching. Developers opt in via the settings API. When enabled, after live capture the verification enters \`AWAITING_VOICE\` state. The user speaks a random digit challenge into their microphone, and the engine verifies both the spoken digits (anti-spoofing) and the speaker embedding (voice match).
+
+### Enable Voice Auth
+
+\`\`\`
+PUT /api/developer/settings/voice-auth
+Content-Type: application/json
+\`\`\`
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| enabled | boolean | Yes | Enable or disable voice authentication |
+
+### Request Voice Challenge
+
+\`\`\`
+POST /api/v2/verify/:id/voice-challenge
+\`\`\`
+
+Generates a random 6-digit challenge. Must be in \`AWAITING_VOICE\` state.
+
+**Response (200):**
+
+\`\`\`json
+{
+  "success": true,
+  "verification_id": "...",
+  "challenge_digits": "3 7 1 9 0 5",
+  "expires_in_seconds": 120,
+  "message": "Please speak these digits clearly into the microphone"
+}
+\`\`\`
+
+### Submit Voice Capture
+
+\`\`\`
+POST /api/v2/verify/:id/voice-capture
+Content-Type: multipart/form-data
+\`\`\`
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| file | File | Yes | Audio recording (WebM/Opus or WAV). Max 10 MB. |
+
+The engine extracts a 192-dimensional speaker embedding and transcribes the spoken digits. Gate 7 evaluates:
+- **Challenge verification**: spoken digits must match the expected challenge
+- **Speaker similarity**: cosine similarity vs enrollment embedding must exceed threshold (0.55 production, 0.50 sandbox)
+
+**Response (200):**
+
+\`\`\`json
+{
+  "success": true,
+  "verification_id": "...",
+  "status": "COMPLETE",
+  "voice_match_results": {
+    "similarity_score": 0.82,
+    "passed": true,
+    "threshold_used": 0.55,
+    "challenge_verified": true,
+    "challenge_digits": "3 7 1 9 0 5"
+  },
+  "final_result": "verified"
+}
+\`\`\`
+
+**Rejection reasons:**
+- \`VOICE_CHALLENGE_FAILED\`: Spoken digits did not match the challenge
+- \`VOICE_MATCH_FAILED\`: Speaker similarity below threshold
+
+---
+
 ## Identity Vault
 
 Tokenized identity storage. Store verified identity data encrypted at rest, reference it via opaque tokens. No PII leaves Idswyft.

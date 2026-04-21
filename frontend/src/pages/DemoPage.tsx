@@ -21,6 +21,7 @@ import {
   BackUploadStep,
   CheckingStep,
   LiveCaptureStep,
+  VoiceCaptureStep,
   ResultsStep,
   AddressStep,
   CredentialStep,
@@ -72,11 +73,15 @@ const DemoPage: React.FC = () => {
   const [skipBack, setSkipBack] = useState(false);
   const skipBackRef = useRef(false);
 
+  // Voice auth toggle — set to true when backend returns AWAITING_VOICE status
+  const [voiceAuthEnabled, setVoiceAuthEnabled] = useState(false);
+
   // Display-step count (UI screens), not backend pipeline gate count
   const totalSteps = isAgeOnly ? 3
     : (skipBack && isDocumentOnly) ? 3
     : (isIdentity || skipBack) ? 4
     : isDocumentOnly ? 5
+    : voiceAuthEnabled ? 7
     : 6;
 
   // Live capture state
@@ -91,6 +96,25 @@ const DemoPage: React.FC = () => {
   const [mobileHandoffDone, setMobileHandoffDone] = useState(false);
   const [mobileResult, setMobileResult] = useState<any>(null);
   const [retryProcessing, setRetryProcessing] = useState(false);
+
+  // Voice capture state
+  const [voiceChallengeDigits, setVoiceChallengeDigits] = useState<string | null>(null);
+  const [voiceExpiresIn, setVoiceExpiresIn] = useState<number | null>(null);
+  const [voiceIsRecording, setVoiceIsRecording] = useState(false);
+  const [voiceRecordingDuration, setVoiceRecordingDuration] = useState(0);
+  const [voiceHasRecording, setVoiceHasRecording] = useState(false);
+  const [voiceStepError, setVoiceStepError] = useState<string | null>(null);
+  const voiceMediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const voiceChunksRef = useRef<Blob[]>([]);
+  const voiceAudioBlobRef = useRef<Blob | null>(null);
+  const voiceTimerRef = useRef<number | null>(null);
+  const voiceDurationRef = useRef<number | null>(null);
+  const voiceExpiryRef = useRef<number | null>(null);
+
+  // Derived step numbers — voice auth inserts a step before results
+  const resultsStep = voiceAuthEnabled ? 8 : 7;
+  const addressStep = voiceAuthEnabled ? 9 : 8;
+  const credentialStep = voiceAuthEnabled ? 10 : 9;
 
   // Responsive layout
   const [isMobile, setIsMobile] = useState(() =>
@@ -838,7 +862,7 @@ const DemoPage: React.FC = () => {
       // Age-only mode: front-document response includes final result directly
       if (isAgeOnly && data.age_verification) {
         setVerificationRequest(data);
-        setCurrentStep(7);
+        setCurrentStep(resultsStep);
         toast.success(data.age_verification.is_of_age ? 'Age verified!' : 'Age verification failed');
         return;
       }
@@ -892,14 +916,14 @@ const DemoPage: React.FC = () => {
           if (status === 'hard_rejected' || status === 'failed') {
             stopOCRPolling();
             toast.error(data.rejection_reason || data.failure_reason || 'Document verification failed');
-            setCurrentStep(7); // Advance to Results so user sees retry/new demo options
+            setCurrentStep(resultsStep); // Advance to Results so user sees retry/new demo options
             return;
           }
 
           // Check if verification already completed (document_only + passport)
           if (data.final_result !== null && data.final_result !== undefined) {
             stopOCRPolling();
-            setCurrentStep(7);
+            setCurrentStep(resultsStep);
             return;
           }
 
@@ -970,14 +994,14 @@ const DemoPage: React.FC = () => {
       if (data.rejection_reason || data.status === 'failed') {
         toast.error(data.rejection_detail || data.rejection_reason || 'Cross-validation failed');
         setVerificationRequest(data);
-        setCurrentStep(7); // Results (failed)
+        setCurrentStep(resultsStep); // Results (failed)
         return;
       }
 
       // document_only: backend may return final result after crossval
       if (data.final_result || data.status === 'verified' || data.status === 'manual_review') {
         setVerificationRequest(data);
-        setCurrentStep(7);
+        setCurrentStep(resultsStep);
         toast.success('Document verification complete');
         return;
       }
@@ -1016,7 +1040,7 @@ const DemoPage: React.FC = () => {
           const status = (data.status || '').toLowerCase();
           if (status === 'failed' || status === 'hard_rejected') {
             stopCrossValPolling();
-            setCurrentStep(7); // Results (failed)
+            setCurrentStep(resultsStep); // Results (failed)
             return;
           }
 
@@ -1026,7 +1050,7 @@ const DemoPage: React.FC = () => {
           if (isDocumentOnly && (status === 'verified' || status === 'manual_review' || status === 'complete' || data.final_result !== null)) {
             stopCrossValPolling();
             setVerificationRequest(data);
-            setCurrentStep(7);
+            setCurrentStep(resultsStep);
             return;
           }
           if (isDocumentOnly && data.cross_validation_results) {
@@ -1040,7 +1064,7 @@ const DemoPage: React.FC = () => {
                 : verdict === 'REJECT' ? 'failed'
                 : 'verified',
             });
-            setCurrentStep(7);
+            setCurrentStep(resultsStep);
             return;
           }
 
@@ -1134,7 +1158,7 @@ const DemoPage: React.FC = () => {
 
       setTimeout(() => {
         loadVerificationResults(verificationId);
-        setCurrentStep(7);
+        setCurrentStep(resultsStep);
       }, 1000);
 
     } catch (error) {
@@ -1180,7 +1204,7 @@ const DemoPage: React.FC = () => {
 
       const data = await response.json();
       setVerificationRequest(data);
-      setCurrentStep(7);
+      setCurrentStep(resultsStep);
       toast.success('Verification completed without live capture');
     } catch (error) {
       console.error('Failed to get verification results:', error);
@@ -1213,8 +1237,14 @@ const DemoPage: React.FC = () => {
       toast.success('Liveness verified!');
       setShowLiveCapture(false);
       setTimeout(() => {
-        loadVerificationResults(verificationId);
-        setCurrentStep(7);
+        // If status is AWAITING_VOICE, voice auth is enabled — go to voice step
+        if (result.status === 'AWAITING_VOICE') {
+          setVoiceAuthEnabled(true);
+          setCurrentStep(7); // voice capture step (results shift to 8)
+        } else {
+          loadVerificationResults(verificationId);
+          setCurrentStep(voiceAuthEnabled ? 8 : 7); // results
+        }
       }, 1000);
     } catch (error) {
       console.error('Active liveness submission failed:', error);
@@ -1297,7 +1327,7 @@ const DemoPage: React.FC = () => {
   const handleMobileVerificationComplete = (verId: string) => {
     setVerificationId(verId);
     loadVerificationResults(verId);
-    setCurrentStep(7);
+    setCurrentStep(resultsStep);
   };
 
   // ── Render Live Capture (stays in parent — refs are tightly coupled) ──
@@ -1418,6 +1448,127 @@ const DemoPage: React.FC = () => {
 
   // ── Step Content Rendering ─────────────────────────────────
 
+  // ── Voice Capture Handlers ──────────────────────────────────
+
+  const handleVoiceChallenge = async () => {
+    if (!apiKey || !verificationId) return;
+    setIsLoading(true);
+    setVoiceStepError(null);
+    try {
+      const url = buildApiUrl(`/api/v2/verify/${verificationId}/voice-challenge`);
+      if (shouldUseSandbox()) url.searchParams.append('sandbox', 'true');
+      const response = await fetch(url.toString(), {
+        method: 'POST',
+        headers: { 'X-API-Key': apiKey },
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Failed to get voice challenge');
+      }
+      const data = await response.json();
+      setVoiceChallengeDigits(data.challenge_digits);
+      setVoiceExpiresIn(data.expires_in_seconds);
+      // Start countdown
+      if (voiceExpiryRef.current) clearInterval(voiceExpiryRef.current);
+      const start = Date.now();
+      const expSec = data.expires_in_seconds;
+      voiceExpiryRef.current = window.setInterval(() => {
+        const remaining = expSec - Math.floor((Date.now() - start) / 1000);
+        if (remaining <= 0) {
+          setVoiceExpiresIn(0);
+          if (voiceExpiryRef.current) clearInterval(voiceExpiryRef.current);
+        } else {
+          setVoiceExpiresIn(remaining);
+        }
+      }, 1000);
+    } catch (error) {
+      setVoiceStepError(error instanceof Error ? error.message : 'Failed to get challenge');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVoiceStartRecording = async () => {
+    setVoiceStepError(null);
+    voiceChunksRef.current = [];
+    voiceAudioBlobRef.current = null;
+    setVoiceHasRecording(false);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus' : 'audio/webm',
+      });
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) voiceChunksRef.current.push(e.data);
+      };
+      recorder.onstop = () => {
+        const blob = new Blob(voiceChunksRef.current, { type: recorder.mimeType });
+        voiceAudioBlobRef.current = blob;
+        setVoiceIsRecording(false);
+        setVoiceHasRecording(true);
+        if (voiceDurationRef.current) clearInterval(voiceDurationRef.current);
+        stream.getTracks().forEach(t => t.stop());
+      };
+      voiceMediaRecorderRef.current = recorder;
+      recorder.start(100);
+      setVoiceIsRecording(true);
+      setVoiceRecordingDuration(0);
+      const dStart = Date.now();
+      voiceDurationRef.current = window.setInterval(() => {
+        setVoiceRecordingDuration(Math.floor((Date.now() - dStart) / 1000));
+      }, 200);
+      // Auto-stop after 10s
+      voiceTimerRef.current = window.setTimeout(() => {
+        if (voiceMediaRecorderRef.current?.state === 'recording') {
+          voiceMediaRecorderRef.current.stop();
+        }
+      }, 10000);
+    } catch (err) {
+      setVoiceStepError(err instanceof Error ? err.message : 'Microphone access denied');
+    }
+  };
+
+  const handleVoiceStopRecording = () => {
+    if (voiceTimerRef.current) clearTimeout(voiceTimerRef.current);
+    if (voiceMediaRecorderRef.current?.state === 'recording') {
+      voiceMediaRecorderRef.current.stop();
+    }
+  };
+
+  const handleVoiceSubmit = async () => {
+    if (!apiKey || !verificationId || !voiceAudioBlobRef.current) return;
+    setIsLoading(true);
+    setVoiceStepError(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', voiceAudioBlobRef.current, 'voice.webm');
+
+      const url = buildApiUrl(`/api/v2/verify/${verificationId}/voice-capture`);
+      if (shouldUseSandbox()) url.searchParams.append('sandbox', 'true');
+      const response = await fetch(url.toString(), {
+        method: 'POST',
+        headers: { 'X-API-Key': apiKey },
+        body: formData,
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Voice verification failed');
+      }
+      const result = await response.json();
+      toast.success(result.voice_match_results?.passed ? 'Voice verified!' : 'Voice capture processed');
+      // Clean up timers
+      if (voiceExpiryRef.current) clearInterval(voiceExpiryRef.current);
+      // Load full results and go to results step
+      loadVerificationResults(verificationId);
+      setCurrentStep(resultsStep);
+    } catch (error) {
+      setVoiceStepError(error instanceof Error ? error.message : 'Voice verification failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const renderStepContent = () => {
     switch (currentStep) {
       case 1:
@@ -1501,47 +1652,73 @@ const DemoPage: React.FC = () => {
           />
         );
 
-      case 7:
-        if (!verificationRequest) return null;
-        return (
-          <ResultsStep
-            verificationRequest={verificationRequest}
-            isMobile={isMobile}
-            retryProcessing={retryProcessing}
-            onRetry={handleRetry}
-            onStartNew={handleStartNew}
-            onGoToAddress={() => setCurrentStep(8)}
-            onGoToCredential={() => setCurrentStep(9)}
-          />
-        );
-
-      case 8:
-        return (
-          <AddressStep
-            addressFile={addressFile}
-            addressPreview={addressPreview}
-            addressDocType={addressDocType}
-            addressResult={addressResult}
-            addressUploading={addressUploading}
-            onAddressFileSelect={handleAddressFileSelect}
-            onAddressDocTypeChange={setAddressDocType}
-            onUploadAddress={uploadAddressDocument}
-            onStartNew={handleStartNew}
-          />
-        );
-
-      case 9:
-        return (
-          <CredentialStep
-            verificationId={verificationId!}
-            onStartNew={handleStartNew}
-            onBack={() => setCurrentStep(7)}
-          />
-        );
-
       default:
-        return null;
+        break;
     }
+
+    // Dynamic step routing — voice auth shifts results/address/credential by 1
+    if (currentStep === 7 && voiceAuthEnabled) {
+      return (
+        <VoiceCaptureStep
+          isProcessing={isLoading}
+          challengeDigits={voiceChallengeDigits}
+          expiresIn={voiceExpiresIn}
+          isRecording={voiceIsRecording}
+          recordingDuration={voiceRecordingDuration}
+          onRequestChallenge={handleVoiceChallenge}
+          onStartRecording={handleVoiceStartRecording}
+          onStopRecording={handleVoiceStopRecording}
+          onSubmit={handleVoiceSubmit}
+          hasRecording={voiceHasRecording}
+          stepError={voiceStepError}
+          step={6}
+          totalSteps={totalSteps}
+        />
+      );
+    }
+
+    if (currentStep === resultsStep) {
+      if (!verificationRequest) return null;
+      return (
+        <ResultsStep
+          verificationRequest={verificationRequest}
+          isMobile={isMobile}
+          retryProcessing={retryProcessing}
+          onRetry={handleRetry}
+          onStartNew={handleStartNew}
+          onGoToAddress={() => setCurrentStep(addressStep)}
+          onGoToCredential={() => setCurrentStep(credentialStep)}
+        />
+      );
+    }
+
+    if (currentStep === addressStep) {
+      return (
+        <AddressStep
+          addressFile={addressFile}
+          addressPreview={addressPreview}
+          addressDocType={addressDocType}
+          addressResult={addressResult}
+          addressUploading={addressUploading}
+          onAddressFileSelect={handleAddressFileSelect}
+          onAddressDocTypeChange={setAddressDocType}
+          onUploadAddress={uploadAddressDocument}
+          onStartNew={handleStartNew}
+        />
+      );
+    }
+
+    if (currentStep === credentialStep) {
+      return (
+        <CredentialStep
+          verificationId={verificationId!}
+          onStartNew={handleStartNew}
+          onBack={() => setCurrentStep(resultsStep)}
+        />
+      );
+    }
+
+    return null;
   };
 
   return (
@@ -1578,7 +1755,7 @@ const DemoPage: React.FC = () => {
           <ProgressIndicator
             currentStep={(() => {
               if (isAgeOnly) {
-                if (currentStep >= 7) return 3;
+                if (currentStep >= resultsStep) return 3;
                 if (currentStep >= 2) return 2;
                 return 1;
               }
@@ -1597,7 +1774,11 @@ const DemoPage: React.FC = () => {
                 const map: Record<number, number> = { 1:1, 2:2, 3:2, 4:3, 5:4, 7:5, 8:5 };
                 return map[currentStep] || 1;
               }
-              // Full flow: 6 display steps
+              // Full flow: 6 display steps (7 with voice auth)
+              if (voiceAuthEnabled) {
+                const map: Record<number, number> = { 1:1, 2:2, 3:2, 4:3, 5:4, 6:5, 7:6, 8:7, 9:7 };
+                return map[currentStep] || 1;
+              }
               const map: Record<number, number> = { 1:1, 2:2, 3:2, 4:3, 5:4, 6:5, 7:6, 8:6 };
               return map[currentStep] || 1;
             })()}
@@ -1607,6 +1788,7 @@ const DemoPage: React.FC = () => {
               : (skipBack && isDocumentOnly) ? ['Start', 'Front ID', 'Results']
               : (isIdentity || skipBack) ? ['Start', 'Front ID', 'Live Photo', 'Results']
               : isDocumentOnly ? ['Start', 'Front ID', 'Back ID', 'Checking', 'Results']
+              : voiceAuthEnabled ? ['Start', 'Front ID', 'Back ID', 'Checking', 'Live Photo', 'Voice', 'Results']
               : undefined
             }
           />

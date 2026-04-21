@@ -19,6 +19,8 @@ export const RejectionReason = {
   AML_POTENTIAL_MATCH: 'AML_POTENTIAL_MATCH',
   DOCUMENT_TAMPERED: 'DOCUMENT_TAMPERED',
   DEEPFAKE_DETECTED: 'DEEPFAKE_DETECTED',
+  VOICE_MATCH_FAILED: 'VOICE_MATCH_FAILED',
+  VOICE_CHALLENGE_FAILED: 'VOICE_CHALLENGE_FAILED',
 } as const;
 
 export type RejectionReasonType = typeof RejectionReason[keyof typeof RejectionReason];
@@ -38,6 +40,8 @@ const RejectionReasonEnum = z.enum([
   'AML_POTENTIAL_MATCH',
   'DOCUMENT_TAMPERED',
   'DEEPFAKE_DETECTED',
+  'VOICE_MATCH_FAILED',
+  'VOICE_CHALLENGE_FAILED',
 ]);
 
 // --- Verification Status (10 states per spec) ---
@@ -50,6 +54,8 @@ export const VerificationStatus = {
   AWAITING_LIVE: 'AWAITING_LIVE',
   LIVE_PROCESSING: 'LIVE_PROCESSING',
   FACE_MATCHING: 'FACE_MATCHING',
+  AWAITING_VOICE: 'AWAITING_VOICE',
+  VOICE_MATCHING: 'VOICE_MATCHING',
   COMPLETE: 'COMPLETE',
   HARD_REJECTED: 'HARD_REJECTED',
 } as const;
@@ -182,7 +188,20 @@ export const FaceMatchResultSchema = z.object({
 
 export type FaceMatchResult = z.infer<typeof FaceMatchResultSchema>;
 
-// --- Gate Result (shared across all 5 gates) ---
+// --- Voice Match Result ---
+export const VoiceMatchResultSchema = z.object({
+  similarity_score: confidence,
+  passed: z.boolean(),
+  threshold_used: confidence,
+  challenge_verified: z.boolean(),
+  challenge_digits: z.string(),
+  /** Set when voice match could not be performed (e.g., first verification — enrollment only). */
+  skipped_reason: z.string().optional(),
+});
+
+export type VoiceMatchResult = z.infer<typeof VoiceMatchResultSchema>;
+
+// --- Gate Result (shared across all 7 gates) ---
 export const GateResultSchema = z.object({
   passed: z.boolean(),
   rejection_reason: RejectionReasonEnum.nullable(),
@@ -308,6 +327,7 @@ export interface SessionState {
   age_estimation: AgeEstimationResult | null;
   velocity_analysis: VelocityAnalysisResult | null;
   geo_analysis: GeoAnalysisResult | null;
+  voice_match: VoiceMatchResult | null;
   created_at: string;
   updated_at: string;
   completed_at: string | null;

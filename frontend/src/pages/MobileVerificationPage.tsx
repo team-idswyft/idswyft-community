@@ -22,6 +22,7 @@ const css = `
 
 // ─── Step definitions ───────────────────────────────────────────────────────
 const FULL_STEP_LABELS = ['Front ID', 'Back ID', 'Checking', 'Live Photo', 'Complete'];
+const FULL_VOICE_STEP_LABELS = ['Front ID', 'Back ID', 'Checking', 'Live Photo', 'Voice', 'Complete'];
 const DOCUMENT_ONLY_STEP_LABELS = ['Front ID', 'Back ID', 'Checking', 'Complete'];
 const IDENTITY_STEP_LABELS = ['Front ID', 'Checking', 'Live Photo', 'Complete'];
 const AGE_ONLY_STEP_LABELS = ['Upload ID', 'Complete'];
@@ -29,8 +30,9 @@ const AGE_ONLY_STEP_LABELS = ['Upload ID', 'Complete'];
 const PASSPORT_DOC_ONLY_STEP_LABELS = ['Front ID', 'Checking', 'Complete'];
 
 // ─── Types ──────────────────────────────────────────────────────────────────
-type Screen = 'front' | 'back' | 'checking' | 'live' | 'done';
-const SCREENS: Screen[] = ['front', 'back', 'checking', 'live', 'done'];
+type Screen = 'front' | 'back' | 'checking' | 'live' | 'voice' | 'done';
+const SCREENS: Screen[] = ['front', 'back', 'checking', 'live', 'voice', 'done'];
+const SCREEN_IDX = { front: 0, back: 1, checking: 2, live: 3, voice: 4, done: 5 } as const;
 
 // ─── Sub-Components ─────────────────────────────────────────────────────────
 
@@ -398,6 +400,19 @@ const MobileVerificationPage: React.FC = () => {
   const [stepError, setStepError] = useState<string | null>(null);
   const [retryProcessing, setRetryProcessing] = useState(false);
 
+  // Voice auth state
+  const [voiceChallengeDigits, setVoiceChallengeDigits] = useState<string | null>(null);
+  const [voiceExpiresIn, setVoiceExpiresIn] = useState<number | null>(null);
+  const [voiceIsRecording, setVoiceIsRecording] = useState(false);
+  const [voiceRecordingDuration, setVoiceRecordingDuration] = useState(0);
+  const [voiceHasRecording, setVoiceHasRecording] = useState(false);
+  const voiceMediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const voiceChunksRef = useRef<Blob[]>([]);
+  const voiceAudioBlobRef = useRef<Blob | null>(null);
+  const voiceTimerRef = useRef<number | null>(null);
+  const voiceDurationRef = useRef<number | null>(null);
+  const voiceExpiryRef = useRef<number | null>(null);
+
   // Page branding
   const [brandingLogo, setBrandingLogo] = useState<string | null>(null);
   const [brandingCompany, setBrandingCompany] = useState<string | null>(null);
@@ -595,13 +610,13 @@ const MobileVerificationPage: React.FC = () => {
       const backSkipped = isIdentity || data?.detected_document_type === 'passport' || data?.requires_back === false;
       if (backSkipped) {
         setSkipBack(true);
-        setScreenIdx(2);
+        setScreenIdx(SCREEN_IDX.checking);
         pollFrontOCRForIdentity(0);
         return;
       }
 
       // Normal flow: move to back ID and poll OCR in background
-      setScreenIdx(1);
+      setScreenIdx(SCREEN_IDX.back);
       pollFrontOCR(0);
     } catch (err: any) {
       if (mountedRef.current) setStepError(err.message);
@@ -639,7 +654,7 @@ const MobileVerificationPage: React.FC = () => {
       if (data.final_result !== null && data.final_result !== undefined) {
         showFinalResult(data);
       } else if (data.ocr_data && Object.keys(data.ocr_data).length > 0) {
-        setScreenIdx(3); // OCR done — proceed to live capture
+        setScreenIdx(SCREEN_IDX.live); // OCR done — proceed to live capture
       } else {
         setTimeout(() => pollFrontOCRForIdentity(attempt + 1), 2000);
       }
@@ -682,7 +697,7 @@ const MobileVerificationPage: React.FC = () => {
         }
       }
 
-      setScreenIdx(2); // Checking screen
+      setScreenIdx(SCREEN_IDX.checking); // Checking screen
       pollCrossValidation(0);
     } catch (err: any) {
       if (mountedRef.current) setStepError(err.message);
@@ -724,11 +739,11 @@ const MobileVerificationPage: React.FC = () => {
           } else {
             // Shouldn't reach here — backend should return cross_validation_results
             // or final_result. Poll briefly in case of timing.
-            setScreenIdx(4);
+            setScreenIdx(SCREEN_IDX.done);
             waitForFinalResult(0);
           }
         }
-        else { setScreenIdx(3); } // Live photo
+        else { setScreenIdx(SCREEN_IDX.live); } // Live photo
       } else {
         setTimeout(() => pollCrossValidation(attempt + 1), 2000);
       }
@@ -777,10 +792,12 @@ const MobileVerificationPage: React.FC = () => {
       // The live-capture response includes final_result — use it directly if available
       // to avoid depending on the polling loop (which can fail if session state save is delayed).
       const data = await res.json().catch(() => null);
-      if (data?.final_result) {
+      if (data?.status === 'AWAITING_VOICE') {
+        setScreenIdx(SCREEN_IDX.voice);
+      } else if (data?.final_result) {
         showFinalResult(data);
       } else {
-        setScreenIdx(4);
+        setScreenIdx(SCREEN_IDX.done);
         waitForFinalResult(0);
       }
     } catch (err: any) {
@@ -819,7 +836,7 @@ const MobileVerificationPage: React.FC = () => {
       if (data?.final_result) {
         showFinalResult(data);
       } else {
-        setScreenIdx(4); // Done screen
+        setScreenIdx(SCREEN_IDX.done); // Done screen
         waitForFinalResult(0);
       }
     } catch (err: any) {
@@ -838,6 +855,7 @@ const MobileVerificationPage: React.FC = () => {
     try {
       const data = await apiGet(`/api/v2/verify/${verificationId}/status`);
       if (!mountedRef.current) return;
+      if (data.status === 'AWAITING_VOICE') { setScreenIdx(SCREEN_IDX.voice); return; }
       if (data.final_result !== null) { showFinalResult(data); return; }
 
       // Defensive: infer final_result for identity mode from face match results
@@ -854,6 +872,95 @@ const MobileVerificationPage: React.FC = () => {
       setTimeout(() => waitForFinalResult(attempt + 1), 3000);
     } catch {
       if (mountedRef.current) setTimeout(() => waitForFinalResult(attempt + 1), 3000);
+    }
+  };
+
+  // ── Voice capture handlers ─────────────────────────────────────────────
+  const handleVoiceChallenge = async () => {
+    if (!verificationId || !token) return;
+    setIsProcessing(true);
+    setStepError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v2/verify/${verificationId}/voice-challenge`, {
+        method: 'POST', headers: { 'X-Handoff-Token': token },
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Failed to get challenge'); }
+      const data = await res.json();
+      setVoiceChallengeDigits(data.challenge_digits);
+      setVoiceExpiresIn(data.expires_in_seconds);
+      if (voiceExpiryRef.current) clearInterval(voiceExpiryRef.current);
+      const start = Date.now();
+      const expSec = data.expires_in_seconds;
+      voiceExpiryRef.current = window.setInterval(() => {
+        const remaining = expSec - Math.floor((Date.now() - start) / 1000);
+        if (remaining <= 0) { setVoiceExpiresIn(0); if (voiceExpiryRef.current) clearInterval(voiceExpiryRef.current); }
+        else setVoiceExpiresIn(remaining);
+      }, 1000) as unknown as number;
+    } catch (err: any) {
+      if (mountedRef.current) setStepError(err.message);
+    } finally {
+      if (mountedRef.current) setIsProcessing(false);
+    }
+  };
+
+  const handleVoiceStartRecording = async () => {
+    setStepError(null);
+    voiceChunksRef.current = [];
+    voiceAudioBlobRef.current = null;
+    setVoiceHasRecording(false);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus') ? 'audio/webm;codecs=opus' : 'audio/webm',
+      });
+      recorder.ondataavailable = (e) => { if (e.data.size > 0) voiceChunksRef.current.push(e.data); };
+      recorder.onstop = () => {
+        voiceAudioBlobRef.current = new Blob(voiceChunksRef.current, { type: recorder.mimeType });
+        setVoiceIsRecording(false);
+        setVoiceHasRecording(true);
+        if (voiceDurationRef.current) clearInterval(voiceDurationRef.current);
+        stream.getTracks().forEach(t => t.stop());
+      };
+      voiceMediaRecorderRef.current = recorder;
+      recorder.start(100);
+      setVoiceIsRecording(true);
+      setVoiceRecordingDuration(0);
+      const dStart = Date.now();
+      voiceDurationRef.current = window.setInterval(() => {
+        setVoiceRecordingDuration(Math.floor((Date.now() - dStart) / 1000));
+      }, 200) as unknown as number;
+      voiceTimerRef.current = window.setTimeout(() => {
+        if (voiceMediaRecorderRef.current?.state === 'recording') voiceMediaRecorderRef.current.stop();
+      }, 10000) as unknown as number;
+    } catch (err: any) {
+      if (mountedRef.current) setStepError(err.message || 'Microphone access denied');
+    }
+  };
+
+  const handleVoiceStopRecording = () => {
+    if (voiceTimerRef.current) clearTimeout(voiceTimerRef.current);
+    if (voiceMediaRecorderRef.current?.state === 'recording') voiceMediaRecorderRef.current.stop();
+  };
+
+  const handleVoiceSubmit = async () => {
+    if (!verificationId || !token || !voiceAudioBlobRef.current) return;
+    setIsProcessing(true);
+    setStepError(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', voiceAudioBlobRef.current, 'voice.webm');
+      const res = await fetch(`${API_BASE_URL}/api/v2/verify/${verificationId}/voice-capture`, {
+        method: 'POST', headers: { 'X-Handoff-Token': token }, body: fd,
+      });
+      if (!res.ok) { const e = await res.json().catch(() => ({})); throw new Error(e.error || 'Voice verification failed'); }
+      if (voiceExpiryRef.current) clearInterval(voiceExpiryRef.current);
+      // Go to done screen and poll for final result
+      setScreenIdx(SCREEN_IDX.done);
+      waitForFinalResult(0);
+    } catch (err: any) {
+      if (mountedRef.current) setStepError(err.message);
+    } finally {
+      if (mountedRef.current) setIsProcessing(false);
     }
   };
 
@@ -887,7 +994,7 @@ const MobileVerificationPage: React.FC = () => {
       setUseFallbackSelfie(false);
       setSkipBack(false);
       selfieMetadataRef.current = null;
-      setScreenIdx(0); // Back to front ID
+      setScreenIdx(SCREEN_IDX.front); // Back to front ID
     } catch (err: any) {
       if (mountedRef.current) setStepError(err.message);
     } finally {
@@ -917,7 +1024,7 @@ const MobileVerificationPage: React.FC = () => {
   const showFinalResult = async (data: any) => {
     if (!mountedRef.current) return;
     setFinalResult(data);
-    setScreenIdx(4);
+    setScreenIdx(SCREEN_IDX.done);
     // Notify desktop
     if (!token) return;
     const status = data.final_result ?? data.status;
@@ -1047,6 +1154,7 @@ const MobileVerificationPage: React.FC = () => {
           : (isIdentity || skipBack)
             ? (isDocumentOnly ? PASSPORT_DOC_ONLY_STEP_LABELS : IDENTITY_STEP_LABELS)
           : isDocumentOnly ? DOCUMENT_ONLY_STEP_LABELS
+          : screen === 'voice' || (screen === 'done' && screenIdx === SCREEN_IDX.done && voiceHasRecording) ? FULL_VOICE_STEP_LABELS
           : FULL_STEP_LABELS
         }
       />
@@ -1332,7 +1440,68 @@ const MobileVerificationPage: React.FC = () => {
           />
         )}
 
-        {/* ── Screen 4: Complete ──────────────────────────────────────── */}
+        {/* ── Screen 4: Voice ─────────────────────────────────────────── */}
+        {screen === 'voice' && (
+          <div className="mv-fade-up" style={{ padding: '0 24px', textAlign: 'center' }}>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--ink)', marginBottom: 4 }}>Speaker Verification</h2>
+            <p style={{ fontSize: 12, color: 'var(--mid)', marginBottom: 16 }}>
+              Speak the digits shown below into your microphone.
+            </p>
+
+            {/* Mic icon */}
+            <div style={{
+              width: 72, height: 72, borderRadius: '50%', margin: '0 auto 16px',
+              border: `2px solid ${voiceIsRecording ? 'var(--accent, #22d3ee)' : 'var(--rule)'}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+            }}>
+              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke={voiceIsRecording ? 'var(--accent, #22d3ee)' : 'var(--mid)'} strokeWidth="1.5">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" y1="19" x2="12" y2="23" />
+                <line x1="8" y1="23" x2="16" y2="23" />
+              </svg>
+            </div>
+
+            {voiceChallengeDigits && (voiceExpiresIn === null || voiceExpiresIn > 0) && (
+              <div style={{ padding: 12, border: '1px solid var(--rule)', borderRadius: 8, marginBottom: 16 }}>
+                <div style={{ fontSize: 9, fontFamily: 'var(--mono)', color: 'var(--mid)', marginBottom: 6, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  Speak these digits
+                </div>
+                <div style={{ fontSize: 24, fontWeight: 700, letterSpacing: '0.2em', color: 'var(--ink)' }}>
+                  {voiceChallengeDigits}
+                </div>
+                {voiceExpiresIn !== null && (
+                  <div style={{ fontSize: 10, fontFamily: 'var(--mono)', color: voiceExpiresIn < 30 ? '#ef4444' : 'var(--mid)', marginTop: 4 }}>
+                    Expires in {voiceExpiresIn}s
+                  </div>
+                )}
+              </div>
+            )}
+
+            {voiceIsRecording && <p style={{ fontFamily: 'var(--mono)', fontSize: 12, color: 'var(--accent, #22d3ee)', marginBottom: 8 }}>Recording: {voiceRecordingDuration}s</p>}
+            {voiceHasRecording && !voiceIsRecording && !isProcessing && <p style={{ fontFamily: 'var(--mono)', fontSize: 11, color: '#22c55e', marginBottom: 8 }}>Captured ({voiceRecordingDuration}s)</p>}
+
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 8, maxWidth: 280, margin: '0 auto' }}>
+              {!voiceChallengeDigits && !isProcessing && (
+                <PrimaryBtn onClick={handleVoiceChallenge}>Get Challenge</PrimaryBtn>
+              )}
+              {voiceChallengeDigits && !voiceIsRecording && !voiceHasRecording && (voiceExpiresIn === null || voiceExpiresIn > 0) && (
+                <PrimaryBtn onClick={handleVoiceStartRecording}>Start Recording</PrimaryBtn>
+              )}
+              {voiceIsRecording && (
+                <PrimaryBtn onClick={handleVoiceStopRecording}>Stop Recording</PrimaryBtn>
+              )}
+              {voiceHasRecording && !voiceIsRecording && !isProcessing && (
+                <PrimaryBtn onClick={handleVoiceSubmit}>Submit Voice</PrimaryBtn>
+              )}
+              {isProcessing && <div style={{ textAlign: 'center', padding: 8 }}><div className="mv-spinner" /></div>}
+            </div>
+
+            {stepError && <p style={{ fontSize: 11, color: '#ef4444', fontFamily: 'var(--mono)', marginTop: 8 }}>{stepError}</p>}
+          </div>
+        )}
+
+        {/* ── Screen 5: Complete ──────────────────────────────────────── */}
         {screen === 'done' && (
           <div key="done" className="mv-fade-up" style={{
             ...screenStyle, alignItems: 'center', justifyContent: 'center', textAlign: 'center',

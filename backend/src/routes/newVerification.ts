@@ -68,6 +68,8 @@ import sharp from 'sharp';
 import engineClient from '@/services/engineClient.js';
 import { loadActiveRulesForDeveloper, evaluateRules } from '@/services/complianceEngine.js';
 import type { ComplianceContext } from '@/services/complianceEngine.js';
+import { generateVoiceChallenge, verifyChallengeTranscription } from '@/verification/voice/challengeGenerator.js';
+import { computeVoiceMatch } from '@/verification/voice/voiceMatchService.js';
 
 const router = express.Router();
 
@@ -101,7 +103,7 @@ interface VerificationAddons {
 }
 
 /** Create a VerificationSession with real service deps, optionally hydrated from DB */
-function createSession(isSandbox: boolean, hydration?: SessionHydration, addons?: VerificationAddons, developerAmlEnabled?: boolean, flow?: FlowConfig): VerificationSession {
+function createSession(isSandbox: boolean, hydration?: SessionHydration, addons?: VerificationAddons, developerAmlEnabled?: boolean, flow?: FlowConfig, voiceAuthEnabled?: boolean): VerificationSession {
   // AML auto-triggers when: providers configured, not sandbox, developer hasn't disabled, addon not explicitly false
   const amlEnabled = amlProviders.length > 0
     && !isSandbox
@@ -125,6 +127,8 @@ function createSession(isSandbox: boolean, hydration?: SessionHydration, addons?
     screenAML: amlEnabled
       ? async (fullName, dob, nationality) => screenAll(amlProviders, { full_name: fullName, date_of_birth: dob, nationality })
       : undefined,
+    voiceAuthEnabled: voiceAuthEnabled === true,
+    voiceMatchThreshold: isSandbox ? 0.50 : 0.55,
   };
 
   return new VerificationSession(deps, hydration, flow);
@@ -149,6 +153,7 @@ async function hydrateSession(verificationId: string, isSandbox: boolean, develo
     age_estimation: (savedState as any).age_estimation ?? null,
     velocity_analysis: (savedState as any).velocity_analysis ?? null,
     geo_analysis: (savedState as any).geo_analysis ?? null,
+    voice_match: (savedState as any).voice_match ?? null,
     created_at: savedState.created_at,
     completed_at: savedState.completed_at,
   } : {
@@ -172,16 +177,18 @@ async function hydrateSession(verificationId: string, isSandbox: boolean, develo
     resolvedDeveloperId = row.developer_id;
   }
 
-  // Look up developer's aml_enabled setting
+  // Look up developer's settings (aml_enabled, voice_auth_enabled)
   let developerAmlEnabled: boolean | undefined;
+  let voiceAuthEnabled: boolean | undefined;
   if (resolvedDeveloperId) {
     const { data: dev } = await supabase
       .from('developers')
-      .select('aml_enabled')
+      .select('aml_enabled, voice_auth_enabled')
       .eq('id', resolvedDeveloperId)
       .single();
-    if (dev && typeof dev.aml_enabled === 'boolean') {
-      developerAmlEnabled = dev.aml_enabled;
+    if (dev) {
+      if (typeof dev.aml_enabled === 'boolean') developerAmlEnabled = dev.aml_enabled;
+      if (typeof dev.voice_auth_enabled === 'boolean') voiceAuthEnabled = dev.voice_auth_enabled;
     }
   }
 
@@ -198,7 +205,7 @@ async function hydrateSession(verificationId: string, isSandbox: boolean, develo
     });
   }
 
-  return createSession(isSandbox, hydration, addons, developerAmlEnabled, flow);
+  return createSession(isSandbox, hydration, addons, developerAmlEnabled, flow, voiceAuthEnabled);
 }
 
 /** Record a step completion timestamp in the verification_requests row. */
@@ -1854,6 +1861,244 @@ router.post('/:verification_id/live-capture',
     autoVaultIfEnabled(verification_id, (req as any).developer.id, state, mapped.final_result);
 
     // Fire webhooks on COMPLETE or HARD_REJECTED (after response is sent)
+    fireWebhooksIfTerminal(
+      verification_id, (req as any).developer.id, verification.user_id,
+      state, mapped, isSandbox, (req as any).apiKey?.id
+    );
+  })
+);
+
+// ─── Voice Challenge ──────────────────────────────────────────────
+router.post('/:verification_id/voice-challenge',
+  authenticateAPIKeyOrHandoff,
+  [
+    param('verification_id').isUUID().withMessage('Invalid verification ID'),
+  ],
+  validate,
+  catchAsync(async (req: Request, res: Response) => {
+    const { verification_id } = req.params;
+    const verification = await requireOwnedVerification(req, verification_id);
+
+    // Must be in AWAITING_VOICE state
+    const state = await loadSessionState(verification_id);
+    if (!state || state.current_step !== VerificationStatus.AWAITING_VOICE) {
+      return res.status(409).json({
+        success: false,
+        error: 'Voice challenge can only be requested in AWAITING_VOICE state',
+        current_step: state?.current_step ?? null,
+      });
+    }
+
+    const challengeDigits = generateVoiceChallenge(6);
+
+    // Store challenge + timestamp in DB
+    await supabase
+      .from('verification_requests')
+      .update({
+        voice_challenge: challengeDigits,
+        voice_challenge_created_at: new Date().toISOString(),
+      })
+      .eq('id', verification_id);
+
+    logVerificationEvent(verification_id, 'voice_challenge_generated', {
+      digit_count: 6,
+    });
+
+    res.json({
+      success: true,
+      verification_id,
+      challenge_digits: challengeDigits,
+      expires_in_seconds: 120,
+      message: 'Please speak these digits clearly into the microphone',
+    });
+  })
+);
+
+// ─── Voice Capture ────────────────────────────────────────────────
+router.post('/:verification_id/voice-capture',
+  authenticateAPIKeyOrHandoff,
+  upload.single('file'),
+  [
+    param('verification_id').isUUID().withMessage('Invalid verification ID'),
+  ],
+  validate,
+  catchAsync(async (req: Request, res: Response) => {
+    const { verification_id } = req.params;
+    const verification = await requireOwnedVerification(req, verification_id);
+    const isSandbox = (verification as any).is_sandbox || false;
+
+    if (!req.file) throw new FileUploadError('Voice audio file is required');
+
+    // Load state — must be AWAITING_VOICE
+    const session = await hydrateSession(verification_id, isSandbox);
+    const stateBefore = session.getState();
+    if (stateBefore.current_step !== VerificationStatus.AWAITING_VOICE) {
+      return res.status(409).json({
+        success: false,
+        error: 'Voice capture can only be submitted in AWAITING_VOICE state',
+        current_step: stateBefore.current_step,
+      });
+    }
+
+    // Validate challenge exists and hasn't expired (120s)
+    const { data: vReq } = await supabase
+      .from('verification_requests')
+      .select('voice_challenge, voice_challenge_created_at')
+      .eq('id', verification_id)
+      .single();
+
+    if (!vReq?.voice_challenge) {
+      return res.status(400).json({
+        success: false,
+        error: 'No voice challenge found — call POST .../voice-challenge first',
+      });
+    }
+
+    const challengeAge = Date.now() - new Date(vReq.voice_challenge_created_at).getTime();
+    if (challengeAge > 120_000) {
+      return res.status(410).json({
+        success: false,
+        error: 'Voice challenge expired (120s limit). Request a new challenge.',
+      });
+    }
+
+    // Send audio to engine for speaker embedding + transcription
+    const voiceResult = engineClient.isEnabled()
+      ? await engineClient.extractVoiceVerify(req.file.buffer)
+      : null;
+
+    if (!voiceResult) {
+      return res.status(503).json({
+        success: false,
+        error: 'Voice verification engine is not available',
+      });
+    }
+
+    // Verify challenge transcription
+    const challengeVerified = verifyChallengeTranscription(
+      voiceResult.transcription,
+      vReq.voice_challenge,
+    );
+
+    // Check for enrollment embedding from a previous verification
+    const { data: enrollmentRow } = await supabase
+      .from('selfies')
+      .select('enrollment_audio_path')
+      .eq('verification_request_id', verification_id)
+      .single();
+
+    // For v1: first verification has no enrollment — voice match is skipped,
+    // only challenge verification matters. Store embedding for future use.
+    const hasEnrollment = false; // TODO v1.1: look up prior enrollment embedding
+    const threshold = isSandbox ? 0.50 : 0.55;
+
+    let voiceMatch;
+    if (!hasEnrollment) {
+      // First verification: skip similarity, only verify challenge
+      voiceMatch = computeVoiceMatch(
+        voiceResult.speaker_embedding,  // enrollment = self (no comparison)
+        voiceResult.speaker_embedding,  // verification = self
+        threshold,
+        challengeVerified,
+        vReq.voice_challenge,
+      );
+      // Override: mark as first enrollment with skipped_reason
+      if (!challengeVerified) {
+        voiceMatch.passed = false;
+      } else {
+        voiceMatch.passed = true;
+        voiceMatch.skipped_reason = 'first_enrollment';
+      }
+    } else {
+      // Future: compare against enrollment embedding
+      voiceMatch = computeVoiceMatch(
+        [], // enrollmentEmbedding from DB
+        voiceResult.speaker_embedding,
+        threshold,
+        challengeVerified,
+        vReq.voice_challenge,
+      );
+    }
+
+    // Store voice match score
+    await supabase
+      .from('verification_requests')
+      .update({ voice_match_score: voiceMatch.similarity_score })
+      .eq('id', verification_id);
+
+    // Run through session state machine (Gate 7)
+    const stepResult = await session.submitVoiceCapture(voiceMatch);
+    const state = session.getState();
+
+    // Persist state + risk score
+    await saveSessionState(verification_id, state);
+    if (state.current_step === VerificationStatus.COMPLETE
+      || state.current_step === VerificationStatus.HARD_REJECTED) {
+      const riskScore = computeRiskScore(state);
+      await supabase
+        .from('verification_risk_scores')
+        .upsert({
+          verification_request_id: verification_id,
+          overall_score: riskScore.overall_score,
+          risk_level: riskScore.risk_level,
+          risk_factors: riskScore.risk_factors,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'verification_request_id' });
+
+      // Update verification status — must inherit prior manual_review signals
+      const priorReview = (state.cross_validation?.verdict === 'REVIEW')
+        || !!state.face_match?.skipped_reason;
+      const finalResult = state.current_step === VerificationStatus.HARD_REJECTED
+        ? 'failed'
+        : (voiceMatch.skipped_reason || priorReview ? 'manual_review' : 'verified');
+      const manualReviewReason = voiceMatch.skipped_reason
+        ? `Voice match skipped: ${voiceMatch.skipped_reason}`
+        : priorReview
+          ? `Prior review signal: ${state.cross_validation?.verdict === 'REVIEW' ? 'cross-validation REVIEW' : 'face match skipped'}`
+          : null;
+      await supabase
+        .from('verification_requests')
+        .update({
+          status: finalResult,
+          manual_review_reason: manualReviewReason,
+          completed_at: new Date().toISOString(),
+        })
+        .eq('id', verification_id);
+    }
+
+    const vrMode = (verification as any).verification_mode || 'full';
+    const flow = FLOW_PRESETS[vrMode as VerificationMode] ?? FLOW_PRESETS.full;
+    const mapped = mapStatusForResponse(state, flow);
+
+    logVerificationEvent(verification_id, 'voice_capture_processed', {
+      challenge_verified: challengeVerified,
+      similarity_score: voiceMatch.similarity_score,
+      passed: voiceMatch.passed,
+      skipped_reason: voiceMatch.skipped_reason,
+    });
+
+    res.json({
+      success: true,
+      verification_id,
+      status: mapped.status,
+      current_step: mapped.current_step,
+      total_steps: mapped.total_steps,
+      voice_match_results: voiceMatch,
+      final_result: mapped.final_result,
+      message: state.current_step === VerificationStatus.COMPLETE
+        ? 'Voice verification completed'
+        : state.current_step === VerificationStatus.HARD_REJECTED
+          ? stepResult.user_message || 'Voice verification failed'
+          : 'Voice capture processed',
+    });
+
+    // Broadcast status change
+    broadcastStatusChange(
+      verification_id, mapped.status, mapped.current_step,
+      mapped.final_result, state.rejection_reason,
+    ).catch(() => {});
+
+    // Fire webhooks if terminal
     fireWebhooksIfTerminal(
       verification_id, (req as any).developer.id, verification.user_id,
       state, mapped, isSandbox, (req as any).apiKey?.id

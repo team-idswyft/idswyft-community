@@ -29,6 +29,7 @@
     "pixelmatch": "^4.0.2",
     "ppu-paddle-ocr": "^4.1.1",
     "sharp": "^0.33.5",
+    "sherpa-onnx-node": "^1.12.39",
     "winston": "^3.11.0",
     "zod": "^3.22.4"
   },

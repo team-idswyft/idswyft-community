@@ -29,6 +29,15 @@ export const STEP_MAPS: Record<string, Record<string, number>> = {
     FACE_MATCHING: 5,
     COMPLETE: 5, HARD_REJECTED: 0,
   },
+  full_voice: {
+    AWAITING_FRONT: 1, FRONT_PROCESSING: 1,
+    AWAITING_BACK: 2, BACK_PROCESSING: 2,
+    CROSS_VALIDATING: 3,
+    AWAITING_LIVE: 4, LIVE_PROCESSING: 4,
+    FACE_MATCHING: 5,
+    AWAITING_VOICE: 6, VOICE_MATCHING: 6,
+    COMPLETE: 6, HARD_REJECTED: 0,
+  },
   document_only: {
     AWAITING_FRONT: 1, FRONT_PROCESSING: 1,
     AWAITING_BACK: 2, BACK_PROCESSING: 2,
@@ -62,7 +71,12 @@ export function mapStatusForResponse(
   total_steps: number;
   final_result: string | null;
 } {
-  const stepMap = STEP_MAPS[flow.preset] ?? STEP_MAPS.full;
+  // Use full_voice map when voice auth is active (monotonic step progression)
+  const hasVoice = state.current_step === 'AWAITING_VOICE'
+    || state.current_step === 'VOICE_MATCHING'
+    || !!state.voice_match;
+  const mapKey = (flow.preset === 'full' && hasVoice) ? 'full_voice' : flow.preset;
+  const stepMap = STEP_MAPS[mapKey] ?? STEP_MAPS.full;
 
   let finalResult: string | null = null;
   if (state.current_step === VerificationStatus.COMPLETE) {
@@ -97,7 +111,7 @@ export function mapStatusForResponse(
   return {
     status: state.current_step,
     current_step: stepMap[state.current_step] ?? 0,
-    total_steps: flow.totalSteps,
+    total_steps: hasVoice ? Math.max(flow.totalSteps, 6) : flow.totalSteps,
     final_result: finalResult,
   };
 }
@@ -172,6 +186,7 @@ export function buildVerificationResponse(input: VerificationResponseInput) {
     age_estimation: state.age_estimation ?? null,
     velocity_analysis: state.velocity_analysis ?? null,
     geo_analysis: state.geo_analysis ?? null,
+    voice_match_results: state.voice_match ?? null,
     risk_score: riskScore,
     compliance_flags: (verification.addons as any)?.compliance_flags ?? null,
     duplicate_flags: verification.duplicate_flags ?? null,

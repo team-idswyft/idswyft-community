@@ -275,8 +275,8 @@ describe('GateResultSchema', () => {
 });
 
 describe('VerificationStatus enum', () => {
-  it('has exactly 10 states per spec', () => {
-    expect(Object.keys(VerificationStatus).length).toBe(10);
+  it('has exactly 12 states (10 original + 2 voice)', () => {
+    expect(Object.keys(VerificationStatus).length).toBe(12);
   });
 
   it('includes all spec-defined states', () => {
@@ -288,14 +288,16 @@ describe('VerificationStatus enum', () => {
     expect(VerificationStatus.AWAITING_LIVE).toBe('AWAITING_LIVE');
     expect(VerificationStatus.LIVE_PROCESSING).toBe('LIVE_PROCESSING');
     expect(VerificationStatus.FACE_MATCHING).toBe('FACE_MATCHING');
+    expect(VerificationStatus.AWAITING_VOICE).toBe('AWAITING_VOICE');
+    expect(VerificationStatus.VOICE_MATCHING).toBe('VOICE_MATCHING');
     expect(VerificationStatus.COMPLETE).toBe('COMPLETE');
     expect(VerificationStatus.HARD_REJECTED).toBe('HARD_REJECTED');
   });
 });
 
 describe('RejectionReason enum', () => {
-  it('has exactly 14 reasons (12 original + 2 security)', () => {
-    expect(Object.keys(RejectionReason).length).toBe(14);
+  it('has exactly 16 reasons (12 original + 2 security + 2 voice)', () => {
+    expect(Object.keys(RejectionReason).length).toBe(16);
   });
 
   it('includes all spec-defined reasons', () => {

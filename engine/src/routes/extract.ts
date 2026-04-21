@@ -1,13 +1,15 @@
 /**
  * Extraction Routes — Engine Worker
  *
- * Four endpoints that perform the heavy ML extraction work:
- *   POST /extract/front  — OCR + face detection + tamper analysis
- *   POST /extract/back   — Barcode/PDF417 + MRZ detection
- *   POST /extract/live   — Face detection + liveness + deepfake analysis
- *   POST /extract/ocr    — OCR-only (address docs, utility bills)
+ * Six endpoints that perform the heavy ML extraction work:
+ *   POST /extract/front        — OCR + face detection + tamper analysis
+ *   POST /extract/back         — Barcode/PDF417 + MRZ detection
+ *   POST /extract/live         — Face detection + liveness + deepfake analysis
+ *   POST /extract/ocr          — OCR-only (address docs, utility bills)
+ *   POST /extract/voice-enroll — Speaker embedding extraction (enrollment)
+ *   POST /extract/voice-verify — Speaker embedding + digit transcription (verification)
  *
- * Each endpoint accepts multipart/form-data with an image file and JSON metadata.
+ * Each endpoint accepts multipart/form-data with a file and optional JSON metadata.
  * Returns typed extraction results matching the backend's type contracts.
  */
 
@@ -31,6 +33,9 @@ import type {
   LLMProviderConfig,
 } from '@idswyft/shared';
 import { getLivenessThresholdSync } from '@/config/verificationThresholds.js';
+import { decodeAudioToFloat32 } from '@/services/audioDecoder.js';
+import { extractSpeakerEmbedding } from '@/services/voiceSpeaker.js';
+import { transcribeAudio } from '@/services/voiceRecognition.js';
 
 const router = express.Router();
 
@@ -460,6 +465,92 @@ router.post('/ocr', upload.single('file'), async (req: Request, res: Response) =
     res.status(500).json({
       success: false,
       error: 'OCR extraction failed',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// ─── POST /extract/voice-enroll ─────────────────────────────────
+// Extracts a speaker embedding from audio for enrollment.
+// Returns { speaker_embedding: number[], embedding_dimension: number }
+
+router.post('/voice-enroll', upload.single('file'), async (req: Request, res: Response) => {
+  const start = Date.now();
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'Audio file is required (field: "file")' });
+    }
+
+    const mimeType = req.file.mimetype || 'audio/webm';
+    const samples = await decodeAudioToFloat32(req.file.buffer, mimeType);
+    const embedding = extractSpeakerEmbedding(samples);
+
+    logger.info('Voice enrollment extraction complete', {
+      elapsedMs: Date.now() - start,
+      embeddingDim: embedding.length,
+    });
+
+    res.json({
+      success: true,
+      result: {
+        speaker_embedding: embedding,
+        embedding_dimension: embedding.length,
+      },
+    });
+  } catch (error) {
+    logger.error('Voice enrollment extraction failed', {
+      error: error instanceof Error ? error.message : String(error),
+      elapsedMs: Date.now() - start,
+    });
+    res.status(500).json({
+      success: false,
+      error: 'Voice enrollment extraction failed',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// ─── POST /extract/voice-verify ─────────────────────────────────
+// Extracts speaker embedding AND transcribes spoken digits.
+// Returns { speaker_embedding, embedding_dimension, transcription }
+
+router.post('/voice-verify', upload.single('file'), async (req: Request, res: Response) => {
+  const start = Date.now();
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'Audio file is required (field: "file")' });
+    }
+
+    const mimeType = req.file.mimetype || 'audio/webm';
+    const samples = await decodeAudioToFloat32(req.file.buffer, mimeType);
+
+    // Both operations use the same decoded audio — run sequentially
+    // (sherpa-onnx native calls are synchronous on the main thread)
+    const embedding = extractSpeakerEmbedding(samples);
+    const transcription = transcribeAudio(samples);
+
+    logger.info('Voice verification extraction complete', {
+      elapsedMs: Date.now() - start,
+      embeddingDim: embedding.length,
+      transcriptionLength: transcription.length,
+    });
+
+    res.json({
+      success: true,
+      result: {
+        speaker_embedding: embedding,
+        embedding_dimension: embedding.length,
+        transcription,
+      },
+    });
+  } catch (error) {
+    logger.error('Voice verification extraction failed', {
+      error: error instanceof Error ? error.message : String(error),
+      elapsedMs: Date.now() - start,
+    });
+    res.status(500).json({
+      success: false,
+      error: 'Voice verification extraction failed',
       message: error instanceof Error ? error.message : 'Unknown error',
     });
   }

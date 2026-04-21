@@ -5,6 +5,7 @@ export { ProcessingStep } from './ProcessingStep';
 export { BackUploadStep } from './BackUploadStep';
 export { CheckingStep } from './CheckingStep';
 export { LiveCaptureStep } from './LiveCaptureStep';
+export { VoiceCaptureStep } from './VoiceCaptureStep';
 export { ResultsStep } from './ResultsStep';
 export { AddressStep } from './AddressStep';
 export { CredentialStep } from './CredentialStep';

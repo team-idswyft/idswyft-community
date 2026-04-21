@@ -32,6 +32,8 @@ POST /api/v2/verify/initialize          → Create session
 POST /api/v2/verify/:id/front-document  → OCR extraction
 POST /api/v2/verify/:id/back-document   → Barcode/MRZ + cross-validation
 POST /api/v2/verify/:id/live-capture    → Liveness + face match
+POST /api/v2/verify/:id/voice-challenge → Generate voice challenge digits (optional)
+POST /api/v2/verify/:id/voice-capture   → Speaker verification (optional)
 GET  /api/v2/verify/:id/status          → Poll for final result
 ```
 

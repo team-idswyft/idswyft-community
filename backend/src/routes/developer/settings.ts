@@ -390,6 +390,48 @@ router.put('/settings/aml',
   })
 );
 
+// ─── Voice Authentication Settings ───────────────────────────
+
+router.get('/settings/voice-auth',
+  authenticateDeveloperJWT,
+  catchAsync(async (req: Request, res: Response) => {
+    const developerId = (req as any).developer.id;
+
+    const { data } = await supabase
+      .from('developers')
+      .select('voice_auth_enabled')
+      .eq('id', developerId)
+      .single();
+
+    res.json({
+      enabled: data?.voice_auth_enabled ?? false,
+    });
+  })
+);
+
+router.put('/settings/voice-auth',
+  authenticateDeveloperJWT,
+  [
+    body('enabled').isBoolean().withMessage('enabled must be a boolean'),
+  ],
+  validate,
+  catchAsync(async (req: Request, res: Response) => {
+    const developerId = (req as any).developer.id;
+    const { enabled } = req.body;
+
+    const { error } = await supabase
+      .from('developers')
+      .update({ voice_auth_enabled: enabled })
+      .eq('id', developerId);
+
+    if (error) {
+      return res.status(500).json({ error: 'Failed to save voice auth settings' });
+    }
+
+    res.json({ success: true, enabled });
+  })
+);
+
 // ─── Verifiable Credentials Settings ─────────────────────────
 
 router.get('/settings/vc',

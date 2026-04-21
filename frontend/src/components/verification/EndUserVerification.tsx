@@ -124,6 +124,21 @@ const EndUserVerification: React.FC<VerificationProps> = ({
   const [finalResult, setFinalResult] = useState<any>(null);
   const [retryProcessing, setRetryProcessing] = useState(false);
 
+  // Voice auth state
+  const [voiceAuthEnabled, setVoiceAuthEnabled] = useState(false);
+  const [voiceChallengeDigits, setVoiceChallengeDigits] = useState<string | null>(null);
+  const [voiceExpiresIn, setVoiceExpiresIn] = useState<number | null>(null);
+  const [voiceIsRecording, setVoiceIsRecording] = useState(false);
+  const [voiceRecordingDuration, setVoiceRecordingDuration] = useState(0);
+  const [voiceHasRecording, setVoiceHasRecording] = useState(false);
+  const [voiceStepError, setVoiceStepError] = useState<string | null>(null);
+  const voiceMediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const voiceChunksRef = useRef<Blob[]>([]);
+  const voiceAudioBlobRef = useRef<Blob | null>(null);
+  const voiceTimerRef = useRef<number | null>(null);
+  const voiceDurationRef = useRef<number | null>(null);
+  const voiceExpiryRef = useRef<number | null>(null);
+
   // Refs
   const mountedRef = useRef(true);
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -365,6 +380,113 @@ const EndUserVerification: React.FC<VerificationProps> = ({
   };
 
   // ── Step 6: After live capture, poll for final result ─────────────────────
+  // ── Voice Capture Handlers ──────────────────────────────────
+  const handleVoiceChallenge = async () => {
+    if (!verificationId) return;
+    setIsLoading(true);
+    setVoiceStepError(null);
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/v2/verify/${verificationId}/voice-challenge`, {
+        method: 'POST',
+        headers: authHeader,
+      });
+      if (!res.ok) { const err = await res.json(); throw new Error(err.error || 'Failed to get challenge'); }
+      const data = await res.json();
+      setVoiceChallengeDigits(data.challenge_digits);
+      setVoiceExpiresIn(data.expires_in_seconds);
+      if (voiceExpiryRef.current) clearInterval(voiceExpiryRef.current);
+      const start = Date.now();
+      const expSec = data.expires_in_seconds;
+      voiceExpiryRef.current = window.setInterval(() => {
+        const remaining = expSec - Math.floor((Date.now() - start) / 1000);
+        if (remaining <= 0) {
+          setVoiceExpiresIn(0);
+          if (voiceExpiryRef.current) clearInterval(voiceExpiryRef.current);
+        } else {
+          setVoiceExpiresIn(remaining);
+        }
+      }, 1000) as unknown as number;
+    } catch (error) {
+      setVoiceStepError(error instanceof Error ? error.message : 'Failed to get challenge');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleVoiceStartRecording = async () => {
+    setVoiceStepError(null);
+    voiceChunksRef.current = [];
+    voiceAudioBlobRef.current = null;
+    setVoiceHasRecording(false);
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream, {
+        mimeType: MediaRecorder.isTypeSupported('audio/webm;codecs=opus')
+          ? 'audio/webm;codecs=opus' : 'audio/webm',
+      });
+      recorder.ondataavailable = (e) => {
+        if (e.data.size > 0) voiceChunksRef.current.push(e.data);
+      };
+      recorder.onstop = () => {
+        const blob = new Blob(voiceChunksRef.current, { type: recorder.mimeType });
+        voiceAudioBlobRef.current = blob;
+        setVoiceIsRecording(false);
+        setVoiceHasRecording(true);
+        if (voiceDurationRef.current) clearInterval(voiceDurationRef.current);
+        stream.getTracks().forEach(t => t.stop());
+      };
+      voiceMediaRecorderRef.current = recorder;
+      recorder.start(100);
+      setVoiceIsRecording(true);
+      setVoiceRecordingDuration(0);
+      const dStart = Date.now();
+      voiceDurationRef.current = window.setInterval(() => {
+        setVoiceRecordingDuration(Math.floor((Date.now() - dStart) / 1000));
+      }, 200) as unknown as number;
+      voiceTimerRef.current = window.setTimeout(() => {
+        if (voiceMediaRecorderRef.current?.state === 'recording') {
+          voiceMediaRecorderRef.current.stop();
+        }
+      }, 10000) as unknown as number;
+    } catch (err) {
+      setVoiceStepError(err instanceof Error ? err.message : 'Microphone access denied');
+    }
+  };
+
+  const handleVoiceStopRecording = () => {
+    if (voiceTimerRef.current) clearTimeout(voiceTimerRef.current);
+    if (voiceMediaRecorderRef.current?.state === 'recording') {
+      voiceMediaRecorderRef.current.stop();
+    }
+  };
+
+  const handleVoiceSubmit = async () => {
+    if (!verificationId || !voiceAudioBlobRef.current) return;
+    setIsLoading(true);
+    setVoiceStepError(null);
+    try {
+      const formData = new FormData();
+      formData.append('file', voiceAudioBlobRef.current, 'voice.webm');
+      const response = await fetch(`${API_BASE_URL}/api/v2/verify/${verificationId}/voice-capture`, {
+        method: 'POST',
+        headers: authHeader,
+        body: formData,
+      });
+      if (!response.ok) {
+        const err = await response.json();
+        throw new Error(err.error || 'Voice verification failed');
+      }
+      if (voiceExpiryRef.current) clearInterval(voiceExpiryRef.current);
+      // Resume polling for final result
+      setCurrentStep(7);
+      waitForFinalResult();
+    } catch (error) {
+      setVoiceStepError(error instanceof Error ? error.message : 'Voice verification failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   const waitForFinalResult = async (attempt = 0) => {
     if (!verificationId || !mountedRef.current) return;
     if (attempt >= MAX_POLL_ATTEMPTS) {
@@ -374,6 +496,12 @@ const EndUserVerification: React.FC<VerificationProps> = ({
     try {
       const data = await apiGet(`/api/v2/verify/${verificationId}/status`);
       if (!mountedRef.current) return;
+      // Voice auth: if status is AWAITING_VOICE, transition to voice step
+      if (data.status === 'AWAITING_VOICE') {
+        setVoiceAuthEnabled(true);
+        setCurrentStep(65); // voice step (between 6 and 7)
+        return;
+      }
       // In v2, final_result is non-null when verification reaches a terminal state
       if (data.final_result !== null) {
         showFinalResult(data);
@@ -453,13 +581,17 @@ const EndUserVerification: React.FC<VerificationProps> = ({
   };
 
   // ── Progress bar ──────────────────────────────────────────────────────────
-  const steps = isAgeOnly ? AGE_ONLY_STEPS
+  const baseSteps = isAgeOnly ? AGE_ONLY_STEPS
     : (isIdentity || skipBack)
       ? (isDocumentOnly
         ? [{ step: 1, label: 'Start' }, { step: 2, label: 'Front ID' }, { step: 3, label: 'Scanning' }, { step: 7, label: 'Done' }]
         : IDENTITY_STEPS)
     : isDocumentOnly ? DOCUMENT_ONLY_STEPS
     : FULL_STEPS;
+  // Insert voice step before Done when voice auth is enabled
+  const steps = voiceAuthEnabled
+    ? [...baseSteps.filter(s => s.step !== 7), { step: 65, label: 'Voice' }, { step: 7, label: 'Done' }]
+    : baseSteps;
   const stepIdx = steps.findIndex(s => s.step === currentStep);
   const activeStepIdx = stepIdx >= 0 ? stepIdx : steps.length - 1;
 
@@ -660,6 +792,92 @@ const EndUserVerification: React.FC<VerificationProps> = ({
             }}
             onError={msg => toast.error(msg)}
           />
+        );
+
+      // ── 65: Voice capture (between live and result) ────────────────────
+      case 65:
+        return (
+          <div className="text-center max-w-sm mx-auto space-y-4">
+            <h2 className="text-xl font-semibold" style={{ color: 'var(--ink)' }}>Speaker Verification</h2>
+            <p className="text-sm" style={{ color: 'var(--mid)' }}>
+              Speak the digits shown below into your microphone.
+            </p>
+
+            {/* Microphone icon */}
+            <div style={{
+              width: 80, height: 80, borderRadius: '50%', margin: '0 auto',
+              border: `2px solid ${voiceIsRecording ? 'var(--accent, #22d3ee)' : 'var(--border, #ddd)'}`,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              transition: 'border-color 0.3s',
+            }}>
+              <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={voiceIsRecording ? 'var(--accent, #22d3ee)' : 'var(--mid, #888)'} strokeWidth="1.5">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" y1="19" x2="12" y2="23" />
+                <line x1="8" y1="23" x2="16" y2="23" />
+              </svg>
+            </div>
+
+            {/* Challenge digits */}
+            {voiceChallengeDigits && (voiceExpiresIn === null || voiceExpiresIn > 0) && (
+              <div style={{ padding: 16, border: '1px solid var(--border, #ddd)', borderRadius: 8, textAlign: 'center' }}>
+                <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: 'var(--mid)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.08em' }}>
+                  Speak these digits
+                </div>
+                <div style={{ fontSize: 28, fontWeight: 700, letterSpacing: '0.2em', color: 'var(--ink)' }}>
+                  {voiceChallengeDigits}
+                </div>
+                {voiceExpiresIn !== null && (
+                  <div style={{ fontSize: 11, fontFamily: 'var(--mono)', color: voiceExpiresIn < 30 ? '#ef4444' : 'var(--mid)', marginTop: 6 }}>
+                    Expires in {voiceExpiresIn}s
+                  </div>
+                )}
+              </div>
+            )}
+
+            {voiceIsRecording && (
+              <p style={{ fontFamily: 'var(--mono)', fontSize: 13, color: 'var(--accent, #22d3ee)' }}>
+                Recording: {voiceRecordingDuration}s
+              </p>
+            )}
+            {voiceHasRecording && !voiceIsRecording && !isLoading && (
+              <p style={{ fontFamily: 'var(--mono)', fontSize: 12, color: '#22c55e' }}>
+                Recording captured ({voiceRecordingDuration}s)
+              </p>
+            )}
+
+            <div className="space-y-2">
+              {!voiceChallengeDigits && !isLoading && (
+                <button className="btn-primary w-full" onClick={handleVoiceChallenge} disabled={isLoading}>
+                  Get Challenge Digits
+                </button>
+              )}
+              {voiceChallengeDigits && !voiceIsRecording && !voiceHasRecording && (voiceExpiresIn === null || voiceExpiresIn > 0) && (
+                <button className="btn-primary w-full" onClick={handleVoiceStartRecording}>
+                  Start Recording
+                </button>
+              )}
+              {voiceIsRecording && (
+                <button className="btn-primary w-full" onClick={handleVoiceStopRecording}>
+                  Stop Recording
+                </button>
+              )}
+              {voiceHasRecording && !voiceIsRecording && !isLoading && (
+                <button className="btn-primary w-full" onClick={handleVoiceSubmit}>
+                  Submit Voice Capture
+                </button>
+              )}
+              {isLoading && (
+                <div className="text-center py-2">
+                  <div className="loading-spinner-glass mx-auto" />
+                </div>
+              )}
+            </div>
+
+            {voiceStepError && (
+              <p style={{ fontSize: 12, color: '#ef4444', fontFamily: 'var(--mono)' }}>{voiceStepError}</p>
+            )}
+          </div>
         );
 
       // ── 7: Final result ──────────────────────────────────────────────────

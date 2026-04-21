@@ -8,6 +8,7 @@
 import fs from 'fs';
 import path from 'path';
 import https from 'https';
+import { execSync } from 'child_process';
 import { fileURLToPath } from 'url';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -211,6 +212,44 @@ const deepfakeModel = {
     'https://github.com/team-idswyft/idswyft/releases/download/models-v1.0.0/deepfake-detector.onnx',
 };
 
+// Voice authentication models (optional — only needed when voice auth is enabled)
+const voiceModels = {
+  speaker: {
+    fileName: 'wespeaker_en_voxceleb_CAM++_LM.onnx',
+    url: process.env.VOICE_SPEAKER_MODEL_URL ||
+      'https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/wespeaker_en_voxceleb_CAM++_LM.onnx',
+  },
+  asr: {
+    archiveName: 'sherpa-onnx-whisper-tiny.en.tar.bz2',
+    dirName: 'sherpa-onnx-whisper-tiny.en',
+    url: process.env.VOICE_ASR_MODEL_URL ||
+      'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.en.tar.bz2',
+    // Files expected after extraction:
+    expectedFiles: [
+      'tiny.en-encoder.int8.onnx',
+      'tiny.en-decoder.int8.onnx',
+      'tiny.en-tokens.txt',
+    ],
+  },
+};
+
+/**
+ * Download a tar.bz2 archive and extract it to the target directory.
+ * Falls back gracefully if tar is not available (Windows dev environments).
+ */
+async function downloadAndExtract(url, targetDir, archiveName) {
+  const archivePath = path.join(targetDir, archiveName);
+  await downloadFile(url, archivePath);
+  try {
+    execSync(`tar xjf "${archivePath}" -C "${targetDir}"`, { stdio: 'pipe' });
+    fs.unlinkSync(archivePath);
+  } catch (err) {
+    // Clean up archive on failure
+    if (fs.existsSync(archivePath)) fs.unlinkSync(archivePath);
+    throw new Error(`tar extraction failed: ${err.message}. Install bzip2/tar or download models manually.`);
+  }
+}
+
 /**
  * Main download function
  */
@@ -287,23 +326,67 @@ async function downloadModels() {
     }
   }
 
+  // ─── Voice Authentication Models (optional) ──────────────────────
+  const voiceModelsDir = path.join(modelsDir, 'voice');
+  if (!fs.existsSync(voiceModelsDir)) {
+    fs.mkdirSync(voiceModelsDir, { recursive: true });
+  }
+
+  // Speaker embedding model (single ONNX file, ~28MB)
+  const speakerPath = path.join(voiceModelsDir, voiceModels.speaker.fileName);
+  if (fs.existsSync(speakerPath) && isValidOnnx(speakerPath)) {
+    console.log(`⏭️  Skipped: ${voiceModels.speaker.fileName} (already exists, valid ONNX)`);
+    skipped++;
+  } else {
+    if (fs.existsSync(speakerPath)) fs.unlinkSync(speakerPath);
+    try {
+      await downloadFile(voiceModels.speaker.url, speakerPath);
+      if (!isValidOnnx(speakerPath)) {
+        fs.unlinkSync(speakerPath);
+        throw new Error('Downloaded file is not a valid ONNX model');
+      }
+      downloaded++;
+    } catch (error) {
+      console.log(`⏭️  Skipped: ${voiceModels.speaker.fileName} (optional — ${error.message})`);
+    }
+  }
+
+  // ASR model (Whisper tiny.en — tar.bz2 archive, ~40MB)
+  const asrDir = path.join(voiceModelsDir, voiceModels.asr.dirName);
+  const asrReady = voiceModels.asr.expectedFiles.every(
+    f => fs.existsSync(path.join(asrDir, f))
+  );
+  if (asrReady) {
+    console.log(`⏭️  Skipped: ${voiceModels.asr.dirName} (already exists)`);
+    skipped++;
+  } else {
+    try {
+      await downloadAndExtract(voiceModels.asr.url, voiceModelsDir, voiceModels.asr.archiveName);
+      downloaded++;
+    } catch (error) {
+      console.log(`⏭️  Skipped: ${voiceModels.asr.dirName} (optional — ${error.message})`);
+    }
+  }
+
   console.log('\n📊 Download Summary:');
   console.log(`✅ Downloaded: ${downloaded} files`);
   console.log(`⏭️  Skipped: ${skipped} files`);
   console.log(`❌ Failed: ${failed} files`);
-  
+
   if (failed > 0) {
     console.log('\n⚠️  Some downloads failed. You may need to retry or download manually.');
     process.exit(1);
   } else {
     console.log('\n🎉 All models downloaded successfully!');
-    console.log('\n📋 Model files ready for face recognition:');
+    console.log('\n📋 Model files ready:');
     console.log('   • Face Detection (SSD MobileNet v1)');
     console.log('   • 68-Point Facial Landmarks');
     console.log('   • Face Recognition Embeddings');
     console.log('   • Facial Expression Recognition');
     console.log('   • Age & Gender Estimation');
-    
+    if (fs.existsSync(speakerPath)) console.log('   • Speaker Embedding (wespeaker CAM++)');
+    if (asrReady || fs.existsSync(asrDir)) console.log('   • Speech Recognition (Whisper tiny.en)');
+
     console.log('\n🚀 You can now use the modern face recognition service!');
   }
 }

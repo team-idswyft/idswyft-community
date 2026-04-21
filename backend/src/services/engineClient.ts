@@ -20,20 +20,34 @@ export function isEngineEnabled(): boolean {
   return ENGINE_URL.length > 0;
 }
 
+/** Voice enrollment result from engine */
+export interface VoiceEnrollResult {
+  speaker_embedding: number[];
+  embedding_dimension: number;
+}
+
+/** Voice verification result from engine */
+export interface VoiceVerifyResult {
+  speaker_embedding: number[];
+  embedding_dimension: number;
+  transcription: string;
+}
+
 /**
  * Send a multipart request to the engine worker.
  * Uses native fetch + FormData (Node 18+).
  */
 async function callEngine<T>(
   endpoint: string,
-  imageBuffer: Buffer,
+  fileBuffer: Buffer,
   metadata: Record<string, string>,
+  filename = 'image.jpg',
 ): Promise<T> {
   const url = `${ENGINE_URL}${endpoint}`;
 
   // Build multipart/form-data using native Blob/FormData
   const formData = new FormData();
-  formData.append('file', new Blob([new Uint8Array(imageBuffer)]), 'image.jpg');
+  formData.append('file', new Blob([new Uint8Array(fileBuffer)]), filename);
 
   for (const [key, value] of Object.entries(metadata)) {
     if (value !== undefined && value !== null) {
@@ -147,12 +161,30 @@ export async function extractOCR(
   return callEngine<OCRData>('/extract/ocr', imageBuffer, { document_type: documentType });
 }
 
+/**
+ * Extract speaker embedding from audio for voice enrollment.
+ */
+export async function extractVoiceEnroll(audioBuffer: Buffer): Promise<VoiceEnrollResult> {
+  logger.info('Calling engine: /extract/voice-enroll');
+  return callEngine<VoiceEnrollResult>('/extract/voice-enroll', audioBuffer, {}, 'audio.webm');
+}
+
+/**
+ * Extract speaker embedding + transcription from audio for voice verification.
+ */
+export async function extractVoiceVerify(audioBuffer: Buffer): Promise<VoiceVerifyResult> {
+  logger.info('Calling engine: /extract/voice-verify');
+  return callEngine<VoiceVerifyResult>('/extract/voice-verify', audioBuffer, {}, 'audio.webm');
+}
+
 export const engineClient = {
   isEnabled: isEngineEnabled,
   extractFront,
   extractBack,
   extractLive,
   extractOCR,
+  extractVoiceEnroll,
+  extractVoiceVerify,
 };
 
 export default engineClient;
