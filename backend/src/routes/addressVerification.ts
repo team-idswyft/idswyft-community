@@ -98,8 +98,8 @@ router.post(
       mime_type: file.mimetype,
     });
 
-    // Extract address data via OCR
-    const extraction = await extractAddressDocument(storedPath, document.id, documentType);
+    // Extract address data via OCR (routes through engine worker when ENGINE_URL is set)
+    const extraction = await extractAddressDocument(storedPath, document.id, documentType, file.buffer);
 
     // Get identity name from the verification's front document OCR
     const idName = await getIdNameFromVerification(verification_id);

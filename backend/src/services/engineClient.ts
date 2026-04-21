@@ -10,6 +10,7 @@
 
 import { logger } from '@/utils/logger.js';
 import type { FrontExtractionResult, BackExtractionResult, LiveCaptureResult, LLMProviderConfig, HeadTurnLivenessMetadata } from '@idswyft/shared';
+import type { OCRData } from '@/types/index.js';
 
 const ENGINE_URL = process.env.ENGINE_URL || '';
 const ENGINE_TIMEOUT = parseInt(process.env.ENGINE_TIMEOUT || '60000'); // 60s default
@@ -134,11 +135,24 @@ export async function extractLive(
   return callEngine<LiveCaptureResult>('/extract/live', selfieBuffer, metadata);
 }
 
+/**
+ * Run OCR-only extraction via the engine worker (no face/tamper/MRZ).
+ * Used for address verification and other utility document flows.
+ */
+export async function extractOCR(
+  imageBuffer: Buffer,
+  documentType: string,
+): Promise<OCRData> {
+  logger.info('Calling engine: /extract/ocr', { documentType });
+  return callEngine<OCRData>('/extract/ocr', imageBuffer, { document_type: documentType });
+}
+
 export const engineClient = {
   isEnabled: isEngineEnabled,
   extractFront,
   extractBack,
   extractLive,
+  extractOCR,
 };
 
 export default engineClient;

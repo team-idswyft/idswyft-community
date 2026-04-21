@@ -1,10 +1,11 @@
 /**
  * Extraction Routes — Engine Worker
  *
- * Three endpoints that perform the heavy ML extraction work:
+ * Four endpoints that perform the heavy ML extraction work:
  *   POST /extract/front  — OCR + face detection + tamper analysis
  *   POST /extract/back   — Barcode/PDF417 + MRZ detection
  *   POST /extract/live   — Face detection + liveness + deepfake analysis
+ *   POST /extract/ocr    — OCR-only (address docs, utility bills)
  *
  * Each endpoint accepts multipart/form-data with an image file and JSON metadata.
  * Returns typed extraction results matching the backend's type contracts.
@@ -430,6 +431,35 @@ router.post('/live', upload.single('file'), async (req: Request, res: Response) 
     res.status(500).json({
       success: false,
       error: 'Live extraction failed',
+      message: error instanceof Error ? error.message : 'Unknown error',
+    });
+  }
+});
+
+// ─── POST /extract/ocr ──────────────────────────────────────────
+// Lightweight OCR-only extraction (no face detection, tamper analysis, or MRZ parsing).
+// Used by address verification and other utility document flows.
+
+router.post('/ocr', upload.single('file'), async (req: Request, res: Response) => {
+  const start = Date.now();
+  try {
+    if (!req.file) {
+      return res.status(400).json({ success: false, error: 'Image file is required (field: "file")' });
+    }
+
+    const documentType = req.body.document_type || 'auto';
+    const ocrData = await ocrService.processDocumentFromBuffer(req.file.buffer, documentType);
+
+    logger.info('OCR-only extraction complete', { elapsedMs: Date.now() - start, documentType });
+    res.json({ success: true, result: ocrData });
+  } catch (error) {
+    logger.error('OCR-only extraction failed', {
+      error: error instanceof Error ? error.message : String(error),
+      elapsedMs: Date.now() - start,
+    });
+    res.status(500).json({
+      success: false,
+      error: 'OCR extraction failed',
       message: error instanceof Error ? error.message : 'Unknown error',
     });
   }

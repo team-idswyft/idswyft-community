@@ -9,6 +9,9 @@
  */
 
 import { OCRService } from '../../services/ocr.js';
+import engineClient from '@/services/engineClient.js';
+import { logger } from '@/utils/logger.js';
+import type { OCRData } from '@/types/index.js';
 import { extractNameFromAddressDoc, parseAddress, type AddressComponents } from './addressNormalizer.js';
 
 // ─── Types ───────────────────────────────────────────────
@@ -116,14 +119,25 @@ function getOCRService(): OCRService {
  * @param documentPath - Path to the uploaded document image
  * @param documentId - Document ID for tracking
  * @param documentType - Type of address document
+ * @param imageBuffer - Original upload buffer; when provided and engine is available, OCR is routed to the engine worker
  */
 export async function extractAddressDocument(
   documentPath: string,
   documentId: string,
   documentType: AddressDocumentType,
+  imageBuffer?: Buffer,
 ): Promise<AddressExtractionResult> {
-  // Run OCR on the document (reuses existing pipeline)
-  const ocrData = await getOCRService().processDocument(documentId, documentPath, documentType);
+  // Route OCR through engine worker when available (avoids ppu-paddle-ocr dep in API container).
+  // Falls back to local OCRService for dev mode (no ENGINE_URL).
+  let ocrData: OCRData;
+  if (engineClient.isEnabled() && imageBuffer) {
+    ocrData = await engineClient.extractOCR(imageBuffer, documentType);
+  } else {
+    if (engineClient.isEnabled() && !imageBuffer) {
+      logger.warn('Engine enabled but no imageBuffer provided — falling back to local OCR', { documentId });
+    }
+    ocrData = await getOCRService().processDocument(documentId, documentPath, documentType);
+  }
 
   const rawText = ocrData.raw_text || '';
 
