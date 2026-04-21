@@ -6,7 +6,7 @@
 
 ## Overview
 
-Idswyft provides a REST API for identity verification. Developers integrate via API key (`X-API-Key: ik_...`) to run a 5-step pipeline: front document OCR, back document barcode/MRZ, cross-validation, liveness detection, and face matching. Face age estimation cross-checks apparent age against DOB as a fraud signal. Velocity checks detect fraud patterns (rapid IP reuse, bot-like timing, burst activity) and route flagged sessions to manual review. IP geolocation risk detects country mismatches, Tor exit nodes, datacenter/VPN IPs, and high-risk jurisdictions. AML/sanctions screening and PEP (Politically Exposed Persons) screening are available as configurable add-ons. All decisions are deterministic — no LLMs in the decision pipeline.
+Idswyft provides a REST API for identity verification. Developers integrate via API key (`X-API-Key: ik_...`) to run a 5-step pipeline: front document OCR, back document barcode/MRZ, cross-validation, liveness detection, and face matching. Additional layers include face age estimation, velocity fraud detection, IP geolocation risk, AML/sanctions screening, PEP screening, and optional voice authentication. All decisions are deterministic — no LLMs in the decision pipeline.
 
 Self-hostable via Docker Compose (4 containers) or available as managed cloud at idswyft.app.
 
@@ -81,6 +81,32 @@ POST   /api/v2/compliance/evaluate           → Dry-run: test context against r
 ```
 
 Rules auto-apply at `POST /api/v2/verify/initialize`. Response includes `compliance_applied` when rules match.
+
+## AML / Sanctions & PEP Screening
+
+Automatic screening after face matching (Gate 6). Configurable via `AML_PROVIDER` env var (`opensanctions`, `pep`, `offline`, or comma-separated for multiple). PEP (Politically Exposed Persons) screens against heads of state, senior officials, and associates. Per-developer opt-out via `aml_enabled: false`. Results include `risk_level`, `match_count`, `matches[]` with `listed_name`, `score`, and `list_source`.
+
+## Face Age Estimation
+
+Cross-checks apparent face age (from both document photo and live capture) against declared DOB. Flags age discrepancies as a fraud signal. Appears in `age_estimation` object in live-capture and status responses.
+
+## Velocity / Fraud Detection
+
+Analyzes verification velocity during live capture: rapid IP reuse, bot-like step timing, burst activity, multi-IP abuse. Flags route sessions to manual review. Contributes to composite risk score. `velocity_analysis` object in responses with `flags[]` and `score`.
+
+## IP Geolocation Risk
+
+Detects country mismatches between document nationality and client IP, Tor exit nodes, datacenter/VPN IPs, and high-risk jurisdictions. `ip_geolocation` object in responses with `geo_risk_flags[]`.
+
+## Voice Authentication (Optional)
+
+Speaker verification step after face matching. Developer opt-in via `voice_auth_enabled` toggle. Random 6-digit challenge → user speaks digits → ASR transcription verification + 192D speaker embedding comparison (cosine similarity, fixed threshold). Anti-spoofing by design.
+
+```
+PUT  /api/developer/settings/voice-auth     → Enable/disable voice auth
+POST /api/v2/verify/:id/voice-challenge     → Generate 6 random digits (120s expiry)
+POST /api/v2/verify/:id/voice-capture       → Submit audio, verify digits + speaker match
+```
 
 ## Identity Vault
 

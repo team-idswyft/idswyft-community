@@ -14,6 +14,10 @@ const NAV: NavItem[] = [
   { id: 'batch', label: 'Batch API', depth: 0 },
   { id: 'address', label: 'Address Verification', depth: 0 },
   { id: 'aml', label: 'AML / Sanctions', depth: 0 },
+  { id: 'age-estimation', label: 'Age Estimation', depth: 0 },
+  { id: 'velocity', label: 'Velocity Checks', depth: 0 },
+  { id: 'ip-geolocation', label: 'IP Geolocation', depth: 0 },
+  { id: 'voice-auth', label: 'Voice Auth', depth: 0 },
   { id: 'compliance', label: 'Compliance Rules', depth: 0 },
   { id: 'monitoring', label: 'Monitoring', depth: 0 },
 ];
@@ -46,6 +50,7 @@ export const DocsFeatures: React.FC = () => {
           { title: 'Document Quality', color: C.blue, items: ['Sobel edge blur detection', 'Brightness & contrast stats', 'Resolution check (≥ 800×600)', 'File size validation', 'Overall quality score', 'Auto-reject below threshold'] },
           { title: 'Cross-Validation', color: C.amber, items: ['PDF417 / QR barcode decode', 'Levenshtein distance matching', 'Token-set name similarity', 'Front OCR ↔ back barcode check', 'Date & ID number consistency', 'Weighted field scoring'] },
           { title: 'Liveness & Face Match', color: C.green, items: ['EXIF metadata analysis (20%)', 'JPEG artifact detection (15%)', 'Color histogram analysis (15%)', 'Byte entropy scoring (12%)', 'Pixel variance & edge density', 'Face detection (SSDMobilenetv1)', '128-d face embeddings', 'Cosine similarity scoring'] },
+          { title: 'Voice Authentication', color: C.purple, items: ['Random digit challenge (6 digits)', 'ASR transcription verification', '192-d speaker embeddings (CAM++)', 'Cosine similarity matching', 'Configurable threshold (0.55)', 'Optional per-developer toggle'] },
         ].map(col => (
           <div key={col.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '18px 20px' }}>
             <div style={{ fontFamily: C.mono, fontSize: '0.8rem', fontWeight: 600, color: col.color, marginBottom: 12 }}>{col.title}</div>
@@ -378,9 +383,150 @@ if (status.aml_screening?.risk_level === 'clear') {
 
       <Divider />
 
+      {/* ══ AGE ESTIMATION ══════════════════════════════════════════════ */}
+      <SectionAnchor id="age-estimation" />
+      <H2 index="06">Face Age Estimation</H2>
+      <Lead>
+        Cross-checks apparent face age against declared date of birth. Extracts age estimates from both
+        the document photo and the live capture, then flags discrepancies as a fraud signal (e.g., identity borrowing).
+      </Lead>
+
+      <Pre label="Status response — age_estimation object" code={`{
+  "age_estimation": {
+    "document_face_age": 34,
+    "live_face_age": 22,
+    "declared_age": 35,
+    "age_discrepancy": 13,
+    "flag": "Age discrepancy between live capture and declared DOB"
+  }
+}`} />
+
+      <Callout type="note">
+        Age estimation runs automatically during live capture. The <code style={{ fontFamily: C.mono }}>age_discrepancy</code> field
+        shows the absolute difference between <code style={{ fontFamily: C.mono }}>live_face_age</code> and{' '}
+        <code style={{ fontFamily: C.mono }}>declared_age</code>. High discrepancies contribute to the composite risk score.
+      </Callout>
+
+      <Divider />
+
+      {/* ══ VELOCITY / FRAUD DETECTION ══════════════════════════════════ */}
+      <SectionAnchor id="velocity" />
+      <H2 index="07">Velocity / Fraud Detection</H2>
+      <Lead>
+        Analyzes verification velocity during the live-capture step to detect fraud patterns such as
+        rapid resubmissions, bot-like step timing, burst activity, and multi-IP abuse. Flagged sessions
+        are routed to manual review.
+      </Lead>
+
+      <Pre label="Status response — velocity_analysis object" code={`{
+  "velocity_analysis": {
+    "ip_address_hash": "a1b2c3...",
+    "ip_reuse_count_1h": 3,
+    "ip_reuse_count_24h": 8,
+    "avg_step_duration_ms": 1200,
+    "flags": ["RAPID_IP_REUSE", "BOT_LIKE_TIMING"],
+    "score": 75
+  }
+}`} />
+
+      <Callout type="note">
+        Velocity flags: <code style={{ fontFamily: C.mono }}>RAPID_IP_REUSE</code> (3+ verifications from same IP in 1 hour),{' '}
+        <code style={{ fontFamily: C.mono }}>BOT_LIKE_TIMING</code> (steps completed too fast),{' '}
+        <code style={{ fontFamily: C.mono }}>BURST_ACTIVITY</code> (sudden spike in verifications),{' '}
+        <code style={{ fontFamily: C.mono }}>MULTI_IP_ABUSE</code> (same user from many IPs). Score range: 0–100, highest flag wins.
+      </Callout>
+
+      <Divider />
+
+      {/* ══ IP GEOLOCATION RISK ═════════════════════════════════════════ */}
+      <SectionAnchor id="ip-geolocation" />
+      <H2 index="08">IP Geolocation Risk</H2>
+      <Lead>
+        Detects geographic risk signals by comparing the client IP location against the document's issuing
+        country. Identifies Tor exit nodes, datacenter/VPN IPs, and high-risk jurisdictions.
+      </Lead>
+
+      <Pre label="Status response — ip_geolocation object" code={`{
+  "ip_geolocation": {
+    "ip_country": "RO",
+    "document_country": "US",
+    "country_match": false,
+    "is_tor": false,
+    "is_datacenter": true,
+    "geo_risk_flags": ["COUNTRY_MISMATCH", "DATACENTER_IP"],
+    "geo_risk_score": 60
+  }
+}`} />
+
+      <Callout type="note">
+        Geo risk flags: <code style={{ fontFamily: C.mono }}>COUNTRY_MISMATCH</code>,{' '}
+        <code style={{ fontFamily: C.mono }}>TOR_EXIT_NODE</code>,{' '}
+        <code style={{ fontFamily: C.mono }}>DATACENTER_IP</code>,{' '}
+        <code style={{ fontFamily: C.mono }}>HIGH_RISK_JURISDICTION</code>. Score contributes to the composite risk score.
+      </Callout>
+
+      <Divider />
+
+      {/* ══ VOICE AUTHENTICATION ════════════════════════════════════════ */}
+      <SectionAnchor id="voice-auth" />
+      <H2 index="09">Voice Authentication</H2>
+      <Lead>
+        Optional speaker verification step after face matching. Users speak randomly generated digits;
+        the system verifies both the spoken content (ASR transcription) and the speaker identity (192-dimensional
+        embedding comparison). Enable per-developer via the settings API.
+      </Lead>
+
+      <Pre label="Enable voice auth  —  PUT /api/developer/settings/voice-auth" code={`curl -X PUT ${apiUrl}/api/developer/settings/voice-auth \\
+  -H "X-API-Key: your-key" \\
+  -H "Content-Type: application/json" \\
+  -d '{ "enabled": true }'
+
+// Response: { "success": true, "voice_auth_enabled": true }`} />
+
+      <EndpointCard method="POST" path="/api/v2/verify/:id/voice-challenge" title="Request Voice Challenge">
+        <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
+          Generates 6 random digits for the user to speak aloud. Challenge expires after 120 seconds.
+          Session must be in <code style={{ fontFamily: C.mono }}>AWAITING_VOICE</code> state.
+        </p>
+        <Pre label="Response  —  HTTP 200" code={`{
+  "success": true,
+  "challenge_digits": "3 7 1 9 0 5",
+  "expires_in": 120
+}`} />
+      </EndpointCard>
+
+      <EndpointCard method="POST" path="/api/v2/verify/:id/voice-capture" title="Submit Voice Capture">
+        <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
+          Upload audio recording of the user speaking the challenge digits. Accepts WebM, WAV, or OGG formats.
+          Returns voice match results and final verification status.
+        </p>
+        <Pre label="Response  —  HTTP 200" code={`{
+  "success": true,
+  "verification_id": "v_abc123",
+  "status": "COMPLETE",
+  "voice_match_results": {
+    "similarity_score": 0.82,
+    "passed": true,
+    "threshold_used": 0.55,
+    "challenge_verified": true,
+    "challenge_digits": "3 7 1 9 0 5"
+  }
+}`} />
+      </EndpointCard>
+
+      <Callout type="note">
+        Voice auth uses 192-dimensional speaker embeddings (CAM++ model) with cosine similarity matching.
+        Thresholds: 0.55 (production), 0.50 (sandbox). All decisions are deterministic — no LLM in the gate path.
+        Challenge expiry: 120 seconds. Rejection reasons:{' '}
+        <code style={{ fontFamily: C.mono }}>VOICE_MATCH_FAILED</code>,{' '}
+        <code style={{ fontFamily: C.mono }}>VOICE_CHALLENGE_FAILED</code>.
+      </Callout>
+
+      <Divider />
+
       {/* ══ COMPLIANCE ORCHESTRATION ═══════════════════════════════════ */}
       <SectionAnchor id="compliance" />
-      <H2 index="06">Compliance Rules</H2>
+      <H2 index="10">Compliance Rules</H2>
       <Lead>
         Ship your compliance policy as code. Define rules that automatically adjust verification requirements
         based on country, document type, user age, risk score, and custom metadata. The engine evaluates
@@ -668,7 +814,7 @@ console.log(result.resolved_action);  // { set_mode: 'full', require_aml: true }
 
       {/* ══ MONITORING ════════════════════════════════════════════════════ */}
       <SectionAnchor id="monitoring" />
-      <H2 index="07">Monitoring & Re-verification</H2>
+      <H2 index="11">Monitoring & Re-verification</H2>
       <Lead>
         Schedule automatic re-verification reminders and track document expiry dates.
         Sends webhook notifications when documents are approaching expiry (90/60/30 days) or when

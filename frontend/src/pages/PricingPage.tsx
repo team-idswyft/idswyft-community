@@ -78,6 +78,7 @@ const features: FeatureGroup[] = [
       { label: 'Cross-validation', community: Y, starter: Y, pro: Y },
       { label: 'Liveness detection', community: Y, starter: Y, pro: Y },
       { label: 'Face matching', community: Y, starter: Y, pro: Y },
+      { label: 'Voice authentication', community: Y, starter: Y, pro: Y },
     ],
   },
   {

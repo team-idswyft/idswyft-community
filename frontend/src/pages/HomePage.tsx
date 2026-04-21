@@ -56,6 +56,11 @@ const featureIcons: Record<string, React.ReactNode> = {
       <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
     </svg>
   ),
+  'Voice Auth': (
+    <svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke={ICON} strokeWidth={SW} strokeLinecap="round" strokeLinejoin="round">
+      <rect x="9" y="1" width="6" height="11" rx="3" /><path d="M5 10a7 7 0 0 0 14 0" /><line x1="12" y1="17" x2="12" y2="21" /><line x1="8" y1="21" x2="16" y2="21" />
+    </svg>
+  ),
 }
 
 const pipelineIcons: Record<string, React.ReactNode> = {
@@ -569,6 +574,7 @@ export function HomePage() {
             { title: 'GDPR Compliant',        desc: 'Configurable data retention, deletion endpoints, and encrypted storage at rest.', tags: [] as string[] },
             { title: 'JavaScript SDK',        desc: 'Drop-in TypeScript SDK with IdswyftEmbed component, real-time event watcher, and automatic error handling.', tags: ['npm install', 'TypeScript', 'watch()'] },
             { title: 'Batch API',             desc: 'Process hundreds of verifications in a single API call. Controlled concurrency, progress tracking, and webhook on completion.', tags: ['Enterprise', 'Bulk Import', 'Async'] },
+            { title: 'Voice Auth',             desc: 'Optional speaker verification with random digit challenge. 192-dimensional embeddings and ASR transcription for anti-spoofing.', tags: ['Optional', 'Anti-spoof', 'Gate 7'] },
             { title: 'Monitoring',            desc: 'Document expiry alerts at 90/60/30 days and scheduled re-verification reminders via webhook.', tags: ['Expiry Alerts', 'Re-verify', 'Cron'] },
           ].map(({ title, desc, tags }) => (
             <div className="landing-card" key={title} style={{ background: C.panel, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.cyan}`, borderRadius: 8, padding: '24px 20px' }}>

@@ -703,7 +703,13 @@ export function HomePageV2() {
                 statBold: 'PEP', statLabel: '+ age check',
               },
               {
-                n: '09 / auditable',
+                n: '09 / voice',
+                title: 'Voice Authentication',
+                body: 'Optional speaker verification step. Random digit challenge with ASR transcription and 192-dimensional speaker embedding comparison. Anti-spoofing by design.',
+                statBold: '192D', statLabel: 'embeddings',
+              },
+              {
+                n: '10 / auditable',
                 title: 'Deterministic Decisions',
                 body: 'Every verification decision is fully reproducible. Same inputs, same result. No LLM in the decision path — only checksums, exact matching, and fixed thresholds.',
                 statBold: '100%', statLabel: 'reproducible',
