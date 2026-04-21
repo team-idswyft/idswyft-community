@@ -87,6 +87,16 @@ app.use(helmet({
   },
 }));
 
+// Prevent CDN (Railway/Fastly) from caching preflight responses.
+// Must run BEFORE cors() because cors() ends OPTIONS responses immediately.
+app.use((req, res, next) => {
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Cache-Control', 'private, no-store');
+    res.setHeader('Surrogate-Control', 'no-store');
+  }
+  next();
+});
+
 // CORS — explicit allowlist only, no wildcard pattern matching
 app.use(cors(buildCorsOptions(config)));
 

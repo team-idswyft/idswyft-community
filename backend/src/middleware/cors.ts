@@ -54,5 +54,9 @@ export function buildCorsOptions(config: CorsConfig) {
     },
     credentials: true,
     optionsSuccessStatus: 200,
+    // Prevent CDN (Railway/Fastly) from caching preflight responses.
+    // Cached preflights with mismatched Origin cause CORS failures.
+    preflightContinue: false,
+    maxAge: 600, // browser may cache preflight for 10 min, but CDN must not
   };
 }
