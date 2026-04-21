@@ -5,6 +5,14 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.46] - 2026-04-21
+
+### Fixed
+- **Demo hard rejection dead-end** — OCR polling HARD_REJECTED now advances to Results step with retry/new demo options instead of leaving the user stuck on the processing screen
+- **Sign-in "Continue with Email" unresponsive** — added explicit JS email validation with inline error message instead of relying solely on browser-native required validation
+- **File picker intermittently unresponsive** — replaced `document.getElementById` with React `useRef` for file input triggering in front and back document upload steps
+- **"View on GitHub" link dead clicks** — fixed clickable area on pricing page Community tier CTA by correcting display mode from block to flex
+
 ## [1.8.45] - 2026-04-21
 
 ### Fixed
