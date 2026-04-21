@@ -5,6 +5,11 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.47] - 2026-04-21
+
+### Fixed
+- **Intermittent CORS failures on staging** — Railway's Fastly CDN was caching OPTIONS preflight responses with stale `Access-Control-Allow-Origin` headers; added `Cache-Control: private, no-store` and `Surrogate-Control: no-store` to all preflight responses, and set `maxAge: 600` for browser-side preflight caching
+
 ## [1.8.46] - 2026-04-21
 
 ### Fixed
