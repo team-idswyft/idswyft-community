@@ -382,10 +382,19 @@ const EndUserVerification: React.FC<VerificationProps> = ({
   // ── Step 6: After live capture, poll for final result ─────────────────────
   // ── Voice Capture Handlers ──────────────────────────────────
   const resetVoiceState = () => {
+    const recorder = voiceMediaRecorderRef.current;
+    if (recorder?.state === 'recording') {
+      recorder.stream.getTracks().forEach(t => t.stop());
+      recorder.stop();
+    }
+    voiceMediaRecorderRef.current = null;
+    if (voiceTimerRef.current) clearTimeout(voiceTimerRef.current);
+    if (voiceDurationRef.current) clearInterval(voiceDurationRef.current);
     setVoiceChallengeDigits(null);
     setVoiceExpiresIn(null);
     setVoiceHasRecording(false);
     setVoiceIsRecording(false);
+    setVoiceRecordingDuration(0);
     setVoiceStepError(null);
     voiceAudioBlobRef.current = null;
     voiceChunksRef.current = [];

@@ -1449,6 +1449,25 @@ const DemoPage: React.FC = () => {
   // ── Step Content Rendering ─────────────────────────────────
 
   // ── Voice Capture Handlers ──────────────────────────────────
+  const resetVoiceState = () => {
+    const recorder = voiceMediaRecorderRef.current;
+    if (recorder?.state === 'recording') {
+      recorder.stream.getTracks().forEach(t => t.stop());
+      recorder.stop();
+    }
+    voiceMediaRecorderRef.current = null;
+    if (voiceTimerRef.current) clearTimeout(voiceTimerRef.current);
+    if (voiceDurationRef.current) clearInterval(voiceDurationRef.current);
+    setVoiceChallengeDigits(null);
+    setVoiceExpiresIn(null);
+    setVoiceHasRecording(false);
+    setVoiceIsRecording(false);
+    setVoiceRecordingDuration(0);
+    setVoiceStepError(null);
+    voiceAudioBlobRef.current = null;
+    voiceChunksRef.current = [];
+    if (voiceExpiryRef.current) clearInterval(voiceExpiryRef.current);
+  };
 
   const handleVoiceChallenge = async () => {
     if (!apiKey || !verificationId) return;
@@ -1671,6 +1690,7 @@ const DemoPage: React.FC = () => {
           onSubmit={handleVoiceSubmit}
           hasRecording={voiceHasRecording}
           stepError={voiceStepError}
+          onRetry={resetVoiceState}
           step={6}
           totalSteps={totalSteps}
         />
