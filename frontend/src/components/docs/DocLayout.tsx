@@ -196,7 +196,7 @@ export const DocLayout: React.FC<DocLayoutProps> = ({ slug, nav, children }) => 
   const isCurrentPage = (path: string) => location.pathname === path;
 
   return (
-    <div className="pattern-wave pattern-faint pattern-fade-edges pattern-full" style={{ fontFamily: C.sans, background: C.bg, color: C.text, margin: '-24px -24px 0', minHeight: '100vh', overflowX: 'hidden' }}>
+    <div className="pattern-wave pattern-faint pattern-fade-edges pattern-full" style={{ fontFamily: C.sans, background: C.bg, color: C.text, margin: '0 -24px 0', minHeight: '100vh', overflowX: 'hidden' }}>
 
       {/* ── Header bar ── */}
       <div style={{ borderBottom: `1px solid ${C.border}`, padding: '18px 32px', display: 'flex', alignItems: 'center', gap: 16, position: 'sticky', top: 0, background: C.bg, zIndex: 10 }}>
