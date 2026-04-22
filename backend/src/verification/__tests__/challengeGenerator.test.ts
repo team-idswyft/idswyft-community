@@ -84,4 +84,39 @@ describe('verifyChallengeTranscription', () => {
   it('rejects empty transcription', () => {
     expect(verifyChallengeTranscription('', '3 7 1 9 0 5')).toBe(false);
   });
+
+  // --- Compound number handling (Whisper groups digits) ---
+  it('handles compound tens-units: "fifty-one" → "51"', () => {
+    // Whisper might interpret "5 1" as "fifty-one"
+    expect(verifyChallengeTranscription('fifty-one fifty-nine thirty-four', '5 1 5 9 3 4')).toBe(true);
+  });
+
+  it('handles compound with space: "fifty one" → "51"', () => {
+    expect(verifyChallengeTranscription('fifty one fifty nine thirty four', '5 1 5 9 3 4')).toBe(true);
+  });
+
+  it('handles teens: "thirteen" → "13"', () => {
+    expect(verifyChallengeTranscription('thirteen nineteen', '1 3 1 9')).toBe(true);
+  });
+
+  it('handles standalone tens: "twenty" → "20"', () => {
+    expect(verifyChallengeTranscription('twenty thirty', '2 0 3 0')).toBe(true);
+  });
+
+  it('handles mixed compound and single digits', () => {
+    // "fifty-one" + "five" + "nine" + "three" + "four"
+    expect(verifyChallengeTranscription('fifty-one five nine thirty-four', '5 1 5 9 3 4')).toBe(true);
+  });
+
+  it('handles "double" prefix', () => {
+    expect(verifyChallengeTranscription('double five three nine', '5 5 3 9')).toBe(true);
+  });
+
+  it('handles "triple" prefix', () => {
+    expect(verifyChallengeTranscription('triple zero one', '0 0 0 1')).toBe(true);
+  });
+
+  it('handles Whisper punctuation with period', () => {
+    expect(verifyChallengeTranscription('3, 7, 1, 9, 0, 5.', '3 7 1 9 0 5')).toBe(true);
+  });
 });

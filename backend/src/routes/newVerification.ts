@@ -1980,6 +1980,14 @@ router.post('/:verification_id/voice-capture',
       vReq.voice_challenge,
     );
 
+    logVerificationEvent(verification_id, 'voice_transcription_debug', {
+      raw_transcription: voiceResult.transcription,
+      expected_challenge: vReq.voice_challenge,
+      challenge_verified: challengeVerified,
+      transcription_length: voiceResult.transcription?.length ?? 0,
+      embedding_dimension: voiceResult.embedding_dimension,
+    });
+
     // Check for enrollment embedding from a previous verification
     const { data: enrollmentRow } = await supabase
       .from('selfies')

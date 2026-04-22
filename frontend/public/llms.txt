@@ -100,7 +100,7 @@ Detects country mismatches between document nationality and client IP, Tor exit 
 
 ## Voice Authentication (Optional)
 
-Speaker verification step after face matching. Developer opt-in via `voice_auth_enabled` toggle. Random 6-digit challenge → user speaks digits → ASR transcription verification + 192D speaker embedding comparison (cosine similarity, fixed threshold). Anti-spoofing by design.
+Speaker verification step after face matching. Developer opt-in via `voice_auth_enabled` toggle. Random 6-digit challenge → user speaks digits → ASR transcription verification + 512D speaker embedding comparison (cosine similarity, fixed threshold). Anti-spoofing by design.
 
 ```
 PUT  /api/developer/settings/voice-auth     → Enable/disable voice auth

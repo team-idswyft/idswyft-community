@@ -25,21 +25,60 @@ export function generateVoiceChallenge(length = 6): string {
  * Verify that a transcription matches the expected challenge digits.
  *
  * Normalizes both strings to digit-only form before comparison.
- * Handles common ASR outputs like "three seven one" → "371" or "3, 7, 1" → "371".
+ * Handles common ASR outputs:
+ *   - Digit strings: "3 7 1 9 0 5" or "3, 7, 1, 9, 0, 5"
+ *   - Spoken words:  "three seven one nine zero five"
+ *   - Compound numbers: "thirty-seven nineteen oh five" (Whisper groups digits)
+ *   - Mixed:         "three 7 one 9 0 five"
  */
 export function verifyChallengeTranscription(transcription: string, expected: string): boolean {
   const normalizeDigits = (s: string): string => {
-    // First, convert spoken number words to digits
+    let normalized = s.toLowerCase().trim();
+
+    // 1. Compound tens-units: "twenty-one" / "twenty one" → "21"
+    const tensWords: Record<string, string> = {
+      twenty: '2', thirty: '3', forty: '4', fifty: '5',
+      sixty: '6', seventy: '7', eighty: '8', ninety: '9',
+    };
+    const onesWords: Record<string, string> = {
+      one: '1', two: '2', three: '3', four: '4', five: '5',
+      six: '6', seven: '7', eight: '8', nine: '9',
+    };
+    const tensPattern = Object.keys(tensWords).join('|');
+    const onesPattern = Object.keys(onesWords).join('|');
+    normalized = normalized.replace(
+      new RegExp(`\\b(${tensPattern})[-\\s]?(${onesPattern})\\b`, 'g'),
+      (_, t, o) => `${tensWords[t]}${onesWords[o]}`,
+    );
+
+    // 2. Standalone tens: "twenty" → "20", "thirty" → "30"
+    for (const [word, digit] of Object.entries(tensWords)) {
+      normalized = normalized.replace(new RegExp(`\\b${word}\\b`, 'g'), `${digit}0`);
+    }
+
+    // 3. Teens: "eleven" → "11", "twelve" → "12", etc.
+    const teenMap: Record<string, string> = {
+      ten: '10', eleven: '11', twelve: '12', thirteen: '13',
+      fourteen: '14', fifteen: '15', sixteen: '16', seventeen: '17',
+      eighteen: '18', nineteen: '19',
+    };
+    for (const [word, digits] of Object.entries(teenMap)) {
+      normalized = normalized.replace(new RegExp(`\\b${word}\\b`, 'g'), digits);
+    }
+
+    // 4. Single digit words (must come after compound/teen handling)
     const wordMap: Record<string, string> = {
       zero: '0', oh: '0', o: '0',
       one: '1', two: '2', three: '3', four: '4', five: '5',
       six: '6', seven: '7', eight: '8', nine: '9',
     };
-
-    let normalized = s.toLowerCase();
     for (const [word, digit] of Object.entries(wordMap)) {
       normalized = normalized.replace(new RegExp(`\\b${word}\\b`, 'g'), digit);
     }
+
+    // 5. "double X" → "XX" (Whisper sometimes says "double five" for "55")
+    normalized = normalized.replace(/\bdouble\s*(\d)/g, '$1$1');
+    normalized = normalized.replace(/\btriple\s*(\d)/g, '$1$1$1');
 
     // Strip everything except digits
     return normalized.replace(/\D/g, '');
