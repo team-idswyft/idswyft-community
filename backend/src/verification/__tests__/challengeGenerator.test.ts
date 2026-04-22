@@ -99,9 +99,9 @@ describe('verifyChallengeTranscription', () => {
     expect(verifyChallengeTranscription('', '3 7 1 9 0 5')).toBe(false);
   });
 
-  // --- Compound number handling (Whisper groups digits) ---
+  // --- Compound number handling (ASR may group digits) ---
   it('handles compound tens-units: "fifty-one" → "51"', () => {
-    // Whisper might interpret "5 1" as "fifty-one"
+    // ASR might interpret "5 1" as "fifty-one"
     expect(verifyChallengeTranscription('fifty-one fifty-nine thirty-four', '5 1 5 9 3 4')).toBe(true);
   });
 
@@ -130,7 +130,7 @@ describe('verifyChallengeTranscription', () => {
     expect(verifyChallengeTranscription('triple zero one', '0 0 0 1')).toBe(true);
   });
 
-  it('handles Whisper punctuation with period', () => {
+  it('handles ASR punctuation with period', () => {
     expect(verifyChallengeTranscription('3, 7, 1, 9, 0, 5.', '3 7 1 9 0 5')).toBe(true);
   });
 });

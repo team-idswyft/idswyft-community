@@ -11,7 +11,7 @@ import { randomInt } from 'crypto';
 /**
  * Generate a random digit challenge string.
  * Consecutive identical digits are avoided to reduce ASR confusion
- * (e.g., Whisper merges "2 2 2" into "222" and may drop or duplicate a digit).
+ * (e.g., ASR may merge "2 2 2" into "222" and drop or duplicate a digit).
  * @param length Number of digits (default: 6)
  * @returns Space-separated digit string, e.g., "3 7 1 9 0 5"
  */
@@ -34,7 +34,7 @@ export function generateVoiceChallenge(length = 6): string {
  * Handles common ASR outputs:
  *   - Digit strings: "3 7 1 9 0 5" or "3, 7, 1, 9, 0, 5"
  *   - Spoken words:  "three seven one nine zero five"
- *   - Compound numbers: "thirty-seven nineteen oh five" (Whisper groups digits)
+ *   - Compound numbers: "thirty-seven nineteen oh five" (ASR may group digits)
  *   - Mixed:         "three 7 one 9 0 five"
  */
 export function verifyChallengeTranscription(transcription: string, expected: string): boolean {
@@ -82,7 +82,7 @@ export function verifyChallengeTranscription(transcription: string, expected: st
       normalized = normalized.replace(new RegExp(`\\b${word}\\b`, 'g'), digit);
     }
 
-    // 5. "double X" → "XX" (Whisper sometimes says "double five" for "55")
+    // 5. "double X" → "XX" (ASR sometimes outputs "double five" for "55")
     normalized = normalized.replace(/\bdouble\s*(\d)/g, '$1$1');
     normalized = normalized.replace(/\btriple\s*(\d)/g, '$1$1$1');
 
