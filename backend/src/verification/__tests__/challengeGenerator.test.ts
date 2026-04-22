@@ -30,6 +30,16 @@ describe('generateVoiceChallenge', () => {
     }
     expect(challenges.size).toBeGreaterThan(1);
   });
+
+  it('never produces consecutive identical digits', () => {
+    for (let i = 0; i < 100; i++) {
+      const challenge = generateVoiceChallenge(6);
+      const digits = challenge.split(' ');
+      for (let j = 1; j < digits.length; j++) {
+        expect(digits[j]).not.toBe(digits[j - 1]);
+      }
+    }
+  });
 });
 
 describe('verifyChallengeTranscription', () => {
@@ -65,8 +75,8 @@ describe('verifyChallengeTranscription', () => {
     expect(verifyChallengeTranscription('Three SEVEN One', '3 7 1')).toBe(true);
   });
 
-  it('rejects wrong digits', () => {
-    expect(verifyChallengeTranscription('3 7 1 9 0 6', '3 7 1 9 0 5')).toBe(false);
+  it('tolerates 1 wrong digit (single substitution)', () => {
+    expect(verifyChallengeTranscription('3 7 1 9 0 6', '3 7 1 9 0 5')).toBe(true);
   });
 
   it('rejects missing digits', () => {
@@ -75,6 +85,10 @@ describe('verifyChallengeTranscription', () => {
 
   it('rejects extra digits', () => {
     expect(verifyChallengeTranscription('3 7 1 9 0 5 2', '3 7 1 9 0 5')).toBe(false);
+  });
+
+  it('rejects 2+ wrong digits', () => {
+    expect(verifyChallengeTranscription('3 7 1 9 6 6', '3 7 1 9 0 5')).toBe(false);
   });
 
   it('rejects completely wrong input', () => {

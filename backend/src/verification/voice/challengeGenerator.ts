@@ -10,13 +10,19 @@ import { randomInt } from 'crypto';
 
 /**
  * Generate a random digit challenge string.
+ * Consecutive identical digits are avoided to reduce ASR confusion
+ * (e.g., Whisper merges "2 2 2" into "222" and may drop or duplicate a digit).
  * @param length Number of digits (default: 6)
  * @returns Space-separated digit string, e.g., "3 7 1 9 0 5"
  */
 export function generateVoiceChallenge(length = 6): string {
   const digits: number[] = [];
   for (let i = 0; i < length; i++) {
-    digits.push(randomInt(0, 10));
+    let d: number;
+    do {
+      d = randomInt(0, 10);
+    } while (digits.length > 0 && d === digits[digits.length - 1]);
+    digits.push(d);
   }
   return digits.join(' ');
 }
@@ -87,5 +93,15 @@ export function verifyChallengeTranscription(transcription: string, expected: st
   const transcribedDigits = normalizeDigits(transcription);
   const expectedDigits = normalizeDigits(expected);
 
-  return transcribedDigits === expectedDigits;
+  if (transcribedDigits === expectedDigits) return true;
+
+  // Allow at most 1 substitution (same length, 1 digit differs).
+  // Does NOT tolerate missing or extra digits — only ASR mishearing a single digit.
+  if (transcribedDigits.length !== expectedDigits.length) return false;
+  let mismatches = 0;
+  for (let i = 0; i < transcribedDigits.length; i++) {
+    if (transcribedDigits[i] !== expectedDigits[i]) mismatches++;
+    if (mismatches > 1) return false;
+  }
+  return true;
 }
