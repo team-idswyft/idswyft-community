@@ -17,6 +17,7 @@ import {
   ExclamationTriangleIcon,
   FingerPrintIcon,
   ShieldExclamationIcon,
+  MicrophoneIcon,
   ServerIcon,
 } from '@heroicons/react/24/outline'
 import { inputStyle, labelStyle } from './types'
@@ -80,6 +81,11 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
   const [dedupLoading, setDedupLoading] = useState(false)
   const [dedupSaving, setDedupSaving] = useState(false)
 
+  // Voice authentication settings
+  const [voiceAuthEnabled, setVoiceAuthEnabled] = useState(false)
+  const [voiceAuthLoading, setVoiceAuthLoading] = useState(false)
+  const [voiceAuthSaving, setVoiceAuthSaving] = useState(false)
+
   // Page branding settings
   const [brandLogoUrl, setBrandLogoUrl] = useState<string>('')
   const [brandAccentColor, setBrandAccentColor] = useState<string>('')
@@ -117,6 +123,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
     fetchSMSSettings()
     fetchAmlSettings()
     fetchDedupSettings()
+    fetchVoiceAuthSettings()
     fetchBrandingSettings()
     fetchReviewers()
   }, [token])
@@ -414,6 +421,41 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
       }
     } catch { toast.error('Network error') }
     setDedupSaving(false)
+  }
+
+  const fetchVoiceAuthSettings = async () => {
+    setVoiceAuthLoading(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/settings/voice-auth`, {
+        headers: authHeaders,
+        credentials: 'include' as RequestCredentials,
+      })
+      if (res.ok) {
+        const data = await res.json()
+        setVoiceAuthEnabled(data.enabled ?? false)
+      }
+    } catch { /* network error */ }
+    setVoiceAuthLoading(false)
+  }
+
+  const saveVoiceAuthSettings = async () => {
+    if (!token) return
+    setVoiceAuthSaving(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/developer/settings/voice-auth`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json', ...authHeaders, ...csrfHeader() },
+        credentials: 'include' as RequestCredentials,
+        body: JSON.stringify({ enabled: voiceAuthEnabled }),
+      })
+      if (res.ok) {
+        toast.success('Voice authentication settings saved')
+      } else {
+        const err = await res.json().catch(() => ({}))
+        toast.error(err.error || 'Failed to save settings')
+      }
+    } catch { toast.error('Network error') }
+    setVoiceAuthSaving(false)
   }
 
   const fetchBrandingSettings = async () => {
@@ -1244,6 +1286,66 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                           style={{ opacity: dedupSaving ? 0.5 : 1 }}
                         >
                           {dedupSaving ? 'Saving...' : 'Save'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Divider between Duplicate Detection and Voice Auth */}
+                  <div style={{ borderTop: `1px solid ${C.border}`, marginTop: 24, paddingTop: 20 }} />
+
+                  {/* Voice Authentication */}
+                  <div>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                      <MicrophoneIcon style={{ width: 16, height: 16, color: C.accent }} />
+                      <div style={{ fontFamily: C.mono, fontWeight: 600, fontSize: 13, color: C.text }}>Voice Authentication</div>
+                    </div>
+                    <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
+                      Optional speaker verification step. When enabled, users must complete a random
+                      digit voice challenge after face matching. Uses <strong style={{ color: C.text, fontWeight: 500 }}>192-dimensional speaker embeddings</strong> for
+                      voice biometric comparison.
+                    </div>
+
+                    {voiceAuthLoading ? (
+                      <div style={{ color: C.muted, fontSize: 13 }}>Loading...</div>
+                    ) : (
+                      <>
+                        {/* Enable toggle */}
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+                          <button
+                            type="button"
+                            onClick={() => setVoiceAuthEnabled(!voiceAuthEnabled)}
+                            style={{
+                              width: 44, height: 24, borderRadius: 12, border: 'none', cursor: 'pointer',
+                              background: voiceAuthEnabled ? C.accent : C.border,
+                              position: 'relative', transition: 'background 0.2s',
+                            }}
+                          >
+                            <div style={{
+                              width: 18, height: 18, borderRadius: '50%', background: '#fff',
+                              position: 'absolute', top: 3,
+                              left: voiceAuthEnabled ? 23 : 3,
+                              transition: 'left 0.2s',
+                            }} />
+                          </button>
+                          <span style={{ color: C.text, fontSize: 13 }}>
+                            {voiceAuthEnabled ? 'Enabled' : 'Disabled'}
+                          </span>
+                        </div>
+
+                        {!voiceAuthEnabled && (
+                          <div style={{ color: C.dim, fontSize: 12, marginBottom: 12, fontStyle: 'italic' }}>
+                            Voice authentication is disabled. Verifications will skip the voice challenge step.
+                          </div>
+                        )}
+
+                        <button
+                          onClick={saveVoiceAuthSettings}
+                          disabled={voiceAuthSaving}
+                          className="btn-accent"
+                          style={{ opacity: voiceAuthSaving ? 0.5 : 1 }}
+                        >
+                          {voiceAuthSaving ? 'Saving...' : 'Save'}
                         </button>
                       </>
                     )}
