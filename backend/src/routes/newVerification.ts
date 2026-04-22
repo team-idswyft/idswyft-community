@@ -1963,9 +1963,24 @@ router.post('/:verification_id/voice-capture',
     }
 
     // Send audio to engine for speaker embedding + transcription
-    const voiceResult = engineClient.isEnabled()
-      ? await engineClient.extractVoiceVerify(req.file.buffer)
-      : null;
+    let voiceResult;
+    try {
+      voiceResult = engineClient.isEnabled()
+        ? await engineClient.extractVoiceVerify(req.file.buffer)
+        : null;
+    } catch (err) {
+      logger.error('Voice engine extraction failed', {
+        error: (err as Error).message,
+        verification_id,
+      });
+      // Session stays in AWAITING_VOICE — user can retry with new recording
+      return res.status(503).json({
+        success: false,
+        error: 'Voice processing failed. Please try recording again.',
+        retryable: true,
+        current_step: 'AWAITING_VOICE',
+      });
+    }
 
     if (!voiceResult) {
       return res.status(503).json({
@@ -2191,6 +2206,10 @@ router.post('/:verification_id/restart',
       selfie_id: null,
       retry_count: currentRetryCount + 1,
       duplicate_flags: null,
+      voice_match_score: null,
+      voice_challenge: null,
+      voice_challenge_created_at: null,
+      completed_at: null,
     }).eq('id', verification_id)
       .eq('retry_count', currentRetryCount)
       .select('id');

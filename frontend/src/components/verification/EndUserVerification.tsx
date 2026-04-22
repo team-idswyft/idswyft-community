@@ -381,6 +381,17 @@ const EndUserVerification: React.FC<VerificationProps> = ({
 
   // ── Step 6: After live capture, poll for final result ─────────────────────
   // ── Voice Capture Handlers ──────────────────────────────────
+  const resetVoiceState = () => {
+    setVoiceChallengeDigits(null);
+    setVoiceExpiresIn(null);
+    setVoiceHasRecording(false);
+    setVoiceIsRecording(false);
+    setVoiceStepError(null);
+    voiceAudioBlobRef.current = null;
+    voiceChunksRef.current = [];
+    if (voiceExpiryRef.current) clearInterval(voiceExpiryRef.current);
+  };
+
   const handleVoiceChallenge = async () => {
     if (!verificationId) return;
     setIsLoading(true);
@@ -875,7 +886,17 @@ const EndUserVerification: React.FC<VerificationProps> = ({
             </div>
 
             {voiceStepError && (
-              <p style={{ fontSize: 12, color: '#ef4444', fontFamily: 'var(--mono)' }}>{voiceStepError}</p>
+              <div className="space-y-2">
+                <p style={{ fontSize: 12, color: '#ef4444', fontFamily: 'var(--mono)' }}>{voiceStepError}</p>
+                <button className="btn-primary w-full" onClick={resetVoiceState}>
+                  Try Again
+                </button>
+              </div>
+            )}
+            {voiceChallengeDigits && voiceExpiresIn !== null && voiceExpiresIn <= 0 && !voiceStepError && (
+              <button className="btn-primary w-full" onClick={() => { resetVoiceState(); handleVoiceChallenge(); }}>
+                Request New Challenge
+              </button>
             )}
           </div>
         );
