@@ -16,6 +16,7 @@ interface ContinueOnPhoneProps {
   apiKey: string;
   userId: string;
   sessionToken?: string;
+  verificationId?: string;
   source?: 'api' | 'vaas' | 'demo';
   verificationMode?: 'full' | 'document_only' | 'identity' | 'age_only';
   ageThreshold?: number;
@@ -26,6 +27,7 @@ export const ContinueOnPhone: React.FC<ContinueOnPhoneProps> = ({
   apiKey,
   userId,
   sessionToken,
+  verificationId,
   source,
   verificationMode,
   ageThreshold,
@@ -70,6 +72,7 @@ export const ContinueOnPhone: React.FC<ContinueOnPhoneProps> = ({
           ...(!sessionToken && { api_key: apiKey }),
           user_id: userId,
           ...(source && { source }),
+          ...(verificationId && { verification_id: verificationId }),
           ...(verificationMode && { verification_mode: verificationMode }),
           ...(ageThreshold && { age_threshold: ageThreshold }),
         }),

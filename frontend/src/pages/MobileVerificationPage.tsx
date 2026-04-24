@@ -458,8 +458,16 @@ const MobileVerificationPage: React.FC = () => {
           setBrandingCompany(data.branding.company_name);
           setBrandingAccent(data.branding.accent_color);
         }
-        // Auto-start verification with source from handoff session
-        initializeVerification(data.user_id, data.source);
+        // If the handoff session carries an existing verification_id (session-token
+        // flow), reuse it instead of creating a duplicate via initialize.
+        if (data.verification_id) {
+          // Reuse existing verification — already linked in the handoff row
+          setVerificationId(data.verification_id);
+          setLoading(false);
+        } else {
+          // Legacy path: no pre-existing verification — create one
+          initializeVerification(data.user_id, data.source);
+        }
       })
       .catch(e => {
         if (e.name === 'AbortError') return;

@@ -378,6 +378,7 @@ const UserVerificationPage: React.FC = () => {
             apiKey={effectiveApiKey}
             userId={effectiveUserId}
             sessionToken={sessionToken || undefined}
+            verificationId={sessionVerificationId || undefined}
             verificationMode={effectiveMode}
             ageThreshold={effectiveAgeThreshold}
             onComplete={(result) => {
