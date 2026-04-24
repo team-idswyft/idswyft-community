@@ -13,8 +13,13 @@ const router = express.Router();
 // POST /api/verify/handoff/create — desktop creates a session, returns token
 // Accepts either api_key in body OR X-Session-Token header for session-based auth.
 router.post('/create', basicRateLimit, catchAsync(async (req: Request, res: Response) => {
-  const { api_key, user_id, source } = req.body;
+  const { api_key, user_id, source, verification_id } = req.body;
   const sessionToken = req.headers['x-session-token'] as string | undefined;
+
+  // Validate verification_id format if provided (UUID)
+  if (verification_id && !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(verification_id)) {
+    throw new ValidationError('Invalid verification_id format', 'verification_id', verification_id);
+  }
 
   let resolvedApiKeyId: string;
   let resolvedUserId: string;
@@ -83,7 +88,14 @@ router.post('/create', basicRateLimit, catchAsync(async (req: Request, res: Resp
 
   const { error } = await supabase
     .from('mobile_handoff_sessions')
-    .insert({ token: tokenHash, api_key_id: resolvedApiKeyId, user_id: resolvedUserId, source: validSource, expires_at: expiresAt.toISOString() });
+    .insert({
+      token: tokenHash,
+      api_key_id: resolvedApiKeyId,
+      user_id: resolvedUserId,
+      source: validSource,
+      expires_at: expiresAt.toISOString(),
+      ...(verification_id && { verification_id }),
+    });
 
   if (error) {
     logger.error('Failed to create handoff session', {
@@ -112,7 +124,7 @@ router.get('/:token/session', catchAsync(async (req: Request, res: Response) => 
   // Fetch session (flat query — no nested joins for PgClient compatibility)
   const { data, error } = await supabase
     .from('mobile_handoff_sessions')
-    .select('user_id, source, status, expires_at, api_key_id')
+    .select('user_id, source, status, expires_at, api_key_id, verification_id')
     .eq('token', tokenHash)
     .single();
 
@@ -165,6 +177,7 @@ router.get('/:token/session', catchAsync(async (req: Request, res: Response) => 
     user_id: data.user_id,
     source: data.source || 'api',
     branding,
+    ...(data.verification_id && { verification_id: data.verification_id }),
   });
 }));
 

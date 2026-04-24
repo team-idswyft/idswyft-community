@@ -1084,6 +1084,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
                     apiKey={apiKey}
                     userId={userId}
                     sessionToken={sessionToken}
+                    verificationId={verificationId || sessionVerificationId || undefined}
                     verificationMode={verificationMode}
                     ageThreshold={ageThreshold}
                     onComplete={result => {
