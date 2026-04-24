@@ -5,6 +5,11 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.49] - 2026-04-24
+
+### Fixed
+- **Duplicate verification in QR handoff** — when a verification was initialized via API (session token flow) and the user chose mobile QR handoff, the mobile page created a second verification instead of reusing the original; the developer's verification stayed stuck at `AWAITING_FRONT` while the duplicate completed silently
+
 ## [1.8.48] - 2026-04-21
 
 ### Added
