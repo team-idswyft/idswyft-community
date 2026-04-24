@@ -5,6 +5,11 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.52] - 2026-04-24
+
+### Changed
+- **LLM docs audit** — added 7 missing sections to llms-full.txt (face age estimation, velocity detection, IP geolocation, voice auth, PEP screening, compliance rules, verifiable credentials, identity vault), fixed version v1.8.2 → v1.8.52
+
 ## [1.8.51] - 2026-04-24
 
 ### Fixed

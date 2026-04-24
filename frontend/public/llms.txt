@@ -136,4 +136,4 @@ GET  /api/v2/vault/share/:shareToken → Access shared attributes (public, no au
 
 ## Version
 
-v1.8.51 — April 2026
+v1.8.52 — April 2026
