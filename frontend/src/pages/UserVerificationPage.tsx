@@ -80,6 +80,7 @@ const UserVerificationPage: React.FC = () => {
   const [isMobile, setIsMobile] = useState(() =>
     typeof window !== 'undefined' && window.innerWidth < 768
   );
+  const [mobileRedirecting, setMobileRedirecting] = useState(false);
   const [verificationResult, setVerificationResult] = useState<any>(null);
 
   // Address verification state
@@ -164,11 +165,57 @@ const UserVerificationPage: React.FC = () => {
   const effectiveMode = (sessionParam ? sessionMode : verificationMode) as 'full' | 'age_only' | undefined;
   const effectiveAgeThreshold = sessionParam ? sessionAgeThreshold : ageThreshold;
 
+  // ── Auto-redirect to mobile verification page on mobile devices ────
+  // Skips the choice screen entirely — creates a handoff session and navigates
+  // to /verify/mobile which has a native mobile-optimized capture experience.
+  useEffect(() => {
+    if (!isMobile || viewOnly || !sessionReady || sessionError || mobileRedirecting) return;
+    setMobileRedirecting(true);
+
+    (async () => {
+      try {
+        const headers: Record<string, string> = { 'Content-Type': 'application/json' };
+        if (sessionToken) headers['X-Session-Token'] = sessionToken;
+
+        const res = await fetch(`${API_BASE_URL}/api/verify/handoff/create`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            ...(!sessionToken && { api_key: apiKey }),
+            user_id: effectiveUserId,
+            ...(sessionVerificationId && { verification_id: sessionVerificationId }),
+          }),
+        });
+        if (!res.ok) throw new Error('Handoff creation failed');
+        const data = await res.json();
+
+        let url = `/verify/mobile?token=${data.token}`;
+        if (effectiveMode) url += `&verification_mode=${effectiveMode}`;
+        if (effectiveAgeThreshold) url += `&age_threshold=${effectiveAgeThreshold}`;
+
+        navigate(url, { replace: true });
+      } catch {
+        // Fallback: render verification inline on this device
+        setMobileRedirecting(false);
+        setPhase('desktop');
+      }
+    })();
+  }, [isMobile, viewOnly, sessionReady, sessionError]);
+
   // Don't render until session info is loaded
   if (!sessionReady) {
     return (
       <div style={{ background: 'var(--paper)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
         <div style={{ fontFamily: C.sans, color: 'var(--mid)', fontSize: '0.9rem' }}>Loading...</div>
+      </div>
+    );
+  }
+
+  // Mobile auto-redirect in progress — show loading spinner
+  if (mobileRedirecting) {
+    return (
+      <div style={{ background: 'var(--paper)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+        <div style={{ fontFamily: C.sans, color: 'var(--mid)', fontSize: '0.9rem' }}>Preparing your session...</div>
       </div>
     );
   }
