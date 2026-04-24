@@ -5,6 +5,11 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.50] - 2026-04-24
+
+### Added
+- **Mobile auto-redirect** — when a user opens the verification URL on a mobile device, automatically redirects to the native mobile verification page instead of showing the desktop/mobile choice screen with a pointless QR code
+
 ## [1.8.49] - 2026-04-24
 
 ### Fixed
