@@ -124,7 +124,7 @@ GET  /api/v2/vault/share/:shareToken → Access shared attributes (public, no au
 
 ## Integration Options
 
-1. **Redirect** — initialize server-side (`POST /api/v2/verify/initialize`), redirect user to the returned `verification_url` (session-token-based, no API key in browser)
+1. **Redirect** — initialize server-side (`POST /api/v2/verify/initialize`), redirect user to the returned `verification_url` (session-token-based, no API key in browser). Append `&redirect_url=https://yourapp.com/done` to auto-redirect the user back with `verification_id`, `status`, and `user_id` query params. Works on both desktop and mobile devices. `redirect_url` must use `http:` or `https:` protocol.
 2. **Iframe** — embed the hosted page with `allow="camera; microphone"`
 3. **SDK** — `@idswyft/sdk` IdswyftEmbed (modal/inline) or `@idswyft/react` React component
 

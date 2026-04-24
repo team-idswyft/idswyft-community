@@ -449,8 +449,10 @@ Use the `@idswyft/sdk` IdswyftEmbed component for modal or inline mode with even
 |-----------|------|----------|-------------|
 | api_key | string | Yes | Your API key |
 | user_id | UUID | Yes | User identifier |
-| redirect_url | URL | No | Where to redirect after completion. Required for redirect; optional for iframe/embed |
+| redirect_url | URL | No | Where to redirect after completion (must be `http:` or `https:`). Required for redirect; optional for iframe/embed. Works on both desktop and mobile devices |
 | theme | 'light' | 'dark' | No | UI theme (default: dark) |
+| verification_mode | 'full' | 'document_only' | 'identity' | 'age_only' | No | Override the verification mode for this session |
+| age_threshold | number | No | Minimum age to verify (used with `age_only` mode, default: 18) |
 | address_verif | 'true' | No | Enable address verification step |
 
 ---

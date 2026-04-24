@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { API_BASE_URL } from '../config/api';
+import { sanitizeRedirectUrl, buildRedirectUrl } from '../utils/redirect';
 import IDCameraCapture from '../components/IDCameraCapture';
 import SelfieCameraCapture from '../components/SelfieCameraCapture';
 import { ActiveLivenessCapture } from '../components/liveness/ActiveLivenessCapture';
@@ -354,6 +355,7 @@ const MobileVerificationPage: React.FC = () => {
   const token = searchParams.get('token');
   const verificationMode = searchParams.get('verification_mode') as 'full' | 'document_only' | 'identity' | 'age_only' | null;
   const ageThreshold = searchParams.get('age_threshold') ? parseInt(searchParams.get('age_threshold')!, 10) : undefined;
+  const redirectUrl = sanitizeRedirectUrl(searchParams.get('redirect_url') || '');
   const isAgeOnly = verificationMode === 'age_only';
   const isDocumentOnly = verificationMode === 'document_only';
   const isIdentity = verificationMode === 'identity';
@@ -419,6 +421,7 @@ const MobileVerificationPage: React.FC = () => {
   const [brandingAccent, setBrandingAccent] = useState<string | null>(null);
 
   const mountedRef = useRef(true);
+  const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const screen: Screen = SCREENS[screenIdx];
 
@@ -428,6 +431,7 @@ const MobileVerificationPage: React.FC = () => {
     setCameraSupported(!!navigator.mediaDevices?.getUserMedia);
     return () => {
       mountedRef.current = false;
+      if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
       if (frontPreviewUrl) URL.revokeObjectURL(frontPreviewUrl);
       if (backPreviewUrl) URL.revokeObjectURL(backPreviewUrl);
       if (selfiePreviewUrl) URL.revokeObjectURL(selfiePreviewUrl);
@@ -995,6 +999,7 @@ const MobileVerificationPage: React.FC = () => {
   // ── Retry failed verification ───────────────────────────────────────────
   const handleRetry = async () => {
     if (!verificationId || !token) return;
+    if (redirectTimerRef.current) { clearTimeout(redirectTimerRef.current); redirectTimerRef.current = null; }
     setRetryProcessing(true);
     try {
       const res = await fetch(`${API_BASE_URL}/api/v2/verify/${verificationId}/restart`, {
@@ -1053,24 +1058,38 @@ const MobileVerificationPage: React.FC = () => {
     if (!mountedRef.current) return;
     setFinalResult(data);
     setScreenIdx(SCREEN_IDX.done);
-    // Notify desktop
-    if (!token) return;
     const status = data.final_result ?? data.status;
-    const ok = await patchWithRetry(
-      `${API_BASE_URL}/api/verify/handoff/${token}/complete`,
-      {
-        status: status === 'failed' ? 'failed' : 'completed',
-        result: {
+
+    // Start redirect timer immediately (don't block on handoff PATCH retries)
+    if (redirectUrl) {
+      redirectTimerRef.current = setTimeout(() => {
+        if (!mountedRef.current) return;
+        window.location.href = buildRedirectUrl(redirectUrl, {
           verification_id: data.verification_id,
           status,
           user_id: data.user_id,
-          confidence_score: data.confidence_score,
-          face_match_score: data.face_match_results?.similarity_score ?? data.face_match_score,
-          liveness_score: data.liveness_results?.liveness_score ?? data.liveness_score,
+        });
+      }, 3000);
+    }
+
+    // Notify desktop via handoff complete (fire-and-forget relative to redirect)
+    if (token) {
+      const ok = await patchWithRetry(
+        `${API_BASE_URL}/api/verify/handoff/${token}/complete`,
+        {
+          status: status === 'failed' ? 'failed' : 'completed',
+          result: {
+            verification_id: data.verification_id,
+            status,
+            user_id: data.user_id,
+            confidence_score: data.confidence_score,
+            face_match_score: data.face_match_results?.similarity_score ?? data.face_match_score,
+            liveness_score: data.liveness_results?.liveness_score ?? data.liveness_score,
+          },
         },
-      },
-    );
-    if (!ok && mountedRef.current) setPatchFailed(true);
+      );
+      if (!ok && mountedRef.current) setPatchFailed(true);
+    }
   };
 
   // ─── Shared styles — v2 tokens ──────────────────────────────────────
@@ -1611,7 +1630,9 @@ const MobileVerificationPage: React.FC = () => {
                     </h1>
 
                     <p style={{ fontSize: 13, color: 'var(--mid)', lineHeight: 1.55, marginBottom: 24 }}>
-                      {isAgeOnly
+                      {redirectUrl
+                        ? 'Verification complete. Redirecting you back…'
+                        : isAgeOnly
                         ? 'Your age has been verified. You can close this tab and return to your desktop.'
                         : isDocumentOnly
                         ? 'Your document has been verified. You can close this tab and return to your desktop.'
@@ -1641,6 +1662,12 @@ const MobileVerificationPage: React.FC = () => {
                         padding: '8px 12px',
                       }}>
                         Note: We couldn't notify your desktop automatically. Please refresh it to see your result.
+                      </p>
+                    )}
+
+                    {redirectUrl && (
+                      <p style={{ marginTop: 16, fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--mid)', letterSpacing: '0.04em' }}>
+                        Redirecting in 3 seconds…
                       </p>
                     )}
                   </>
@@ -1698,6 +1725,12 @@ const MobileVerificationPage: React.FC = () => {
                       padding: '8px 12px',
                     }}>
                       Note: We couldn't notify your desktop automatically. Please refresh it to see your result.
+                    </p>
+                  )}
+
+                  {redirectUrl && (
+                    <p style={{ marginTop: 16, fontFamily: 'var(--mono)', fontSize: 11, color: 'var(--mid)', letterSpacing: '0.04em' }}>
+                      Redirecting in 3 seconds…
                     </p>
                   )}
                 </>
