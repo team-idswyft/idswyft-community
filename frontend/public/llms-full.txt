@@ -2,7 +2,7 @@
 
 > Open-source identity verification platform. Verify government-issued IDs with OCR, cross-validation, liveness detection, and face matching.
 > Base URL: https://api.idswyft.app (replace with your own domain for self-hosted deployments)
-> Version: v1.8.51 — April 2026
+> Version: v1.8.52 — April 2026
 > Source of truth: backend/src/api-docs/apiDocsMarkdown.ts
 
 ## Links
@@ -1214,7 +1214,7 @@ On first boot, navigate to the frontend. If no developer account exists, a setup
 
 ## Changelog
 
-### v1.8.51 (2026-04-24)
+### v1.8.52 (2026-04-24)
 
 **Fixed:**
 - `redirect_url` now works on mobile verification pages (previously dropped during mobile auto-redirect)
@@ -1336,4 +1336,4 @@ On first boot, navigate to the frontend. If no developer account exists, a setup
 
 ---
 
-Generated from Idswyft API v1.8.51 — https://idswyft.app/docs
+Generated from Idswyft API v1.8.52 — https://idswyft.app/docs
