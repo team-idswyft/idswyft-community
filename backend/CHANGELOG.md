@@ -5,6 +5,18 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.8.51] - 2026-04-24
+
+### Fixed
+- **redirect_url not working on hosted page** — thread redirect_url through mobile auto-redirect flow, add redirect support to MobileVerificationPage with 3-second auto-redirect after completion (fixes idswyft-community#28)
+
+### Security
+- **Open redirect prevention** — validate redirect_url protocol (http/https only), rejecting javascript:, data:, and other dangerous schemes
+
+### Changed
+- Extract shared `buildRedirectUrl` utility to `frontend/src/utils/redirect.ts`
+- Add `verification_mode` and `age_threshold` to hosted page URL parameters documentation
+
 ## [1.8.50] - 2026-04-24
 
 ### Added
