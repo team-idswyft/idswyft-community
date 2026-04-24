@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import toast from 'react-hot-toast';
 import { API_BASE_URL } from '../../config/api';
+import { sanitizeRedirectUrl } from '../../utils/redirect';
 import { ContinueOnPhone } from '../ContinueOnPhone';
 import { LiveCaptureWidget } from './LiveCaptureWidget';
 
@@ -89,7 +90,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
   sessionVerificationId,
   onComplete,
   onRedirect,
-  redirectUrl,
+  redirectUrl: rawRedirectUrl,
   className = '',
   theme = 'light',
   allowedDocumentTypes = ['passport', 'drivers_license', 'national_id'],
@@ -98,6 +99,7 @@ const EndUserVerification: React.FC<VerificationProps> = ({
   ageThreshold,
   branding: _branding,
 }) => {
+  const redirectUrl = sanitizeRedirectUrl(rawRedirectUrl || '');
   const isAgeOnly = verificationMode === 'age_only';
   const isDocumentOnly = verificationMode === 'document_only';
   const isIdentity = verificationMode === 'identity';

@@ -5,6 +5,7 @@ import EndUserVerification from '../components/verification/EndUserVerification'
 import { ContinueOnPhone } from '../components/ContinueOnPhone';
 import { C, injectFonts } from '../theme';
 import { API_BASE_URL, buildApiUrl, shouldUseSandbox } from '../config/api';
+import { sanitizeRedirectUrl, buildRedirectUrl } from '../utils/redirect';
 
 // ─── State machine ─────────────────────────────────────────────────
 // 'choice'     → user picks mobile or desktop
@@ -53,7 +54,7 @@ const UserVerificationPage: React.FC = () => {
   const sessionParam = searchParams.get('session') || '';
   const apiKey = searchParams.get('api_key') || process.env.REACT_APP_IDSWYFT_API_KEY || '';
   const userId = searchParams.get('user_id') || '';
-  const redirectUrl = searchParams.get('redirect_url') || '';
+  const redirectUrl = sanitizeRedirectUrl(searchParams.get('redirect_url') || '');
   const theme = (searchParams.get('theme') as 'light' | 'dark') || 'dark';
   const showBackButton = searchParams.get('show_back') !== 'false';
   const addressVerifEnabled = searchParams.get('address_verif') === 'true';
@@ -192,6 +193,7 @@ const UserVerificationPage: React.FC = () => {
         let url = `/verify/mobile?token=${data.token}`;
         if (effectiveMode) url += `&verification_mode=${effectiveMode}`;
         if (effectiveAgeThreshold) url += `&age_threshold=${effectiveAgeThreshold}`;
+        if (redirectUrl) url += `&redirect_url=${encodeURIComponent(redirectUrl)}`;
 
         navigate(url, { replace: true });
       } catch {
@@ -246,25 +248,6 @@ const UserVerificationPage: React.FC = () => {
   }
 
   // ── Handlers ──────────────────────────────────────────────────────
-  /** Append verification result params to the redirect URL */
-  const buildRedirectUrl = (url: string, result: any) => {
-    try {
-      const u = new URL(url);
-      if (result?.verification_id) u.searchParams.set('verification_id', result.verification_id);
-      if (result?.status) u.searchParams.set('status', result.status);
-      if (result?.user_id) u.searchParams.set('user_id', result.user_id);
-      return u.toString();
-    } catch {
-      // Fallback for relative or malformed URLs
-      const sep = url.includes('?') ? '&' : '?';
-      const params = new URLSearchParams();
-      if (result?.verification_id) params.set('verification_id', result.verification_id);
-      if (result?.status) params.set('status', result.status);
-      if (result?.user_id) params.set('user_id', result.user_id);
-      return url + sep + params.toString();
-    }
-  };
-
   const handleVerificationComplete = (result: any) => {
     // If address verification is enabled, go to address phase instead of finishing
     if (addressVerifEnabled) {
