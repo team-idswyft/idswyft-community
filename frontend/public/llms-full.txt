@@ -1,8 +1,8 @@
 # Idswyft API Documentation
 
-> Open-source identity verification platform. Verify government-issued IDs with OCR, liveness detection, and face matching.
+> Open-source identity verification platform. Verify government-issued IDs with OCR, cross-validation, liveness detection, and face matching.
 > Base URL: https://api.idswyft.app (replace with your own domain for self-hosted deployments)
-> Version: v1.8.2 — April 2026
+> Version: v1.8.51 — April 2026
 > Source of truth: backend/src/api-docs/apiDocsMarkdown.ts
 
 ## Links
@@ -636,6 +636,338 @@ All verification decisions are **deterministic** — no LLMs or probabilistic mo
 | Document Quality | Sobel edge blur detection, brightness/contrast stats, resolution check (≥800x600), file size validation, overall quality score, auto-reject below threshold |
 | Cross-Validation | PDF417/QR barcode decode, MRZ parsing, Levenshtein distance matching, token-set name similarity, front OCR vs back barcode/MRZ check, date & ID number consistency, weighted field scoring, address cross-validation (supplementary) |
 | Liveness & Face Match | EXIF metadata analysis, JPEG artifact detection, color histogram analysis, byte entropy scoring, pixel variance & edge density, face detection (SSDMobilenetv1), 128-d face embeddings, cosine similarity scoring, deepfake detection |
+| Voice Authentication | Random digit challenge (6 digits), ASR transcription verification, 512-d speaker embeddings (CAM++), cosine similarity matching, configurable threshold (0.55 production / 0.50 sandbox), optional per-developer toggle |
+
+---
+
+## Face Age Estimation
+
+Cross-checks apparent face age against declared date of birth. Extracts age estimates from both the document photo and the live capture, then flags discrepancies as a fraud signal (e.g., identity borrowing).
+
+Age estimation runs automatically during live capture — no additional API call needed. Results appear in the `age_estimation` object of the live-capture and status responses.
+
+**Response shape (`age_estimation` object):**
+
+```json
+{
+  "age_estimation": {
+    "document_face_age": 34,
+    "live_face_age": 22,
+    "declared_age": 35,
+    "age_discrepancy": 13,
+    "flag": "Age discrepancy between live capture and declared DOB"
+  }
+}
+```
+
+| Field | Type | Description |
+|-------|------|-------------|
+| document_face_age | integer | Estimated age from the document photo |
+| live_face_age | integer | Estimated age from the live capture |
+| declared_age | integer | Age calculated from OCR-extracted date of birth |
+| age_discrepancy | integer | Absolute difference between `live_face_age` and `declared_age` |
+| flag | string \| null | Human-readable flag when discrepancy exceeds threshold; `null` when ages are consistent |
+
+High discrepancies contribute to the composite risk score. The `age_estimation` field is `null` when the engine is unavailable or no face is detected.
+
+---
+
+## Velocity / Fraud Detection
+
+Analyzes verification velocity during the live-capture step to detect fraud patterns such as rapid resubmissions, bot-like step timing, burst activity, and multi-IP abuse. Flagged sessions are routed to manual review.
+
+**Response shape (`velocity_analysis` object):**
+
+```json
+{
+  "velocity_analysis": {
+    "ip_address_hash": "a1b2c3...",
+    "ip_reuse_count_1h": 3,
+    "ip_reuse_count_24h": 8,
+    "avg_step_duration_ms": 1200,
+    "flags": ["RAPID_IP_REUSE", "BOT_LIKE_TIMING"],
+    "score": 75
+  }
+}
+```
+
+**Velocity flags:**
+
+| Flag | Trigger |
+|------|---------|
+| `RAPID_IP_REUSE` | 3+ verifications from the same IP in 1 hour |
+| `BOT_LIKE_TIMING` | Steps completed faster than humanly possible |
+| `BURST_ACTIVITY` | Sudden spike in verification volume |
+| `MULTI_IP_ABUSE` | Same user_id from many different IPs |
+
+Score range: 0–100. Highest flag wins. Score contributes to the composite risk score. Sessions with velocity flags are routed to `manual_review`.
+
+---
+
+## IP Geolocation Risk
+
+Detects geographic risk signals by comparing the client IP location against the document's issuing country. Identifies Tor exit nodes, datacenter/VPN IPs, and high-risk jurisdictions.
+
+**Response shape (`ip_geolocation` object):**
+
+```json
+{
+  "ip_geolocation": {
+    "ip_country": "RO",
+    "document_country": "US",
+    "country_match": false,
+    "is_tor": false,
+    "is_datacenter": true,
+    "geo_risk_flags": ["COUNTRY_MISMATCH", "DATACENTER_IP"],
+    "geo_risk_score": 60
+  }
+}
+```
+
+**Geo risk flags:**
+
+| Flag | Trigger |
+|------|---------|
+| `COUNTRY_MISMATCH` | Client IP country differs from document nationality |
+| `TOR_EXIT_NODE` | Client IP is a known Tor exit node |
+| `DATACENTER_IP` | Client IP belongs to a datacenter/VPN provider |
+| `HIGH_RISK_JURISDICTION` | Client IP is in a high-risk jurisdiction |
+
+Score contributes to the composite risk score.
+
+---
+
+## Voice Authentication (Optional)
+
+Optional speaker verification step after face matching. Users speak randomly generated digits; the system verifies both the spoken content (ASR transcription) and the speaker identity (512-dimensional embedding comparison). Enable per-developer via the settings API.
+
+### Enable Voice Auth
+
+```
+PUT /api/developer/settings/voice-auth
+Content-Type: application/json
+
+{ "enabled": true }
+```
+
+Response: `{ "success": true, "voice_auth_enabled": true }`
+
+When enabled, the verification pipeline adds an `AWAITING_VOICE` state after face matching. When disabled, verification completes at face match as usual.
+
+### Request Voice Challenge
+
+```
+POST /api/v2/verify/:id/voice-challenge
+```
+
+Generates 6 random digits for the user to speak aloud. Challenge expires after 120 seconds. Session must be in `AWAITING_VOICE` state.
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "challenge_digits": "3 7 1 9 0 5",
+  "expires_in": 120
+}
+```
+
+### Submit Voice Capture
+
+```
+POST /api/v2/verify/:id/voice-capture
+Content-Type: multipart/form-data
+```
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| audio | File | Yes | Audio recording (WebM, WAV, or OGG). User speaking the challenge digits |
+
+**Response (200):**
+
+```json
+{
+  "success": true,
+  "verification_id": "v_abc123",
+  "status": "COMPLETE",
+  "voice_match_results": {
+    "similarity_score": 0.82,
+    "passed": true,
+    "threshold_used": 0.55,
+    "challenge_verified": true,
+    "challenge_digits": "3 7 1 9 0 5"
+  }
+}
+```
+
+**Technical details:**
+
+- Speaker embeddings: 512-dimensional vectors from CAM++ model
+- Similarity: cosine similarity between live capture voice and enrollment
+- Thresholds: 0.55 (production), 0.50 (sandbox)
+- All decisions are deterministic — no LLM in the gate path
+- Rejection reasons: `VOICE_MATCH_FAILED` (speaker mismatch), `VOICE_CHALLENGE_FAILED` (wrong digits spoken)
+
+---
+
+## PEP Screening (Politically Exposed Persons)
+
+Screens verified identities against PEP databases (heads of state, senior officials, political associates). PEP screening is a separate provider that can run alongside or instead of AML/sanctions screening.
+
+**Configuration:** Set `AML_PROVIDER=pep` or combine with sanctions: `AML_PROVIDER=opensanctions,pep`. Per-developer opt-out via `aml_enabled: false`.
+
+PEP results appear in the same `aml_screening` field as sanctions results. When multiple providers run, matches are merged and deduplicated. The `list_source` field in each match indicates whether the hit came from a sanctions list or a PEP database.
+
+---
+
+## Compliance Orchestration Engine
+
+Developer-configurable rule engine. Define rules that automatically adjust verification requirements based on country, document type, user age, risk score, and custom metadata. Rules auto-apply at `POST /api/v2/verify/initialize` — zero code changes needed to your existing integration.
+
+All compliance endpoints accept **either** `X-API-Key` (developer automation/SDK) **or** an organization-admin reviewer session cookie (Admin Dashboard UI).
+
+### Endpoints
+
+```
+POST   /api/v2/compliance/rulesets           → Create ruleset
+GET    /api/v2/compliance/rulesets           → List rulesets (includes rule_count)
+GET    /api/v2/compliance/rulesets/:id       → Get ruleset with all rules
+PUT    /api/v2/compliance/rulesets/:id       → Update ruleset metadata
+DELETE /api/v2/compliance/rulesets/:id       → Delete ruleset + all rules (CASCADE)
+POST   /api/v2/compliance/rulesets/:id/rules → Add rule to ruleset
+PUT    /api/v2/compliance/rules/:id          → Update rule condition/action
+DELETE /api/v2/compliance/rules/:id          → Delete rule
+POST   /api/v2/compliance/evaluate           → Dry-run evaluation
+```
+
+### Condition Fields
+
+| Field | Description |
+|-------|-------------|
+| `country` | ISO country code |
+| `document_type` | passport, drivers_license, national_id |
+| `user_age` | Calculated from DOB |
+| `risk_score` | Composite score (0.0–1.0) |
+| `aml_risk_level` | clear, potential_match, confirmed_match |
+| `metadata.*` | Developer-supplied key-value data |
+
+### Action Fields
+
+| Field | Description |
+|-------|-------------|
+| `set_mode` | Override to age_only / document_only / identity / full |
+| `require_address` | Enable address verification step |
+| `require_liveness` | Set to passive or head_turn |
+| `require_aml` | Force AML/sanctions screening |
+| `force_manual_review` | Route to manual review |
+| `set_flag` | Attach a custom flag (e.g. high_risk) |
+
+### Condition Operators
+
+| Operator | Description |
+|----------|-------------|
+| `eq` / `neq` | Equals / not equals |
+| `in` / `not_in` | Value in / not in array |
+| `gt` / `gte` / `lt` / `lte` | Numeric comparisons |
+| `exists` | Field present (true) or absent (false) |
+| `contains` | String contains substring |
+| `all` / `any` / `not` | Combinators — nest conditions |
+
+### Rule Structure
+
+Conditions use leaf nodes (`{ "field": "country", "op": "in", "value": ["DE", "FR"] }`) or combinators (`{ "all": [...] }`, `{ "any": [...] }`, `{ "not": {...} }`).
+
+**Example — EU minor rule:**
+
+```json
+{
+  "condition": {
+    "all": [
+      { "field": "country", "op": "in", "value": ["DE", "FR", "IT", "ES"] },
+      { "field": "user_age", "op": "lt", "value": 18 }
+    ]
+  },
+  "action": {
+    "set_mode": "full",
+    "require_aml": true,
+    "force_manual_review": true,
+    "set_flag": "eu_minor"
+  }
+}
+```
+
+**Merging behavior:** When multiple rules match, actions merge additively. Verification mode escalates (never downgrades): `age_only < document_only < identity < full`. Boolean flags like `force_manual_review` stick once set. Custom flags from all matching rules are collected and deduplicated.
+
+### Dry-Run Evaluate
+
+```
+POST /api/v2/compliance/evaluate
+Content-Type: application/json
+
+{
+  "context": {
+    "country": "DE",
+    "user_age": 16,
+    "document_type": "passport"
+  }
+}
+```
+
+**Response:**
+
+```json
+{
+  "success": true,
+  "matched_rules": 1,
+  "matches": [
+    {
+      "ruleset": "EU Compliance",
+      "rule": "Full verification + manual review for EU minors",
+      "action": { "set_mode": "full", "require_aml": true, "force_manual_review": true, "set_flag": "eu_minor" }
+    }
+  ],
+  "resolved_action": {
+    "set_mode": "full",
+    "require_aml": true,
+    "force_manual_review": true,
+    "flags": ["eu_minor"]
+  }
+}
+```
+
+Response includes `compliance_applied` when rules match during `POST /api/v2/verify/initialize`.
+
+---
+
+## Verifiable Credentials (W3C JWT-VC)
+
+Issue W3C Verifiable Credentials for completed verifications. Credentials are signed with Ed25519 (EdDSA) and can be independently verified by any relying party using the issuer's DID document — no API key needed for verification.
+
+```
+GET  /api/v2/verify/:id/credential         → Issue JWT-VC (requires API key, vc_enabled)
+POST /api/v2/verify/:id/credential/send    → Email credential with QR code (requires API key, vc_enabled)
+GET  /api/v2/credentials/:jti/status       → Check revocation status (public, no auth)
+POST /api/v2/credentials/:jti/revoke       → Revoke credential (requires API key)
+GET  /.well-known/did.json                 → Issuer DID document (public)
+```
+
+**Client-side verification:** Resolve `did:web:api.idswyft.app` → fetch `/.well-known/did.json` → extract Ed25519 public key → verify JWT signature. ~15KB with `@noble/ed25519`.
+
+---
+
+## Identity Vault
+
+Tokenized identity storage. Store verified identity data encrypted at rest (AES-256-GCM), reference it via opaque tokens.
+
+```
+POST   /api/v2/vault/store                    → Store verified identity, get vault token (requires API key, vault_enabled)
+GET    /api/v2/vault/:token                   → Retrieve full identity data (requires API key)
+GET    /api/v2/vault/:token/attributes/:attr  → Get single attribute e.g. age_over_21 (requires API key)
+DELETE /api/v2/vault/:token                   → GDPR hard delete (requires API key)
+GET    /api/v2/vault                          → List vault tokens, paginated (requires API key)
+POST   /api/v2/vault/:token/share             → Create time-limited share link (requires API key)
+GET    /api/v2/vault/share/:shareToken        → Access shared attributes (public, no auth)
+```
 
 ---
 
@@ -882,6 +1214,22 @@ On first boot, navigate to the frontend. If no developer account exists, a setup
 
 ## Changelog
 
+### v1.8.51 (2026-04-24)
+
+**Fixed:**
+- `redirect_url` now works on mobile verification pages (previously dropped during mobile auto-redirect)
+- Open redirect vulnerability: `redirect_url` validated to only allow `http:` / `https:` protocols
+
+**Added:**
+- Face age estimation — cross-checks apparent face age against declared DOB as fraud signal
+- PEP screening — screen against politically exposed persons databases
+- Velocity / fraud detection — flags rapid resubmissions, bot timing, burst activity, multi-IP abuse
+- IP geolocation risk — detects country mismatch, Tor, datacenter IPs, high-risk jurisdictions
+- Voice authentication — optional speaker verification with 512-d embeddings (CAM++ model)
+- Compliance orchestration engine — rule-based verification policy automation
+- Verifiable Credentials (W3C JWT-VC) — issue and verify Ed25519-signed credentials
+- Identity Vault — tokenized identity storage with AES-256-GCM encryption
+
 ### v1.8.2 (2026-04-02)
 
 **Added:**
@@ -988,4 +1336,4 @@ On first boot, navigate to the frontend. If no developer account exists, a setup
 
 ---
 
-Generated from Idswyft API v1.8.2 — https://idswyft.app/docs
+Generated from Idswyft API v1.8.51 — https://idswyft.app/docs
