@@ -1,9 +1,14 @@
 # ─────────────────────────────────────────────────
-# CI — Type checking and build verification
+# CI — Type checking, tests, and build verification
 # ─────────────────────────────────────────────────
 # Triggers on pull requests targeting main or dev.
 # Must pass before PRs can be merged (configure as
 # required status check in branch protection rules).
+#
+# Backend job runs both `tsc --noEmit` and the vitest
+# suite. Job name preserved as `typecheck-backend` to
+# avoid breaking required-status-check rules; rename
+# in a coordinated branch-protection update later.
 # ─────────────────────────────────────────────────
 
 name: CI
@@ -48,7 +53,10 @@ jobs:
       - run: npm install
       # Build shared so backend can resolve its type declarations
       - run: cd shared && npx tsc && npx tsc-alias
-      - run: cd backend && npx tsc --noEmit
+      - name: Type-check backend
+        run: cd backend && npx tsc --noEmit
+      - name: Run backend tests (vitest)
+        run: cd backend && npm test -- --run
 
   typecheck-frontend:
     name: Typecheck frontend
