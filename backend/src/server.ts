@@ -18,6 +18,7 @@ import { generateAPIKey, authenticateAPIKey } from './middleware/auth.js';
 import { apiActivityLogger } from './middleware/apiLogger.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { logger } from './utils/logger.js';
+import { createGracefulShutdown } from './utils/gracefulShutdown.js';
 import { configureSharedLogger } from '@idswyft/shared';
 import newVerificationRoutes from './routes/newVerification.js';
 import developerRoutes from './routes/developer/index.js';
@@ -448,17 +449,49 @@ const startServer = async () => {
       }
     });
 
-    // Graceful shutdown
-    const gracefulShutdown = (signal: string) => {
-      console.log(`Received ${signal}. Starting graceful shutdown...`);
-      server.close(() => {
-        console.log('HTTP server closed');
-        process.exit(0);
-      });
-    };
+    // ─── Graceful shutdown (S2.7) ─────────────────────────────────
+    // Railway sends SIGTERM and gives 30s before SIGKILL. We aim for 25s
+    // (the createGracefulShutdown default) so there's a small buffer. The
+    // factory handles the drain sequence and idempotency; see
+    // utils/gracefulShutdown.ts for the orchestration logic.
+    const sb = supabase as any;
+    const dbPoolEnd =
+      sb?.pool?.end && typeof sb.pool.end === 'function'
+        ? () => sb.pool.end()
+        : undefined;
 
-    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+    const gracefulShutdown = createGracefulShutdown({
+      server,
+      dbPoolEnd,
+      exit: (code) => process.exit(code),
+      log: logger,
+    });
+
+    process.on('SIGTERM', () => { void gracefulShutdown('SIGTERM'); });
+    process.on('SIGINT', () => { void gracefulShutdown('SIGINT'); });
+
+    // uncaughtException: process state is undefined after this — we should
+    // not continue serving requests. Drain in-flight and exit non-zero.
+    process.on('uncaughtException', (err) => {
+      console.error('uncaughtException:', err);
+      logger.error('uncaughtException', {
+        message: err.message,
+        stack: err.stack,
+      });
+      void gracefulShutdown('uncaughtException', 1);
+    });
+
+    // unhandledRejection: log but DO NOT crash. Many ecosystems still
+    // produce these (esp. fire-and-forget background jobs). Future Node
+    // will crash by default; until then, this matches the conservative
+    // posture of the rest of the codebase.
+    process.on('unhandledRejection', (reason) => {
+      console.error('unhandledRejection:', reason);
+      logger.error('unhandledRejection', {
+        reason: reason instanceof Error ? reason.message : String(reason),
+        stack: reason instanceof Error ? reason.stack : undefined,
+      });
+    });
 
     return server;
   } catch (error) {
