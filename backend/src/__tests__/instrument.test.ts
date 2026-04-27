@@ -277,9 +277,35 @@ describe('scrubSentryEvent', () => {
     expect(event.exception.values[0].stacktrace.frames[0].vars.timeout).toBe(5000);
   });
 
+  it('scrubs PII patterns from event.transaction (route name)', () => {
+    const event: any = { transaction: 'GET /users/alice@example.com/profile' };
+    scrubSentryEvent(event);
+    expect(event.transaction).not.toContain('alice@example.com');
+    expect(event.transaction).toContain('[email]');
+  });
+
+  it('scrubs PII patterns from event.fingerprint entries', () => {
+    const event: any = {
+      fingerprint: ['error', 'User alice@example.com failed', 42],
+    };
+    scrubSentryEvent(event);
+    expect(event.fingerprint[0]).toBe('error');
+    expect(event.fingerprint[1]).not.toContain('alice@example.com');
+    expect(event.fingerprint[1]).toContain('[email]');
+    // Non-string entries pass through unchanged
+    expect(event.fingerprint[2]).toBe(42);
+  });
+
   it('returns a stub event (not the original) if scrubbing throws', () => {
     // Force a throw by making a getter that explodes on access.
-    const event: any = {};
+    const event: any = {
+      event_id: 'abc123',
+      transaction: 'GET /verify',
+      level: 'warning',
+      release: 'v1.9.0',
+      environment: 'production',
+      platform: 'node',
+    };
     Object.defineProperty(event, 'request', {
       get() { throw new Error('boom'); },
       configurable: true,
@@ -287,5 +313,26 @@ describe('scrubSentryEvent', () => {
     const result = scrubSentryEvent(event);
     expect(result).not.toBe(event);
     expect(result?.tags?.scrubber).toBe('failed');
+    // Correlation fields preserved so ops can still trace the failure.
+    expect(result?.event_id).toBe('abc123');
+    expect(result?.transaction).toBe('GET /verify');
+    expect(result?.level).toBe('warning');
+    expect(result?.release).toBe('v1.9.0');
+    expect(result?.environment).toBe('production');
+    expect(result?.platform).toBe('node');
+  });
+
+  it('falls back to minimal stub if even the enriched stub throws', () => {
+    // Pathological event: every property access throws. The outer scrubber
+    // catches the first throw, then the inner stub-builder catches the
+    // throwing getters that block field access for correlation. Should
+    // still return a non-empty stub rather than re-throwing.
+    const event: any = new Proxy({}, {
+      get() { throw new Error('every-access-throws'); },
+    });
+    expect(() => scrubSentryEvent(event)).not.toThrow();
+    const result = scrubSentryEvent(event);
+    expect(result?.tags?.scrubber).toBe('failed');
+    expect(result?.message).toContain('scrubber_error');
   });
 });

@@ -207,14 +207,44 @@ export function scrubSentryEvent(event: any): any {
       }
     }
 
+    // 4. event.transaction is the route name — usually safe but
+    // /users/alice@example.com style routes leak. Scrub free-text patterns.
+    if (typeof event.transaction === 'string') {
+      event.transaction = scrubText(event.transaction) as string;
+    }
+
+    // 5. event.fingerprint is a user-supplied grouping key (string array).
+    // Code that calls Sentry.withScope(s => s.setFingerprint([err.message]))
+    // can inject raw error text — scrub each string entry.
+    if (Array.isArray(event.fingerprint)) {
+      event.fingerprint = event.fingerprint.map((f: unknown) =>
+        typeof f === 'string' ? scrubText(f) : f,
+      );
+    }
+
     return event;
   } catch {
     // Scrubber failure must never let the original event through.
-    // Return a minimal stub so we still see "something happened" in Sentry.
-    return {
-      message: '[scrubber_error] event suppressed to prevent PII leak',
-      level: 'error',
-      tags: { scrubber: 'failed' },
-    };
+    // Return a stub that preserves correlation fields (event_id, transaction,
+    // release, environment) so ops can still group and trace, but no PII.
+    // Inner try/catch in case the original event has throwing getters.
+    try {
+      return {
+        event_id: event?.event_id,
+        transaction: event?.transaction,
+        level: event?.level ?? 'error',
+        release: event?.release,
+        environment: event?.environment,
+        platform: event?.platform,
+        message: '[scrubber_error] event suppressed to prevent PII leak',
+        tags: { scrubber: 'failed' },
+      };
+    } catch {
+      return {
+        message: '[scrubber_error] event suppressed to prevent PII leak',
+        level: 'error',
+        tags: { scrubber: 'failed' },
+      };
+    }
   }
 }
