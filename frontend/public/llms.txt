@@ -37,6 +37,8 @@ POST /api/v2/verify/:id/voice-capture   → Speaker verification (optional)
 GET  /api/v2/verify/:id/status          → Poll for final result
 ```
 
+All POST endpoints accept an `Idempotency-Key` header for safe retry on network failures. Same key replays the original response within 24 hours. See llms-full.txt § Idempotency.
+
 ## Verification Modes
 
 | Mode | Steps | Use Case |
