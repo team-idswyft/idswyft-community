@@ -159,8 +159,9 @@ cd engine && npm install && npm run dev     # → localhost:3002
 ## Compliance
 
 - Face embeddings stripped before DB persistence (GDPR Article 9)
-- Data retention with configurable `DATA_RETENTION_DAYS`
-- GDPR erasure covers all tables: documents, selfies, contexts, risk scores, webhook payloads
+- Data retention with configurable `DATA_RETENTION_DAYS` (default 90 days)
+- GDPR erasure (`dataRetention.ts:deleteUserData`) covers `documents`, `selfies`, `verification_contexts`, `verification_risk_scores`, `expiry_alerts`, `reverification_schedules`, `phone_otp_codes`, `phone_otp_rate_limits`, `dedup_fingerprints`, `aml_screenings` (hard delete), plus `webhook_deliveries.payload` (nulled, delivery row preserved). `verification_requests` and `users` are anonymized — `user_id` nulled, PII fields cleared — preserving the verification audit trail for compliance reporting
+- **Verification audit trail vs request telemetry**: the verification audit trail (`verification_requests`, `documents`, `selfies`, `aml_screenings`) is **anonymized-not-deleted** so audit reports remain queryable after retention. `api_activity_logs` is **separate operational telemetry** (one row per API call) hard-deleted on a 7-day rolling window via `dataRetention.ts:runActivityLogCleanup`. The two layers serve different purposes; don't conflate them in compliance docs
 - File encryption at rest: S3-backed storage uses SSE-AES256 server-side encryption (`storage.ts:194`). The `local` provider writes plaintext to disk — operators using `STORAGE_PROVIDER=local` for production should rely on filesystem-level encryption (LUKS, dm-crypt, EBS volume encryption) until envelope encryption ships. Cloud edition uses S3.
 - HTTPS enforced in production, PG SSL auto-enabled for non-local connections
 - CSP + HSTS headers on both nginx and Express
