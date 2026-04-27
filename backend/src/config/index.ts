@@ -37,7 +37,15 @@ export const config: AppConfig = {
     awsAccessKey: process.env.AWS_ACCESS_KEY_ID,
     awsSecretKey: process.env.AWS_SECRET_ACCESS_KEY,
     awsRegion: process.env.AWS_REGION || 'us-east-1',
-    awsS3Bucket: process.env.AWS_S3_BUCKET
+    awsS3Bucket: process.env.AWS_S3_BUCKET,
+    // Envelope encryption for the local provider. When true, new file writes
+    // are AES-256-GCM encrypted under ENCRYPTION_KEY (envelope-wrapped per file).
+    // Read path always handles a mixed population — pre-encryption files
+    // pass through as-is, encrypted files decrypt. See storageCrypto.ts.
+    encryption: process.env.STORAGE_ENCRYPTION === 'true',
+    // Optional previous master key, used during key rotation. When set, the
+    // read path tries this key as a fallback after the current ENCRYPTION_KEY.
+    encryptionKeyPrevious: process.env.ENCRYPTION_KEY_PREVIOUS,
   },
   
   ocr: {
@@ -111,4 +119,27 @@ if (process.env.NODE_ENV === 'production') {
     encryptionKey: config.encryptionKey,
     serviceToken: config.serviceToken,
   });
+}
+
+// Hard guard: STORAGE_ENCRYPTION=true with the default placeholder ENCRYPTION_KEY
+// would encrypt files under a public-string key (the placeholder appears
+// verbatim in this file and the README). Fail-fast at startup regardless of
+// NODE_ENV so this misconfiguration can't slip through dev → staging → prod.
+if (config.storage.encryption) {
+  const placeholderKeys = [
+    'your-32-character-encryption-key',
+    'change-this-32-char-encrypt-key!',
+  ];
+  if (placeholderKeys.includes(config.encryptionKey) || !process.env.ENCRYPTION_KEY) {
+    throw new Error(
+      'STORAGE_ENCRYPTION=true requires ENCRYPTION_KEY to be set to a real value (not the default placeholder). ' +
+      'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))" — ' +
+      'then set it as the ENCRYPTION_KEY env var.'
+    );
+  }
+  if (Buffer.byteLength(config.encryptionKey, 'utf8') < 32) {
+    throw new Error(
+      `STORAGE_ENCRYPTION=true requires ENCRYPTION_KEY to be at least 32 bytes (got ${Buffer.byteLength(config.encryptionKey, 'utf8')}).`
+    );
+  }
 }

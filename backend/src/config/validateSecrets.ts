@@ -44,6 +44,18 @@ export function validateSecrets(secrets: Secrets): void {
     );
   }
 
+  // Placeholder check: the default value is exactly 32 chars, so the length
+  // check above would let it pass. Block it explicitly. Critical when
+  // STORAGE_ENCRYPTION=true — files would otherwise be encrypted under a
+  // public-string key, re-creating the audit finding the feature was
+  // supposed to fix.
+  if (PLACEHOLDER_SECRETS.includes(secrets.encryptionKey)) {
+    throw new Error(
+      'ENCRYPTION_KEY must be changed from the default value. ' +
+      'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))"'
+    );
+  }
+
   if (secrets.apiKeySecret.length < 32) {
     throw new Error('API_KEY_SECRET must be at least 32 characters long.');
   }
