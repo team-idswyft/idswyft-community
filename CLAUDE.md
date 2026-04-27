@@ -161,6 +161,6 @@ cd engine && npm install && npm run dev     # → localhost:3002
 - Face embeddings stripped before DB persistence (GDPR Article 9)
 - Data retention with configurable `DATA_RETENTION_DAYS`
 - GDPR erasure covers all tables: documents, selfies, contexts, risk scores, webhook payloads
-- All uploaded files encrypted at rest
+- File encryption at rest: S3-backed storage uses SSE-AES256 server-side encryption (`storage.ts:194`). The `local` provider writes plaintext to disk — operators using `STORAGE_PROVIDER=local` for production should rely on filesystem-level encryption (LUKS, dm-crypt, EBS volume encryption) until envelope encryption ships. Cloud edition uses S3.
 - HTTPS enforced in production, PG SSL auto-enabled for non-local connections
 - CSP + HSTS headers on both nginx and Express
