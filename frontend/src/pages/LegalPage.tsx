@@ -169,10 +169,17 @@ export function LegalPage() {
 
         <SubHeading>Data Storage & Security</SubHeading>
         <P>
-          All identity documents and biometric data are encrypted at rest using AES-256 encryption.
-          Data is transmitted exclusively over HTTPS/TLS 1.3. We store verification data only for the
-          duration required by your configured retention policy (default: 30 days), after which it is
-          permanently deleted.
+          On Idswyft Cloud (idswyft.app), identity documents and biometric data are stored with
+          AES-256 server-side encryption at rest. Application-layer encryption additionally protects
+          stored secrets such as API keys and webhook signing keys. Data is transmitted exclusively
+          over HTTPS/TLS 1.3. We store verification data only for the duration required by your
+          configured retention policy (default: 30 days), after which it is permanently deleted.
+        </P>
+        <P>
+          Self-hosted deployments (community edition) ship with local filesystem storage by default;
+          operators are responsible for configuring encryption at rest, either via filesystem-level
+          encryption (LUKS, dm-crypt, EBS volume encryption) or by switching to S3-compatible storage
+          with server-side encryption enabled.
         </P>
 
         <SubHeading>Third-Party Sharing</SubHeading>

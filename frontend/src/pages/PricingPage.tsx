@@ -94,7 +94,7 @@ const features: FeatureGroup[] = [
   {
     category: 'Security & Compliance',
     rows: [
-      { label: 'Encryption at rest', community: Y, starter: Y, pro: Y },
+      { label: 'Encryption at rest (managed)', community: N, starter: Y, pro: Y },
       { label: 'GDPR / CCPA compliance', community: Y, starter: Y, pro: Y },
       { label: 'Configurable data retention', community: Y, starter: Y, pro: Y },
       { label: 'Audit logs', community: Y, starter: N, pro: Y },
