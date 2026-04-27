@@ -78,6 +78,12 @@ export class DataRetentionService {
         .delete()
         .in('verification_request_id', verificationIds);
 
+      // Delete AML/PEP screening records — these contain screened name + DOB
+      // and full match details, which are PII tied to the verification.
+      await supabase.from('aml_screenings')
+        .delete()
+        .in('verification_request_id', verificationIds);
+
       // Nullify webhook delivery payloads (preserve delivery audit trail, remove PII)
       await supabase.from('webhook_deliveries')
         .update({ payload: null })
@@ -167,6 +173,7 @@ export class DataRetentionService {
     await supabase.from('phone_otp_codes').delete().in('verification_request_id', ids);
     await supabase.from('phone_otp_rate_limits').delete().in('verification_request_id', ids);
     await supabase.from('dedup_fingerprints').delete().in('verification_request_id', ids);
+    await supabase.from('aml_screenings').delete().in('verification_request_id', ids);
     await supabase.from('verification_requests').delete().in('id', ids);
 
     logger.info(`Demo cleanup: ${ids.length} verifications deleted`, {

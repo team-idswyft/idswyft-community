@@ -44,9 +44,30 @@ export function isPathSafe(filePath: string): boolean {
 }
 
 /**
+ * Map a file extension to a MIME type for Content-Type headers when serving
+ * via res.send(buffer) instead of res.sendFile (which infers it automatically).
+ */
+function mimeFromPath(filePath: string): string {
+  const ext = path.extname(filePath).toLowerCase();
+  const mimes: Record<string, string> = {
+    '.png': 'image/png',
+    '.jpg': 'image/jpeg',
+    '.jpeg': 'image/jpeg',
+    '.gif': 'image/gif',
+    '.webp': 'image/webp',
+    '.pdf': 'application/pdf',
+  };
+  return mimes[ext] || 'application/octet-stream';
+}
+
+/**
  * Express handler that serves a file from the uploads directory.
  * Only registered when STORAGE_PROVIDER=local.
  * Requires API key authentication (applied in server.ts).
+ *
+ * When STORAGE_ENCRYPTION=true, reads via the StorageService so envelope-
+ * encrypted bytes get decrypted before they reach the wire. Otherwise
+ * defaults to res.sendFile for native streaming performance.
  */
 export async function serveLocalFile(req: Request, res: Response): Promise<void> {
   const requestedPath = (req.params as any)[0]; // everything after /api/files/
@@ -60,10 +81,30 @@ export async function serveLocalFile(req: Request, res: Response): Promise<void>
 
   try {
     await fs.access(absolutePath);
-    res.sendFile(absolutePath);
   } catch {
     res.status(404).json({ error: 'File not found' });
+    return;
   }
+
+  // When encryption is enabled, on-disk bytes are ciphertext — read through
+  // StorageService so maybeDecryptBlob runs on the response path.
+  if (config.storage.encryption) {
+    try {
+      const { StorageService } = await import('@/services/storage.js');
+      const storage = new StorageService();
+      // downloadFile takes a path relative to cwd (e.g. "uploads/documents/abc.jpg").
+      const relPath = path.relative(process.cwd(), absolutePath).replace(/\\/g, '/');
+      const buffer = await storage.downloadFile(relPath);
+      res.setHeader('Content-Type', mimeFromPath(absolutePath));
+      res.send(buffer);
+      return;
+    } catch {
+      res.status(404).json({ error: 'File not found' });
+      return;
+    }
+  }
+
+  res.sendFile(absolutePath);
 }
 
 /**
@@ -96,11 +137,31 @@ export async function servePublicAsset(req: Request, res: Response): Promise<voi
 
     try {
       await fs.access(absolutePath);
-      res.setHeader('Cache-Control', 'public, max-age=3600');
-      res.sendFile(absolutePath);
     } catch {
       res.status(404).json({ error: 'File not found' });
+      return;
     }
+
+    // When encryption is enabled, on-disk bytes are ciphertext — read through
+    // StorageService so maybeDecryptBlob runs on the response path.
+    if (config.storage.encryption) {
+      try {
+        const { StorageService } = await import('@/services/storage.js');
+        const storage = new StorageService();
+        const relPath = path.relative(process.cwd(), absolutePath).replace(/\\/g, '/');
+        const buffer = await storage.downloadFile(relPath);
+        res.setHeader('Content-Type', mimeFromPath(absolutePath));
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        res.send(buffer);
+        return;
+      } catch {
+        res.status(404).json({ error: 'File not found' });
+        return;
+      }
+    }
+
+    res.setHeader('Cache-Control', 'public, max-age=3600');
+    res.sendFile(absolutePath);
     return;
   }
 

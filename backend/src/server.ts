@@ -18,6 +18,7 @@ import { generateAPIKey, authenticateAPIKey } from './middleware/auth.js';
 import { apiActivityLogger } from './middleware/apiLogger.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { logger } from './utils/logger.js';
+import { createGracefulShutdown } from './utils/gracefulShutdown.js';
 import { configureSharedLogger } from '@idswyft/shared';
 import newVerificationRoutes from './routes/newVerification.js';
 import developerRoutes from './routes/developer/index.js';
@@ -448,17 +449,63 @@ const startServer = async () => {
       }
     });
 
-    // Graceful shutdown
-    const gracefulShutdown = (signal: string) => {
-      console.log(`Received ${signal}. Starting graceful shutdown...`);
-      server.close(() => {
-        console.log('HTTP server closed');
-        process.exit(0);
-      });
-    };
+    // ─── Graceful shutdown (S2.7) ─────────────────────────────────
+    // Railway sends SIGTERM and gives 30s before SIGKILL. We aim for 25s
+    // (the createGracefulShutdown default) so there's a small buffer. The
+    // factory handles the drain sequence and idempotency; see
+    // utils/gracefulShutdown.ts for the orchestration logic.
+    const sb = supabase as any;
+    const dbPoolEnd =
+      sb?.pool?.end && typeof sb.pool.end === 'function'
+        ? () => sb.pool.end()
+        : undefined;
 
-    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+    const gracefulShutdown = createGracefulShutdown({
+      server,
+      dbPoolEnd,
+      exit: (code) => process.exit(code),
+      log: logger,
+    });
+
+    process.on('SIGTERM', () => { void gracefulShutdown('SIGTERM'); });
+    process.on('SIGINT', () => { void gracefulShutdown('SIGINT'); });
+
+    // uncaughtException: process state is undefined after this — V8 heap
+    // may be corrupt, in-flight requests could be reading stale globals or
+    // committing half-state. We still call server.close() to stop NEW
+    // connections (and finish the small set of in-flight requests that
+    // can complete cleanly), but cap the wait at 2s instead of the
+    // 25s SIGTERM budget — much shorter than the 25s SIGTERM budget so
+    // we don't continue shipping potentially-corrupt responses to live
+    // users while we wait.
+    const UNCAUGHT_FORCE_EXIT_MS = 2000;
+    process.on('uncaughtException', (err) => {
+      console.error('uncaughtException:', err);
+      logger.error('uncaughtException', {
+        message: err.message,
+        stack: err.stack,
+      });
+      void gracefulShutdown('uncaughtException', 1, UNCAUGHT_FORCE_EXIT_MS);
+    });
+
+    // unhandledRejection: policy configurable via env var. Default 'log' to
+    // match the conservative posture this codebase has historically held —
+    // many fire-and-forget background jobs produce these and crashing on
+    // them would kill the API. Operators who prefer Node's modern default
+    // (crash on unhandled rejection) can set UNHANDLED_REJECTION_POLICY=crash.
+    const unhandledRejectionPolicy = (process.env.UNHANDLED_REJECTION_POLICY ?? 'log').toLowerCase();
+    process.on('unhandledRejection', (reason) => {
+      console.error('unhandledRejection:', reason);
+      logger.error('unhandledRejection', {
+        reason: reason instanceof Error ? reason.message : String(reason),
+        stack: reason instanceof Error ? reason.stack : undefined,
+        policy: unhandledRejectionPolicy,
+      });
+      if (unhandledRejectionPolicy === 'crash') {
+        // Same emergency-shutdown semantics as uncaughtException.
+        void gracefulShutdown('unhandledRejection', 1, UNCAUGHT_FORCE_EXIT_MS);
+      }
+    });
 
     return server;
   } catch (error) {

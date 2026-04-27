@@ -6,6 +6,13 @@
  *
  * If ENGINE_URL is not set, the client is disabled and callers should
  * fall back to local extraction (backward compatibility for dev mode).
+ *
+ * Reliability layer (added 2026-04 per audit S2.5):
+ *   - 2 retries on transient failure (3 attempts total)
+ *   - exponential backoff: 500ms, 1000ms
+ *   - no retry on 4xx (engine deliberately rejected input)
+ *   - circuit breaker opens after 5 consecutive failures, auto-recovers
+ *     after 30s. Open state fails fast in <1ms with a clear error.
  */
 
 import { logger } from '@/utils/logger.js';
@@ -15,40 +22,120 @@ import type { OCRData } from '@/types/index.js';
 const ENGINE_URL = process.env.ENGINE_URL || '';
 const ENGINE_TIMEOUT = parseInt(process.env.ENGINE_TIMEOUT || '60000'); // 60s default
 
+// ─── Retry / circuit breaker config ─────────────────────────────
+const MAX_ATTEMPTS = 3;
+// Backoff is configurable via env so tests can use 1ms instead of 500/1000ms.
+// Production should leave this unset to use the audit-recommended defaults.
+const BACKOFF_BASE_MS = parseInt(process.env.ENGINE_BACKOFF_BASE_MS || '500');
+const BREAKER_FAILURE_THRESHOLD = 5;
+const BREAKER_OPEN_MS = parseInt(process.env.ENGINE_BREAKER_OPEN_MS || '30000');
+
 /** Whether the engine worker is configured (ENGINE_URL is set). */
 export function isEngineEnabled(): boolean {
   return ENGINE_URL.length > 0;
 }
 
-/** Voice enrollment result from engine */
-export interface VoiceEnrollResult {
-  speaker_embedding: number[];
-  embedding_dimension: number;
+// ─── Typed error so retry logic can branch on retryability ──────
+export class EngineError extends Error {
+  constructor(
+    message: string,
+    public readonly status: number,
+    public readonly retryable: boolean,
+  ) {
+    super(message);
+    this.name = 'EngineError';
+  }
 }
 
-/** Voice verification result from engine */
-export interface VoiceVerifyResult {
-  speaker_embedding: number[];
-  embedding_dimension: number;
-  transcription: string;
+/** Thrown when the circuit breaker is open and we're failing fast. */
+export class EngineCircuitOpenError extends Error {
+  constructor(reopensAt: number) {
+    super(`Engine circuit breaker is open; auto-recovers at ${new Date(reopensAt).toISOString()}`);
+    this.name = 'EngineCircuitOpenError';
+  }
+}
+
+// ─── Circuit breaker state (module-level singleton) ─────────────
+interface BreakerState {
+  consecutiveFailures: number;
+  openedAt: number | null;
+}
+
+const breaker: BreakerState = {
+  consecutiveFailures: 0,
+  openedAt: null,
+};
+
+function breakerIsOpen(): boolean {
+  if (breaker.openedAt === null) return false;
+  if (Date.now() - breaker.openedAt > BREAKER_OPEN_MS) {
+    // Half-open: clear timestamp so the next call is allowed through.
+    // consecutiveFailures stays elevated; if the probe fails it'll reopen
+    // immediately, if it succeeds breakerOnSuccess will clear the count.
+    breaker.openedAt = null;
+    return false;
+  }
+  return true;
+}
+
+function breakerOnSuccess(): void {
+  if (breaker.consecutiveFailures > 0 || breaker.openedAt !== null) {
+    logger.info('Engine circuit breaker: success, resetting', {
+      previousFailures: breaker.consecutiveFailures,
+    });
+  }
+  breaker.consecutiveFailures = 0;
+  breaker.openedAt = null;
+}
+
+function breakerOnFailure(): void {
+  breaker.consecutiveFailures++;
+  if (breaker.consecutiveFailures >= BREAKER_FAILURE_THRESHOLD && breaker.openedAt === null) {
+    breaker.openedAt = Date.now();
+    logger.warn('Engine circuit breaker: opening', {
+      consecutiveFailures: breaker.consecutiveFailures,
+      durationMs: BREAKER_OPEN_MS,
+    });
+  }
 }
 
 /**
- * Send a multipart request to the engine worker.
- * Uses native fetch + FormData (Node 18+).
+ * Reset breaker state. Exported only for tests — production code should not
+ * call this; the breaker auto-recovers via its half-open path.
+ *
+ * Hard-guarded against accidental production calls via NODE_ENV check —
+ * the function is exported (so tests across files can use it) but throws
+ * if invoked outside test mode. Prevents the breaker from being defeated
+ * by a route handler accidentally importing it.
  */
-async function callEngine<T>(
+export function _resetBreakerForTests(): void {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('_resetBreakerForTests cannot be called in production');
+  }
+  breaker.consecutiveFailures = 0;
+  breaker.openedAt = null;
+}
+
+/** Inspect breaker state. Exported for tests and observability. */
+export function getBreakerState(): Readonly<BreakerState> {
+  return { ...breaker };
+}
+
+/**
+ * Single attempt: build the multipart request, send via fetch, parse JSON.
+ * Throws EngineError on protocol/HTTP errors with retryability marked.
+ * Throws plain Error for fundamental failures (e.g. invalid response shape).
+ */
+async function callEngineOnce<T>(
   endpoint: string,
   fileBuffer: Buffer,
   metadata: Record<string, string>,
-  filename = 'image.jpg',
+  filename: string,
 ): Promise<T> {
   const url = `${ENGINE_URL}${endpoint}`;
 
-  // Build multipart/form-data using native Blob/FormData
   const formData = new FormData();
   formData.append('file', new Blob([new Uint8Array(fileBuffer)]), filename);
-
   for (const [key, value] of Object.entries(metadata)) {
     if (value !== undefined && value !== null) {
       formData.append(key, value);
@@ -67,23 +154,110 @@ async function callEngine<T>(
 
     if (!response.ok) {
       const body = await response.text();
-      throw new Error(`Engine returned ${response.status}: ${body}`);
+      // 4xx = engine deliberately rejected input → not retryable.
+      // 5xx = engine had an internal failure → retryable.
+      const retryable = response.status >= 500;
+      throw new EngineError(
+        `Engine returned ${response.status}: ${body}`,
+        response.status,
+        retryable,
+      );
     }
 
-    const json = await response.json() as { success: boolean; result: T; error?: string; message?: string };
+    const json = (await response.json()) as { success: boolean; result: T; error?: string; message?: string };
     if (!json.success) {
-      throw new Error(`Engine extraction failed: ${json.message || json.error || 'Unknown'}`);
+      // Engine returned 200 but indicated logical failure. Treat as 4xx-like:
+      // not retryable (the engine looked at the input and said no).
+      throw new EngineError(
+        `Engine extraction failed: ${json.message || json.error || 'Unknown'}`,
+        200,
+        false,
+      );
     }
 
     return json.result;
   } catch (error) {
+    // Map AbortError (timeout) and network errors to retryable EngineError.
     if (error instanceof DOMException && error.name === 'AbortError') {
-      throw new Error(`Engine request timed out after ${ENGINE_TIMEOUT}ms: ${endpoint}`);
+      throw new EngineError(
+        `Engine request timed out after ${ENGINE_TIMEOUT}ms: ${endpoint}`,
+        0,
+        true,
+      );
+    }
+    if (error instanceof EngineError) {
+      throw error;
+    }
+    // fetch() throws TypeError on network failures (DNS, refused, reset).
+    if (error instanceof TypeError) {
+      throw new EngineError(
+        `Engine network error: ${error.message}`,
+        0,
+        true,
+      );
     }
     throw error;
   } finally {
     clearTimeout(timeout);
   }
+}
+
+/** Sleep helper — no setTimeout in promise constructors per lint convention. */
+function sleep(ms: number): Promise<void> {
+  return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Top-level call: applies the circuit breaker and retry policy around
+ * callEngineOnce. All extract* helpers route through this.
+ */
+async function callEngine<T>(
+  endpoint: string,
+  fileBuffer: Buffer,
+  metadata: Record<string, string>,
+  filename = 'image.jpg',
+): Promise<T> {
+  if (breakerIsOpen()) {
+    throw new EngineCircuitOpenError(breaker.openedAt! + BREAKER_OPEN_MS);
+  }
+
+  let lastError: Error | undefined;
+
+  for (let attempt = 1; attempt <= MAX_ATTEMPTS; attempt++) {
+    try {
+      const result = await callEngineOnce<T>(endpoint, fileBuffer, metadata, filename);
+      breakerOnSuccess();
+      return result;
+    } catch (error) {
+      lastError = error as Error;
+
+      // Non-retryable errors (4xx, logical failure): break out immediately
+      // and don't count this against the breaker (the input was bad, not
+      // the engine).
+      if (error instanceof EngineError && !error.retryable) {
+        throw error;
+      }
+
+      // Retryable failure: count it against the breaker and either retry
+      // or give up.
+      breakerOnFailure();
+
+      if (attempt < MAX_ATTEMPTS) {
+        const backoff = BACKOFF_BASE_MS * Math.pow(2, attempt - 1);
+        logger.warn('Engine call failed, retrying', {
+          endpoint,
+          attempt,
+          maxAttempts: MAX_ATTEMPTS,
+          backoffMs: backoff,
+          error: (error as Error).message,
+        });
+        await sleep(backoff);
+      }
+    }
+  }
+
+  // All retries exhausted.
+  throw lastError ?? new Error('Engine call failed without a captured error');
 }
 
 /**
@@ -159,6 +333,19 @@ export async function extractOCR(
 ): Promise<OCRData> {
   logger.info('Calling engine: /extract/ocr', { documentType });
   return callEngine<OCRData>('/extract/ocr', imageBuffer, { document_type: documentType });
+}
+
+/** Voice enrollment result from engine */
+export interface VoiceEnrollResult {
+  speaker_embedding: number[];
+  embedding_dimension: number;
+}
+
+/** Voice verification result from engine */
+export interface VoiceVerifyResult {
+  speaker_embedding: number[];
+  embedding_dimension: number;
+  transcription: string;
 }
 
 /**

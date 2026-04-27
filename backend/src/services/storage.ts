@@ -5,6 +5,21 @@ import crypto from 'crypto';
 import path from 'path';
 import fs from 'fs/promises';
 import type { VerificationSource } from '@/types/index.js';
+import { encryptBlob, maybeDecryptBlob } from './storageCrypto.js';
+
+/**
+ * Build the master-key candidate list for envelope decryption.
+ * Order: current ENCRYPTION_KEY first, then ENCRYPTION_KEY_PREVIOUS if set.
+ * During key rotation both are configured; new files use the current key,
+ * old files (still encrypted under the previous key) decrypt via the fallback.
+ */
+function masterKeyCandidates(): string[] {
+  const current = config.encryptionKey;
+  const previous = config.storage.encryptionKeyPrevious;
+  const candidates = [current];
+  if (previous && previous !== current) candidates.push(previous);
+  return candidates;
+}
 
 export class StorageService {
   private generateSecureFileName(originalName: string, verificationId: string): string {
@@ -157,12 +172,21 @@ export class StorageService {
     await this.ensureDirectoryExists(uploadDir);
 
     const filePath = path.join(uploadDir, fileName);
-    await fs.writeFile(filePath, buffer);
+
+    // Envelope-encrypt before writing if STORAGE_ENCRYPTION=true. The read
+    // path detects the magic prefix and decrypts on the fly, so flipping
+    // the flag is forward-compatible — existing plaintext files keep working.
+    const bytesToWrite = config.storage.encryption
+      ? encryptBlob(buffer, config.encryptionKey)
+      : buffer;
+
+    await fs.writeFile(filePath, bytesToWrite);
 
     logger.info('File stored locally', {
       path: filePath,
       folder,
-      fileName
+      fileName,
+      encrypted: config.storage.encryption,
     });
 
     return `uploads/${folder}/${fileName}`;
@@ -310,7 +334,10 @@ export class StorageService {
         return Buffer.from(await data.arrayBuffer());
       } else if (config.storage.provider === 'local') {
         const fullPath = path.join(process.cwd(), filePath);
-        return await fs.readFile(fullPath);
+        const raw = await fs.readFile(fullPath);
+        // Read path is always-on: encrypted files decrypt, legacy plaintext
+        // passes through unchanged. Detection is by magic-byte prefix.
+        return maybeDecryptBlob(raw, masterKeyCandidates());
       } else if (config.storage.provider === 's3') {
         const { S3Client, GetObjectCommand } = await import('@aws-sdk/client-s3');
 
@@ -438,8 +465,25 @@ export class StorageService {
   async getLocalFilePath(filePath: string): Promise<string> {
     try {
       if (config.storage.provider === 'local') {
-        // For local storage, just return the full path
-        return path.join(process.cwd(), filePath);
+        const fullPath = path.join(process.cwd(), filePath);
+
+        // If envelope encryption is OFF, the on-disk file is plaintext and
+        // we can return its path directly — same behavior as before.
+        if (!config.storage.encryption) {
+          return fullPath;
+        }
+
+        // Encryption ON: the on-disk file is ciphertext. Native consumers
+        // (OCR libraries, sharp, etc.) that read by path can't handle that,
+        // so write a decrypted temp file and return its path. Caller is
+        // responsible for cleanup (mirrors the supabase branch below).
+        const buffer = await this.downloadFile(filePath);   // handles decrypt
+        const tempDir = path.join(process.cwd(), 'temp');
+        await this.ensureDirectoryExists(tempDir);
+        const fileName = path.basename(filePath);
+        const tempFilePath = path.join(tempDir, `temp_${Date.now()}_${fileName}`);
+        await fs.writeFile(tempFilePath, buffer);
+        return tempFilePath;
       } else if (config.storage.provider === 'supabase') {
         // For Supabase, download to temp directory for processing
         const tempDir = path.join(process.cwd(), 'temp');

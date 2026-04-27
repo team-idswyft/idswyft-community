@@ -1506,9 +1506,23 @@ Register webhook URLs to receive real-time notifications when verification event
 | \`verification.reverification_due\` | Scheduled re-verification is due |
 | \`verification.age_check\` | Age-only verification completed (includes \`age_verification\` in payload data) |
 
+### Webhook Headers
+
+Every delivery includes these headers:
+
+| Header | Description |
+|--------|-------------|
+| \`Content-Type\` | Always \`application/json\` |
+| \`User-Agent\` | \`Idswyft-Webhooks/1.0\` |
+| \`X-Idswyft-Webhook-Id\` | Unique delivery ID — use to dedupe retries |
+| \`X-Idswyft-Delivery-Attempt\` | Attempt number (1, 2, or 3) |
+| \`X-Idswyft-Sandbox\` | \`true\` for sandbox webhooks, \`false\` for production. Use to route or alert without parsing the payload |
+| \`X-Idswyft-Verification-Mode\` | \`sandbox\` or \`production\` (string form of the same signal) |
+| \`X-Idswyft-Signature\` | HMAC-SHA256 signature when a signing secret is configured |
+
 ### Webhook Security
 
-All webhooks are signed with HMAC-SHA256 using your webhook secret. Verify the \`X-Webhook-Signature\` header to confirm authenticity.
+All webhooks are signed with HMAC-SHA256 using your webhook secret. Verify the \`X-Idswyft-Signature\` header to confirm authenticity. The signature is over the raw JSON body — verify before parsing to avoid replay/tamper attacks.
 
 ### Webhook Management
 
@@ -1521,6 +1535,43 @@ All webhooks are signed with HMAC-SHA256 using your webhook secret. Verify the \
 | POST | \`/api/developer/webhooks/:id/deliveries/:did/resend\` | Resend a failed delivery |
 
 Webhooks retry up to 3 times on failure with exponential backoff.
+
+---
+
+## Idempotency
+
+The verification endpoints accept an \`Idempotency-Key\` header (or the legacy \`X-Idempotency-Key\`) to make POST requests safely retryable. If a request times out or your network blips, retrying with the same key returns the stored response instead of creating a duplicate verification or processing the document twice.
+
+### How it works
+
+- Send any unique string per request — typically a UUIDv4 generated client-side.
+- We cache the (key, developer) → response mapping for 24 hours.
+- Retries within the window get the original response back, with header \`Idempotent-Replayed: true\` so observability can distinguish replays from fresh requests.
+- Keys are scoped per-developer; the same key from a different account doesn't collide.
+
+### Supported endpoints
+
+| Endpoint | Notes |
+|----------|-------|
+| \`POST /api/v2/verify/initialize\` | Prevents duplicate sessions on retry |
+| \`POST /api/v2/verify/:id/front-document\` | Prevents duplicate document rows |
+| \`POST /api/v2/verify/:id/back-document\` | Same |
+| \`POST /api/v2/verify/:id/live-capture\` | Same |
+
+### Example
+
+\`\`\`bash
+curl -X POST https://api.idswyft.app/api/v2/verify/initialize \\
+  -H "X-API-Key: ik_..." \\
+  -H "Idempotency-Key: $(uuidgen)" \\
+  -H "Content-Type: application/json" \\
+  -d '{"user_id": "...", "document_type": "auto"}'
+\`\`\`
+
+### Notes
+
+- The cache covers the response body and status code only — it does not validate that the request body matches the original. Reusing a key with a different body silently replays the original response. Generate a fresh key per logical operation.
+- If you don't send the header, the endpoint behaves normally (no caching, no idempotency guarantee) — opt-in only.
 
 ---
 

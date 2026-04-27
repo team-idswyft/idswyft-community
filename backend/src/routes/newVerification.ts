@@ -4,6 +4,7 @@ import { body, param } from 'express-validator';
 import crypto from 'crypto';
 import { authenticateAPIKeyOrHandoff, authenticateUser, checkSandboxMode, hashHandoffToken } from '@/middleware/auth.js';
 import { verificationRateLimit } from '@/middleware/rateLimit.js';
+import { idempotencyMiddleware } from '@/middleware/idempotency.js';
 import { catchAsync, ValidationError, FileUploadError } from '@/middleware/errorHandler.js';
 import { validate } from '@/middleware/validate.js';
 import { StorageService } from '@/services/storage.js';
@@ -729,6 +730,7 @@ async function requireOwnedVerification(req: Request, verificationId: string) {
 router.post('/initialize',
   authenticateAPIKeyOrHandoff,
   checkSandboxMode,
+  idempotencyMiddleware,
   verificationRateLimit,
   [
     body('user_id').isUUID().withMessage('User ID must be a valid UUID'),
@@ -1054,6 +1056,7 @@ router.post('/re-verify',
 
 router.post('/:verification_id/front-document',
   authenticateAPIKeyOrHandoff,
+  idempotencyMiddleware,
   verificationRateLimit,
   upload.single('document'),
   [
@@ -1325,6 +1328,7 @@ router.post('/:verification_id/front-document',
 
 router.post('/:verification_id/back-document',
   authenticateAPIKeyOrHandoff,
+  idempotencyMiddleware,
   verificationRateLimit,
   upload.single('document'),
   [
@@ -1552,6 +1556,7 @@ router.post('/:verification_id/cross-validation',
 
 router.post('/:verification_id/live-capture',
   authenticateAPIKeyOrHandoff,
+  idempotencyMiddleware,
   verificationRateLimit,
   upload.single('selfie'),
   [
