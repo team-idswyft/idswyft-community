@@ -139,8 +139,14 @@ backend/temp/
 # MediaPipe WASM assets (copied from node_modules at install time)
 **/public/mediapipe/
 
-# OCR benchmark scripts and specimens (internal tooling, not committed)
-backend/scripts/
+# OCR benchmark scripts and specimens (internal tooling, not committed).
+# Use scripts/* instead of scripts/ so explicit exceptions below can re-include
+# specific files (negative patterns can't escape an ignored directory).
+backend/scripts/*
+# Operational tooling that DOES need to ship — narrow exceptions to the
+# blanket scripts/* ignore above. Keep this list small and intentional.
+!backend/scripts/rotate-encryption-key.ts
+!backend/scripts/encryption-key-rotation.md
 
 # Caddy — generated Caddyfile and user-provided TLS certificates
 caddy/Caddyfile
