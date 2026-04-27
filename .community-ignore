@@ -18,6 +18,15 @@ frontend/.env.production
 .github/workflows/sync-release.yml
 .github/workflows/docker-publish.yml
 
+# Cloud-only operational tooling — the encryption-key rotation script and
+# its runbook are sensitive operational intelligence (env var names,
+# rotation timing, failure modes). Strip from the public community mirror.
+# The files stay in the private repo so Railway production builds can
+# include them; community self-hosters who enable STORAGE_ENCRYPTION are
+# responsible for their own rotation procedure.
+backend/scripts/rotate-encryption-key.ts
+backend/scripts/encryption-key-rotation.md
+
 # NOTE: .community-ignore and community-overrides/ are cleaned up
 # explicitly in sync-community.yml AFTER the overlay step.
 # Do NOT list them here — the overlay must happen first.
