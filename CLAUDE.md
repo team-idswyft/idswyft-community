@@ -114,7 +114,7 @@ postgres:16-alpine → engine (ML, port 3002) → api (port 3001) → frontend (
 
 - **`main`** is production — protected by branch rules, requires PR with approval
 - **`dev`** is the working branch — also protected, requires PR
-- CI runs `tsc --noEmit` on backend, frontend, and engine for all PRs
+- CI runs `tsc --noEmit` on shared, backend, frontend, and engine for all PRs, and runs the backend `vitest` suite
 - Docker images are built on `v*` tag push (not on merge to main)
 - CODEOWNERS requires `@doobee46` approval on all changes
 
