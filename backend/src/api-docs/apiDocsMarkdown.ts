@@ -1506,9 +1506,23 @@ Register webhook URLs to receive real-time notifications when verification event
 | \`verification.reverification_due\` | Scheduled re-verification is due |
 | \`verification.age_check\` | Age-only verification completed (includes \`age_verification\` in payload data) |
 
+### Webhook Headers
+
+Every delivery includes these headers:
+
+| Header | Description |
+|--------|-------------|
+| \`Content-Type\` | Always \`application/json\` |
+| \`User-Agent\` | \`Idswyft-Webhooks/1.0\` |
+| \`X-Idswyft-Webhook-Id\` | Unique delivery ID — use to dedupe retries |
+| \`X-Idswyft-Delivery-Attempt\` | Attempt number (1, 2, or 3) |
+| \`X-Idswyft-Sandbox\` | \`true\` for sandbox webhooks, \`false\` for production. Use to route or alert without parsing the payload |
+| \`X-Idswyft-Verification-Mode\` | \`sandbox\` or \`production\` (string form of the same signal) |
+| \`X-Idswyft-Signature\` | HMAC-SHA256 signature when a signing secret is configured |
+
 ### Webhook Security
 
-All webhooks are signed with HMAC-SHA256 using your webhook secret. Verify the \`X-Webhook-Signature\` header to confirm authenticity.
+All webhooks are signed with HMAC-SHA256 using your webhook secret. Verify the \`X-Idswyft-Signature\` header to confirm authenticity. The signature is over the raw JSON body — verify before parsing to avoid replay/tamper attacks.
 
 ### Webhook Management
 

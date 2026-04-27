@@ -14,7 +14,7 @@ vi.mock('@/config/index.js', () => ({
 }));
 vi.mock('axios', () => ({ default: { post: vi.fn() } }));
 
-import { createWebhookSignature, verifyWebhookSignature } from '../../services/webhook.js';
+import { createWebhookSignature, verifyWebhookSignature, buildWebhookHeaders } from '../../services/webhook.js';
 
 const secret = 'test-secret-key-12345';
 const payload = JSON.stringify({ event: 'verification.completed', data: {} });
@@ -55,5 +55,39 @@ describe('Webhook HMAC signing', () => {
 
   it('rejects signatures with mismatched length', () => {
     expect(verifyWebhookSignature(payload, 'sha256=tooshort', secret)).toBe(false);
+  });
+});
+
+describe('buildWebhookHeaders', () => {
+  it('sets X-Idswyft-Sandbox=true and verification-mode=sandbox for sandbox webhooks', () => {
+    const headers = buildWebhookHeaders({ is_sandbox: true }, 'delivery-123', 1);
+    expect(headers['X-Idswyft-Sandbox']).toBe('true');
+    expect(headers['X-Idswyft-Verification-Mode']).toBe('sandbox');
+  });
+
+  it('sets X-Idswyft-Sandbox=false and verification-mode=production for production webhooks', () => {
+    const headers = buildWebhookHeaders({ is_sandbox: false }, 'delivery-456', 1);
+    expect(headers['X-Idswyft-Sandbox']).toBe('false');
+    expect(headers['X-Idswyft-Verification-Mode']).toBe('production');
+  });
+
+  it('treats undefined is_sandbox as false (defensive default)', () => {
+    const headers = buildWebhookHeaders({ is_sandbox: undefined as any }, 'delivery-x', 1);
+    expect(headers['X-Idswyft-Sandbox']).toBe('false');
+    expect(headers['X-Idswyft-Verification-Mode']).toBe('production');
+  });
+
+  it('preserves the existing required headers', () => {
+    const headers = buildWebhookHeaders({ is_sandbox: false }, 'delivery-789', 2);
+    expect(headers['Content-Type']).toBe('application/json');
+    expect(headers['User-Agent']).toBe('Idswyft-Webhooks/1.0');
+    expect(headers['X-Idswyft-Webhook-Id']).toBe('delivery-789');
+    expect(headers['X-Idswyft-Delivery-Attempt']).toBe('2');
+  });
+
+  it('renders attempt as a string (header values must be strings)', () => {
+    const headers = buildWebhookHeaders({ is_sandbox: false }, 'd', 3);
+    expect(typeof headers['X-Idswyft-Delivery-Attempt']).toBe('string');
+    expect(headers['X-Idswyft-Delivery-Attempt']).toBe('3');
   });
 });
