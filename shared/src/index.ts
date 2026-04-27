@@ -5,6 +5,9 @@ export type { SharedLogger } from './utils/logger.js';
 // Encryption
 export { encryptSecret, decryptSecret, maskApiKey } from './utils/encryption.js';
 
+// Sentry scrubbing — used by both backend and engine instrument.ts
+export { scrubSentryEvent, redactPII, scrubText, PII_FIELDS } from './utils/sentryScrub.js';
+
 // Core types
 export type { OCRData, DocumentType } from './types/index.js';
 

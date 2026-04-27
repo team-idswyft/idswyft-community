@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { redactPII, scrubSentryEvent } from '../instrument.js';
+import { redactPII, scrubSentryEvent, scrubText } from '../instrument.js';
 
 describe('redactPII', () => {
   it('redacts top-level PII field values', () => {
@@ -66,36 +66,91 @@ describe('redactPII', () => {
     expect(obj.config.timeout).toBe(5000);
     expect(obj.config.retries).toBe(3);
   });
+
+  it('redacts the highest-leakage field names from this codebase', () => {
+    const obj = {
+      raw_text: 'NAME: ALICE EXAMPLE\nDOB: 1990-01-01\nDLN: X1234567',
+      aamva_data: { dln: 'X1234567' },
+      pdf417_data: 'PDF417 raw',
+      external_user_id: 'ext-abc',
+      end_user_id: 'eu-123',
+      selfie_url: 'https://signed.example/selfie.jpg',
+      otp_code: '123456',
+    };
+    redactPII(obj);
+    expect(obj.raw_text).toBe('[redacted]');
+    expect(obj.aamva_data).toBe('[redacted]');
+    expect(obj.pdf417_data).toBe('[redacted]');
+    expect(obj.external_user_id).toBe('[redacted]');
+    expect(obj.end_user_id).toBe('[redacted]');
+    expect(obj.selfie_url).toBe('[redacted]');
+    expect(obj.otp_code).toBe('[redacted]');
+  });
+});
+
+describe('scrubText (free-text patterns)', () => {
+  it('redacts emails', () => {
+    expect(scrubText('contact alice@example.com please')).toBe('contact [email] please');
+  });
+
+  it('redacts ISO and slash dates', () => {
+    expect(scrubText('born 1990-01-15')).toBe('born [date]');
+    expect(scrubText('born 01/15/1990')).toBe('born [date]');
+  });
+
+  it('redacts mixed alphanumeric IDs', () => {
+    expect(scrubText('docnum X1234567 found')).toBe('docnum [id] found');
+  });
+
+  it('redacts long pure-digit sequences', () => {
+    expect(scrubText('phone 5551234567 here')).toBe('phone [id] here');
+  });
+
+  it('does not mangle UUIDs (lowercase hex with dashes)', () => {
+    const uuid = 'a1b2c3d4-e5f6-7890-abcd-ef0123456789';
+    expect(scrubText(`request id=${uuid}`)).toBe(`request id=${uuid}`);
+  });
+
+  it('does not redact short numbers like HTTP status codes', () => {
+    expect(scrubText('returned 404 status')).toBe('returned 404 status');
+    expect(scrubText('took 1500ms')).toBe('took 1500ms');
+  });
+
+  it('returns non-strings unchanged', () => {
+    expect(scrubText(42)).toBe(42);
+    expect(scrubText(null)).toBe(null);
+    expect(scrubText(undefined)).toBe(undefined);
+  });
 });
 
 describe('scrubSentryEvent', () => {
   it('removes request body', () => {
     const event: any = {
-      request: {
-        data: { first_name: 'Alice', document_number: 'X123' },
-      },
+      request: { data: { first_name: 'Alice', document_number: 'X123' } },
     };
     scrubSentryEvent(event);
     expect(event.request.data).toBeUndefined();
   });
 
-  it('strips sensitive headers (lowercase and uppercase)', () => {
+  it('strips sensitive headers regardless of casing', () => {
     const event: any = {
       request: {
         headers: {
           'x-api-key': 'ik_secret',
-          'X-API-KEY': 'ik_secret',
-          'authorization': 'Bearer abc',
-          'cookie': 'session=xyz',
+          'X-Api-Key': 'ik_secret_titlecase',
+          'X-API-KEY': 'ik_secret_upper',
+          'Authorization': 'Bearer abc',
+          'Cookie': 'session=xyz',
           'user-agent': 'keep-me',
         },
       },
     };
     scrubSentryEvent(event);
     expect(event.request.headers['x-api-key']).toBeUndefined();
+    expect(event.request.headers['X-Api-Key']).toBeUndefined();
     expect(event.request.headers['X-API-KEY']).toBeUndefined();
-    expect(event.request.headers['authorization']).toBeUndefined();
-    expect(event.request.headers['cookie']).toBeUndefined();
+    expect(event.request.headers['Authorization']).toBeUndefined();
+    expect(event.request.headers['Cookie']).toBeUndefined();
     expect(event.request.headers['user-agent']).toBe('keep-me');
   });
 
@@ -115,9 +170,7 @@ describe('scrubSentryEvent', () => {
 
   it('redacts PII in event.contexts', () => {
     const event: any = {
-      contexts: {
-        user: { email: 'a@b.com', id: 'u123' },
-      },
+      contexts: { user: { email: 'a@b.com', id: 'u123' } },
     };
     scrubSentryEvent(event);
     expect(event.contexts.user.email).toBe('[redacted]');
@@ -132,7 +185,15 @@ describe('scrubSentryEvent', () => {
     };
     scrubSentryEvent(event);
     expect(event.breadcrumbs[0].data.email).toBe('[redacted]');
-    expect(event.breadcrumbs[0].message).toBe('request');
+  });
+
+  it('redacts PII in event.user (Sentry.setUser context)', () => {
+    const event: any = {
+      user: { email: 'a@b.com', id: 'u123', ip_address: '1.2.3.4' },
+    };
+    scrubSentryEvent(event);
+    expect(event.user.email).toBe('[redacted]');
+    expect(event.user.id).toBe('u123');
   });
 
   it('removes query_string and cookies from request', () => {
@@ -153,14 +214,78 @@ describe('scrubSentryEvent', () => {
     expect(event.extra.email).toBe('[redacted]');
   });
 
-  it('returns the event itself (mutation)', () => {
-    const event: any = { extra: { name: 'Alice' } };
-    const result = scrubSentryEvent(event);
-    expect(result).toBe(event);
-  });
-
   it('handles null/undefined event', () => {
     expect(() => scrubSentryEvent(null)).not.toThrow();
     expect(() => scrubSentryEvent(undefined)).not.toThrow();
+  });
+
+  it('scrubs PII patterns from event.message', () => {
+    const event: any = {
+      message: 'User alice@example.com failed verification with doc X1234567 on 2024-01-15',
+    };
+    scrubSentryEvent(event);
+    expect(event.message).not.toContain('alice@example.com');
+    expect(event.message).not.toContain('X1234567');
+    expect(event.message).not.toContain('2024-01-15');
+    expect(event.message).toContain('[email]');
+    expect(event.message).toContain('[id]');
+    expect(event.message).toContain('[date]');
+  });
+
+  it('scrubs PII from event.exception.values[].value', () => {
+    const event: any = {
+      exception: {
+        values: [
+          { type: 'Error', value: 'Engine extraction failed: name=Alice doc=X1234567' },
+        ],
+      },
+    };
+    scrubSentryEvent(event);
+    expect(event.exception.values[0].value).not.toContain('X1234567');
+    expect(event.exception.values[0].value).toContain('[id]');
+  });
+
+  it('scrubs breadcrumb messages (not just data)', () => {
+    const event: any = {
+      breadcrumbs: [
+        { category: 'http', message: 'GET /verify?email=a@b.com&id=X1234567' },
+      ],
+    };
+    scrubSentryEvent(event);
+    expect(event.breadcrumbs[0].message).not.toContain('a@b.com');
+    expect(event.breadcrumbs[0].message).not.toContain('X1234567');
+  });
+
+  it('redacts stack-frame local variables (defense-in-depth)', () => {
+    const event: any = {
+      exception: {
+        values: [
+          {
+            type: 'Error',
+            value: 'oops',
+            stacktrace: {
+              frames: [
+                { filename: 'a.ts', vars: { email: 'a@b.com', timeout: 5000 } },
+              ],
+            },
+          },
+        ],
+      },
+    };
+    scrubSentryEvent(event);
+    expect(event.exception.values[0].stacktrace.frames[0].vars.email).toBe('[redacted]');
+    expect(event.exception.values[0].stacktrace.frames[0].vars.timeout).toBe(5000);
+  });
+
+  it('returns a stub event (not the original) if scrubbing throws', () => {
+    // Force a throw by making a getter that explodes on access.
+    const event: any = {};
+    Object.defineProperty(event, 'request', {
+      get() { throw new Error('boom'); },
+      configurable: true,
+    });
+    const result = scrubSentryEvent(event);
+    expect(result).not.toBe(event);
+    expect(result?.tags?.scrubber).toBe('failed');
   });
 });
