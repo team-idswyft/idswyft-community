@@ -1303,7 +1303,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                     </div>
                     <div style={{ color: C.muted, fontSize: 13, marginBottom: 16, lineHeight: 1.6 }}>
                       Optional speaker verification step. When enabled, users must complete a random
-                      digit voice challenge after face matching. Uses <strong style={{ color: C.text, fontWeight: 500 }}>192-dimensional speaker embeddings</strong> for
+                      digit voice challenge after face matching. Uses <strong style={{ color: C.text, fontWeight: 500 }}>512-dimensional speaker embeddings</strong> for
                       voice biometric comparison.
                     </div>
 

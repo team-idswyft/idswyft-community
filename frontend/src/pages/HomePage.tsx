@@ -574,7 +574,7 @@ export function HomePage() {
             { title: 'GDPR Compliant',        desc: 'Configurable data retention, deletion endpoints, and encrypted storage at rest.', tags: [] as string[] },
             { title: 'JavaScript SDK',        desc: 'Drop-in TypeScript SDK with IdswyftEmbed component, real-time event watcher, and automatic error handling.', tags: ['npm install', 'TypeScript', 'watch()'] },
             { title: 'Batch API',             desc: 'Process hundreds of verifications in a single API call. Controlled concurrency, progress tracking, and webhook on completion.', tags: ['Enterprise', 'Bulk Import', 'Async'] },
-            { title: 'Voice Auth',             desc: 'Optional speaker verification with random digit challenge. 192-dimensional embeddings and ASR transcription for anti-spoofing.', tags: ['Optional', 'Anti-spoof', 'Gate 7'] },
+            { title: 'Voice Auth',             desc: 'Optional speaker verification with random digit challenge. 512-dimensional embeddings and ASR transcription for anti-spoofing.', tags: ['Optional', 'Anti-spoof', 'Gate 7'] },
             { title: 'Monitoring',            desc: 'Document expiry alerts at 90/60/30 days and scheduled re-verification reminders via webhook.', tags: ['Expiry Alerts', 'Re-verify', 'Cron'] },
           ].map(({ title, desc, tags }) => (
             <div className="landing-card" key={title} style={{ background: C.panel, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.cyan}`, borderRadius: 8, padding: '24px 20px' }}>

@@ -12,8 +12,8 @@ import type { VoiceMatchResult } from '@idswyft/shared';
  * Compute voice match result from enrollment and verification embeddings.
  * Pure function — no side effects.
  *
- * @param enrollmentEmbedding  192D speaker embedding from enrollment
- * @param verificationEmbedding  192D speaker embedding from verification audio
+ * @param enrollmentEmbedding  Speaker embedding from enrollment (512D)
+ * @param verificationEmbedding  Speaker embedding from verification audio (512D)
  * @param threshold  Cosine similarity threshold (0.55 prod, 0.50 sandbox)
  * @param challengeVerified  Whether the spoken digits matched the challenge
  * @param challengeDigits  The expected challenge digits string

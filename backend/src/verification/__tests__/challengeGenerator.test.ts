@@ -30,6 +30,16 @@ describe('generateVoiceChallenge', () => {
     }
     expect(challenges.size).toBeGreaterThan(1);
   });
+
+  it('never produces consecutive identical digits', () => {
+    for (let i = 0; i < 100; i++) {
+      const challenge = generateVoiceChallenge(6);
+      const digits = challenge.split(' ');
+      for (let j = 1; j < digits.length; j++) {
+        expect(digits[j]).not.toBe(digits[j - 1]);
+      }
+    }
+  });
 });
 
 describe('verifyChallengeTranscription', () => {
@@ -65,8 +75,8 @@ describe('verifyChallengeTranscription', () => {
     expect(verifyChallengeTranscription('Three SEVEN One', '3 7 1')).toBe(true);
   });
 
-  it('rejects wrong digits', () => {
-    expect(verifyChallengeTranscription('3 7 1 9 0 6', '3 7 1 9 0 5')).toBe(false);
+  it('tolerates 1 wrong digit (single substitution)', () => {
+    expect(verifyChallengeTranscription('3 7 1 9 0 6', '3 7 1 9 0 5')).toBe(true);
   });
 
   it('rejects missing digits', () => {
@@ -77,11 +87,50 @@ describe('verifyChallengeTranscription', () => {
     expect(verifyChallengeTranscription('3 7 1 9 0 5 2', '3 7 1 9 0 5')).toBe(false);
   });
 
+  it('rejects 2+ wrong digits', () => {
+    expect(verifyChallengeTranscription('3 7 1 9 6 6', '3 7 1 9 0 5')).toBe(false);
+  });
+
   it('rejects completely wrong input', () => {
     expect(verifyChallengeTranscription('hello world', '3 7 1 9 0 5')).toBe(false);
   });
 
   it('rejects empty transcription', () => {
     expect(verifyChallengeTranscription('', '3 7 1 9 0 5')).toBe(false);
+  });
+
+  // --- Compound number handling (ASR may group digits) ---
+  it('handles compound tens-units: "fifty-one" → "51"', () => {
+    // ASR might interpret "5 1" as "fifty-one"
+    expect(verifyChallengeTranscription('fifty-one fifty-nine thirty-four', '5 1 5 9 3 4')).toBe(true);
+  });
+
+  it('handles compound with space: "fifty one" → "51"', () => {
+    expect(verifyChallengeTranscription('fifty one fifty nine thirty four', '5 1 5 9 3 4')).toBe(true);
+  });
+
+  it('handles teens: "thirteen" → "13"', () => {
+    expect(verifyChallengeTranscription('thirteen nineteen', '1 3 1 9')).toBe(true);
+  });
+
+  it('handles standalone tens: "twenty" → "20"', () => {
+    expect(verifyChallengeTranscription('twenty thirty', '2 0 3 0')).toBe(true);
+  });
+
+  it('handles mixed compound and single digits', () => {
+    // "fifty-one" + "five" + "nine" + "three" + "four"
+    expect(verifyChallengeTranscription('fifty-one five nine thirty-four', '5 1 5 9 3 4')).toBe(true);
+  });
+
+  it('handles "double" prefix', () => {
+    expect(verifyChallengeTranscription('double five three nine', '5 5 3 9')).toBe(true);
+  });
+
+  it('handles "triple" prefix', () => {
+    expect(verifyChallengeTranscription('triple zero one', '0 0 0 1')).toBe(true);
+  });
+
+  it('handles ASR punctuation with period', () => {
+    expect(verifyChallengeTranscription('3, 7, 1, 9, 0, 5.', '3 7 1 9 0 5')).toBe(true);
   });
 });

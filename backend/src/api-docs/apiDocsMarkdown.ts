@@ -822,7 +822,7 @@ All verification decisions are **deterministic** — no LLMs or probabilistic mo
 | Document Quality | Sobel edge blur detection, brightness/contrast stats, resolution check (≥800x600), file size validation, overall quality score, auto-reject below threshold |
 | Cross-Validation | PDF417/QR barcode decode, MRZ parsing, Levenshtein distance matching, token-set name similarity, front OCR vs back barcode/MRZ check, date & ID number consistency, weighted field scoring, address cross-validation (supplementary) |
 | Liveness & Face Match | EXIF metadata analysis, JPEG artifact detection, color histogram analysis, byte entropy scoring, pixel variance & edge density, face detection (SSDMobilenetv1), 128-d face embeddings, cosine similarity scoring, deepfake detection |
-| Voice Authentication | 192-d speaker embeddings (CAM++ model), ASR digit transcription (Whisper), cosine similarity matching, random challenge anti-spoofing, configurable threshold (0.55 prod / 0.50 sandbox) |
+| Voice Authentication | 512-d speaker embeddings (CAM++ model), ASR digit transcription (NeMo CTC Conformer), cosine similarity matching, random challenge anti-spoofing, configurable threshold (0.55 prod / 0.50 sandbox) |
 
 ---
 
@@ -1301,7 +1301,7 @@ Content-Type: multipart/form-data
 |-------|------|----------|-------------|
 | file | File | Yes | Audio recording (WebM/Opus or WAV). Max 10 MB. |
 
-The engine extracts a 192-dimensional speaker embedding and transcribes the spoken digits. Gate 7 evaluates:
+The engine extracts a 512-dimensional speaker embedding and transcribes the spoken digits. Gate 7 evaluates:
 - **Challenge verification**: spoken digits must match the expected challenge
 - **Speaker similarity**: cosine similarity vs enrollment embedding must exceed threshold (0.55 production, 0.50 sandbox)
 

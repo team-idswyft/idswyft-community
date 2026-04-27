@@ -517,6 +517,8 @@ OVERRIDE_EOF
     else
       ok "Using local filesystem storage"
     fi
+    warn "Local storage writes plaintext files to disk."
+    detail "For production: rely on filesystem-level encryption (LUKS, dm-crypt, EBS) or use STORAGE_PROVIDER=s3."
   fi
 
   divider

@@ -888,6 +888,26 @@ const MobileVerificationPage: React.FC = () => {
   };
 
   // ── Voice capture handlers ─────────────────────────────────────────────
+  const resetVoiceState = () => {
+    const recorder = voiceMediaRecorderRef.current;
+    if (recorder?.state === 'recording') {
+      recorder.stream.getTracks().forEach(t => t.stop());
+      recorder.stop();
+    }
+    voiceMediaRecorderRef.current = null;
+    if (voiceTimerRef.current) clearTimeout(voiceTimerRef.current);
+    if (voiceDurationRef.current) clearInterval(voiceDurationRef.current);
+    setVoiceChallengeDigits(null);
+    setVoiceExpiresIn(null);
+    setVoiceHasRecording(false);
+    setVoiceIsRecording(false);
+    setVoiceRecordingDuration(0);
+    setStepError(null);
+    voiceAudioBlobRef.current = null;
+    voiceChunksRef.current = [];
+    if (voiceExpiryRef.current) clearInterval(voiceExpiryRef.current);
+  };
+
   const handleVoiceChallenge = async () => {
     if (!verificationId || !token) return;
     setIsProcessing(true);
@@ -1524,7 +1544,17 @@ const MobileVerificationPage: React.FC = () => {
               {isProcessing && <div style={{ textAlign: 'center', padding: 8 }}><div className="mv-spinner" /></div>}
             </div>
 
-            {stepError && <p style={{ fontSize: 11, color: '#ef4444', fontFamily: 'var(--mono)', marginTop: 8 }}>{stepError}</p>}
+            {stepError && (
+              <div style={{ marginTop: 8, display: 'flex', flexDirection: 'column', gap: 8 }}>
+                <p style={{ fontSize: 11, color: '#ef4444', fontFamily: 'var(--mono)' }}>{stepError}</p>
+                <PrimaryBtn onClick={resetVoiceState}>Try Again</PrimaryBtn>
+              </div>
+            )}
+            {voiceChallengeDigits && voiceExpiresIn !== null && voiceExpiresIn <= 0 && !stepError && (
+              <div style={{ marginTop: 8, maxWidth: 280, margin: '8px auto 0' }}>
+                <PrimaryBtn onClick={() => { resetVoiceState(); handleVoiceChallenge(); }}>Request New Challenge</PrimaryBtn>
+              </div>
+            )}
           </div>
         )}
 

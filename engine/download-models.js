@@ -220,15 +220,14 @@ const voiceModels = {
       'https://github.com/k2-fsa/sherpa-onnx/releases/download/speaker-recongition-models/wespeaker_en_voxceleb_CAM++_LM.onnx',
   },
   asr: {
-    archiveName: 'sherpa-onnx-whisper-tiny.en.tar.bz2',
-    dirName: 'sherpa-onnx-whisper-tiny.en',
+    archiveName: 'sherpa-onnx-nemo-ctc-en-conformer-small.tar.bz2',
+    dirName: 'sherpa-onnx-nemo-ctc-en-conformer-small',
     url: process.env.VOICE_ASR_MODEL_URL ||
-      'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-whisper-tiny.en.tar.bz2',
+      'https://github.com/k2-fsa/sherpa-onnx/releases/download/asr-models/sherpa-onnx-nemo-ctc-en-conformer-small.tar.bz2',
     // Files expected after extraction:
     expectedFiles: [
-      'tiny.en-encoder.int8.onnx',
-      'tiny.en-decoder.int8.onnx',
-      'tiny.en-tokens.txt',
+      'model.int8.onnx',
+      'tokens.txt',
     ],
   },
 };
@@ -351,7 +350,7 @@ async function downloadModels() {
     }
   }
 
-  // ASR model (Whisper tiny.en — tar.bz2 archive, ~40MB)
+  // ASR model (NeMo CTC Conformer small — tar.bz2 archive, ~44MB)
   const asrDir = path.join(voiceModelsDir, voiceModels.asr.dirName);
   const asrReady = voiceModels.asr.expectedFiles.every(
     f => fs.existsSync(path.join(asrDir, f))
@@ -385,7 +384,7 @@ async function downloadModels() {
     console.log('   • Facial Expression Recognition');
     console.log('   • Age & Gender Estimation');
     if (fs.existsSync(speakerPath)) console.log('   • Speaker Embedding (wespeaker CAM++)');
-    if (asrReady || fs.existsSync(asrDir)) console.log('   • Speech Recognition (Whisper tiny.en)');
+    if (asrReady || fs.existsSync(asrDir)) console.log('   • Speech Recognition (NeMo CTC Conformer)');
 
     console.log('\n🚀 You can now use the modern face recognition service!');
   }

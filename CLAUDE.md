@@ -114,7 +114,7 @@ postgres:16-alpine → engine (ML, port 3002) → api (port 3001) → frontend (
 
 - **`main`** is production — protected by branch rules, requires PR with approval
 - **`dev`** is the working branch — also protected, requires PR
-- CI runs `tsc --noEmit` on backend, frontend, and engine for all PRs
+- CI runs `tsc --noEmit` on shared, backend, frontend, and engine for all PRs, and runs the backend `vitest` suite
 - Docker images are built on `v*` tag push (not on merge to main)
 - CODEOWNERS requires `@doobee46` approval on all changes
 
@@ -161,6 +161,6 @@ cd engine && npm install && npm run dev     # → localhost:3002
 - Face embeddings stripped before DB persistence (GDPR Article 9)
 - Data retention with configurable `DATA_RETENTION_DAYS`
 - GDPR erasure covers all tables: documents, selfies, contexts, risk scores, webhook payloads
-- All uploaded files encrypted at rest
+- File encryption at rest: S3-backed storage uses SSE-AES256 server-side encryption (`storage.ts:194`). The `local` provider writes plaintext to disk — operators using `STORAGE_PROVIDER=local` for production should rely on filesystem-level encryption (LUKS, dm-crypt, EBS volume encryption) until envelope encryption ships. Cloud edition uses S3.
 - HTTPS enforced in production, PG SSL auto-enabled for non-local connections
 - CSP + HSTS headers on both nginx and Express

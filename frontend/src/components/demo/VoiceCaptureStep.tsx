@@ -14,6 +14,7 @@ interface VoiceCaptureStepProps {
   onSubmit: () => void;
   hasRecording: boolean;
   stepError?: string | null;
+  onRetry?: () => void;
   step?: number;
   totalSteps?: number;
 }
@@ -30,6 +31,7 @@ export const VoiceCaptureStep: React.FC<VoiceCaptureStepProps> = ({
   onSubmit,
   hasRecording,
   stepError,
+  onRetry,
   step,
   totalSteps,
 }) => {
@@ -153,20 +155,27 @@ export const VoiceCaptureStep: React.FC<VoiceCaptureStepProps> = ({
           </DemoPrimaryBtn>
         )}
 
-        {expired && (
-          <DemoPrimaryBtn onClick={onRequestChallenge} disabled={isProcessing}>
+        {expired && !stepError && (
+          <DemoPrimaryBtn onClick={() => { onRetry?.(); onRequestChallenge(); }} disabled={isProcessing}>
             Request New Challenge
           </DemoPrimaryBtn>
         )}
       </div>
 
       {stepError && (
-        <p style={{
-          marginTop: 10, fontSize: 12, color: C.red,
-          fontFamily: C.mono, textAlign: 'center',
-        }}>
-          {stepError}
-        </p>
+        <div style={{ marginTop: 10, textAlign: 'center', display: 'flex', flexDirection: 'column', gap: 8, alignItems: 'center' }}>
+          <p style={{
+            fontSize: 12, color: C.red,
+            fontFamily: C.mono,
+          }}>
+            {stepError}
+          </p>
+          {onRetry && (
+            <DemoPrimaryBtn onClick={onRetry} disabled={isProcessing}>
+              Try Again
+            </DemoPrimaryBtn>
+          )}
+        </div>
       )}
     </div>
   );

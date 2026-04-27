@@ -1,9 +1,9 @@
 /**
- * Voice Speaker Embedding — Extracts 192D speaker embeddings via sherpa-onnx-node.
+ * Voice Speaker Embedding — Extracts speaker embeddings via sherpa-onnx-node.
  *
  * Model: wespeaker_en_voxceleb_CAM++_LM (Apache-2.0, ~28MB)
  * Input:  16kHz mono Float32Array (from audioDecoder)
- * Output: 192-dimensional speaker embedding (number[])
+ * Output: 512-dimensional speaker embedding (number[])
  *
  * The extractor is lazy-loaded on first call to avoid startup cost
  * when voice auth is disabled (the default).
@@ -51,7 +51,7 @@ function getExtractor(): any {
  * Extract a speaker embedding from audio samples.
  * @param samples 16kHz mono Float32Array (use audioDecoder first)
  * @param sampleRate Sample rate of the audio (default: 16000)
- * @returns 192-dimensional speaker embedding
+ * @returns Speaker embedding (dimension determined by model, typically 512)
  */
 export function extractSpeakerEmbedding(samples: Float32Array, sampleRate = 16000): number[] {
   const ext = getExtractor();
@@ -67,7 +67,7 @@ export function extractSpeakerEmbedding(samples: Float32Array, sampleRate = 1600
   return Array.from(embedding);
 }
 
-/** Embedding dimension (192 for wespeaker CAM++). */
+/** Embedding dimension (512 for wespeaker CAM++). */
 export function getEmbeddingDimension(): number {
   getExtractor();
   return extractorDim;

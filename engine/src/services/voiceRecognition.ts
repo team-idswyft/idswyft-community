@@ -1,9 +1,14 @@
 /**
  * Voice Recognition — Transcribes spoken digits via sherpa-onnx-node.
  *
- * Model: Whisper tiny.en (int8 quantized, ~40MB total)
+ * Model: NeMo CTC Conformer small (int8 quantized, ~44MB)
  * Input:  16kHz mono Float32Array (from audioDecoder)
  * Output: Transcribed text string
+ *
+ * CTC (Connectionist Temporal Classification) models classify each audio frame
+ * independently — they cannot hallucinate words absent from the audio, unlike
+ * autoregressive models (Whisper) which generate tokens sequentially and can
+ * "fill in" plausible English on short utterances like isolated digits.
  *
  * Used for voice challenge verification — the user speaks 6 random digits
  * and this module transcribes them for comparison against the expected challenge.
@@ -32,20 +37,16 @@ function getRecognizer(): any {
 
   const sherpaOnnx = esmRequire('sherpa-onnx-node');
 
-  const whisperDir = process.env.VOICE_ASR_MODEL_DIR
-    || path.join(VOICE_MODELS_DIR, 'sherpa-onnx-whisper-tiny.en');
+  const ctcDir = process.env.VOICE_ASR_MODEL_DIR
+    || path.join(VOICE_MODELS_DIR, 'sherpa-onnx-nemo-ctc-en-conformer-small');
 
-  const encoderPath = path.join(whisperDir, 'tiny.en-encoder.int8.onnx');
-  const decoderPath = path.join(whisperDir, 'tiny.en-decoder.int8.onnx');
-  const tokensPath = path.join(whisperDir, 'tiny.en-tokens.txt');
-
-  logger.info('Loading ASR model (Whisper tiny.en)', { whisperDir });
+  logger.info('Loading ASR model (NeMo CTC Conformer)', { modelDir: ctcDir });
 
   recognizer = new sherpaOnnx.OfflineRecognizer({
     featConfig: { sampleRate: 16000, featureDim: 80 },
     modelConfig: {
-      whisper: { encoder: encoderPath, decoder: decoderPath },
-      tokens: tokensPath,
+      nemoCtc: { model: path.join(ctcDir, 'model.int8.onnx') },
+      tokens: path.join(ctcDir, 'tokens.txt'),
       numThreads: 1,
       provider: 'cpu',
       debug: 0,

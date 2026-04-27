@@ -188,7 +188,7 @@ Front of ID ──► OCR + Barcode ──► Cross-Validation ──► Live Ca
 - Batch API for bulk verification processing
 
 **Security & Compliance**
-- Encryption at rest for all uploaded documents
+- Encryption at rest for documents stored via S3-compatible providers (server-side AES256). For `STORAGE_PROVIDER=local`, rely on filesystem-level encryption (LUKS, dm-crypt, EBS).
 - GDPR/CCPA compliant data handling with configurable retention
 - HTTPS-only communication
 - Audit logging for verification activities
@@ -310,10 +310,10 @@ The core API (~250MB) handles routing, sessions, webhooks, and API key managemen
 | `DATABASE_URL` | PostgreSQL connection string (auto-built in Docker) | required |
 | `JWT_SECRET` | Secret for auth tokens | required |
 | `API_KEY_SECRET` | Secret for API key generation | required |
-| `ENCRYPTION_KEY` | 32-char key for file encryption at rest | required |
+| `ENCRYPTION_KEY` | 32-byte hex master key — encrypts stored secrets (LLM API keys, webhook secrets) at the application layer | required |
 | `PORT` | API server port | `3001` |
 | `NODE_ENV` | `development` or `production` | `development` |
-| `STORAGE_PROVIDER` | `local` or `supabase` | `local` |
+| `STORAGE_PROVIDER` | `local`, `s3`, or `supabase`. `s3` is the only provider with built-in encryption at rest today. | `local` |
 | `SANDBOX_MODE` | Enable sandbox for testing | `false` |
 | `ENGINE_URL` | Engine worker URL (auto-set in Docker) | `http://engine:3002` |
 

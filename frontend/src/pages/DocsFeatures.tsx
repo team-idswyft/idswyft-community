@@ -50,7 +50,7 @@ export const DocsFeatures: React.FC = () => {
           { title: 'Document Quality', color: C.blue, items: ['Sobel edge blur detection', 'Brightness & contrast stats', 'Resolution check (≥ 800×600)', 'File size validation', 'Overall quality score', 'Auto-reject below threshold'] },
           { title: 'Cross-Validation', color: C.amber, items: ['PDF417 / QR barcode decode', 'Levenshtein distance matching', 'Token-set name similarity', 'Front OCR ↔ back barcode check', 'Date & ID number consistency', 'Weighted field scoring'] },
           { title: 'Liveness & Face Match', color: C.green, items: ['EXIF metadata analysis (20%)', 'JPEG artifact detection (15%)', 'Color histogram analysis (15%)', 'Byte entropy scoring (12%)', 'Pixel variance & edge density', 'Face detection (SSDMobilenetv1)', '128-d face embeddings', 'Cosine similarity scoring'] },
-          { title: 'Voice Authentication', color: C.purple, items: ['Random digit challenge (6 digits)', 'ASR transcription verification', '192-d speaker embeddings (CAM++)', 'Cosine similarity matching', 'Configurable threshold (0.55)', 'Optional per-developer toggle'] },
+          { title: 'Voice Authentication', color: C.purple, items: ['Random digit challenge (6 digits)', 'ASR transcription verification', '512-d speaker embeddings (CAM++)', 'Cosine similarity matching', 'Configurable threshold (0.55)', 'Optional per-developer toggle'] },
         ].map(col => (
           <div key={col.title} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, padding: '18px 20px' }}>
             <div style={{ fontFamily: C.mono, fontSize: '0.8rem', fontWeight: 600, color: col.color, marginBottom: 12 }}>{col.title}</div>
@@ -472,7 +472,7 @@ if (status.aml_screening?.risk_level === 'clear') {
       <H2 index="09">Voice Authentication</H2>
       <Lead>
         Optional speaker verification step after face matching. Users speak randomly generated digits;
-        the system verifies both the spoken content (ASR transcription) and the speaker identity (192-dimensional
+        the system verifies both the spoken content (ASR transcription) and the speaker identity (512-dimensional
         embedding comparison). Enable per-developer via the settings API.
       </Lead>
 
@@ -515,7 +515,7 @@ if (status.aml_screening?.risk_level === 'clear') {
       </EndpointCard>
 
       <Callout type="note">
-        Voice auth uses 192-dimensional speaker embeddings (CAM++ model) with cosine similarity matching.
+        Voice auth uses 512-dimensional speaker embeddings (CAM++ model) with cosine similarity matching.
         Thresholds: 0.55 (production), 0.50 (sandbox). All decisions are deterministic — no LLM in the gate path.
         Challenge expiry: 120 seconds. Rejection reasons:{' '}
         <code style={{ fontFamily: C.mono }}>VOICE_MATCH_FAILED</code>,{' '}

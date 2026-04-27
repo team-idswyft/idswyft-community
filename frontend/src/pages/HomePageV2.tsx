@@ -705,8 +705,8 @@ export function HomePageV2() {
               {
                 n: '09 / voice',
                 title: 'Voice Authentication',
-                body: 'Optional speaker verification step. Random digit challenge with ASR transcription and 192-dimensional speaker embedding comparison. Anti-spoofing by design.',
-                statBold: '192D', statLabel: 'embeddings',
+                body: 'Optional speaker verification step. Random digit challenge with ASR transcription and 512-dimensional speaker embedding comparison. Anti-spoofing by design.',
+                statBold: '512D', statLabel: 'embeddings',
               },
               {
                 n: '10 / auditable',
