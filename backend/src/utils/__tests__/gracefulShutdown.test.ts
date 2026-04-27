@@ -143,18 +143,81 @@ describe('createGracefulShutdown', () => {
     }
   });
 
-  it('force-exit timer is unref-able (does not keep process alive)', async () => {
-    // We can't directly observe unref; assert behavior by checking the
-    // shutdown completes happily without timers blocking process exit.
-    const exit = vi.fn();
-    const dbPoolEnd = vi.fn().mockResolvedValue(undefined);
+  it('force-exit timer is unref-able and cleared on the happy path', async () => {
+    // Spy on global setTimeout/clearTimeout to verify the timer registered
+    // for force-exit is passed to clearTimeout before the function returns.
+    // Regression guard against leaked handles in long-running test runners.
+    const realSetTimeout = global.setTimeout;
+    const realClearTimeout = global.clearTimeout;
+    const setSpy = vi.fn((fn: any, ms: number) => {
+      const t = realSetTimeout(fn, ms);
+      (t as any).__shutdownForceExit = true;
+      return t;
+    });
+    const clearSpy = vi.fn((t: any) => realClearTimeout(t));
+    (global as any).setTimeout = setSpy;
+    (global as any).clearTimeout = clearSpy;
 
+    try {
+      const exit = vi.fn();
+      const dbPoolEnd = vi.fn().mockResolvedValue(undefined);
+
+      const shutdown = createGracefulShutdown({
+        server: fakeServer('success'),
+        dbPoolEnd, exit, log: noopLog, console: silentConsole,
+        forceExitMs: 60_000,
+      });
+
+      await shutdown('SIGTERM');
+      expect(exit).toHaveBeenCalledWith(0);
+
+      // The timer registered for force-exit must be the one passed to clearTimeout.
+      const tagged = setSpy.mock.results.find((r) => (r.value as any).__shutdownForceExit);
+      expect(tagged).toBeDefined();
+      expect(clearSpy).toHaveBeenCalledWith(tagged!.value);
+    } finally {
+      (global as any).setTimeout = realSetTimeout;
+      (global as any).clearTimeout = realClearTimeout;
+    }
+  });
+
+  it('per-call forceExitMs override beats the factory default', async () => {
+    vi.useFakeTimers();
+    try {
+      const exit = vi.fn();
+      // Factory default 30s — without the override the test would need to
+      // advance 30s, taking many ticks.
+      const shutdown = createGracefulShutdown({
+        server: fakeServer('hang'),
+        exit, log: noopLog, console: silentConsole,
+        forceExitMs: 30_000,
+      });
+
+      // Pass an emergency 100ms override (uncaughtException-like).
+      void shutdown('uncaughtException', 1, 100);
+
+      // After 50ms — under the override threshold — exit must NOT have fired.
+      await vi.advanceTimersByTimeAsync(50);
+      expect(exit).not.toHaveBeenCalled();
+
+      // After 110ms total — past the override threshold — force-exit fires with code 1.
+      await vi.advanceTimersByTimeAsync(60);
+      expect(exit).toHaveBeenCalledWith(1);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('factory default is used when no per-call override is passed', async () => {
+    const exit = vi.fn();
     const shutdown = createGracefulShutdown({
       server: fakeServer('success'),
-      dbPoolEnd, exit, log: noopLog, console: silentConsole,
-      forceExitMs: 60_000,
+      exit, log: noopLog, console: silentConsole,
+      forceExitMs: 30_000,
     });
 
+    // Standard SIGTERM call — no third arg. Happy path completes via
+    // server.close success well under 30s.
     await shutdown('SIGTERM');
     expect(exit).toHaveBeenCalledWith(0);
     // If force-exit timer wasn't unref'd, this test would hang past resolution.

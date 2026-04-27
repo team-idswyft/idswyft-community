@@ -470,27 +470,41 @@ const startServer = async () => {
     process.on('SIGTERM', () => { void gracefulShutdown('SIGTERM'); });
     process.on('SIGINT', () => { void gracefulShutdown('SIGINT'); });
 
-    // uncaughtException: process state is undefined after this — we should
-    // not continue serving requests. Drain in-flight and exit non-zero.
+    // uncaughtException: process state is undefined after this — V8 heap
+    // may be corrupt, in-flight requests could be reading stale globals or
+    // committing half-state. We still call server.close() to stop NEW
+    // connections (and finish the small set of in-flight requests that
+    // can complete cleanly), but cap the wait at 2s instead of the
+    // 25s SIGTERM budget — much shorter than the 25s SIGTERM budget so
+    // we don't continue shipping potentially-corrupt responses to live
+    // users while we wait.
+    const UNCAUGHT_FORCE_EXIT_MS = 2000;
     process.on('uncaughtException', (err) => {
       console.error('uncaughtException:', err);
       logger.error('uncaughtException', {
         message: err.message,
         stack: err.stack,
       });
-      void gracefulShutdown('uncaughtException', 1);
+      void gracefulShutdown('uncaughtException', 1, UNCAUGHT_FORCE_EXIT_MS);
     });
 
-    // unhandledRejection: log but DO NOT crash. Many ecosystems still
-    // produce these (esp. fire-and-forget background jobs). Future Node
-    // will crash by default; until then, this matches the conservative
-    // posture of the rest of the codebase.
+    // unhandledRejection: policy configurable via env var. Default 'log' to
+    // match the conservative posture this codebase has historically held —
+    // many fire-and-forget background jobs produce these and crashing on
+    // them would kill the API. Operators who prefer Node's modern default
+    // (crash on unhandled rejection) can set UNHANDLED_REJECTION_POLICY=crash.
+    const unhandledRejectionPolicy = (process.env.UNHANDLED_REJECTION_POLICY ?? 'log').toLowerCase();
     process.on('unhandledRejection', (reason) => {
       console.error('unhandledRejection:', reason);
       logger.error('unhandledRejection', {
         reason: reason instanceof Error ? reason.message : String(reason),
         stack: reason instanceof Error ? reason.stack : undefined,
+        policy: unhandledRejectionPolicy,
       });
+      if (unhandledRejectionPolicy === 'crash') {
+        // Same emergency-shutdown semantics as uncaughtException.
+        void gracefulShutdown('unhandledRejection', 1, UNCAUGHT_FORCE_EXIT_MS);
+      }
     });
 
     return server;

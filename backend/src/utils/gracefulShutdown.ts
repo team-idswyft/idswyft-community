@@ -23,8 +23,18 @@ export interface ShutdownDeps {
 }
 
 export interface ShutdownHandler {
-  /** Trigger shutdown with the given signal/reason. Idempotent — repeat calls no-op. */
-  (signal: string, exitCode?: number): Promise<void>;
+  /**
+   * Trigger shutdown with the given signal/reason. Idempotent — repeat calls no-op.
+   *
+   * `forceExitMs` overrides the factory's default. SIGTERM uses the default
+   * (25s — Railway gives 30s before SIGKILL). uncaughtException should pass
+   * a much shorter override (e.g. 2000ms): per Node docs, after an uncaught
+   * throw the process state is undefined — V8 heap may be corrupt, in-flight
+   * requests could be reading stale globals or commit half-state. Server
+   * still calls server.close() to stop NEW connections, but capping the
+   * in-flight wait at ~2s prevents shipping corrupt responses to live users.
+   */
+  (signal: string, exitCode?: number, forceExitMs?: number): Promise<void>;
 }
 
 /**
@@ -33,18 +43,23 @@ export interface ShutdownHandler {
  * active shutdown log and return without re-running the sequence.
  */
 export function createGracefulShutdown(deps: ShutdownDeps): ShutdownHandler {
-  const forceExitMs = deps.forceExitMs ?? 25_000;
+  const defaultForceExitMs = deps.forceExitMs ?? 25_000;
   const con = deps.console ?? console;
   let inProgress = false;
 
-  return async function shutdown(signal: string, exitCode: number = 0): Promise<void> {
+  return async function shutdown(
+    signal: string,
+    exitCode: number = 0,
+    forceExitMsOverride?: number,
+  ): Promise<void> {
     if (inProgress) {
       con.log(`${signal} received during shutdown, ignoring`);
       return;
     }
     inProgress = true;
+    const forceExitMs = forceExitMsOverride ?? defaultForceExitMs;
     con.log(`Received ${signal}. Starting graceful shutdown (max ${forceExitMs}ms)...`);
-    deps.log.info('Graceful shutdown initiated', { signal, exitCode });
+    deps.log.info('Graceful shutdown initiated', { signal, exitCode, forceExitMs });
 
     const forceExitTimer = setTimeout(() => {
       con.error(`Graceful shutdown exceeded ${forceExitMs}ms; force-exiting`);
