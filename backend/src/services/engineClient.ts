@@ -102,8 +102,16 @@ function breakerOnFailure(): void {
 /**
  * Reset breaker state. Exported only for tests — production code should not
  * call this; the breaker auto-recovers via its half-open path.
+ *
+ * Hard-guarded against accidental production calls via NODE_ENV check —
+ * the function is exported (so tests across files can use it) but throws
+ * if invoked outside test mode. Prevents the breaker from being defeated
+ * by a route handler accidentally importing it.
  */
 export function _resetBreakerForTests(): void {
+  if (process.env.NODE_ENV === 'production') {
+    throw new Error('_resetBreakerForTests cannot be called in production');
+  }
   breaker.consecutiveFailures = 0;
   breaker.openedAt = null;
 }
