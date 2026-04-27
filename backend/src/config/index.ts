@@ -120,3 +120,26 @@ if (process.env.NODE_ENV === 'production') {
     serviceToken: config.serviceToken,
   });
 }
+
+// Hard guard: STORAGE_ENCRYPTION=true with the default placeholder ENCRYPTION_KEY
+// would encrypt files under a public-string key (the placeholder appears
+// verbatim in this file and the README). Fail-fast at startup regardless of
+// NODE_ENV so this misconfiguration can't slip through dev → staging → prod.
+if (config.storage.encryption) {
+  const placeholderKeys = [
+    'your-32-character-encryption-key',
+    'change-this-32-char-encrypt-key!',
+  ];
+  if (placeholderKeys.includes(config.encryptionKey) || !process.env.ENCRYPTION_KEY) {
+    throw new Error(
+      'STORAGE_ENCRYPTION=true requires ENCRYPTION_KEY to be set to a real value (not the default placeholder). ' +
+      'Generate one with: node -e "console.log(require(\'crypto\').randomBytes(32).toString(\'hex\'))" — ' +
+      'then set it as the ENCRYPTION_KEY env var.'
+    );
+  }
+  if (Buffer.byteLength(config.encryptionKey, 'utf8') < 32) {
+    throw new Error(
+      `STORAGE_ENCRYPTION=true requires ENCRYPTION_KEY to be at least 32 bytes (got ${Buffer.byteLength(config.encryptionKey, 'utf8')}).`
+    );
+  }
+}

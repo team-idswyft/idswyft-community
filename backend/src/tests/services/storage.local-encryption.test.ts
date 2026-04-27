@@ -170,3 +170,59 @@ describe('StorageService local provider — envelope encryption', () => {
     await expect(svc.downloadFile(stored)).rejects.toThrow();
   });
 });
+
+/**
+ * HTTP-layer integration: when STORAGE_ENCRYPTION=true, the file-serving
+ * middleware (used by /api/files/*) must decrypt before sending bytes on
+ * the wire. Without this round-trip test, a write-side encryption fix can
+ * ship while the read-side still sends ciphertext — exactly the C1 issue
+ * the S2.4 review caught.
+ */
+describe('fileServing middleware — encryption round-trip', () => {
+  it('serveLocalFile reads encrypted file from disk and serves plaintext bytes', async () => {
+    mockConfig.storage.encryption = true;
+
+    // Store an encrypted file via StorageService (write side).
+    const original = Buffer.from('http-served plaintext content');
+    const stored = await svc.storeDocument(original, 'served.jpg', 'image/jpeg', 'http-1');
+
+    // Verify the on-disk file is actually encrypted (sanity).
+    const onDisk = await fs.readFile(path.join(tmpRoot, stored));
+    expect(onDisk.subarray(0, 4).toString('ascii')).toBe('IDSW');
+
+    // Simulate the serveLocalFile handler. The route mount strips the
+    // "/api/files/" prefix and the "uploads/" base, so req.params[0] is
+    // just the path relative to UPLOADS_BASE.
+    const innerPath = stored.replace(/^uploads\//, '');
+    const { serveLocalFile } = await import('../../middleware/fileServing.js');
+    const sentChunks: Buffer[] = [];
+    const headers: Record<string, string> = {};
+    const req: any = { params: { 0: innerPath } };
+    const res: any = {
+      status: () => res,
+      json: () => res,
+      setHeader: (k: string, v: string) => { headers[k] = v; return res; },
+      sendFile: () => { throw new Error('Should not call sendFile when encryption is on'); },
+      send: (body: any) => {
+        sentChunks.push(Buffer.isBuffer(body) ? body : Buffer.from(body));
+        return res;
+      },
+    };
+
+    await serveLocalFile(req, res);
+
+    // The bytes the handler sent must be the original plaintext —
+    // NOT the IDSW-encrypted bytes on disk.
+    expect(sentChunks).toHaveLength(1);
+    expect(sentChunks[0].equals(original)).toBe(true);
+    expect(headers['Content-Type']).toBe('image/jpeg');
+  });
+
+  // Note: a complementary "encryption=false uses res.sendFile" test was
+  // considered but removed. fileServing.ts captures UPLOADS_BASE at module
+  // load time from process.cwd(); the cross-test chdir in this file
+  // invalidates that snapshot. The encryption-on case above is the one
+  // that protects against the C1 bug class (ciphertext leaking through
+  // res.sendFile); the off-case is exercised by every non-encryption test
+  // in the suite implicitly.
+});
