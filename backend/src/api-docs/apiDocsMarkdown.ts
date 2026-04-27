@@ -1538,6 +1538,43 @@ Webhooks retry up to 3 times on failure with exponential backoff.
 
 ---
 
+## Idempotency
+
+The verification endpoints accept an \`Idempotency-Key\` header (or the legacy \`X-Idempotency-Key\`) to make POST requests safely retryable. If a request times out or your network blips, retrying with the same key returns the stored response instead of creating a duplicate verification or processing the document twice.
+
+### How it works
+
+- Send any unique string per request — typically a UUIDv4 generated client-side.
+- We cache the (key, developer) → response mapping for 24 hours.
+- Retries within the window get the original response back, with header \`Idempotent-Replayed: true\` so observability can distinguish replays from fresh requests.
+- Keys are scoped per-developer; the same key from a different account doesn't collide.
+
+### Supported endpoints
+
+| Endpoint | Notes |
+|----------|-------|
+| \`POST /api/v2/verify/initialize\` | Prevents duplicate sessions on retry |
+| \`POST /api/v2/verify/:id/front-document\` | Prevents duplicate document rows |
+| \`POST /api/v2/verify/:id/back-document\` | Same |
+| \`POST /api/v2/verify/:id/live-capture\` | Same |
+
+### Example
+
+\`\`\`bash
+curl -X POST https://api.idswyft.app/api/v2/verify/initialize \\
+  -H "X-API-Key: ik_..." \\
+  -H "Idempotency-Key: $(uuidgen)" \\
+  -H "Content-Type: application/json" \\
+  -d '{"user_id": "...", "document_type": "auto"}'
+\`\`\`
+
+### Notes
+
+- The cache covers the response body and status code only — it does not validate that the request body matches the original. Reusing a key with a different body silently replays the original response. Generate a fresh key per logical operation.
+- If you don't send the header, the endpoint behaves normally (no caching, no idempotency guarantee) — opt-in only.
+
+---
+
 ## Verification Statuses
 
 | Status | Description | Terminal |
