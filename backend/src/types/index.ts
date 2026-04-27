@@ -274,6 +274,8 @@ export interface AppConfig {
     awsSecretKey?: string;
     awsRegion?: string;
     awsS3Bucket?: string;
+    encryption: boolean;
+    encryptionKeyPrevious?: string;
   };
   ocr: {
     tesseractPath: string;

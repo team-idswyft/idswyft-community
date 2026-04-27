@@ -37,7 +37,15 @@ export const config: AppConfig = {
     awsAccessKey: process.env.AWS_ACCESS_KEY_ID,
     awsSecretKey: process.env.AWS_SECRET_ACCESS_KEY,
     awsRegion: process.env.AWS_REGION || 'us-east-1',
-    awsS3Bucket: process.env.AWS_S3_BUCKET
+    awsS3Bucket: process.env.AWS_S3_BUCKET,
+    // Envelope encryption for the local provider. When true, new file writes
+    // are AES-256-GCM encrypted under ENCRYPTION_KEY (envelope-wrapped per file).
+    // Read path always handles a mixed population — pre-encryption files
+    // pass through as-is, encrypted files decrypt. See storageCrypto.ts.
+    encryption: process.env.STORAGE_ENCRYPTION === 'true',
+    // Optional previous master key, used during key rotation. When set, the
+    // read path tries this key as a fallback after the current ENCRYPTION_KEY.
+    encryptionKeyPrevious: process.env.ENCRYPTION_KEY_PREVIOUS,
   },
   
   ocr: {
