@@ -5,6 +5,52 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.9.0] - 2026-04-27
+
+Sprint 1 of the production-readiness remediation plan
+(`docs/plans/2026-04-27-prod-readiness-remediation.md`). Addresses ship-blockers
+from the 2026-04-25 audit: Sentry PII leak path, storage-encryption claim drift,
+and CI not running tests.
+
+### Security
+- **Sentry PII scrubber (S1.1)** — set `sendDefaultPii: false` and add a
+  `beforeSend` scrubber that strips request body, sensitive headers, and known
+  PII field values from Sentry events. Closes a GDPR Article 9 leak path that
+  could have shipped document images, names, DOBs, and OCR text to Sentry on
+  any thrown error during verification. Scrubber lives in
+  `shared/src/utils/sentryScrub.ts` and is applied to BOTH the backend API and
+  the engine worker (engine had the same vulnerability untouched). 32 unit
+  tests cover redaction, free-text patterns, header case-insensitivity,
+  circular refs, stack-frame vars, fingerprint/transaction scrubbing, and
+  scrubber-failure fallback.
+
+### Changed
+- **CI runs the test suite (S1.2)** — `.github/workflows/ci.yml` now runs
+  `npm test -- --run` after the existing `tsc --noEmit` step on the
+  `typecheck-backend` job. Closes the audit finding that CI gave false
+  confidence by never executing the 1022-case vitest suite. Verified clean
+  baseline (1022/1022 passing) before flipping the gate.
+- **Storage encryption claims corrected (S1.3)** — `CLAUDE.md`, `README.md`,
+  and `install.sh` no longer claim a blanket "encryption at rest" for all
+  uploaded files. The claim was true only for `STORAGE_PROVIDER=s3`
+  (server-side AES-256); the local provider writes plaintext. Updated docs
+  scope the claim correctly and recommend filesystem-level encryption (LUKS,
+  dm-crypt, EBS) for local-storage operators. `install.sh` now warns when
+  local storage is selected. Customer-facing pages corrected too:
+  `LegalPage.tsx` privacy policy now distinguishes Idswyft Cloud (S3 + AES-256
+  SSE) from self-hosted deployments, and the retention default was corrected
+  from 30 to 90 days. `PricingPage.tsx` Community-tier "Encryption at rest"
+  flipped from Y to N (relabeled "Encryption at rest (managed)") to align
+  with the existing "managed by Idswyft" pattern. `ENCRYPTION_KEY`
+  description corrected to reflect actual usage (encrypts stored
+  third-party provider credentials and Identity Vault records — not files).
+
+### Fixed
+- Removed false claims that "API keys" and "webhook signing keys" are
+  encrypted at rest. API keys are stored as HMAC-SHA256 hashes (not
+  encryption); webhook secret storage is in mixed state (`secret_token`
+  encrypted, legacy `secret_key` plaintext).
+
 ## [1.8.52] - 2026-04-24
 
 ### Changed
