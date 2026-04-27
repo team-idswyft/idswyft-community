@@ -5,6 +5,86 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.0] - 2026-04-27
+
+Sprint 2 of the production-readiness remediation plan
+(`docs/plans/2026-04-27-prod-readiness-remediation.md`). 8 items
+addressing compliance, reliability, and security gaps from the
+2026-04-25 audit. All branches went through code review; review
+findings are addressed in the same commits as the original work.
+
+### Security
+- **Envelope encryption for local file storage (S2.4 + S2.4a)** —
+  opt-in via `STORAGE_ENCRYPTION=true`. Per-file AES-256-GCM with
+  DEK wrapped under a master key derived from `ENCRYPTION_KEY`.
+  Format: 4-byte "IDSW" magic + 1-byte version + DEK envelope + file
+  envelope (93-byte overhead). Read path always decrypts on detection;
+  legacy plaintext files pass through unchanged. Multi-key candidate
+  decrypt enables online key rotation via `ENCRYPTION_KEY_PREVIOUS` +
+  the new `backend/scripts/rotate-encryption-key.ts` script (see
+  `backend/scripts/encryption-key-rotation.md` runbook). Hard guard:
+  fails startup if `STORAGE_ENCRYPTION=true` with default placeholder
+  key.
+- **Webhook X-Idswyft-Sandbox header (S2.3)** — adds
+  `X-Idswyft-Sandbox` (boolean string) and `X-Idswyft-Verification-Mode`
+  (sandbox/production string) to every delivery so receivers can route
+  or alert without parsing the JSON body. Drive-by fix: corrected
+  long-standing `X-Webhook-Signature` → `X-Idswyft-Signature` doc
+  drift in apiDocsMarkdown.ts and llms-full.txt.
+
+### Reliability
+- **Engine retry + circuit breaker (S2.5)** — 2 retries (3 total
+  attempts) with exponential backoff (500ms, 1s) on transient failures
+  (5xx, network, timeout). 4xx and `success:false` are not retried.
+  Circuit breaker opens after 5 consecutive retryable failures, half-
+  open recovery after 30s. Configurable via `ENGINE_BACKOFF_BASE_MS`
+  and `ENGINE_BREAKER_OPEN_MS` env vars.
+- **Idempotency keys on verify endpoints (S2.6)** — wired the
+  existing `idempotencyMiddleware` onto `/verify/initialize`,
+  `/verify/:id/front-document`, `/verify/:id/back-document`,
+  `/verify/:id/live-capture`. Accepts both `Idempotency-Key` (RFC
+  draft / Stripe) and `X-Idempotency-Key` (legacy) headers. Cache
+  hits replay the original response with `Idempotent-Replayed: true`
+  header. 24h TTL per migration 09; cleanup cron deferred to Sprint 3.
+- **SIGTERM drain + uncaught handlers (S2.7)** — refactored to
+  `utils/gracefulShutdown.ts` factory: drain HTTP server, close DB
+  pool (community-mode PgClient only), exit with configurable force-
+  exit timeout. SIGTERM uses 25s (Railway gives 30s before SIGKILL);
+  `uncaughtException` uses 2s emergency timeout (process state may be
+  corrupt — don't ship potentially-bad responses for 25s).
+  `unhandledRejection` policy is env-configurable via
+  `UNHANDLED_REJECTION_POLICY=log|crash` (default `log` for backward
+  compat).
+
+### Changed
+- **GDPR erasure now covers `aml_screenings` (S2.1)** — added the
+  table to `dataRetention.ts:deleteUserData` and `runDemoCleanup`.
+  Closes the audit's "GDPR erasure covers all tables" partial-falsity.
+- **Audit log claim clarification (S2.2)** — corrected CLAUDE.md
+  to enumerate the exact tables in `deleteUserData` scope and to
+  distinguish "verification audit trail" (anonymized, retained) from
+  "request telemetry" (`api_activity_logs`, hard-deleted on 7-day
+  cron). `DATA_RETENTION_DAYS` default documented as 90 days.
+- **LLM docs sync (cross-cutting)** — `frontend/public/llms.txt` and
+  `llms-full.txt` updated with Webhook Headers table, Idempotency
+  section, and the same X-Idswyft-Signature drift fix.
+
+### Tests
+- 70+ new test cases across the 8 items. Backend full suite:
+  1093/1093 passing on merged dev (was 1025 baseline post-Sprint 1).
+
+### Sprint 3 follow-ups (filed, none merge-blocking)
+1. catchAsync return-promise refactor (test ergonomics, broad benefit)
+2. idempotency_keys cleanup cron (table grows unbounded)
+3. Idempotency concurrent-first-time race + in-flight lock (schema
+   change required)
+4. Decide 5xx caching policy for idempotency
+5. Backoff jitter + per-request deadline budget vs proxy timeouts
+6. Redis-backed shared breaker state for horizontal scale
+7. Document SyntaxError handling in engineClient retry path
+8. Optional comments in dataRetention re: cascade redundancy and
+   hard-delete vs anonymize for AML
+
 ## [1.9.0] - 2026-04-27
 
 Sprint 1 of the production-readiness remediation plan
