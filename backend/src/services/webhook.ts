@@ -6,6 +6,31 @@ import { logger, logWebhookDelivery } from '@/utils/logger.js';
 import { Webhook, WebhookDelivery, WebhookPayload } from '@/types/index.js';
 import { encryptSecret, decryptSecret } from '@idswyft/shared';
 
+/**
+ * Build the headers attached to every webhook delivery. Pure function —
+ * exported so unit tests can assert header construction without spinning
+ * up axios / supabase mocks.
+ *
+ * Includes X-Idswyft-Sandbox (boolean string) and X-Idswyft-Verification-Mode
+ * ("sandbox" | "production") — receivers can route or alert based on these
+ * without parsing the JSON payload.
+ */
+export function buildWebhookHeaders(
+  webhook: Pick<Webhook, 'is_sandbox'>,
+  deliveryId: string,
+  attempt: number,
+): Record<string, string> {
+  const isSandbox = Boolean(webhook.is_sandbox);
+  return {
+    'Content-Type': 'application/json',
+    'User-Agent': 'Idswyft-Webhooks/1.0',
+    'X-Idswyft-Webhook-Id': deliveryId,
+    'X-Idswyft-Delivery-Attempt': attempt.toString(),
+    'X-Idswyft-Sandbox': String(isSandbox),
+    'X-Idswyft-Verification-Mode': isSandbox ? 'sandbox' : 'production',
+  };
+}
+
 /** Encrypt a webhook secret_token before writing to the DB. */
 function encryptWebhookSecret(plaintext: string): string {
   return encryptSecret(plaintext, config.encryptionKey);
@@ -184,14 +209,9 @@ export class WebhookService {
           url: webhook.url
         });
         
-        // Prepare headers
-        const headers: Record<string, string> = {
-          'Content-Type': 'application/json',
-          'User-Agent': 'Idswyft-Webhooks/1.0',
-          'X-Idswyft-Webhook-Id': delivery.id,
-          'X-Idswyft-Delivery-Attempt': attempt.toString()
-        };
-        
+        // Prepare headers (pure construction, exported for testability)
+        const headers = buildWebhookHeaders(webhook, delivery.id, attempt);
+
         // Add signature if signing secret is provided (decrypt from DB storage)
         const rawSecret = webhook.secret_key || webhook.secret_token;
         if (rawSecret) {
