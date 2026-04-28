@@ -56,9 +56,31 @@ async function main() {
     ...(useSSL ? { ssl: { rejectUnauthorized: false } } : {}),
   });
 
+  // Postgres advisory lock key — fixed integer specific to Idswyft's
+  // migration runner. Two concurrent invocations of `npm run migrate`
+  // (e.g. two Railway replicas redeploying simultaneously) will serialize:
+  // the second waits on pg_advisory_lock until the first releases. Without
+  // this, both could try to apply the same SQL file, racing on the
+  // INSERT INTO _migrations and producing partial / undefined state.
+  //
+  // Picked from a deterministic 32-bit hash of "idswyft-migrations" so any
+  // future migration runner with the same key serializes correctly with
+  // this one. NOT shared with other advisory locks elsewhere in the app.
+  const ADVISORY_LOCK_KEY = 0x1d59f73b;   // 491,517,755
+
   try {
     await client.connect();
     console.log('✅ Connected to database');
+
+    // Acquire the advisory lock BEFORE doing any migration work. This call
+    // blocks if another runner holds the lock, so concurrent invocations
+    // serialize naturally rather than racing. The lock is automatically
+    // released when the session ends (`client.end()` in the finally block),
+    // so a crashed runner doesn't leave the lock held — Postgres ties
+    // session-level advisory locks to the connection lifetime.
+    console.log(`🔒 Acquiring migration advisory lock (key ${ADVISORY_LOCK_KEY})...`);
+    await client.query('SELECT pg_advisory_lock($1)', [ADVISORY_LOCK_KEY]);
+    console.log('🔒 Lock acquired');
 
     // Ensure tracking table exists
     await client.query(`
