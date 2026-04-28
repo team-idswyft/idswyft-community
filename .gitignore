@@ -149,6 +149,7 @@ backend/scripts/*
 !backend/scripts/encryption-key-rotation.md
 !backend/scripts/self-hosted-backups.md
 !backend/scripts/mint-service-key.md
+!backend/scripts/mint-service-key.ts
 
 # Caddy — generated Caddyfile and user-provided TLS certificates
 caddy/Caddyfile
