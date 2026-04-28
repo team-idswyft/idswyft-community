@@ -116,15 +116,68 @@ function preflightOrExit(): void {
   }
 }
 
+// ANSI color palette. Git Bash on Windows + modern terminals support these.
+// Disabled when stdout isn't a TTY (e.g. piping to a file) so we don't pollute
+// log files with escape sequences.
+const ANSI_ENABLED = process.stdout.isTTY ?? false;
+const C = {
+  reset: ANSI_ENABLED ? '\x1b[0m' : '',
+  bold: ANSI_ENABLED ? '\x1b[1m' : '',
+  dim: ANSI_ENABLED ? '\x1b[2m' : '',
+  italic: ANSI_ENABLED ? '\x1b[3m' : '',
+  red: ANSI_ENABLED ? '\x1b[31m' : '',
+  green: ANSI_ENABLED ? '\x1b[32m' : '',
+  yellow: ANSI_ENABLED ? '\x1b[33m' : '',
+  blue: ANSI_ENABLED ? '\x1b[34m' : '',
+  magenta: ANSI_ENABLED ? '\x1b[35m' : '',
+  cyan: ANSI_ENABLED ? '\x1b[36m' : '',
+  white: ANSI_ENABLED ? '\x1b[37m' : '',
+  gray: ANSI_ENABLED ? '\x1b[90m' : '',
+  brightRed: ANSI_ENABLED ? '\x1b[91m' : '',
+  brightGreen: ANSI_ENABLED ? '\x1b[92m' : '',
+  brightYellow: ANSI_ENABLED ? '\x1b[93m' : '',
+  brightCyan: ANSI_ENABLED ? '\x1b[96m' : '',
+};
+
 // Friendly env display: red for prod, yellow for staging, green for dev
 function envBadge(env: Environment): string {
   const colors: Record<Environment, string> = {
-    development: '\x1b[32m',
-    staging: '\x1b[33m',
-    production: '\x1b[31m',
+    development: C.green,
+    staging: C.yellow,
+    production: C.red,
   };
-  const reset = '\x1b[0m';
-  return `${colors[env]}${env}${reset}`;
+  return `${C.bold}${colors[env]}${env}${C.reset}`;
+}
+
+// Pad a string to a target visible width. ANSI escape sequences don't take
+// visual columns so naive padEnd() throws off table alignment if we color
+// the value first. This pads using only the visible characters then wraps
+// the result with color codes.
+function padCol(value: string, width: number, color = ''): string {
+  const visible = value.length > width ? value.slice(0, width - 1) + '…' : value;
+  const padding = ' '.repeat(Math.max(0, width - visible.length));
+  return `${color}${visible}${color ? C.reset : ''}${padding}`;
+}
+
+// Highlighted box around a one-time plaintext key. Drawn in bright cyan with
+// the key itself in bold so it stands out in scrollback. Internal-only
+// tooling — printing the plaintext is intentional (operator copies it from
+// here into Railway env vars).
+function printKeyBox(key: string): void {
+  const label = ' NEW SERVICE KEY — copy now, will not be shown again ';
+  const inner = key;
+  const width = Math.max(label.length, inner.length) + 4;
+  const horiz = '━'.repeat(width);
+  const lblPad = ' '.repeat(Math.max(0, width - label.length));
+  const innerPad = ' '.repeat(Math.max(0, width - inner.length - 2));
+
+  process.stdout.write('\n');
+  process.stdout.write(`  ${C.brightCyan}┏${horiz}┓${C.reset}\n`);
+  process.stdout.write(`  ${C.brightCyan}┃${C.reset}${C.bold}${label}${C.reset}${lblPad}${C.brightCyan}┃${C.reset}\n`);
+  process.stdout.write(`  ${C.brightCyan}┣${horiz}┫${C.reset}\n`);
+  process.stdout.write(`  ${C.brightCyan}┃${C.reset}  ${C.bold}${C.brightCyan}${inner}${C.reset}${innerPad}${C.brightCyan}┃${C.reset}\n`);
+  process.stdout.write(`  ${C.brightCyan}┗${horiz}┛${C.reset}\n`);
+  process.stdout.write('\n');
 }
 
 async function confirmProduction(action: string, env: Environment): Promise<void> {
@@ -247,11 +300,12 @@ async function cmdMint(product: string, env: string, label: string): Promise<voi
     file: fpath,
   });
 
-  ok(`Minted ${body.key_prefix}... (id ${body.id})`);
-  info(`Plaintext key saved to ${fpath} (chmod 0600)`);
-  info(`Copy from there to Railway IDSWYFT_API_KEY env var on the consuming service.`);
+  ok(`Minted ${C.brightCyan}${C.bold}${body.key_prefix}${C.reset} (id ${C.dim}${body.id}${C.reset})`);
+  printKeyBox(body.key);
+  info(`${C.dim}Also saved to ${fpath} (chmod 0600)${C.reset}`);
+  info(`Set on the consumer's Railway service: ${C.bold}IDSWYFT_API_KEY=${body.key.slice(0, 8)}…${C.reset}`);
   info(``);
-  info(`Verifying via list:`);
+  info(`${C.dim}Verifying via list:${C.reset}`);
   await listKeysSummary({ filterId: body.id });
 }
 
@@ -272,33 +326,59 @@ async function cmdList(opts: { all?: boolean; filterId?: string }): Promise<void
     return;
   }
 
-  // Pretty table
-  const cols = [
-    { h: 'PREFIX', w: 12, k: (k: ServiceKeyResponse) => k.key_prefix },
-    { h: 'PRODUCT', w: 18, k: (k: ServiceKeyResponse) => k.service_product },
-    { h: 'ENV', w: 12, k: (k: ServiceKeyResponse) => k.service_environment },
-    { h: 'LABEL', w: 30, k: (k: ServiceKeyResponse) => k.service_label?.slice(0, 30) ?? '' },
-    { h: 'ACTIVE', w: 7, k: (k: ServiceKeyResponse) => (k.is_active ? 'yes' : 'no') },
-    { h: 'CREATED', w: 11, k: (k: ServiceKeyResponse) => k.created_at?.slice(0, 10) ?? '' },
-    {
-      h: 'LAST USED',
-      w: 11,
-      k: (k: ServiceKeyResponse) => (k.last_used_at ? k.last_used_at.slice(0, 10) : '—'),
-    },
-    { h: 'ID (short)', w: 9, k: (k: ServiceKeyResponse) => k.id.slice(0, 8) },
-  ];
+  // Column widths — keep these in one place so header + rule + rows align.
+  const W = {
+    prefix: 12,
+    product: 18,
+    env: 12,
+    label: 30,
+    active: 7,
+    created: 11,
+    lastUsed: 11,
+    id: 9,
+  } as const;
 
-  const head = cols.map((c) => c.h.padEnd(c.w)).join(' ');
-  process.stdout.write(`  ${head}\n`);
-  process.stdout.write(`  ${cols.map((c) => '─'.repeat(c.w)).join(' ')}\n`);
+  // Header (bold + dim gray underline rule)
+  const header =
+    `${C.bold}${padCol('PREFIX', W.prefix)}${C.reset} ` +
+    `${C.bold}${padCol('PRODUCT', W.product)}${C.reset} ` +
+    `${C.bold}${padCol('ENV', W.env)}${C.reset} ` +
+    `${C.bold}${padCol('LABEL', W.label)}${C.reset} ` +
+    `${C.bold}${padCol('ACTIVE', W.active)}${C.reset} ` +
+    `${C.bold}${padCol('CREATED', W.created)}${C.reset} ` +
+    `${C.bold}${padCol('LAST USED', W.lastUsed)}${C.reset} ` +
+    `${C.bold}${padCol('ID', W.id)}${C.reset}`;
+  const rule = `${C.gray}${'─'.repeat(W.prefix)} ${'─'.repeat(W.product)} ${'─'.repeat(W.env)} ${'─'.repeat(W.label)} ${'─'.repeat(W.active)} ${'─'.repeat(W.created)} ${'─'.repeat(W.lastUsed)} ${'─'.repeat(W.id)}${C.reset}`;
+
+  process.stdout.write(`\n  ${header}\n`);
+  process.stdout.write(`  ${rule}\n`);
+
   for (const k of keys) {
-    process.stdout.write(`  ${cols.map((c) => String(c.k(k)).padEnd(c.w)).join(' ')}\n`);
+    const env = k.service_environment;
+    const envColor = env === 'production' ? C.red : env === 'staging' ? C.yellow : C.green;
+    const activeText = k.is_active ? 'yes' : 'no';
+    const activeColor = k.is_active ? C.green : C.red;
+    const lastUsed = k.last_used_at ? k.last_used_at.slice(0, 10) : '—';
+    const lastUsedColor = k.last_used_at ? '' : C.dim;
+
+    process.stdout.write(
+      `  ` +
+        `${padCol(k.key_prefix, W.prefix, C.brightCyan + C.bold)} ` +
+        `${padCol(k.service_product, W.product, C.cyan)} ` +
+        `${padCol(env, W.env, envColor + C.bold)} ` +
+        `${padCol(k.service_label ?? '', W.label)} ` +
+        `${padCol(activeText, W.active, activeColor)} ` +
+        `${padCol(k.created_at?.slice(0, 10) ?? '', W.created, C.dim)} ` +
+        `${padCol(lastUsed, W.lastUsed, lastUsedColor)} ` +
+        `${padCol(k.id.slice(0, 8), W.id, C.dim + C.cyan)}` +
+        `\n`,
+    );
   }
-  process.stdout.write(
-    `\n  ${keys.length} key(s) shown` +
-      (opts.all ? ' (active + revoked)' : ' (active only — pass --all to include revoked)') +
-      `\n`,
-  );
+
+  const summary = opts.all
+    ? `${keys.length} key(s) shown (active + revoked)`
+    : `${keys.length} key(s) shown ${C.dim}(active only — pass --all to include revoked)${C.reset}`;
+  process.stdout.write(`\n  ${summary}\n`);
 }
 
 async function listKeysSummary(opts: { filterId?: string }): Promise<void> {
@@ -346,9 +426,11 @@ async function cmdRotate(id: string): Promise<void> {
     file: fpath,
   });
 
-  ok(`Rotated. New key ${body.key_prefix}... (id ${body.id}) — old key ${id} marked inactive.`);
-  info(`Plaintext saved to ${fpath} (chmod 0600)`);
-  info(`Update IDSWYFT_API_KEY on the consuming Railway service before traffic hits cutover.`);
+  ok(`Rotated. New key ${C.brightCyan}${C.bold}${body.key_prefix}${C.reset} (id ${C.dim}${body.id}${C.reset}) — old key ${C.dim}${id}${C.reset} marked inactive.`);
+  printKeyBox(body.key);
+  info(`${C.dim}Also saved to ${fpath} (chmod 0600)${C.reset}`);
+  info(`${C.bold}${C.yellow}Update IDSWYFT_API_KEY on the consuming Railway service before traffic hits cutover.${C.reset}`);
+  info(`${C.dim}There is no overlap window — the old key is invalid the moment this script returned.${C.reset}`);
 }
 
 async function cmdRevoke(id: string): Promise<void> {
