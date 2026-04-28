@@ -215,12 +215,17 @@ _set_env_var() {
     grep -v "^${key}=" .env > .env.tmp && mv .env.tmp .env
   fi
   printf '%s=%s\n' "$key" "$value" >> .env
+  # Re-assert restrictive perms after every write — `mv .env.tmp .env`
+  # above takes the source file's mode (default 0644 with typical umask),
+  # losing any chmod 600 that was applied earlier in the install.
+  chmod 600 .env 2>/dev/null || true
 }
 
 _remove_env_var() {
   local key="$1"
   if [ -f .env ] && grep -q "^${key}=" .env; then
     grep -v "^${key}=" .env > .env.tmp && mv .env.tmp .env
+    chmod 600 .env 2>/dev/null || true
   fi
 }
 
@@ -236,6 +241,9 @@ setup_env() {
     read -rp "       Overwrite? (y/N): " overwrite
     if [[ ! "$overwrite" =~ ^[Yy]$ ]]; then
       ok "Keeping existing .env"
+      # Tighten perms on existing .env even when we don't overwrite — older
+      # installs may have left it world-readable (0644) per default umask.
+      chmod 600 .env 2>/dev/null || true
       divider
       return
     fi
@@ -300,8 +308,15 @@ WATCHTOWER_API_TOKEN=${watchtower_token}
 # WATCHTOWER_SCHEDULE=0 0 4 * * *   (6-field cron: sec min hour day month weekday)
 EOF
 
+  # Lock down .env permissions to owner-read/write only. Without this we
+  # rely on the user's umask, which on many distros leaves the file
+  # world-readable — exposing JWT_SECRET, API_KEY_SECRET, ENCRYPTION_KEY,
+  # and SERVICE_TOKEN to any non-root user on the host.
+  chmod 600 .env 2>/dev/null || true
+
   ok "Created .env with secure secrets"
   detail "DB_PASSWORD, JWT_SECRET, API_KEY_SECRET, ENCRYPTION_KEY, SERVICE_TOKEN"
+  detail "File permissions: chmod 600 (owner read/write only)"
   divider
 }
 
