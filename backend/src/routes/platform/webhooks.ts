@@ -280,7 +280,7 @@ router.get(
 
     const { data, error } = await supabase
       .from('webhooks')
-      .select('id, developer_id, url, is_sandbox, is_active, events, secret_key, created_at, last_attempted_at')
+      .select('id, developer_id, url, is_sandbox, is_active, events, secret_key, created_at')
       .in('developer_id', Array.from(productByDevId.keys()))
       .order('created_at', { ascending: false });
 
@@ -297,7 +297,6 @@ router.get(
       is_sandbox: w.is_sandbox,
       is_active: w.is_active,
       created_at: w.created_at,
-      last_attempted_at: w.last_attempted_at,
       signing_secret_masked: maskSecret(w.secret_key ?? ''),
     }));
 
