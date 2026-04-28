@@ -109,12 +109,18 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
 // Rate limiting
+// IP-based bucket bounds anonymous abuse. API-key-authenticated requests are
+// throttled per-key by rateLimitMiddleware downstream (which also handles the
+// service-key bypass). Skipping here when X-API-Key is present prevents
+// double-counting and avoids GatePass at venue throughput tripping the IP
+// bucket — all venue scans share a Railway egress IP.
 const limiter = rateLimit({
   windowMs: config.rateLimiting.windowMs,
   max: config.rateLimiting.maxRequestsPerDev,
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => Boolean(req.headers['x-api-key']),
 });
 app.use(limiter);
 

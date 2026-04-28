@@ -337,3 +337,52 @@ describe('DELETE /api/platform/api-keys/service/:id — revoke', () => {
     expect(res.status).toBe(400);
   });
 });
+
+describe('POST /api/platform/api-keys/service/:id/rotate', () => {
+  it('returns 404 when target key does not exist', async () => {
+    state.rotateLookupRow = null; // .single() returns no data
+
+    const res = await request(app)
+      .post('/api/platform/api-keys/service/22222222-2222-4222-8222-222222222222/rotate')
+      .set('X-Platform-Service-Token', TEST_TOKEN);
+
+    expect(res.status).toBe(404);
+  });
+
+  it('rejects non-UUID id', async () => {
+    const res = await request(app)
+      .post('/api/platform/api-keys/service/not-a-uuid/rotate')
+      .set('X-Platform-Service-Token', TEST_TOKEN);
+
+    expect(res.status).toBe(400);
+  });
+
+  it('mints new isk_* + revokes old on happy path', async () => {
+    // Old key found in lookup
+    state.rotateLookupRow = {
+      id: 'old-key-uuid',
+      developer_id: 'shadow-uuid-gatepass',
+      service_product: 'gatepass',
+      service_environment: 'production',
+      service_label: 'GatePass production',
+    };
+
+    const res = await request(app)
+      .post('/api/platform/api-keys/service/22222222-2222-4222-8222-222222222222/rotate')
+      .set('X-Platform-Service-Token', TEST_TOKEN);
+
+    expect(res.status).toBe(200);
+    expect(res.body.key).toMatch(/^isk_[0-9a-f]{64}$/);
+    expect(res.body.revoked_old_id).toBe('22222222-2222-4222-8222-222222222222');
+    expect(res.body.service_product).toBe('gatepass');
+    expect(res.body.service_environment).toBe('production');
+
+    // The insert preserved the original product/env/label (rotation invariant)
+    expect(state.insertedKeys.length).toBeGreaterThan(0);
+    const inserted = state.insertedKeys[state.insertedKeys.length - 1];
+    expect(inserted.developer_id).toBe('shadow-uuid-gatepass');
+    expect(inserted.service_product).toBe('gatepass');
+    expect(inserted.service_environment).toBe('production');
+    expect(inserted.is_service).toBe(true);
+  });
+});

@@ -276,9 +276,10 @@ describe('Service-key integration — end-to-end middleware chain', () => {
       .set('X-API-Key', DEVELOPER_KEY)
       .send({});
 
-    // ik_* keys MUST hit the rate limiter when blocked. Either 429 or
-    // RateLimitError surfaces (exact code depends on rateLimit.ts return shape).
-    expect([429, 500]).toContain(res.status);
+    // ik_* keys MUST hit the rate limiter when blocked — exactly 429.
+    // Allowing 500 would let an accidental crash in rateLimitMiddleware
+    // silently pass this regression test.
+    expect(res.status).toBe(429);
     expect(res.body.error || res.body.message).toBeTruthy();
   });
 
