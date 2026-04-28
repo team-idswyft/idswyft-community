@@ -5,6 +5,46 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.1] - 2026-04-29
+
+Operational tooling — TypeScript CLI for service-key management.
+No runtime behavior change.
+
+### Added
+- **`backend/scripts/mint-service-key.ts`** — `tsx`-runnable CLI
+  wrapping the `/api/platform/api-keys/service` endpoints with
+  safety rails the curl recipes leave to operator discipline:
+  - Plaintext keys never printed to stdout — written to
+    `~/.idswyft-keys/<timestamp>-<product>-<env>.json` with
+    `chmod 0600` (operator copies from file into Railway env vars).
+  - Production operations require typing `production` to confirm
+    (prevents `up-arrow + enter` accidental prod mints).
+  - All operations append to `~/.idswyft-keys/audit.jsonl`
+    (timestamp, event, id, prefix, product, env, file path —
+    no plaintext).
+  - After mint/rotate, automatically calls list to verify the
+    operation landed.
+  - Color-coded env labels (red production / yellow staging /
+    green development).
+  - Token length sanity check (warns on < 32 chars).
+  - Subcommands: `mint`, `list`, `rotate`, `revoke`,
+    `launch-gatepass` (one-shot mint of dev + staging + prod
+    GatePass keys), `help`.
+
+### Changed
+- **`backend/scripts/mint-service-key.md`** restructured to point
+  at the script as the preferred path. Curl recipes retained as
+  fallback for environments without Node.js or for debugging the
+  underlying HTTP behavior.
+
+### Cloud-only
+- Both files (`.ts` and `.md`) are in `.community-ignore` and
+  stripped from the public mirror via `sync-community.yml`. The
+  `.gitignore` exception list now permits both to land in the
+  private repo (alongside the existing
+  `rotate-encryption-key.ts` + `encryption-key-rotation.md`
+  pattern).
+
 ## [1.11.0] - 2026-04-29
 
 Service keys (`isk_*`) — a new class of API key for internal Idswyft
