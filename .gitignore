@@ -147,6 +147,7 @@ backend/scripts/*
 # blanket scripts/* ignore above. Keep this list small and intentional.
 !backend/scripts/rotate-encryption-key.ts
 !backend/scripts/encryption-key-rotation.md
+!backend/scripts/self-hosted-backups.md
 
 # Caddy — generated Caddyfile and user-provided TLS certificates
 caddy/Caddyfile
@@ -162,3 +163,4 @@ caddy/certs/*.crt
 .vercel
 .agents/
 .aidesigner/
+.env*.local

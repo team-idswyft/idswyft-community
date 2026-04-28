@@ -122,6 +122,14 @@ docker compose --profile https up -d
 
 Caddy automatically obtains and renews Let's Encrypt certificates. Requirements: ports 80 + 443 open, DNS A record pointing to your server.
 
+### Backup & Restore
+
+For production self-hosted deployments, see the dedicated runbook at
+[`backend/scripts/self-hosted-backups.md`](backend/scripts/self-hosted-backups.md).
+Covers daily database snapshots, uploads volume backup, `.env`
+preservation, monthly restore drills, and RTO/RPO targets. Skip if
+you're running this in a sandbox where data loss is acceptable.
+
 ### Uninstall
 
 To cleanly remove Idswyft from your server:

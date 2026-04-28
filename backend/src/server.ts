@@ -394,6 +394,28 @@ const startServer = async () => {
         });
       }
 
+      // Idempotency key cleanup — runs daily at 1:15 AM UTC, deletes rows
+      // whose expires_at has passed (default 24h TTL per migration 09).
+      // Without this the table grows unbounded — rows are inserted on
+      // every retryable POST request that includes Idempotency-Key.
+      {
+        const cron = await import('node-cron');
+        const { DataRetentionService } = await import('@/services/dataRetention.js');
+        const idempotencyRetentionService = new DataRetentionService();
+
+        cron.schedule('15 1 * * *', async () => {
+          try {
+            await idempotencyRetentionService.runIdempotencyKeyCleanup();
+          } catch (err) {
+            logger.error('Idempotency key cleanup cron failed', { error: err });
+          }
+        });
+
+        logger.info('Idempotency key cleanup scheduler started', {
+          schedule: '15 1 * * * (daily at 1:15 AM UTC)',
+        });
+      }
+
       // Webhook payload cleanup — daily at 3:30 AM UTC, nullifies PII from deliveries older than 30 days
       {
         const cron = await import('node-cron');

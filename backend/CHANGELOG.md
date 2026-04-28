@@ -5,6 +5,66 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.1] - 2026-04-27
+
+Sprint 3 of the production-readiness remediation plan
+(`docs/plans/2026-04-27-prod-readiness-remediation.md`). 10 items
+hardening operational, supply-chain, and reliability surfaces from
+the 2026-04-25 audit. Single patch release (no breaking changes).
+All branches went through code review; review findings are folded
+into the same commits as the original work.
+
+### Security
+- **Per-route admin login rate limiter (S3.5)** — 5 failed attempts
+  per IP per 15 minutes on `/api/admin/login` and
+  `/api/admin/login/verify-totp`. `skipSuccessfulRequests` and
+  `skip: requiresTotp` so the budget tracks only true credential
+  failures, not the protocol-step 401 that signals "TOTP required".
+- **Tighter `.env` permissions in `install.sh` (S3.3)** — chmod 600
+  on every code path that writes the secrets file (initial
+  generation, `_set_env_var`, `_remove_env_var`, "keep existing"
+  branch). Limits exposure if the install dir is later relaxed.
+
+### Reliability
+- **Migration runner advisory lock (S3.1)** — `pg_advisory_lock`
+  on key `0x1d59f73b` prevents two API instances racing the
+  `_migrations` table during a rolling deploy. Lock auto-releases
+  on connection close; partial migrations roll back cleanly.
+- **Idempotency keys cleanup cron (S3.8)** — daily at 01:15 UTC,
+  removes `idempotency_keys` rows past `expires_at`. Closes the
+  long-running gap where the table grew unbounded.
+- **catchAsync returns its inner promise (S3.7)** — Express ignored
+  return values, but the test harness awaits the middleware. Adding
+  the return lets tests await async middleware directly and removes
+  7 `setImmediate` polling workarounds in `idempotency.test.ts`.
+- **Engine breaker semantics clarified (S3.11)** — added inline
+  comment that `BREAKER_FAILURE_THRESHOLD` counts physical attempts
+  (post-retry), not logical requests. Test added for `SyntaxError`
+  on malformed JSON response — defaults to retryable per catch-all.
+
+### Operational
+- **Self-hosted backup + restore runbook (S3.6)** — new
+  `backend/scripts/self-hosted-backups.md` covers Postgres `pg_dump`
+  + uploads volume snapshot, S3 offsite, retention pruning, restore
+  verification. Volume name derived portably from `$PWD` (works
+  regardless of install directory). `pg_isready` precheck,
+  `--no-tablespaces`, `ON_ERROR_STOP=1` on restore.
+- **Docker resource limits + Renovate digest pinning (S3.2)** —
+  `mem_limit` and `cpus` on every service in `docker-compose.yml`
+  (postgres 1g, engine 2g/2.0, api 1g/1.0, frontend 256m/0.5,
+  caddy 256m/0.5). New `renovate.json` pins Dockerfile and compose
+  base images by digest; vulnerability alerts ship at any time, npm
+  patch+minor grouped weekly.
+
+### CI
+- **CI on direct push to main/dev (S3.9)** — workflow now runs on
+  both `pull_request` and `push: branches: [main, dev]`. Catches
+  rebases, merge commits, and direct pushes that bypassed PR.
+- **`npm audit` advisory job (S3.4)** — new CI job runs
+  `npm audit --audit-level=high --omit=dev` on backend, engine,
+  frontend, shared. `continue-on-error: true` for now to surface
+  findings without blocking; flip to blocking once backlog is clean.
+
 ## [1.10.0] - 2026-04-27
 
 Sprint 2 of the production-readiness remediation plan

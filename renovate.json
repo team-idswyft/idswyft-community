@@ -1,0 +1,42 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": ["config:recommended"],
+  "labels": ["dependencies", "renovate"],
+  "schedule": ["before 6am on monday"],
+  "timezone": "UTC",
+  "prConcurrentLimit": 5,
+  "prHourlyLimit": 2,
+  "rangeStrategy": "bump",
+
+  "packageRules": [
+    {
+      "description": "Pin Docker base images to digest so rebuilds are reproducible. Renovate will keep digests fresh; without this, FROM node:20-slim rebuilds against whatever the latest tag points to (supply-chain hijack risk per S3.2 audit finding).",
+      "matchManagers": ["dockerfile", "docker-compose"],
+      "pinDigests": true
+    },
+    {
+      "description": "Group all Docker image updates into one PR per week so we don't have 6 separate digest-bump PRs.",
+      "matchManagers": ["dockerfile", "docker-compose"],
+      "groupName": "docker base images"
+    },
+    {
+      "description": "Group npm patch + minor updates so Sprint review doesn't get overwhelmed. Major bumps still get individual PRs because they often need code changes.",
+      "matchManagers": ["npm"],
+      "matchUpdateTypes": ["patch", "minor"],
+      "groupName": "npm patch + minor"
+    },
+    {
+      "description": "Security advisories bypass the schedule — open immediately so we don't sit on known vulns for a week.",
+      "matchPackagePatterns": ["*"],
+      "matchDepTypes": ["dependencies", "devDependencies"],
+      "vulnerabilityAlerts": {
+        "schedule": ["at any time"],
+        "labels": ["security"]
+      }
+    }
+  ],
+
+  "vulnerabilityAlerts": {
+    "enabled": true
+  }
+}

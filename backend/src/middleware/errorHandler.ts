@@ -236,10 +236,21 @@ export const errorHandler = (
   }
 };
 
-// Async error handler wrapper
+// Async error handler wrapper.
+//
+// Returns the inner promise so callers (typically tests) can `await
+// middleware(req, res, next)` and have the await resolve only after the
+// inner async work completes. Express itself ignores the return value
+// of middleware, so adding `return` is a pure ergonomics win for tests
+// — production behavior is unchanged.
+//
+// Without the return, `await middleware(...)` resolved before the inner
+// fn finished, requiring tests to flush microtasks via
+// `await new Promise(setImmediate)` to observe side effects.
+// See S2.6 review for the original finding.
 export const catchAsync = (fn: Function) => {
   return (req: Request, res: Response, next: NextFunction) => {
-    fn(req, res, next).catch(next);
+    return fn(req, res, next).catch(next);
   };
 };
 
