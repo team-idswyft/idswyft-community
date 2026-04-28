@@ -38,7 +38,7 @@
     "express": "^4.22.1",
     "express-rate-limit": "^7.1.5",
     "express-validator": "^7.0.1",
-    "file-type": "^22.0.1",
+    "file-type": "^21.3.4",
     "geoip-lite": "^2.0.1",
     "helmet": "^7.1.0",
     "image-size": "^1.0.2",
