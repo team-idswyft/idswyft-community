@@ -34,9 +34,12 @@ frontend/.env.production
 # surface is stripped.
 backend/src/routes/platform/serviceKeys.ts
 backend/src/routes/platform/__tests__/serviceKeys.test.ts
+backend/src/routes/platform/webhooks.ts
+backend/src/routes/platform/__tests__/webhooks.test.ts
 backend/src/middleware/platformAuth.ts
 backend/scripts/mint-service-key.md
 backend/scripts/mint-service-key.ts
+backend/scripts/service-key.sh
 
 # Cloud-only operational tooling — the encryption-key rotation script and
 # its runbook are sensitive operational intelligence (env var names,

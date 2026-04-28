@@ -5,6 +5,92 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.0] - 2026-04-29
+
+Platform webhook surface for service keys + payload enrichment.
+
+Closes the architectural gap from the GatePass spec review:
+verifications driven by `isk_*` keys reference shadow developer
+rows, so existing webhook lookup (`WHERE developer_id = X`)
+returned 0 rows for service-key calls — no webhooks fired.
+Resolution: register webhooks directly on shadow developer rows
+via a new platform endpoint surface, and enrich the payload +
+headers with service-key context so receivers like GatePass
+can route to the correct internal workspace.
+
+### Added
+
+- **`POST/GET/POST :id/rotate/DELETE /api/platform/webhooks`** —
+  cloud-only endpoints (`X-Platform-Service-Token` auth) that
+  register/list/rotate/delete webhooks against shadow developer
+  rows. Mounted via dynamic import + top-level `await` in
+  `server.ts`. Stripped from community mirror via
+  `.community-ignore`.
+  - SSRF guard (HTTPS-only, mirrors dev-portal flow)
+  - Duplicate guard (same URL + sandbox + product)
+  - One-time plaintext signing secret returned on register/rotate
+  - Rotate/delete restricted to known shadow developer UUIDs (set
+    populated lazily on first use, fail-closed on lookup error)
+- **Webhook payload enrichment** (additive, backwards-compatible):
+  - `is_service: boolean`
+  - `service_product: 'gatepass' | 'idswyft-internal' | null`
+  - `service_environment: 'production' | 'staging' | 'development' | null`
+- **Webhook headers** emitted only when `is_service=true`:
+  - `X-Idswyft-Is-Service`
+  - `X-Idswyft-Service-Product`
+  - `X-Idswyft-Service-Environment`
+- **CLI subcommands** (`backend/scripts/mint-service-key.ts`):
+  - `sk -e <env> webhook register --product <p> --url <https-url>`
+  - `sk -e <env> webhook list [--product <p>]`
+  - `sk -e <env> webhook rotate <id>`
+  - `sk -e <env> webhook delete <id>`
+  - One-time plaintext signing secret rendered in a yellow
+    highlighted box, plus saved to `~/.idswyft-keys/<timestamp>-
+    <product>-webhook-secret.json` (chmod 0600).
+  - Audit log appends `webhook-register`, `webhook-rotate`,
+    `webhook-delete` events (no plaintext).
+
+### Fixed
+
+- **`GET /api/platform/webhooks` 500** — initial implementation
+  selected `last_attempted_at` from the `webhooks` table, which
+  doesn't exist (timestamp lives on `webhook_deliveries`). Caught
+  during live staging smoke test; unit tests had passed because
+  the mock returned the field. Lesson logged in the
+  service-key-deferred-ui memory note.
+
+### Tests
+
+- 14 → 18 platform-webhook router tests (rotate happy path
+  added)
+- 11 → 16 `buildWebhookHeaders` tests (4 cases for service-key
+  context: absent on `ik_*`, present on `isk_*`, partial when
+  fields are null)
+- Suite total: 84 files / 1151 tests / 0 failures
+
+### Operational notes
+
+- Production already has `IDSWYFT_EDITION=cloud` and
+  `IDSWYFT_PLATFORM_SERVICE_TOKEN` set from v1.11.0, so no
+  env-var work needed on this deploy.
+- Migration 58 (service-key columns + shadow developers) is
+  already applied to the shared Supabase DB. No DB work needed.
+
+### Spec / docs
+
+- `docs/specs/2026-04-28-gatepass-service-key.md` updated with
+  shipped status + corrections (gitignored, internal)
+- `docs/onboarding.md` Service Keys section already covers the
+  shadow-developer pattern; webhook subsection deferred until
+  this lands
+
+### Code review
+
+`superpowers:code-reviewer` audit on the feature branch flagged
+HTTPS-only, UUID-set guard, and 3 test-coverage gaps (rotate
+happy path, `buildWebhookHeaders` Phase 2 unit tests). All
+addressed in commit `eeb56e3` before merge.
+
 ## [1.11.1] - 2026-04-29
 
 Operational tooling — TypeScript CLI for service-key management.

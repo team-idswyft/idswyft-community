@@ -150,6 +150,7 @@ backend/scripts/*
 !backend/scripts/self-hosted-backups.md
 !backend/scripts/mint-service-key.md
 !backend/scripts/mint-service-key.ts
+!backend/scripts/service-key.sh
 
 # Caddy — generated Caddyfile and user-provided TLS certificates
 caddy/Caddyfile
