@@ -34,6 +34,25 @@ const otpSendLimiter = rateLimit({
   legacyHeaders: false,
 });
 
+// Rate limiter for admin password login: 5 failed attempts per 15 min per IP.
+// `skipSuccessfulRequests` so a legitimate operator typing their password
+// correctly doesn't burn through the budget. Keyed per-IP, not per-account
+// — per-account lockout would leak account existence (attacker observes
+// "this email triggers lockout, that one doesn't").
+//
+// The OTP routes above already have their own limiters. This limiter
+// specifically protects the password-based admin login at /admin/login,
+// which was previously only covered by the global 1000 req/hour limiter
+// in server.ts — too generous for password brute-forcing.
+const adminLoginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 5,
+  skipSuccessfulRequests: true,
+  message: { message: 'Too many failed login attempts. Please try again in 15 minutes.' },
+  standardHeaders: true,
+  legacyHeaders: false,
+});
+
 const router = express.Router();
 
 // Set httpOnly auth cookie alongside JSON token response (H3 security fix)
@@ -61,6 +80,7 @@ router.get('/csrf-token', catchAsync(async (req: Request, res: Response) => {
 
 // Admin login
 router.post('/admin/login',
+  adminLoginLimiter,
   [
     body('email')
       .isEmail()
