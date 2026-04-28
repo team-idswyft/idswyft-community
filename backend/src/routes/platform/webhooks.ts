@@ -65,6 +65,33 @@ async function resolveShadowDeveloperId(product: ServiceProduct): Promise<string
   return data.id as string;
 }
 
+/**
+ * Set of shadow developer UUIDs, populated lazily on first use. Used to
+ * gate rotate/delete so platform endpoints can only manage webhooks owned
+ * by the known shadow rows — not by any real developer who happens to
+ * have an email starting with "service+".
+ */
+let shadowDeveloperIds: Set<string> | null = null;
+
+async function getShadowDeveloperIds(): Promise<Set<string>> {
+  if (shadowDeveloperIds) return shadowDeveloperIds;
+
+  const emails = Object.values(SHADOW_DEVELOPER_EMAIL);
+  const { data, error } = await supabase
+    .from('developers')
+    .select('id, email')
+    .in('email', emails);
+
+  if (error || !data) {
+    logger.error('Failed to resolve shadow developer IDs', { error });
+    // Fail closed: empty set means rotate/delete reject everything until
+    // the lookup succeeds.
+    return new Set();
+  }
+  shadowDeveloperIds = new Set(data.map((row: any) => row.id as string));
+  return shadowDeveloperIds;
+}
+
 function validate(req: Request): void {
   const errors = validationResult(req);
   if (!errors.isEmpty()) {
@@ -103,8 +130,11 @@ router.post(
       .withMessage(`service_product must be one of: ${SERVICE_PRODUCTS.join(', ')}`),
     body('url')
       .isString()
-      .isURL({ protocols: ['https', 'http'], require_protocol: true })
-      .withMessage('url must be a valid http(s) URL'),
+      // HTTPS-only — mirrors backend/src/routes/developer/webhooks.ts. Webhook
+      // payloads carry HMAC signatures over PII fragments (OCR data); plaintext
+      // HTTP would leak content even with the signature intact.
+      .isURL({ protocols: ['https'], require_protocol: true })
+      .withMessage('url must be a valid https URL'),
     body('events')
       .optional()
       .isArray()
@@ -297,14 +327,11 @@ router.post(
       throw new NotFoundError(`Webhook ${req.params.id} not found`);
     }
 
-    // Check the developer is a shadow row (we don't allow rotating dev-portal webhooks here)
-    const { data: dev } = await supabase
-      .from('developers')
-      .select('email')
-      .eq('id', existing.developer_id)
-      .single();
-
-    if (!dev?.email?.startsWith('service+')) {
+    // Gate: only manage webhooks owned by known shadow developer UUIDs.
+    // Email-prefix matching would also accept a real developer who happened
+    // to register with email like "service+app@idswyft.app".
+    const shadowIds = await getShadowDeveloperIds();
+    if (!shadowIds.has(existing.developer_id)) {
       throw new ValidationError(
         'This endpoint only manages webhooks on shadow developer rows. Use /api/developer/webhooks for developer webhooks.',
         'id',
@@ -357,13 +384,9 @@ router.delete(
       throw new NotFoundError(`Webhook ${req.params.id} not found`);
     }
 
-    const { data: dev } = await supabase
-      .from('developers')
-      .select('email')
-      .eq('id', existing.developer_id)
-      .single();
-
-    if (!dev?.email?.startsWith('service+')) {
+    // Gate: only delete webhooks owned by known shadow developer UUIDs.
+    const shadowIds = await getShadowDeveloperIds();
+    if (!shadowIds.has(existing.developer_id)) {
       throw new ValidationError(
         'This endpoint only manages webhooks on shadow developer rows. Use /api/developer/webhooks for developer webhooks.',
         'id',

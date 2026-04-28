@@ -250,7 +250,7 @@ describe('POST /api/platform/webhooks — register', () => {
     const res = await request(app)
       .post('/api/platform/webhooks')
       .set('X-Platform-Service-Token', TEST_TOKEN)
-      .send({ service_product: 'gatepass', url: 'http://169.254.169.254/latest/meta-data/' });
+      .send({ service_product: 'gatepass', url: 'https://169.254.169.254/latest/meta-data/' });
     expect(res.status).toBe(400);
     expect(res.body.error).toMatch(/SSRF/i);
   });
@@ -336,6 +336,52 @@ describe('GET /api/platform/webhooks — list', () => {
     expect(res.body.webhooks[0].signing_secret_masked).toMatch(/^whsec_\*+/);
     expect(res.body.webhooks[0]).not.toHaveProperty('secret_key');
     expect(res.body.webhooks[0]).not.toHaveProperty('signing_secret');
+  });
+});
+
+describe('POST /api/platform/webhooks/:id/rotate', () => {
+  it('returns 404 for unknown id', async () => {
+    state.rotateLookupRow = null;
+    const res = await request(app)
+      .post('/api/platform/webhooks/00000000-0000-4000-8000-000000000000/rotate')
+      .set('X-Platform-Service-Token', TEST_TOKEN);
+    expect(res.status).toBe(404);
+  });
+
+  it('rejects non-UUID id', async () => {
+    const res = await request(app)
+      .post('/api/platform/webhooks/not-a-uuid/rotate')
+      .set('X-Platform-Service-Token', TEST_TOKEN);
+    expect(res.status).toBe(400);
+  });
+
+  it('refuses to rotate a webhook owned by a NON-shadow developer', async () => {
+    state.rotateLookupRow = {
+      id: '33333333-3333-4333-8333-333333333333',
+      developer_id: REAL_DEV_ID,
+      url: 'https://real-dev.example.com/hook',
+    };
+    const res = await request(app)
+      .post('/api/platform/webhooks/33333333-3333-4333-8333-333333333333/rotate')
+      .set('X-Platform-Service-Token', TEST_TOKEN);
+    expect(res.status).toBe(400);
+    expect(res.body.error).toMatch(/only manages webhooks on shadow developer/i);
+  });
+
+  it('returns 200 with new plaintext signing secret on happy path', async () => {
+    state.rotateLookupRow = {
+      id: '44444444-4444-4444-8444-444444444444',
+      developer_id: SHADOW_GP_ID,
+      url: 'https://api.gatepass.example.com/hook',
+    };
+    const res = await request(app)
+      .post('/api/platform/webhooks/44444444-4444-4444-8444-444444444444/rotate')
+      .set('X-Platform-Service-Token', TEST_TOKEN);
+
+    expect(res.status).toBe(200);
+    expect(res.body.id).toBe('44444444-4444-4444-8444-444444444444');
+    expect(res.body.signing_secret).toMatch(/^whsec_[0-9a-f]{48}$/);
+    expect(res.body.warning).toMatch(/old secret is INVALID NOW/i);
   });
 });
 
