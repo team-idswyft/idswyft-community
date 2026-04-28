@@ -5,6 +5,64 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.10.2] - 2026-04-28
+
+Vulnerability triage of the GitHub Dependabot backlog (89 advisories
+flagged after Sprint 3 ship). Local `npm audit` showed zero
+high/critical findings — all moderate. Auto-fixed every runtime
+advisory that had a non-breaking patch path; documented the rest
+with mitigations. Triage notes in
+`docs/security/2026-04-27-vulnerability-triage.md` (gitignored,
+internal).
+
+### Security
+- **Runtime dep bumps via `npm audit fix`** — applied non-breaking
+  patches across all workspaces:
+  - `follow-redirects` 1.15.11 → 1.16.0 (cross-domain auth-header
+    leak; reachable via axios + outbound webhooks/AML lookups)
+  - `fast-xml-parser` 5.5.8 → 5.7.2 (XML/CDATA injection;
+    transitive via `@aws-sdk/client-s3`)
+  - `postcss` 8.5.6 → 8.5.12 (XSS via unescaped `</style>`)
+  - `dompurify` 3.3.3 → 3.4.1 (sanitizer bypasses; transitive
+    optional via `jspdf`, vulnerable features unused)
+- **`backend/file-type` 19.6.0 → 21.3.4** — closes the ASF parser
+  infinite-loop DoS (GHSA-9vrp-r5w4-94mj). Reachable via the upload
+  validation middleware, which calls `fileTypeFromBuffer` on every
+  uploaded image. v22 was the cleanest fix per `npm audit fix --force`
+  but ships pure-ESM types incompatible with our `moduleResolution:
+  node`. v21.3.4 is the minimum patched version per the GHSA's
+  `vulnerableVersionRange: <21.3.1` and ships compatible types.
+- **`engine/file-type` direct dep removed** — declared in
+  `engine/package.json` but never imported in `engine/src`. The
+  transitive `file-type@16.5.4` via `jimp@0.x` still has the same
+  ASF advisory, but is unreachable in practice: the API edge
+  (`backend/src/middleware/fileValidation.ts`) validates uploads
+  with patched file-type@21.3.4 BEFORE forwarding to engine, and
+  the engine listens only on Railway's private network.
+
+### CI
+- **`npm audit` job flipped to blocking** — the S3.4 advisory job
+  (`.github/workflows/ci.yml`) had `continue-on-error: true` so the
+  pre-existing 89-advisory backlog wouldn't block all PRs. After
+  this triage there are zero high/critical findings at production
+  scope (`--omit=dev`), so the gate is safe to enforce. Threshold
+  stays at `--audit-level=high`; moderate findings still surface in
+  the log without blocking.
+
+### Deferred (with mitigations documented)
+- `jimp` v0 → v1 in engine — major API rewrite. Backend's
+  patched file-type validates uploads before the engine sees them.
+- `vite` v4 → v8 in frontend, `vitest` v1 → v4 in backend — dev-only,
+  separate migrations.
+- `node-cron` v3 → v4 — transitive `uuid` advisory only affects
+  `v3()`/`v5()`/`v6()` with a `buf` argument, which our code never
+  uses (we use `crypto.randomUUID()` and Postgres `gen_random_uuid()`).
+
+### Tests
+- `backend/src/tests/middleware/fileValidation.test.ts`: 5/5 passing
+  on file-type@21.3.4. `fileTypeFromBuffer` API stable across
+  19.x → 21.x.
+
 ## [1.10.1] - 2026-04-27
 
 Sprint 3 of the production-readiness remediation plan
