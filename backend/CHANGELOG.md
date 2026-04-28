@@ -5,6 +5,41 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.1] - 2026-04-29
+
+Security hardening — RLS on `public._migrations`.
+
+### Fixed
+- **Supabase lint "RLS Disabled in Public" on `_migrations`** —
+  the migration tracking table was created by `migrate.ts`
+  directly (not via a migration file), so it never received the
+  RLS treatment that migration 57 applied to every other
+  `public.*` table. Without RLS, anon/authenticated PostgREST
+  requests could potentially read or modify migration-tracking
+  state, which could cause real migrations to re-run or be
+  silently skipped.
+
+### Added
+- **Migration 59** — `ENABLE ROW LEVEL SECURITY` +
+  `service_role_all_migrations` policy + `REVOKE ALL` on
+  `anon`/`authenticated`. Mirrors the migration-57 pattern.
+  service_role bypasses RLS so the migrate.ts runner is
+  unaffected; PostgREST anon/authenticated requests are denied.
+
+### Changed
+- **`backend/src/scripts/migrate.ts`** — extends the
+  `CREATE TABLE IF NOT EXISTS _migrations` block with the same
+  ALTER/CREATE POLICY/REVOKE statements, so a fresh DB
+  initialization never has the lint warning. Idempotent
+  (DROP POLICY IF EXISTS / CREATE POLICY pattern).
+
+### Operational notes
+- No env-var changes needed.
+- Migration 59 already applied to the shared Supabase DB
+  (single-DB across staging+production) before this version
+  was tagged.
+- Supabase Studio's lint UI will refresh on next scan.
+
 ## [1.12.0] - 2026-04-29
 
 Platform webhook surface for service keys + payload enrichment.
