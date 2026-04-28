@@ -1,9 +1,11 @@
 # ─────────────────────────────────────────────────
 # CI — Type checking, tests, and build verification
 # ─────────────────────────────────────────────────
-# Triggers on pull requests targeting main or dev.
-# Must pass before PRs can be merged (configure as
-# required status check in branch protection rules).
+# Triggers on pull requests AND direct pushes to main/dev.
+# Per CLAUDE.md the project's dominant workflow is direct-push-
+# to-dev — without the push trigger those changes bypass the
+# test gate entirely. Configure as required status check in
+# branch protection rules.
 #
 # Backend job runs both `tsc --noEmit` and the vitest
 # suite. Job name preserved as `typecheck-backend` to
@@ -15,6 +17,8 @@ name: CI
 
 on:
   pull_request:
+    branches: [main, dev]
+  push:
     branches: [main, dev]
 
 permissions:
