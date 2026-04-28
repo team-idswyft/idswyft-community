@@ -13,5 +13,11 @@ export default {
   },
   test: {
     environment: 'node',
+    // storage.local-encryption.test.ts uses process.chdir() which is not
+    // permitted in worker_threads (the default 'threads' pool). Forks pool
+    // uses child processes and supports chdir.
+    poolMatchGlobs: [
+      ['**/storage.local-encryption.test.ts', 'forks'],
+    ],
   },
 };
