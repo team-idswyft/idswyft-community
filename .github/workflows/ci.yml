@@ -96,16 +96,15 @@ jobs:
       - run: cd shared && npx tsc && npx tsc-alias
       - run: cd engine && npx tsc --noEmit
 
-  # ─── npm audit (S3.4) ─────────────────────────────────────────
-  # Surfaces NEW high/critical advisories on each PR/push. Currently
-  # 89 known advisories exist on main (per Dependabot); this job's
-  # `continue-on-error` setting starts permissive so the existing
-  # backlog doesn't block all CI. Once the backlog is triaged,
-  # remove `continue-on-error` to make the gate blocking.
+  # ─── npm audit ────────────────────────────────────────────────
+  # Blocks PRs on new high/critical production advisories. Backlog
+  # was triaged on 2026-04-27 (see docs/security/2026-04-27-
+  # vulnerability-triage.md). After that triage we have zero
+  # high/critical findings at production scope (--omit=dev), so
+  # this gate fails fast on regressions without immediate friction.
   audit:
-    name: npm audit (advisory)
+    name: npm audit
     runs-on: ubuntu-latest
-    continue-on-error: true   # remove once 89-advisory backlog is triaged
     steps:
       - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
 
@@ -117,13 +116,10 @@ jobs:
 
       - run: npm install
       - name: Audit backend (production deps only)
-        run: cd backend && npm audit --audit-level=high --omit=dev || true
+        run: cd backend && npm audit --audit-level=high --omit=dev
       - name: Audit engine (production deps only)
-        run: cd engine && npm audit --audit-level=high --omit=dev || true
+        run: cd engine && npm audit --audit-level=high --omit=dev
       - name: Audit frontend (production deps only)
-        run: cd frontend && npm audit --audit-level=high --omit=dev || true
+        run: cd frontend && npm audit --audit-level=high --omit=dev
       - name: Audit shared (production deps only)
-        run: cd shared && npm audit --audit-level=high --omit=dev || true
-      # The `|| true` per-step lets the job report all audit results,
-      # not just the first to fail. Once backlog is triaged, drop the
-      # `|| true` AND `continue-on-error: true` together.
+        run: cd shared && npm audit --audit-level=high --omit=dev
