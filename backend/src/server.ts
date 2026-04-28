@@ -145,6 +145,28 @@ app.use('/api/v2/vault', vaultRoutes);
 app.use('/.well-known', wellKnownRoutes);
 app.use('/api/system', conditionalCsrf, systemRoutes);
 
+// Cloud-only: platform service-key endpoints (mint/list/rotate/revoke for
+// internal products like GatePass). Stripped from community mirror via
+// .community-ignore. The path goes through a variable so TypeScript
+// won't try to statically resolve it during community builds — the
+// `import()` returns Promise<any> at compile time and fails at runtime
+// (caught here) when the file is absent.
+if (process.env.IDSWYFT_EDITION === 'cloud') {
+  const platformServiceKeysPath = './routes/platform/serviceKeys.js';
+  // eslint-disable-next-line @typescript-eslint/no-floating-promises
+  import(platformServiceKeysPath)
+    .then((mod: any) => {
+      app.use('/api/platform/api-keys/service', mod.default);
+      logger.info('Platform service-keys endpoints mounted');
+    })
+    .catch((err: unknown) => {
+      logger.warn(
+        'IDSWYFT_EDITION=cloud but platform service-keys module not present',
+        { error: err instanceof Error ? err.message : String(err) },
+      );
+    });
+}
+
 // Public asset serving (branding logos, avatars) — no auth, folder-scoped in handler
 // For local: serves directly from filesystem. For S3: proxies via download.
 if (config.storage.provider === 'local' || config.storage.provider === 's3') {

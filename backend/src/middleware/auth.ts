@@ -628,16 +628,33 @@ export const hashHandoffToken = (token: string): string => {
     .digest('hex');
 };
 
-// Generate API key
-export const generateAPIKey = (): { key: string; hash: string; prefix: string } => {
-  const key = `ik_${crypto.randomBytes(32).toString('hex')}`;
+/**
+ * Mint an API key with the given prefix.
+ *
+ * Generates 32 random bytes (256-bit entropy), formats as
+ * `<prefix>_<hex>`, and returns the plaintext key, its HMAC-SHA256
+ * hash (using config.apiKeySecret), and the 8-char prefix used in
+ * logs and admin UI.
+ *
+ * Used by:
+ * - generateAPIKey() for ik_* developer keys
+ * - service-key minting endpoint for isk_* keys (Phase 5)
+ */
+export const generatePrefixedAPIKey = (
+  prefix: 'ik' | 'isk',
+): { key: string; hash: string; prefix: string } => {
+  const key = `${prefix}_${crypto.randomBytes(32).toString('hex')}`;
   const hash = crypto
     .createHmac('sha256', config.apiKeySecret)
     .update(key)
     .digest('hex');
-  const prefix = key.substring(0, 8);
-  
-  return { key, hash, prefix };
+  const keyPrefix = key.substring(0, 8);
+  return { key, hash, prefix: keyPrefix };
+};
+
+// Generate API key (developer ik_*)
+export const generateAPIKey = (): { key: string; hash: string; prefix: string } => {
+  return generatePrefixedAPIKey('ik');
 };
 
 // Generate a short-lived registration token (15 min) for new developers who verified OTP
