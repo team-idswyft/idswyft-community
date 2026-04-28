@@ -27,6 +27,13 @@ const MAX_ATTEMPTS = 3;
 // Backoff is configurable via env so tests can use 1ms instead of 500/1000ms.
 // Production should leave this unset to use the audit-recommended defaults.
 const BACKOFF_BASE_MS = parseInt(process.env.ENGINE_BACKOFF_BASE_MS || '500');
+// IMPORTANT: this counts every retryable PHYSICAL ATTEMPT against the engine,
+// not logical request-failure events. A single fully-failing logical request
+// fires 3 physical attempts (1 initial + 2 retries), so 2 fully-failing
+// requests = 6 attempts → trips the breaker partway through the second.
+// This is intentional: the breaker protects the engine from amplified retry
+// traffic, so attempt-count is the right metric. The name kept for backward
+// compat across observability tooling that may key off it.
 const BREAKER_FAILURE_THRESHOLD = 5;
 const BREAKER_OPEN_MS = parseInt(process.env.ENGINE_BREAKER_OPEN_MS || '30000');
 
@@ -196,6 +203,13 @@ async function callEngineOnce<T>(
         true,
       );
     }
+    // Anything else — most commonly SyntaxError from response.json() when
+    // the engine returns non-JSON (gateway 502 HTML, mid-deploy connection
+    // reset that returns a partial body). The retry loop catches plain
+    // Error instances as retryable by default — same effect as if we
+    // marked them explicitly. Documented here so the behavior is clear:
+    // unknown error types DEFAULT TO RETRYABLE because most real-world
+    // unknown errors during an engine call are transient.
     throw error;
   } finally {
     clearTimeout(timeout);

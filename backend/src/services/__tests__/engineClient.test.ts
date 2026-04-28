@@ -115,6 +115,30 @@ describe('engineClient retry policy', () => {
     expect(fetchMock).toHaveBeenCalledTimes(3);
     expect(getBreakerState().consecutiveFailures).toBe(3);
   });
+
+  it('retries on SyntaxError from malformed JSON response (defaults unknown errors to retryable)', async () => {
+    // Build a response that returns 200 OK but whose .json() throws —
+    // simulates an engine that returned non-JSON (gateway 502 HTML, partial
+    // body from a mid-deploy connection reset). The retry loop catches
+    // unknown error types (not EngineError, TypeError, AbortError) and
+    // treats them as retryable by default.
+    const malformedResponse = {
+      ok: true,
+      status: 200,
+      text: async () => '<html>502 Bad Gateway</html>',
+      json: async () => { throw new SyntaxError('Unexpected token < in JSON at position 0'); },
+    } as unknown as Response;
+
+    const fetchMock = vi.fn()
+      .mockResolvedValueOnce(malformedResponse)
+      .mockResolvedValueOnce(malformedResponse)
+      .mockResolvedValueOnce(fakeSuccess());
+    globalThis.fetch = fetchMock as any;
+
+    const result = await extractBack(Buffer.from('img'));
+    expect(result).toEqual({ ok: true });
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+  });
 });
 
 describe('engineClient circuit breaker', () => {
