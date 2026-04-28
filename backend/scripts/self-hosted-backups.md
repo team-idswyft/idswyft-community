@@ -63,25 +63,43 @@ DEST="$BACKUP_DIR/idswyft-db-$TIMESTAMP.sql.gz"
 
 cd "$COMPOSE_DIR"
 
-# Pull credentials from .env
-export $(grep -E '^(DB_USER|DB_NAME)=' .env | xargs)
+# Source .env safely. `set -a` exports every assignment that follows;
+# unlike `export $(grep | xargs)` this handles values containing
+# spaces, hashes, or quotes correctly.
+set -a; . ./.env; set +a
 
+# Health check first — a backup against an unhealthy postgres
+# container can succeed silently with empty output.
+docker compose exec -T postgres pg_isready -U "${DB_USER}" -d "${DB_NAME}" -t 5 \
+  || { echo "[$(date -u +%FT%TZ)] postgres not ready, aborting"; exit 1; }
+
+# Run pg_dump → gzip. Check pg_dump's exit code via PIPESTATUS so a
+# failed dump doesn't produce a "successful" empty .gz file.
 docker compose exec -T postgres \
-  pg_dump --clean --if-exists --no-owner --no-acl \
+  pg_dump --clean --if-exists --no-owner --no-acl --no-tablespaces \
   -U "${DB_USER}" "${DB_NAME}" \
   | gzip > "$DEST"
+PG_DUMP_EXIT=${PIPESTATUS[0]}
+if [ "$PG_DUMP_EXIT" -ne 0 ]; then
+  echo "[$(date -u +%FT%TZ)] pg_dump failed (exit $PG_DUMP_EXIT)"
+  rm -f "$DEST"
+  exit 1
+fi
 
 echo "[$(date -u +%FT%TZ)] Backup written: $DEST ($(du -h "$DEST" | cut -f1))"
 
-# ── Optional: ship to remote object storage ───
-if [ -n "$S3_BUCKET" ]; then
-  aws s3 cp "$DEST" "$S3_BUCKET" --storage-class STANDARD_IA
-  echo "[$(date -u +%FT%TZ)] Uploaded to $S3_BUCKET"
-fi
-
-# ── Retention ──────────────────────────────────
+# ── Retention (BEFORE remote upload so set -e doesn't skip pruning) ──
 find "$BACKUP_DIR" -name "idswyft-db-*.sql.gz" -mtime +$RETENTION_DAYS -delete
 echo "[$(date -u +%FT%TZ)] Pruned local backups older than $RETENTION_DAYS days"
+
+# ── Optional: ship to remote object storage ───
+# || true keeps the script exiting 0 even when S3 hiccups — local
+# copy is the durable artifact, remote is best-effort.
+if [ -n "$S3_BUCKET" ]; then
+  aws s3 cp "$DEST" "$S3_BUCKET" --storage-class STANDARD_IA \
+    && echo "[$(date -u +%FT%TZ)] Uploaded to $S3_BUCKET" \
+    || echo "[$(date -u +%FT%TZ)] S3 upload failed — local copy preserved"
+fi
 ```
 
 Make it executable and add a daily cron entry:
@@ -123,14 +141,26 @@ When `STORAGE_PROVIDER=local`, document images and selfies live in the `uploads`
 
 ### How to back up the local uploads volume
 
+Docker Compose names volumes `<project>_<volume>` where `<project>` is
+the lowercase, alphanumeric-only name of the directory containing
+`docker-compose.yml`. The default install is `/opt/idswyft` → volume
+named `idswyft_uploads`. If you cloned into `~/Idswyft` or any other
+directory, the volume name differs. The snippet below derives the name
+portably:
+
 ```bash
-# Find the volume mount path on the host (varies by Docker setup)
-docker volume inspect idswyft_uploads --format '{{ .Mountpoint }}'
-# → typically /var/lib/docker/volumes/idswyft_uploads/_data
+# Derive the project-prefixed volume name from the current directory
+PROJECT=$(basename "$PWD" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]')
+VOLUME="${PROJECT}_uploads"
+
+# Find the host-side mount path
+MOUNT=$(docker volume inspect "$VOLUME" --format '{{ .Mountpoint }}')
+echo "Volume $VOLUME mounted at $MOUNT"
+# → typically /var/lib/docker/volumes/<PROJECT>_uploads/_data
 
 # Snapshot via tar
 sudo tar czf "/var/backups/idswyft/uploads-$(date -u +%Y%m%d).tar.gz" \
-  -C "$(docker volume inspect idswyft_uploads --format '{{ .Mountpoint }}')" .
+  -C "$MOUNT" .
 ```
 
 ### When backups become unnecessary
@@ -174,9 +204,13 @@ If you rotate a secret (e.g. via the `ENCRYPTION_KEY` rotation procedure), back 
 # Stop containers that would mutate the DB during restore
 docker compose stop api engine
 
-# Restore from a backup file
+# Restore from a backup file. ON_ERROR_STOP=1 aborts cleanly if any
+# statement fails mid-restore (e.g. constraint violation from a
+# half-applied previous restore). Without it psql continues past
+# errors and you end up with a partial schema.
 gunzip -c "/var/backups/idswyft/idswyft-db-20260427-023000.sql.gz" | \
-  docker compose exec -T postgres psql -U "${DB_USER:-idswyft}" -d "${DB_NAME:-idswyft}"
+  docker compose exec -T postgres psql -v ON_ERROR_STOP=1 \
+    -U "${DB_USER:-idswyft}" -d "${DB_NAME:-idswyft}"
 
 # Restart
 docker compose start api engine
@@ -192,9 +226,14 @@ The `--clean --if-exists` flags from `pg_dump` make the restore idempotent: it d
 
 ```bash
 docker compose stop api engine
-sudo rm -rf "$(docker volume inspect idswyft_uploads --format '{{ .Mountpoint }}')/*"
-sudo tar xzf "/var/backups/idswyft/uploads-20260427.tar.gz" \
-  -C "$(docker volume inspect idswyft_uploads --format '{{ .Mountpoint }}')"
+
+# Derive the project-prefixed volume name from the current directory
+# (same logic as the backup snippet above).
+PROJECT=$(basename "$PWD" | tr '[:upper:]' '[:lower:]' | tr -cd '[:alnum:]')
+MOUNT=$(docker volume inspect "${PROJECT}_uploads" --format '{{ .Mountpoint }}')
+
+sudo rm -rf "$MOUNT"/*
+sudo tar xzf "/var/backups/idswyft/uploads-20260427.tar.gz" -C "$MOUNT"
 docker compose start api engine
 ```
 
@@ -261,5 +300,5 @@ For regulated deployments with stricter requirements, consider:
 
 - **Don't snapshot the running pgdata volume directly.** Postgres's WAL semantics mean a hot-copied data directory can be inconsistent. Use `pg_dump` instead — it produces a logically consistent snapshot regardless of concurrent writes.
 - **Don't store backups on the same disk as the production volume.** A disk failure that kills the database also kills the backup. Cross-disk or cross-region.
-- **Don't rotate `ENCRYPTION_KEY` without backing up `.env` first.** If the rotation goes wrong, you need the original key to recover. See `backend/scripts/encryption-key-rotation.md` (cloud-only — community operators using `STORAGE_ENCRYPTION` should write their own rotation procedure).
+- **Don't rotate `ENCRYPTION_KEY` without backing up `.env` first.** If the rotation goes wrong, you need the original key to recover. The rotation procedure itself is operator-specific — your threat model and storage backend determine the right stages, retention windows, and verification steps. The Idswyft Cloud team uses an internal runbook not shipped here.
 - **Don't assume Watchtower auto-updates back up your data.** They update the application image; volumes (including pgdata and uploads) are unaffected. Backups are still your responsibility.
