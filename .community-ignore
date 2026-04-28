@@ -26,6 +26,17 @@ frontend/.env.production
 # via the regular sync.
 .github/dependabot.yml
 
+# Cloud-only: platform service keys (isk_* — internal product enabler,
+# e.g. GatePass at venue throughput). Routes, auth middleware, tests,
+# and the curl recipe are all platform-team operations and don't
+# belong in the community self-hosted edition. The migration ships
+# (harmless without rows where is_service=true), but the minting
+# surface is stripped.
+backend/src/routes/platform/serviceKeys.ts
+backend/src/routes/platform/__tests__/serviceKeys.test.ts
+backend/src/middleware/platformAuth.ts
+backend/scripts/mint-service-key.md
+
 # Cloud-only operational tooling — the encryption-key rotation script and
 # its runbook are sensitive operational intelligence (env var names,
 # rotation timing, failure modes). Strip from the public community mirror.
