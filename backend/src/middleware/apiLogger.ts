@@ -13,6 +13,11 @@ interface ApiLogEntry {
   ip_address?: string;
   error_message?: string;
   timestamp?: Date;
+  // Service-key denormalization (Phase 4) — fast filtering for
+  // dashboards like "GatePass calls per minute" without joining
+  // api_keys. is_service defaults to false in schema.
+  is_service?: boolean;
+  service_product?: string | null;
 }
 
 // In-memory store for recent API activities (last 100 calls per developer)
@@ -57,7 +62,9 @@ export const apiActivityLogger = (req: Request, res: Response, next: NextFunctio
       response_time_ms: responseTime,
       user_agent: req.get('User-Agent'),
       ip_address: req.ip || req.connection.remoteAddress,
-      error_message: res.statusCode >= 400 ? `${res.statusCode} ${res.statusMessage}` : undefined
+      error_message: res.statusCode >= 400 ? `${res.statusCode} ${res.statusMessage}` : undefined,
+      is_service: apiKey?.is_service === true,
+      service_product: apiKey?.service_product ?? null,
     };
     
     // Store in memory for quick access (but exclude developer portal calls)
@@ -128,7 +135,10 @@ export const apiActivityLogger = (req: Request, res: Response, next: NextFunctio
                 user_agent: req.get('User-Agent'),
                 ip_address: req.ip || req.connection.remoteAddress,
                 error_message: logEntry.error_message,
-                timestamp: new Date().toISOString()
+                timestamp: new Date().toISOString(),
+                // Service-key denormalization for dashboard queries
+                is_service: apiKey?.is_service === true,
+                service_product: apiKey?.service_product ?? null,
               });
           } catch (error) {
             logger.error('Failed to log API activity to database:', error);

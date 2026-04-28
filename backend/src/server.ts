@@ -109,12 +109,18 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(cookieParser());
 
 // Rate limiting
+// IP-based bucket bounds anonymous abuse. API-key-authenticated requests are
+// throttled per-key by rateLimitMiddleware downstream (which also handles the
+// service-key bypass). Skipping here when X-API-Key is present prevents
+// double-counting and avoids GatePass at venue throughput tripping the IP
+// bucket — all venue scans share a Railway egress IP.
 const limiter = rateLimit({
   windowMs: config.rateLimiting.windowMs,
   max: config.rateLimiting.maxRequestsPerDev,
   message: 'Too many requests from this IP, please try again later.',
   standardHeaders: true,
   legacyHeaders: false,
+  skip: (req) => Boolean(req.headers['x-api-key']),
 });
 app.use(limiter);
 
@@ -144,6 +150,28 @@ app.use('/api/v2/compliance', conditionalCsrf, complianceRoutes);
 app.use('/api/v2/vault', vaultRoutes);
 app.use('/.well-known', wellKnownRoutes);
 app.use('/api/system', conditionalCsrf, systemRoutes);
+
+// Cloud-only: platform service-key endpoints (mint/list/rotate/revoke for
+// internal products like GatePass). Stripped from community mirror via
+// .community-ignore. The path goes through a variable so TypeScript
+// won't try to statically resolve it during community builds — the
+// `import()` returns Promise<any> at compile time and fails at runtime
+// (caught here) when the file is absent.
+if (process.env.IDSWYFT_EDITION === 'cloud') {
+  const platformServiceKeysPath = './routes/platform/serviceKeys.js';
+  // eslint-disable-next-line @typescript-eslint/no-floating-promises
+  import(platformServiceKeysPath)
+    .then((mod: any) => {
+      app.use('/api/platform/api-keys/service', mod.default);
+      logger.info('Platform service-keys endpoints mounted');
+    })
+    .catch((err: unknown) => {
+      logger.warn(
+        'IDSWYFT_EDITION=cloud but platform service-keys module not present',
+        { error: err instanceof Error ? err.message : String(err) },
+      );
+    });
+}
 
 // Public asset serving (branding logos, avatars) — no auth, folder-scoped in handler
 // For local: serves directly from filesystem. For S3: proxies via download.

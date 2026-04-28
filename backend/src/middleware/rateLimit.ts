@@ -21,15 +21,23 @@ export const basicRateLimit = rateLimit({
 export const rateLimitMiddleware = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
   if (!config.rateLimiting.enabled) return next();
 
+  // Service keys (isk_*) bypass rate limits entirely. They're internal-product
+  // calls (e.g. GatePass at venue throughput) where customer-facing throttles
+  // are inappropriate. Telemetry comes from api_activity_logs.is_service queries
+  // rather than the rate_limits table — see Phase 4 audit logging.
+  if (req.apiKey?.is_service) {
+    return next();
+  }
+
   const windowMs = config.rateLimiting.windowMs;
   const now = new Date();
   const windowStart = new Date(now.getTime() - windowMs);
-  
+
   // Determine identifier and limits based on request type
   let identifier: string;
   let identifierType: 'user' | 'developer' | 'ip';
   let maxRequests: number;
-  
+
   if (req.apiKey) {
     identifier = req.apiKey.developer_id;
     identifierType = 'developer';
@@ -196,6 +204,13 @@ export const cleanupRateLimitRecords = async () => {
 // Verification-specific rate limiting
 export const verificationRateLimit = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
   if (!config.rateLimiting.enabled) return next();
+
+  // Service keys bypass the 24h verification cap. The cap is keyed off
+  // user_id (or developer_id fallback), and shadow developers would otherwise
+  // accumulate every venue-scan into a single throttled bucket.
+  if (req.apiKey?.is_service) {
+    return next();
+  }
 
   // Fall back to developer scope when req.user is not set (API-key authenticated requests)
   const userId = req.user?.id || (req as any).apiKey?.developer_id;
