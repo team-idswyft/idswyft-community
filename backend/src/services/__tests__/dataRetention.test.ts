@@ -147,3 +147,53 @@ describe('DataRetentionService.runDemoCleanup', () => {
     expect(inCall?.args[1]).toEqual(['demo-v1', 'demo-v2']);
   });
 });
+
+describe('DataRetentionService.runIdempotencyKeyCleanup', () => {
+  it('deletes only rows whose expires_at is in the past', async () => {
+    const fromMock = supabase.from as any as ReturnType<typeof vi.fn>;
+
+    // First call: count(expired) → returns 7 to indicate work to do.
+    // Second call: actual delete with same .lt('expires_at', now).
+    let invocation = 0;
+    const chains: any[] = [];
+    fromMock.mockImplementation((table: string) => {
+      expect(table).toBe('idempotency_keys');
+      invocation++;
+      const chain = chainable(
+        invocation === 1
+          ? { count: 7, error: null }
+          : { data: null, error: null },
+      );
+      chains.push(chain);
+      return chain;
+    });
+
+    const deleted = await new DataRetentionService().runIdempotencyKeyCleanup();
+
+    expect(deleted).toBe(7);
+    expect(fromMock).toHaveBeenCalledTimes(2);
+
+    // The delete chain (second invocation) must have called .delete()
+    // and .lt('expires_at', <ISO string>). The cutoff must be a valid date.
+    const deleteChain = chains[1];
+    const methods = deleteChain.__calls.map((c: any) => c.method);
+    expect(methods).toContain('delete');
+    expect(methods).toContain('lt');
+
+    const ltCall = deleteChain.__calls.find((c: any) => c.method === 'lt');
+    expect(ltCall?.args[0]).toBe('expires_at');
+    expect(typeof ltCall?.args[1]).toBe('string');
+    expect(() => new Date(ltCall?.args[1])).not.toThrow();
+  });
+
+  it('returns 0 and does not run delete when count is zero', async () => {
+    const fromMock = supabase.from as any as ReturnType<typeof vi.fn>;
+    fromMock.mockImplementationOnce(() => chainable({ count: 0, error: null }));
+
+    const deleted = await new DataRetentionService().runIdempotencyKeyCleanup();
+
+    expect(deleted).toBe(0);
+    // Only the count query ran — no delete.
+    expect(fromMock).toHaveBeenCalledTimes(1);
+  });
+});
