@@ -18,6 +18,14 @@ frontend/.env.production
 .github/workflows/sync-release.yml
 .github/workflows/docker-publish.yml
 
+# Dependabot — the community repo is a force-push mirror, so any PR
+# merged on community gets overwritten by the next sync from private.
+# That makes dependabot PRs on community functionally unmergeable and
+# misleading to users browsing the public repo. Source of truth for
+# dependency updates is the private repo; updates flow to community
+# via the regular sync.
+.github/dependabot.yml
+
 # Cloud-only operational tooling — the encryption-key rotation script and
 # its runbook are sensitive operational intelligence (env var names,
 # rotation timing, failure modes). Strip from the public community mirror.
