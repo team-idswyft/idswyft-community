@@ -5,6 +5,107 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.11.0] - 2026-04-29
+
+Service keys (`isk_*`) — a new class of API key for internal Idswyft
+products to call the verification API without hitting customer-facing
+rate limits, quotas, or plan-tier gates. First consumer: GatePass.
+
+Cloud-only feature: schema + middleware bypasses ship to both
+editions (inert in community), but the minting endpoints + auth
+middleware + curl recipe are stripped from the public mirror via
+`.community-ignore`. Gated at runtime via `IDSWYFT_EDITION=cloud`.
+
+### Added
+- **Migration 58 — service-key schema** — adds `is_service`,
+  `service_product`, `service_environment`, `service_label` columns
+  to `api_keys` with CHECK constraints (service-key fields are
+  all-or-nothing; product enum: `gatepass`/`idswyft-internal`;
+  env enum: `production`/`staging`/`development`). Adds
+  `is_service` + `service_product` to `api_activity_logs` for
+  dashboard filterability without joins. Inserts two shadow
+  developer rows (`service+gatepass@idswyft.app`,
+  `service+internal@idswyft.app`) so service keys can populate
+  the existing `developer_id` FK without 41-site code changes.
+- **`isk_*` key resolution in `authenticateAPIKey`** — surfaces
+  `is_service`, `service_product`, `service_environment` on
+  `req.apiKey`; sets `req.isService` convenience flag.
+- **Sandbox/premium short-circuits for service keys** —
+  `checkSandboxMode` skips the production/sandbox validation
+  (service keys are scoped via `service_environment`, not
+  `is_sandbox`); `checkPremiumAccess` marks service keys as
+  `isPremium=true` (internal principal full access).
+- **Rate-limit + verification-cap bypass** — `rateLimitMiddleware`
+  and `verificationRateLimit` short-circuit when
+  `req.apiKey?.is_service === true`. Bypass is BEFORE the DB
+  lookup so service keys never increment counters.
+- **Global IP rate limiter skip for `X-API-Key` callers** —
+  `server.ts:112` `express-rate-limit` now skips when an API key
+  header is present (per-key throttling takes over downstream).
+  Closes the GatePass-egress-IP-saturation gap that would
+  otherwise trip the IP bucket in seconds.
+- **Audit log denormalization** — `apiActivityLogger` stamps
+  `is_service` + `service_product` on every row so dashboards
+  can query "GatePass calls last 24h" with a single
+  `WHERE service_product='gatepass'` filter, no join required.
+- **Platform service-key endpoints** (cloud-only,
+  `/api/platform/api-keys/service*`) — POST mint, GET list,
+  POST :id/rotate, DELETE :id. Auth via new
+  `authenticatePlatformServiceToken` middleware that validates
+  `X-Platform-Service-Token` with `crypto.timingSafeEqual` and
+  fails closed when `IDSWYFT_PLATFORM_SERVICE_TOKEN` is unset.
+  Rotate preserves product/env/label and revokes the old key in
+  one operation; partial-failure path returns 207.
+- **`generatePrefixedAPIKey()` shared helper** — refactored from
+  `generateAPIKey()` so both `ik_*` (developers) and `isk_*`
+  (services) share entropy + HMAC-SHA256 hashing. 32-byte random
+  bytes, formatted as `<prefix>_<hex>`, hashed under
+  `config.apiKeySecret`.
+- **`backend/scripts/mint-service-key.md`** — curl recipe for
+  the platform team. Operating procedure until the platform-admin
+  UI ships in `idswyft-vaas`. Includes telemetry SQL queries and
+  rotation procedure.
+
+### Operational requirements
+
+Cloud production + staging Railway env vars (must be set before
+service-key minting works):
+
+- `IDSWYFT_EDITION=cloud` — gates platform endpoint mounting
+- `IDSWYFT_PLATFORM_SERVICE_TOKEN=<openssl rand -hex 32>` — token
+  validated by `authenticatePlatformServiceToken`. Stored in
+  1Password under "Idswyft / Platform Service Token".
+
+Without these, the platform endpoints don't mount (silent skip)
+and any platform request returns 503. The migration runs
+regardless and is harmless when no rows have `is_service=true`.
+
+### Tests
+- 30 new test cases across 4 files (auth resolver, rate-limit
+  bypass, platform endpoints, end-to-end integration). Suite
+  total: 83 files / 1129 tests / 0 failures (was 79/1099
+  baseline).
+- Code review via `superpowers:code-reviewer` flagged 1 HIGH
+  (IP rate limiter throttling service keys), 2 MEDIUM (loose
+  500 acceptance, missing rotate tests). All addressed in
+  follow-up commit `6948639`.
+
+### Deferred
+- **Admin UI** — lives in `idswyft-vaas/platform-admin/` (separate
+  repo, not deployed yet). Curl recipe replaces UI until vaas
+  ships. See memory `service-key-deferred-ui.md`.
+- **Mint-endpoint rate limit** (10/hr fat-finger guard from spec
+  Phase 5) — only callers with the platform service token can hit
+  the endpoint, narrow attack surface. Deferred to follow-up.
+- **`developer_id=null` for service-key audit rows** (plan said
+  null; implementation uses shadow developer ID). Deviation is
+  correct — preserves FK integrity. Plan phase-4 acceptance
+  criterion will be updated.
+
+### Spec
+- `docs/features/2026-27-04-idswyft-service-key`
+- Plan: `docs/plans/2026-04-28-idswyft-service-key.md` (gitignored)
+
 ## [1.10.2] - 2026-04-28
 
 Vulnerability triage of the GitHub Dependabot backlog (89 advisories
