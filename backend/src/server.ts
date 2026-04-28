@@ -157,20 +157,23 @@ app.use('/api/system', conditionalCsrf, systemRoutes);
 // won't try to statically resolve it during community builds — the
 // `import()` returns Promise<any> at compile time and fails at runtime
 // (caught here) when the file is absent.
+//
+// MUST use top-level await: registering the route AFTER the 404 handler
+// at line ~297 makes Express ignore it (middleware order matters). The
+// .then(...).catch(...) variant lost the race — requests 404'd before
+// the import resolved.
 if (process.env.IDSWYFT_EDITION === 'cloud') {
   const platformServiceKeysPath = './routes/platform/serviceKeys.js';
-  // eslint-disable-next-line @typescript-eslint/no-floating-promises
-  import(platformServiceKeysPath)
-    .then((mod: any) => {
-      app.use('/api/platform/api-keys/service', mod.default);
-      logger.info('Platform service-keys endpoints mounted');
-    })
-    .catch((err: unknown) => {
-      logger.warn(
-        'IDSWYFT_EDITION=cloud but platform service-keys module not present',
-        { error: err instanceof Error ? err.message : String(err) },
-      );
-    });
+  try {
+    const mod: any = await import(platformServiceKeysPath);
+    app.use('/api/platform/api-keys/service', mod.default);
+    logger.info('Platform service-keys endpoints mounted');
+  } catch (err: unknown) {
+    logger.warn(
+      'IDSWYFT_EDITION=cloud but platform service-keys module not present',
+      { error: err instanceof Error ? err.message : String(err) },
+    );
+  }
 }
 
 // Public asset serving (branding logos, avatars) — no auth, folder-scoped in handler
