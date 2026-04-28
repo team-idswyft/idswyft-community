@@ -263,6 +263,46 @@ export class DataRetentionService {
     return toDelete;
   }
 
+  /**
+   * Delete `idempotency_keys` rows whose `expires_at` has passed.
+   *
+   * The table's PK is (key, developer_id) and `expires_at` is indexed
+   * (`idx_idempotency_expires`). Rows default to a 24h TTL, but no
+   * cleanup ran prior to this — the table grew unbounded. This cron
+   * handles natural decay; nothing in the application logic blocks
+   * inserts when the table is large, so missing the cron only matters
+   * for storage cost, never for correctness.
+   *
+   * Safe to run any cadence ≤ TTL. We schedule daily.
+   */
+  async runIdempotencyKeyCleanup(): Promise<number> {
+    const nowIso = new Date().toISOString();
+
+    const { count } = await supabase
+      .from('idempotency_keys')
+      .select('*', { count: 'exact', head: true })
+      .lt('expires_at', nowIso);
+
+    const toDelete = count ?? 0;
+    if (toDelete === 0) return 0;
+
+    const { error } = await supabase
+      .from('idempotency_keys')
+      .delete()
+      .lt('expires_at', nowIso);
+
+    if (error) {
+      logger.error('Idempotency key cleanup failed', { error });
+      return 0;
+    }
+
+    logger.info(`Idempotency key cleanup: ${toDelete} rows deleted`, {
+      cutoff: nowIso,
+    });
+
+    return toDelete;
+  }
+
   async runActivityLogCleanup(retentionDays: number = 7): Promise<number> {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - retentionDays);
