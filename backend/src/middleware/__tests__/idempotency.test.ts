@@ -71,10 +71,7 @@ beforeEach(() => {
 describe('idempotencyMiddleware', () => {
   it('passes through when no Idempotency-Key header is present', async () => {
     const { req, res, next } = makeReqResNext({ headers: {} });
-    idempotencyMiddleware(req, res, next, () => {});
-    // catchAsync wraps the async fn but doesn't return its promise, so awaiting
-    // the call would resolve before the inner work. Flush microtasks instead.
-    await new Promise<void>((r) => setImmediate(r));
+    await idempotencyMiddleware(req, res, next, () => {});
     expect(next).toHaveBeenCalledTimes(1);
   });
 
@@ -83,10 +80,7 @@ describe('idempotencyMiddleware', () => {
       headers: { 'idempotency-key': 'k1' },
       developer: undefined,
     });
-    idempotencyMiddleware(req, res, next, () => {});
-    // catchAsync wraps the async fn but doesn't return its promise, so awaiting
-    // the call would resolve before the inner work. Flush microtasks instead.
-    await new Promise<void>((r) => setImmediate(r));
+    await idempotencyMiddleware(req, res, next, () => {});
     expect(next).toHaveBeenCalledTimes(1);
   });
 
@@ -101,10 +95,7 @@ describe('idempotencyMiddleware', () => {
       developer: { id: 'dev-1' },
     });
 
-    idempotencyMiddleware(req, res, next, () => {});
-    // catchAsync wraps the async fn but doesn't return its promise, so awaiting
-    // the call would resolve before the inner work. Flush microtasks instead.
-    await new Promise<void>((r) => setImmediate(r));
+    await idempotencyMiddleware(req, res, next, () => {});
 
     expect(next).not.toHaveBeenCalled();
     const result = getResult();
@@ -123,10 +114,7 @@ describe('idempotencyMiddleware', () => {
       developer: { id: 'dev-1' },
     });
 
-    idempotencyMiddleware(req, res, next, () => {});
-    // catchAsync wraps the async fn but doesn't return its promise, so awaiting
-    // the call would resolve before the inner work. Flush microtasks instead.
-    await new Promise<void>((r) => setImmediate(r));
+    await idempotencyMiddleware(req, res, next, () => {});
 
     expect(next).toHaveBeenCalledTimes(1);
     // res.json was wrapped — calling it should now also write to the cache.
@@ -148,10 +136,7 @@ describe('idempotencyMiddleware', () => {
       developer: { id: 'dev-1' },
     });
 
-    idempotencyMiddleware(req, res, next, () => {});
-    // catchAsync wraps the async fn but doesn't return its promise, so awaiting
-    // the call would resolve before the inner work. Flush microtasks instead.
-    await new Promise<void>((r) => setImmediate(r));
+    await idempotencyMiddleware(req, res, next, () => {});
     expect(getResult().body).toEqual(cachedResponse);
     expect(getResult().statusCode).toBe(201);
   });
@@ -170,10 +155,7 @@ describe('idempotencyMiddleware', () => {
       developer: { id: 'dev-1' },
     });
 
-    idempotencyMiddleware(req, res, next, () => {});
-    // catchAsync wraps the async fn but doesn't return its promise, so awaiting
-    // the call would resolve before the inner work. Flush microtasks instead.
-    await new Promise<void>((r) => setImmediate(r));
+    await idempotencyMiddleware(req, res, next, () => {});
 
     const eqCalls = ch.__calls.filter((c: any) => c.eq);
     const keyEq = eqCalls.find((c: any) => c.eq[0] === 'key');
@@ -189,10 +171,7 @@ describe('idempotencyMiddleware', () => {
       developer: { id: 'dev-99' },
     });
 
-    idempotencyMiddleware(req, res, next, () => {});
-    // catchAsync wraps the async fn but doesn't return its promise, so awaiting
-    // the call would resolve before the inner work. Flush microtasks instead.
-    await new Promise<void>((r) => setImmediate(r));
+    await idempotencyMiddleware(req, res, next, () => {});
 
     const eqCalls = ch.__calls.filter((c: any) => c.eq).map((c: any) => c.eq);
     expect(eqCalls).toContainEqual(['key', 'kx']);

@@ -163,3 +163,4 @@ caddy/certs/*.crt
 .vercel
 .agents/
 .aidesigner/
+.env*.local

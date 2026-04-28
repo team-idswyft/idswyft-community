@@ -19,7 +19,14 @@
     "db:migrate": "cd backend && npm run db:migrate",
     "db:seed": "cd backend && npm run db:seed"
   },
-  "keywords": ["identity", "verification", "kyc", "ocr", "face-recognition", "api"],
+  "keywords": [
+    "identity",
+    "verification",
+    "kyc",
+    "ocr",
+    "face-recognition",
+    "api"
+  ],
   "author": "Idswyft Team",
   "license": "MIT",
   "devDependencies": {
