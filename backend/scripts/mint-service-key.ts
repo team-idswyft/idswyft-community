@@ -464,6 +464,102 @@ async function cmdRevoke(id: string): Promise<void> {
   ok(`Revoked ${existing.key_prefix}... — subsequent calls will return 401 immediately.`);
 }
 
+interface RevokeAllOpts {
+  serviceEnv?: Environment;     // filter by service_environment column
+  product?: Product;             // filter by service_product column
+  yes?: boolean;                 // skip confirmation prompt
+}
+
+/**
+ * Bulk-revoke active service keys, optionally filtered by service_environment
+ * and/or service_product. Lists matches first and requires explicit confirmation
+ * before any destructive action. Production keys add an extra confirmation gate.
+ */
+async function cmdRevokeAll(opts: RevokeAllOpts): Promise<void> {
+  const { body } = await platformRequest<{ keys: ServiceKeyResponse[] }>('GET', '');
+  if (!('keys' in body)) fail(`could not list service keys: ${JSON.stringify(body)}`);
+
+  let candidates = (body.keys ?? []).filter((k) => k.is_active !== false);
+  if (opts.serviceEnv) {
+    candidates = candidates.filter((k) => k.service_environment === opts.serviceEnv);
+  }
+  if (opts.product) {
+    candidates = candidates.filter((k) => k.service_product === opts.product);
+  }
+
+  if (candidates.length === 0) {
+    info(
+      `No active service keys match the filter` +
+        (opts.serviceEnv ? ` (service-env=${opts.serviceEnv})` : '') +
+        (opts.product ? ` (product=${opts.product})` : '') +
+        `.`,
+    );
+    return;
+  }
+
+  // Show what will be revoked, in the same colored table format as `list`
+  process.stdout.write(`\n${C.bold}${C.yellow}About to revoke ${candidates.length} key(s):${C.reset}\n`);
+  await cmdList({ all: false }); // shows current active set; matches what's about to die
+
+  const hasProduction = candidates.some((k) => k.service_environment === 'production');
+
+  // Two-stage confirmation: typed yes, plus explicit "production" if any prod keys
+  const rl = readline.createInterface({ input: process.stdin, output: process.stdout });
+  try {
+    if (!opts.yes) {
+      process.stderr.write(
+        `\n${C.yellow}Type ${C.bold}yes${C.reset}${C.yellow} to revoke all ${candidates.length} key(s) ` +
+          `(or anything else to cancel): ${C.reset}`,
+      );
+      const reply = await rl.question('');
+      if (reply.trim().toLowerCase() !== 'yes') fail('Cancelled.');
+    }
+
+    if (hasProduction) {
+      const prodCount = candidates.filter((k) => k.service_environment === 'production').length;
+      process.stderr.write(
+        `\n${C.red}${C.bold}⚠ ${prodCount} of these are PRODUCTION keys.${C.reset}\n` +
+          `${C.red}Type ${C.bold}production${C.reset}${C.red} to confirm production revocation ` +
+          `(or anything else to cancel): ${C.reset}`,
+      );
+      const prodReply = await rl.question('');
+      if (prodReply.trim() !== 'production') fail('Cancelled.');
+    }
+  } finally {
+    rl.close();
+  }
+
+  // Revoke each one. Continue on individual failures so a single 404 doesn't
+  // strand the rest in a half-revoked state.
+  let revoked = 0;
+  let failed = 0;
+  process.stdout.write(`\n`);
+  for (const k of candidates) {
+    process.stdout.write(`  Revoking ${k.key_prefix}... `);
+    const { status } = await platformRequest('DELETE', `/${k.id}`);
+    if (status === 204) {
+      process.stdout.write(`${C.green}ok${C.reset}\n`);
+      audit('revoke-all', {
+        id: k.id,
+        prefix: k.key_prefix,
+        product: k.service_product,
+        env: k.service_environment,
+      });
+      revoked += 1;
+    } else {
+      process.stdout.write(`${C.red}failed (${status})${C.reset}\n`);
+      failed += 1;
+    }
+  }
+
+  process.stdout.write(`\n`);
+  if (failed === 0) {
+    ok(`Revoked ${revoked} key(s).`);
+  } else {
+    warn(`Revoked ${revoked}, ${failed} failed. Check 'sk -e <env> list --all' to inspect.`);
+  }
+}
+
 async function cmdLaunchGatepass(): Promise<void> {
   warn('Launch flow: mints 3 service keys for GatePass (development, staging, production).');
   warn(`Each key is written to a separate file in ${KEYS_DIR}.`);
@@ -496,10 +592,12 @@ function printHelp(): void {
     `Usage:\n` +
     `  tsx mint-service-key.ts <command> [args]\n\n` +
     `Commands:\n` +
-    `  mint <product> <env> <label>    Mint a new service key (one-time plaintext written to file)\n` +
+    `  mint <product> <env> <label>    Mint a new service key (plaintext shown in highlighted box + saved to file)\n` +
     `  list [--all]                    List service keys (active by default; --all includes revoked)\n` +
     `  rotate <id>                     Mint a fresh key with same product/env, revoke the old\n` +
     `  revoke <id>                     Mark key inactive — subsequent calls return 401\n` +
+    `  revoke-all [--service-env <e>] [--product <p>] [--yes]\n` +
+    `                                  Bulk-revoke active keys (with confirmation; production needs extra confirm)\n` +
     `  launch-gatepass                 Mint dev + staging + prod GatePass keys (one-shot launch)\n` +
     `  help                            Print this message\n\n` +
     `Valid products: ${VALID_PRODUCTS.join(', ')}\n` +
@@ -507,9 +605,9 @@ function printHelp(): void {
     `Required env vars:\n` +
     `  IDSWYFT_PLATFORM_SERVICE_TOKEN  (the platform service token)\n` +
     `  IDSWYFT_API_BASE                (default https://api.idswyft.app; set to staging URL when testing)\n\n` +
-    `Plaintext keys are NEVER printed to stdout. They are written to:\n` +
+    `Plaintext keys: shown in a highlighted box on mint/rotate AND saved to:\n` +
     `  ${KEYS_DIR}/<timestamp>-<product>-<env>.json  (chmod 0600)\n` +
-    `Audit log of all operations: ${AUDIT_LOG}\n\n` +
+    `Audit log of all operations (no plaintext): ${AUDIT_LOG}\n\n` +
     `Examples:\n` +
     `  # Mint a single staging key\n` +
     `  tsx mint-service-key.ts mint gatepass staging "GatePass staging"\n\n` +
@@ -517,6 +615,10 @@ function printHelp(): void {
     `  tsx mint-service-key.ts list\n\n` +
     `  # Rotate a key (production prompt requires typing "production")\n` +
     `  tsx mint-service-key.ts rotate 06d621d9-720f-4c46-b140-c955dd992a63\n\n` +
+    `  # Bulk-revoke ALL active keys with service_environment=staging\n` +
+    `  tsx mint-service-key.ts revoke-all --service-env staging\n\n` +
+    `  # Bulk-revoke all GatePass keys regardless of environment\n` +
+    `  tsx mint-service-key.ts revoke-all --product gatepass\n\n` +
     `  # Test against staging instead of production\n` +
     `  IDSWYFT_API_BASE=https://staging.api.idswyft.app tsx mint-service-key.ts list\n`,
   );
@@ -556,6 +658,44 @@ async function main(): Promise<void> {
       const [id] = args;
       if (!id) fail('Usage: revoke <id>');
       await cmdRevoke(id);
+      break;
+    }
+    case 'revoke-all': {
+      // Parse optional filters: --service-env <env>, --product <product>, --yes
+      const opts: RevokeAllOpts = {};
+      for (let i = 0; i < args.length; i++) {
+        const arg = args[i];
+        if (arg === '--service-env') {
+          const v = args[++i];
+          if (!VALID_ENVS.includes(v as Environment)) {
+            fail(`--service-env must be one of: ${VALID_ENVS.join(', ')} (got ${JSON.stringify(v)})`);
+          }
+          opts.serviceEnv = v as Environment;
+        } else if (arg.startsWith('--service-env=')) {
+          const v = arg.slice('--service-env='.length);
+          if (!VALID_ENVS.includes(v as Environment)) {
+            fail(`--service-env must be one of: ${VALID_ENVS.join(', ')} (got ${JSON.stringify(v)})`);
+          }
+          opts.serviceEnv = v as Environment;
+        } else if (arg === '--product') {
+          const v = args[++i];
+          if (!VALID_PRODUCTS.includes(v as Product)) {
+            fail(`--product must be one of: ${VALID_PRODUCTS.join(', ')} (got ${JSON.stringify(v)})`);
+          }
+          opts.product = v as Product;
+        } else if (arg.startsWith('--product=')) {
+          const v = arg.slice('--product='.length);
+          if (!VALID_PRODUCTS.includes(v as Product)) {
+            fail(`--product must be one of: ${VALID_PRODUCTS.join(', ')} (got ${JSON.stringify(v)})`);
+          }
+          opts.product = v as Product;
+        } else if (arg === '--yes' || arg === '-y') {
+          opts.yes = true;
+        } else {
+          fail(`Unknown flag for revoke-all: ${arg}`);
+        }
+      }
+      await cmdRevokeAll(opts);
       break;
     }
     case 'launch-gatepass': {
