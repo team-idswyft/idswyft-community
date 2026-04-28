@@ -7,13 +7,28 @@ Service keys (`isk_*`) let internal Idswyft products call the verification API w
 ## Prerequisites
 
 - The Idswyft backend must be running with `IDSWYFT_EDITION=cloud` set.
-- You must hold the `IDSWYFT_PLATFORM_SERVICE_TOKEN` (32-byte random hex), set in the platform 1Password vault under "Idswyft / Platform Service Token". This token is set as a Railway env var on production + staging.
-- Replace `https://api.idswyft.app` with the staging URL when testing against staging.
+- You must hold the `IDSWYFT_PLATFORM_SERVICE_TOKEN` (32-byte random hex). This token is set as a Railway env var on the cloud production + staging environments. **The Railway dashboard's Variables tab is the canonical source of truth** — encrypted at rest, click the eye icon to reveal. If you keep a separate copy in a password manager (Bitwarden, 1Password, Apple Keychain, KeePass, plain `chmod 600` file, etc.), label the entry `Idswyft / Platform Service Token (<env>)` for greppability.
+- Replace `https://api.idswyft.app` with `https://staging.api.idswyft.app` when testing against staging.
 
 ```bash
-export IDSWYFT_PLATFORM_SERVICE_TOKEN="<paste from 1Password>"
+# Paste from Railway Variables tab or your password manager:
+export IDSWYFT_PLATFORM_SERVICE_TOKEN="<paste here>"
 export IDSWYFT_API_BASE="https://api.idswyft.app"
 ```
+
+### Generating the token (one-time at deploy / rotation)
+
+```bash
+# Pipe directly to clipboard so the token never echoes to your terminal:
+openssl rand -hex 32 | clip       # Windows (Git Bash)
+openssl rand -hex 32 | pbcopy     # macOS
+openssl rand -hex 32 | xclip      # Linux
+
+# Then paste into Railway → Idswyft → <env> → idswyfts-main-api → Variables → IDSWYFT_PLATFORM_SERVICE_TOKEN
+# Railway auto-redeploys when env vars change.
+```
+
+Production + staging should hold **different** tokens — never reuse a value across environments.
 
 ## Mint a new service key
 
@@ -47,7 +62,7 @@ curl -X POST "${IDSWYFT_API_BASE}/api/platform/api-keys/service" \
 }
 ```
 
-> **Save the `key` value immediately** — it will not be shown again. Hand off via 1Password vault, never via Slack / email / chat.
+> **Save the `key` value immediately** — it will not be shown again. Hand off via your team's secrets channel (encrypted password-manager share, signed message, etc.), **never via Slack / email / chat / Discord**. If the key is leaked in transit, rotate immediately via the rotate endpoint below.
 
 ## List existing service keys
 
@@ -96,7 +111,9 @@ for env in development staging production; do
 done
 ```
 
-Save each `key` to 1Password under "GatePass / Idswyft API Key (env)" and hand off to the GatePass team.
+Save each `key` to your secrets store (Railway env var on the GatePass services, plus a copy in your password manager if you use one — label as `GatePass / Idswyft API Key (<env>)`). Hand off to the GatePass team via your encrypted secrets channel.
+
+The `IDSWYFT_API_KEY` env var on the GatePass Railway services is the consuming side: rotate that var when you rotate keys here. The GatePass code at `apps/api/src/lib/idswyft.ts` doesn't need any change — it already reads `IDSWYFT_API_KEY` and sends it as `X-API-Key`, agnostic to whether the value starts with `ik_` or `isk_`.
 
 ## Telemetry
 
@@ -126,7 +143,7 @@ WHERE is_service = true
 
 ## Security notes
 
-- `IDSWYFT_PLATFORM_SERVICE_TOKEN` rotates separately from `isk_*` keys. To rotate the token: generate a new one with `openssl rand -hex 32`, update Railway env var (cloud production + staging), update 1Password vault, then restart the backend.
+- `IDSWYFT_PLATFORM_SERVICE_TOKEN` rotates separately from `isk_*` keys. To rotate the token: generate a new one with `openssl rand -hex 32 | clip` (Windows) or `| pbcopy` (macOS), update the Railway env var on cloud production + staging (the dashboard auto-redeploys), update any backup copy you keep, then verify with a list call against the new token. The old token is invalid the moment Railway redeploys with the new value — there is no overlap window, so coordinate the change with anyone holding the old value.
 - The token is compared with `crypto.timingSafeEqual` to prevent timing-attack discovery (see `backend/src/middleware/platformAuth.ts`).
 - `isk_*` keys hash with HMAC-SHA256 using `apiKeySecret` (same as `ik_*`). Only the hash is stored — the plaintext is shown once at mint/rotate time.
 - The shadow developer rows (`service+gatepass@idswyft.app`, `service+internal@idswyft.app`) cannot log in — they have no password, no JWT issued, no admin role. They exist purely to satisfy the `developer_id` FK on `api_keys`.
