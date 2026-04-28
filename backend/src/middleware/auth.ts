@@ -99,8 +99,12 @@ export const authenticateAPIKey = catchAsync(async (req: Request, res: Response,
     // Attach API key and developer to request
     req.apiKey = apiKeyRecord as APIKey;
     req.developer = apiKeyRecord.developer as Developer;
+    req.isService = apiKeyRecord.is_service === true;
 
-    // Check if developer account is suspended
+    // Check if developer account is suspended.
+    // Service keys reference shadow developer rows that are always 'active' —
+    // the suspended check is effectively dead code for service keys but
+    // remains as a safety net.
     if (req.developer?.status === 'suspended') {
       throw new AuthorizationError('Developer account suspended');
     }
@@ -108,7 +112,12 @@ export const authenticateAPIKey = catchAsync(async (req: Request, res: Response,
     logger.info('API key authenticated', {
       developerId: apiKeyRecord.developer_id,
       keyPrefix,
-      isSandbox: apiKeyRecord.is_sandbox
+      isSandbox: apiKeyRecord.is_sandbox,
+      isService: req.isService,
+      ...(req.isService && {
+        serviceProduct: apiKeyRecord.service_product,
+        serviceEnvironment: apiKeyRecord.service_environment,
+      }),
     });
     
     next();
@@ -474,9 +483,17 @@ export const requireOrgAdminOrPlatformAdmin = catchAsync(
 
 // Sandbox mode check
 export const checkSandboxMode = (req: Request, res: Response, next: NextFunction) => {
+  // Service keys (isk_*) bypass sandbox/production validation entirely.
+  // They're internal-product calls scoped via service_environment, not the
+  // is_sandbox boolean. Treat as production-equivalent regardless of NODE_ENV.
+  if (req.apiKey?.is_service) {
+    req.isSandbox = false;
+    return next();
+  }
+
   const isSandboxRequest = req.body.sandbox === true || req.query.sandbox === 'true';
   const isProductionEnv = config.nodeEnv === 'production';
-  
+
   if (req.apiKey) {
     const isSandboxKey = req.apiKey.is_sandbox;
 
@@ -494,20 +511,28 @@ export const checkSandboxMode = (req: Request, res: Response, next: NextFunction
   // Auto-infer sandbox mode from key type — SDK widgets (e.g. EndUserVerification)
   // don't need to explicitly pass sandbox:true; the key itself declares its mode.
   req.isSandbox = req.apiKey?.is_sandbox || isSandboxRequest || false;
-  
+
   next();
 };
 
 // Rate limiting bypass for premium developers (future feature)
 export const checkPremiumAccess = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
+  // Service keys (isk_*) are treated as the internal principal — full access
+  // to all features regardless of plan tier. This is the spec's
+  // "treat as internal principal with full access" behavior.
+  if (req.apiKey?.is_service) {
+    req.isPremium = true;
+    return next();
+  }
+
   if (!req.developer) {
     return next();
   }
-  
+
   // For now, all developers have the same access level
   // This can be extended to check for premium subscriptions
   req.isPremium = false;
-  
+
   next();
 });
 

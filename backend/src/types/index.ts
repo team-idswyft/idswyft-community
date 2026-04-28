@@ -110,6 +110,11 @@ export interface APIKey {
   last_used_at?: Date;
   created_at: Date;
   expires_at?: Date;
+  // Service-key fields (cloud-only feature; null on developer ik_* keys)
+  is_service?: boolean;
+  service_product?: 'gatepass' | 'idswyft-internal' | null;
+  service_environment?: 'production' | 'staging' | 'development' | null;
+  service_label?: string | null;
 }
 
 export interface Developer {
@@ -366,6 +371,10 @@ declare global {
       user?: User;
       reviewer?: Reviewer;
       sessionVerificationId?: string;
+      // True when authenticated via a service key (isk_*). Convenience signal
+      // for middleware to short-circuit rate limits, quotas, and plan checks.
+      // Equivalent to `req.apiKey?.is_service === true`.
+      isService?: boolean;
     }
   }
 }
