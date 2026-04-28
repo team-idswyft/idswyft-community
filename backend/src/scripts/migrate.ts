@@ -82,12 +82,22 @@ async function main() {
     await client.query('SELECT pg_advisory_lock($1)', [ADVISORY_LOCK_KEY]);
     console.log('🔒 Lock acquired');
 
-    // Ensure tracking table exists
+    // Ensure tracking table exists, with RLS locked down at the same time.
+    // RLS + service_role-only policy match the pattern from migration 57
+    // for every other public.* table, and pre-empts the Supabase lint
+    // "RLS Disabled in Public" warning on fresh databases. service_role
+    // bypasses RLS, so the runner itself is unaffected.
     await client.query(`
       CREATE TABLE IF NOT EXISTS _migrations (
         name TEXT PRIMARY KEY,
         applied_at TIMESTAMPTZ DEFAULT NOW()
       );
+      ALTER TABLE _migrations ENABLE ROW LEVEL SECURITY;
+      DROP POLICY IF EXISTS service_role_all_migrations ON _migrations;
+      CREATE POLICY service_role_all_migrations
+        ON _migrations FOR ALL TO service_role USING (true) WITH CHECK (true);
+      REVOKE ALL ON _migrations FROM anon;
+      REVOKE ALL ON _migrations FROM authenticated;
     `);
 
     // Get already-applied migrations
