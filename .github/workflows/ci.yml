@@ -91,3 +91,35 @@ jobs:
       # Build shared so engine can resolve its type declarations
       - run: cd shared && npx tsc && npx tsc-alias
       - run: cd engine && npx tsc --noEmit
+
+  # ─── npm audit (S3.4) ─────────────────────────────────────────
+  # Surfaces NEW high/critical advisories on each PR/push. Currently
+  # 89 known advisories exist on main (per Dependabot); this job's
+  # `continue-on-error` setting starts permissive so the existing
+  # backlog doesn't block all CI. Once the backlog is triaged,
+  # remove `continue-on-error` to make the gate blocking.
+  audit:
+    name: npm audit (advisory)
+    runs-on: ubuntu-latest
+    continue-on-error: true   # remove once 89-advisory backlog is triaged
+    steps:
+      - uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd # v6.0.2
+
+      - uses: actions/setup-node@cdca7365b2dadb8aad0a33bc7601856ffabcc48e # v4.3.0
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: package-lock.json
+
+      - run: npm install
+      - name: Audit backend (production deps only)
+        run: cd backend && npm audit --audit-level=high --omit=dev || true
+      - name: Audit engine (production deps only)
+        run: cd engine && npm audit --audit-level=high --omit=dev || true
+      - name: Audit frontend (production deps only)
+        run: cd frontend && npm audit --audit-level=high --omit=dev || true
+      - name: Audit shared (production deps only)
+        run: cd shared && npm audit --audit-level=high --omit=dev || true
+      # The `|| true` per-step lets the job report all audit results,
+      # not just the first to fail. Once backlog is triaged, drop the
+      # `|| true` AND `continue-on-error: true` together.
