@@ -1,10 +1,43 @@
-# Service-key minting — curl recipe
+# Service-key minting — operating procedure
 
 > **Cloud-only.** This file is in `.community-ignore` and never ships to the public mirror. The endpoints described here only exist when `IDSWYFT_EDITION=cloud` is set on the backend.
 
 Service keys (`isk_*`) let internal Idswyft products call the verification API without hitting customer-facing rate limits, quotas, or plan gates. The minting UI lives in `idswyft-vaas/platform-admin/` (separate repo, deferred until vaas deploys). Until then, this is the operating procedure.
 
-## Prerequisites
+## Preferred: TypeScript CLI
+
+`backend/scripts/mint-service-key.ts` wraps the curl recipes below with safety rails:
+
+- Plaintext keys never printed to stdout — written to `~/.idswyft-keys/<timestamp>-<product>-<env>.json` with `chmod 0600`
+- Production operations require typing `production` to confirm
+- All operations append to `~/.idswyft-keys/audit.jsonl` (no plaintext)
+- After mint/rotate, automatically lists keys to verify the operation landed
+- Pretty table for `list`
+
+```bash
+export IDSWYFT_PLATFORM_SERVICE_TOKEN="<paste from Railway Variables tab>"
+export IDSWYFT_API_BASE="https://api.idswyft.app"  # or staging URL
+
+# See full usage:
+npx tsx backend/scripts/mint-service-key.ts help
+
+# Common operations:
+npx tsx backend/scripts/mint-service-key.ts list
+npx tsx backend/scripts/mint-service-key.ts mint gatepass staging "GatePass staging"
+npx tsx backend/scripts/mint-service-key.ts rotate <id>
+npx tsx backend/scripts/mint-service-key.ts revoke <id>
+
+# Launch flow: mint dev + staging + prod GatePass keys (with prompts):
+npx tsx backend/scripts/mint-service-key.ts launch-gatepass
+```
+
+The curl recipes below are still useful when the script can't run (e.g. fresh server without Node, or debugging the underlying HTTP). Otherwise prefer the script — it handles redaction, audit logging, and prod confirmation that you'd otherwise need to remember.
+
+---
+
+## Curl recipes (fallback / debugging)
+
+### Prerequisites
 
 - The Idswyft backend must be running with `IDSWYFT_EDITION=cloud` set.
 - You must hold the `IDSWYFT_PLATFORM_SERVICE_TOKEN` (32-byte random hex). This token is set as a Railway env var on the cloud production + staging environments. **The Railway dashboard's Variables tab is the canonical source of truth** — encrypted at rest, click the eye icon to reveal. If you keep a separate copy in a password manager (Bitwarden, 1Password, Apple Keychain, KeePass, plain `chmod 600` file, etc.), label the entry `Idswyft / Platform Service Token (<env>)` for greppability.
