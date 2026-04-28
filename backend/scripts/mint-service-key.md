@@ -4,7 +4,35 @@
 
 Service keys (`isk_*`) let internal Idswyft products call the verification API without hitting customer-facing rate limits, quotas, or plan gates. The minting UI lives in `idswyft-vaas/platform-admin/` (separate repo, deferred until vaas deploys). Until then, this is the operating procedure.
 
-## Preferred: TypeScript CLI
+## Easiest: bash wrapper that pulls the token from Railway
+
+`backend/scripts/service-key.sh` wraps the TypeScript CLI and pulls `IDSWYFT_PLATFORM_SERVICE_TOKEN` from Railway automatically based on a `--env` flag. No manual export required:
+
+```bash
+# List keys on staging:
+./backend/scripts/service-key.sh --env staging list
+
+# Mint a key on staging:
+./backend/scripts/service-key.sh -e staging mint gatepass staging "GatePass staging"
+
+# Mint all 3 GatePass envs on production (with confirmation prompts):
+./backend/scripts/service-key.sh -e production launch-gatepass
+
+# Rotate / revoke:
+./backend/scripts/service-key.sh -e production rotate <id>
+./backend/scripts/service-key.sh -e production revoke <id>
+```
+
+The wrapper:
+- Validates `--env` (must be `staging` or `production`)
+- Pulls the token via `railway variables --json` (token never echoed to stdout/disk/log)
+- Sets `IDSWYFT_API_BASE` automatically (staging URL for `staging`, production URL for `production`)
+- Shows a banner before any production operation
+- Forwards all other args verbatim to `mint-service-key.ts`
+
+If you want to set the token manually (e.g. you have it in your password manager and don't have railway CLI handy), use the TS CLI directly — see next section.
+
+## TypeScript CLI (direct invocation)
 
 `backend/scripts/mint-service-key.ts` wraps the curl recipes below with safety rails:
 
