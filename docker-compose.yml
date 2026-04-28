@@ -20,6 +20,11 @@ services:
   postgres:
     image: postgres:16-alpine
     restart: unless-stopped
+    # Resource limits prevent any single container from taking down the host
+    # under load (e.g. malicious upload triggering OOM in the engine
+    # cascading into the database via cgroup pressure). Per the audit,
+    # tuned for the recommended deployment spec (4 vCPU / 8GB RAM).
+    mem_limit: 1g
     labels:
       - "com.centurylinklabs.watchtower.enable=false"
     volumes:
@@ -40,6 +45,12 @@ services:
   engine:
     image: ghcr.io/team-idswyft/idswyft-engine:latest
     restart: unless-stopped
+    # Engine spikes to ~1.5GB during ML inference (PaddleOCR + face-api +
+    # ONNX + Sharp). 2g cap leaves headroom for concurrent extractions
+    # without the unbounded growth that would OOM the host. cpus: 2.0
+    # because OCR + face detection both parallelize well on multiple cores.
+    mem_limit: 2g
+    cpus: 2.0
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     environment:
@@ -59,6 +70,10 @@ services:
   api:
     image: ghcr.io/team-idswyft/idswyft-api:latest
     restart: unless-stopped
+    # API is request-routing + light orchestration — 1g is plenty.
+    # cpus: 1.0 since the heavy work (OCR, face match) is offloaded to engine.
+    mem_limit: 1g
+    cpus: 1.0
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     depends_on:
@@ -104,6 +119,9 @@ services:
   frontend:
     image: ghcr.io/team-idswyft/idswyft-frontend:latest
     restart: unless-stopped
+    # nginx serving static React build — minimal RAM/CPU.
+    mem_limit: 256m
+    cpus: 0.5
     labels:
       - "com.centurylinklabs.watchtower.enable=true"
     depends_on:
@@ -119,6 +137,9 @@ services:
   caddy:
     image: caddy:2-alpine
     restart: unless-stopped
+    # Caddy as reverse proxy / TLS terminator — minimal footprint.
+    mem_limit: 256m
+    cpus: 0.5
     profiles:
       - https
     depends_on:
