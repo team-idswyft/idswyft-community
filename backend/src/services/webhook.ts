@@ -19,9 +19,10 @@ export function buildWebhookHeaders(
   webhook: Pick<Webhook, 'is_sandbox'>,
   deliveryId: string,
   attempt: number,
+  payload?: Pick<WebhookPayload, 'is_service' | 'service_product' | 'service_environment'>,
 ): Record<string, string> {
   const isSandbox = Boolean(webhook.is_sandbox);
-  return {
+  const headers: Record<string, string> = {
     'Content-Type': 'application/json',
     'User-Agent': 'Idswyft-Webhooks/1.0',
     'X-Idswyft-Webhook-Id': deliveryId,
@@ -29,6 +30,21 @@ export function buildWebhookHeaders(
     'X-Idswyft-Sandbox': String(isSandbox),
     'X-Idswyft-Verification-Mode': isSandbox ? 'sandbox' : 'production',
   };
+
+  // Service-key context headers (Phase 2). Emitted only for service-key-driven
+  // webhooks so receivers like GatePass can route per-product without parsing
+  // JSON. Backwards-compatible — absent for ordinary developer webhooks.
+  if (payload?.is_service) {
+    headers['X-Idswyft-Is-Service'] = 'true';
+    if (payload.service_product) {
+      headers['X-Idswyft-Service-Product'] = payload.service_product;
+    }
+    if (payload.service_environment) {
+      headers['X-Idswyft-Service-Environment'] = payload.service_environment;
+    }
+  }
+
+  return headers;
 }
 
 /** Encrypt a webhook secret_token before writing to the DB. */
@@ -209,8 +225,15 @@ export class WebhookService {
           url: webhook.url
         });
         
-        // Prepare headers (pure construction, exported for testability)
-        const headers = buildWebhookHeaders(webhook, delivery.id, attempt);
+        // Prepare headers (pure construction, exported for testability).
+        // Pass the payload so service-key context headers can be emitted
+        // when the verification was driven by an isk_* key.
+        const headers = buildWebhookHeaders(
+          webhook,
+          delivery.id,
+          attempt,
+          delivery.payload as WebhookPayload,
+        );
 
         // Add signature if signing secret is provided (decrypt from DB storage)
         const rawSecret = webhook.secret_key || webhook.secret_token;
