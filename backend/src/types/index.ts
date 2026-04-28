@@ -164,6 +164,12 @@ export interface WebhookPayload {
   verification_id: string;
   status: VerificationStatus;
   timestamp: string;
+  // Service-key context (Phase 2). Populated only when the verification was
+  // driven by an isk_* service key. Receivers like GatePass use these to
+  // route the callback to the right internal workspace/customer.
+  is_service?: boolean;
+  service_product?: string | null;
+  service_environment?: string | null;
   data?: {
     ocr_data?: OCRData;
     face_match_score?: number;

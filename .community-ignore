@@ -34,6 +34,8 @@ frontend/.env.production
 # surface is stripped.
 backend/src/routes/platform/serviceKeys.ts
 backend/src/routes/platform/__tests__/serviceKeys.test.ts
+backend/src/routes/platform/webhooks.ts
+backend/src/routes/platform/__tests__/webhooks.test.ts
 backend/src/middleware/platformAuth.ts
 backend/scripts/mint-service-key.md
 backend/scripts/mint-service-key.ts

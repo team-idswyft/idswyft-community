@@ -601,6 +601,37 @@ async function autoVaultIfEnabled(
 }
 
 /**
+ * Look up the api_key row's service-key context (is_service / service_product /
+ * service_environment) so webhook payloads can include them. Returns null
+ * fields when apiKeyId is missing or the row doesn't exist. Failure-tolerant:
+ * any DB error returns null context (webhook still fires without service-key
+ * fields rather than skipping delivery).
+ */
+async function lookupServiceKeyContext(apiKeyId?: string): Promise<{
+  is_service: boolean;
+  service_product: string | null;
+  service_environment: string | null;
+}> {
+  if (!apiKeyId) {
+    return { is_service: false, service_product: null, service_environment: null };
+  }
+  try {
+    const { data } = await supabase
+      .from('api_keys')
+      .select('is_service, service_product, service_environment')
+      .eq('id', apiKeyId)
+      .single();
+    return {
+      is_service: data?.is_service === true,
+      service_product: data?.service_product ?? null,
+      service_environment: data?.service_environment ?? null,
+    };
+  } catch {
+    return { is_service: false, service_product: null, service_environment: null };
+  }
+}
+
+/**
  * Fire webhooks if the verification has reached a terminal state.
  * Called AFTER res.json() so it never delays the HTTP response.
  * Errors are caught and logged — never thrown.
@@ -625,12 +656,15 @@ async function fireWebhooksIfTerminal(
     const webhooks = await webhookService.getActiveWebhooksForDeveloper(developerId, isSandbox, eventType, apiKeyId);
     if (webhooks.length === 0) return;
 
+    const serviceCtx = await lookupServiceKeyContext(apiKeyId);
+
     const payload: WebhookPayload = {
       event: eventType,
       user_id: userId,
       verification_id: verificationId,
       status: mapped.final_result as any,
       timestamp: new Date().toISOString(),
+      ...serviceCtx,
       data: {
         ocr_data: state.front_extraction?.ocr ?? undefined,
         face_match_score: state.face_match?.similarity_score ?? undefined,
@@ -677,12 +711,15 @@ async function fireWebhookEvent(
     const mapped = mapStatusForResponse(state);
     const currentStatus = mapped.final_result || 'processing';
 
+    const serviceCtx = await lookupServiceKeyContext(apiKeyId);
+
     const payload: WebhookPayload = {
       event: eventType,
       user_id: userId,
       verification_id: verificationId,
       status: currentStatus as any,
       timestamp: new Date().toISOString(),
+      ...serviceCtx,
       data: {
         ocr_data: state.front_extraction?.ocr ?? undefined,
         face_match_score: state.face_match?.similarity_score ?? undefined,

@@ -213,12 +213,12 @@ interface ServiceKeyResponse {
   revoked_old_id?: string;
 }
 
-async function platformRequest<T>(
+async function platformRequestRaw<T>(
   method: 'GET' | 'POST' | 'DELETE',
-  pathPart: string,
+  fullPath: string,
   body?: unknown,
 ): Promise<{ status: number; body: T | { status: 'error'; message: string; code?: string } }> {
-  const url = `${API_BASE}/api/platform/api-keys/service${pathPart}`;
+  const url = `${API_BASE}${fullPath}`;
   const res = await fetch(url, {
     method,
     headers: {
@@ -240,6 +240,24 @@ async function platformRequest<T>(
     parsed = { status: 'error', message: `Non-JSON response: ${res.status}` };
   }
   return { status: res.status, body: parsed };
+}
+
+// Service-keys endpoints (/api/platform/api-keys/service)
+async function platformRequest<T>(
+  method: 'GET' | 'POST' | 'DELETE',
+  pathPart: string,
+  body?: unknown,
+) {
+  return platformRequestRaw<T>(method, `/api/platform/api-keys/service${pathPart}`, body);
+}
+
+// Webhook endpoints (/api/platform/webhooks)
+async function platformWebhookRequest<T>(
+  method: 'GET' | 'POST' | 'DELETE',
+  pathPart: string,
+  body?: unknown,
+) {
+  return platformRequestRaw<T>(method, `/api/platform/webhooks${pathPart}`, body);
 }
 
 // ───────────────────────────────────────────────────────────────
@@ -583,6 +601,176 @@ async function cmdLaunchGatepass(): Promise<void> {
 }
 
 // ───────────────────────────────────────────────────────────────
+// Webhook subcommands (Phase 1 — platform webhooks for service products)
+// ───────────────────────────────────────────────────────────────
+
+interface WebhookResponse {
+  id: string;
+  service_product?: string;
+  url: string;
+  events: string[];
+  is_sandbox: boolean;
+  is_active: boolean;
+  created_at: string;
+  last_attempted_at?: string | null;
+  signing_secret?: string;          // present only on register / rotate
+  signing_secret_masked?: string;   // present on list
+  warning?: string;
+}
+
+function writeWebhookSecretFile(record: WebhookResponse, product: string): string {
+  ensureKeysDir();
+  const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+  const fname = `${stamp}-${product}-webhook-secret.json`;
+  const fpath = path.join(KEYS_DIR, fname);
+  fs.writeFileSync(fpath, JSON.stringify(record, null, 2) + '\n', { mode: 0o600 });
+  fs.chmodSync(fpath, 0o600);
+  return fpath;
+}
+
+function printSecretBox(secret: string): void {
+  const label = ' NEW WEBHOOK SIGNING SECRET — copy now, will not be shown again ';
+  const inner = secret;
+  const width = Math.max(label.length, inner.length) + 4;
+  const horiz = '━'.repeat(width);
+  const lblPad = ' '.repeat(Math.max(0, width - label.length));
+  const innerPad = ' '.repeat(Math.max(0, width - inner.length - 2));
+  process.stdout.write('\n');
+  process.stdout.write(`  ${C.brightYellow}┏${horiz}┓${C.reset}\n`);
+  process.stdout.write(`  ${C.brightYellow}┃${C.reset}${C.bold}${label}${C.reset}${lblPad}${C.brightYellow}┃${C.reset}\n`);
+  process.stdout.write(`  ${C.brightYellow}┣${horiz}┫${C.reset}\n`);
+  process.stdout.write(`  ${C.brightYellow}┃${C.reset}  ${C.bold}${C.brightYellow}${inner}${C.reset}${innerPad}${C.brightYellow}┃${C.reset}\n`);
+  process.stdout.write(`  ${C.brightYellow}┗${horiz}┛${C.reset}\n`);
+  process.stdout.write('\n');
+}
+
+interface WebhookRegisterOpts {
+  product: Product;
+  url: string;
+  events?: string[];
+  isSandbox?: boolean;
+}
+
+async function cmdWebhookRegister(opts: WebhookRegisterOpts): Promise<void> {
+  if (!VALID_PRODUCTS.includes(opts.product)) {
+    fail(`product must be one of: ${VALID_PRODUCTS.join(', ')}`);
+  }
+
+  process.stdout.write(`Registering webhook ${opts.product} → ${opts.url} ... `);
+  const { status, body } = await platformWebhookRequest<WebhookResponse>('POST', '', {
+    service_product: opts.product,
+    url: opts.url,
+    ...(opts.events ? { events: opts.events } : {}),
+    is_sandbox: opts.isSandbox ?? false,
+  });
+
+  if (status !== 201 || !('signing_secret' in body) || !body.signing_secret) {
+    process.stdout.write('failed\n');
+    fail(`register returned ${status}: ${JSON.stringify(body)}`);
+  }
+  process.stdout.write('ok\n');
+
+  const fpath = writeWebhookSecretFile(body, opts.product);
+  audit('webhook-register', {
+    id: body.id,
+    product: opts.product,
+    url: opts.url,
+    file: fpath,
+  });
+
+  ok(`Registered webhook ${C.brightCyan}${C.bold}${body.id}${C.reset} for ${opts.product}.`);
+  printSecretBox(body.signing_secret);
+  info(`${C.dim}Also saved to ${fpath} (chmod 0600)${C.reset}`);
+  info(`Use this secret to verify the X-Idswyft-Signature header on inbound webhooks at ${C.bold}${opts.url}${C.reset}.`);
+  info(`Events subscribed: ${body.events.join(', ')}`);
+}
+
+async function cmdWebhookList(opts: { product?: Product }): Promise<void> {
+  const query = opts.product ? `?service_product=${opts.product}` : '';
+  const { status, body } = await platformWebhookRequest<{ webhooks: WebhookResponse[]; count: number }>(
+    'GET',
+    query,
+  );
+  if (status !== 200 || !('webhooks' in body)) {
+    fail(`list returned ${status}: ${JSON.stringify(body)}`);
+  }
+
+  if (body.webhooks.length === 0) {
+    info(opts.product ? `No webhooks registered for ${opts.product}.` : 'No platform webhooks registered.');
+    return;
+  }
+
+  const W = { product: 18, url: 50, sandbox: 8, active: 7, events: 30, secret: 20, id: 9 };
+  process.stdout.write(`\n  `);
+  process.stdout.write(`${C.bold}${padCol('PRODUCT', W.product)}${C.reset} `);
+  process.stdout.write(`${C.bold}${padCol('URL', W.url)}${C.reset} `);
+  process.stdout.write(`${C.bold}${padCol('SANDBOX', W.sandbox)}${C.reset} `);
+  process.stdout.write(`${C.bold}${padCol('ACTIVE', W.active)}${C.reset} `);
+  process.stdout.write(`${C.bold}${padCol('EVENTS', W.events)}${C.reset} `);
+  process.stdout.write(`${C.bold}${padCol('SECRET', W.secret)}${C.reset} `);
+  process.stdout.write(`${C.bold}${padCol('ID', W.id)}${C.reset}\n`);
+  process.stdout.write(`  ${C.gray}${'─'.repeat(W.product)} ${'─'.repeat(W.url)} ${'─'.repeat(W.sandbox)} ${'─'.repeat(W.active)} ${'─'.repeat(W.events)} ${'─'.repeat(W.secret)} ${'─'.repeat(W.id)}${C.reset}\n`);
+
+  for (const w of body.webhooks) {
+    const sandboxText = w.is_sandbox ? 'yes' : 'no';
+    const sandboxColor = w.is_sandbox ? C.yellow : C.dim;
+    const activeText = w.is_active ? 'yes' : 'no';
+    const activeColor = w.is_active ? C.green : C.red;
+    const eventsShort = (w.events ?? []).map((e) => e.replace('verification.', 'v.')).join(',');
+
+    process.stdout.write(
+      `  ` +
+        `${padCol(w.service_product ?? '?', W.product, C.cyan)} ` +
+        `${padCol(w.url, W.url, C.brightCyan)} ` +
+        `${padCol(sandboxText, W.sandbox, sandboxColor)} ` +
+        `${padCol(activeText, W.active, activeColor)} ` +
+        `${padCol(eventsShort, W.events, C.dim)} ` +
+        `${padCol(w.signing_secret_masked ?? '***', W.secret, C.dim)} ` +
+        `${padCol(w.id.slice(0, 8), W.id, C.dim + C.cyan)}` +
+        `\n`,
+    );
+  }
+  process.stdout.write(`\n  ${body.count} webhook(s) shown\n`);
+}
+
+async function cmdWebhookRotate(id: string): Promise<void> {
+  if (!isUuid(id)) fail(`id must be a UUID (got ${id})`);
+
+  process.stdout.write(`Rotating webhook signing secret for ${id} ... `);
+  const { status, body } = await platformWebhookRequest<WebhookResponse>('POST', `/${id}/rotate`);
+
+  if (status !== 200 || !('signing_secret' in body) || !body.signing_secret) {
+    process.stdout.write('failed\n');
+    fail(`rotate returned ${status}: ${JSON.stringify(body)}`);
+  }
+  process.stdout.write('ok\n');
+
+  const fpath = writeWebhookSecretFile(body, 'rotated');
+  audit('webhook-rotate', { id, file: fpath });
+
+  ok(`Rotated signing secret for webhook ${C.brightCyan}${C.bold}${id}${C.reset}.`);
+  printSecretBox(body.signing_secret);
+  info(`${C.dim}Also saved to ${fpath} (chmod 0600)${C.reset}`);
+  info(`${C.bold}${C.yellow}Update the consumer's HMAC verification secret IMMEDIATELY.${C.reset}`);
+  info(`${C.dim}There is no overlap window — the old secret is invalid the moment this command returned.${C.reset}`);
+}
+
+async function cmdWebhookDelete(id: string): Promise<void> {
+  if (!isUuid(id)) fail(`id must be a UUID (got ${id})`);
+
+  process.stdout.write(`Deleting webhook ${id} ... `);
+  const { status, body } = await platformWebhookRequest('DELETE', `/${id}`);
+  if (status !== 204) {
+    process.stdout.write('failed\n');
+    fail(`delete returned ${status}: ${JSON.stringify(body)}`);
+  }
+  process.stdout.write('ok\n');
+
+  audit('webhook-delete', { id });
+  ok(`Deleted webhook ${id}. Subsequent verification events will not fire to this URL.`);
+}
+
+// ───────────────────────────────────────────────────────────────
 // Help + entrypoint
 // ───────────────────────────────────────────────────────────────
 
@@ -599,6 +787,12 @@ function printHelp(): void {
     `  revoke-all [--service-env <e>] [--product <p>] [--yes]\n` +
     `                                  Bulk-revoke active keys (with confirmation; production needs extra confirm)\n` +
     `  launch-gatepass                 Mint dev + staging + prod GatePass keys (one-shot launch)\n` +
+    `  webhook register --product <p> --url <url> [--events e1,e2] [--sandbox]\n` +
+    `                                  Register a webhook on the shadow developer for a service product.\n` +
+    `                                  Returns plaintext signing secret ONCE (highlighted box + saved to file).\n` +
+    `  webhook list [--product <p>]    List platform webhooks (signing secret masked)\n` +
+    `  webhook rotate <id>             Rotate signing secret (no overlap window — old invalid immediately)\n` +
+    `  webhook delete <id>             Hard-delete webhook registration\n` +
     `  help                            Print this message\n\n` +
     `Valid products: ${VALID_PRODUCTS.join(', ')}\n` +
     `Valid envs:     ${VALID_ENVS.join(', ')}\n\n` +
@@ -620,8 +814,75 @@ function printHelp(): void {
     `  # Bulk-revoke all GatePass keys regardless of environment\n` +
     `  tsx mint-service-key.ts revoke-all --product gatepass\n\n` +
     `  # Test against staging instead of production\n` +
-    `  IDSWYFT_API_BASE=https://staging.api.idswyft.app tsx mint-service-key.ts list\n`,
+    `  IDSWYFT_API_BASE=https://staging.api.idswyft.app tsx mint-service-key.ts list\n\n` +
+    `  # Register a webhook for GatePass on staging\n` +
+    `  tsx mint-service-key.ts webhook register --product gatepass --url https://api.gatepass.example.com/idswyft-webhook\n\n` +
+    `  # List webhooks for a specific service product\n` +
+    `  tsx mint-service-key.ts webhook list --product gatepass\n\n` +
+    `  # Rotate a webhook signing secret\n` +
+    `  tsx mint-service-key.ts webhook rotate <webhook-id>\n`,
   );
+}
+
+async function dispatchWebhookSubcommand(subcmd: string, args: string[]): Promise<void> {
+  switch (subcmd) {
+    case 'register': {
+      const opts: Partial<WebhookRegisterOpts> = {};
+      for (let i = 0; i < args.length; i++) {
+        const a = args[i];
+        if (a === '--product') {
+          opts.product = args[++i] as Product;
+        } else if (a.startsWith('--product=')) {
+          opts.product = a.slice('--product='.length) as Product;
+        } else if (a === '--url') {
+          opts.url = args[++i];
+        } else if (a.startsWith('--url=')) {
+          opts.url = a.slice('--url='.length);
+        } else if (a === '--events') {
+          opts.events = (args[++i] ?? '').split(',').map((s) => s.trim()).filter(Boolean);
+        } else if (a.startsWith('--events=')) {
+          opts.events = a.slice('--events='.length).split(',').map((s) => s.trim()).filter(Boolean);
+        } else if (a === '--sandbox') {
+          opts.isSandbox = true;
+        } else {
+          fail(`Unknown flag for webhook register: ${a}`);
+        }
+      }
+      if (!opts.product || !opts.url) {
+        fail(`webhook register: --product and --url are required.\nValid products: ${VALID_PRODUCTS.join(', ')}`);
+      }
+      await cmdWebhookRegister(opts as WebhookRegisterOpts);
+      break;
+    }
+    case 'list': {
+      let product: Product | undefined;
+      for (let i = 0; i < args.length; i++) {
+        const a = args[i];
+        if (a === '--product') product = args[++i] as Product;
+        else if (a.startsWith('--product=')) product = a.slice('--product='.length) as Product;
+        else fail(`Unknown flag for webhook list: ${a}`);
+      }
+      if (product && !VALID_PRODUCTS.includes(product)) {
+        fail(`--product must be one of: ${VALID_PRODUCTS.join(', ')}`);
+      }
+      await cmdWebhookList({ product });
+      break;
+    }
+    case 'rotate': {
+      const [id] = args;
+      if (!id) fail('Usage: webhook rotate <id>');
+      await cmdWebhookRotate(id);
+      break;
+    }
+    case 'delete': {
+      const [id] = args;
+      if (!id) fail('Usage: webhook delete <id>');
+      await cmdWebhookDelete(id);
+      break;
+    }
+    default:
+      fail(`Unknown webhook subcommand: ${subcmd}\nValid: register, list, rotate, delete`);
+  }
 }
 
 async function main(): Promise<void> {
@@ -700,6 +961,20 @@ async function main(): Promise<void> {
     }
     case 'launch-gatepass': {
       await cmdLaunchGatepass();
+      break;
+    }
+    case 'webhook': {
+      const [subcmd, ...subargs] = args;
+      if (!subcmd) {
+        fail(
+          `Usage: webhook <register|list|rotate|delete> [args...]\n` +
+            `  webhook register --product <p> --url <url> [--events e1,e2] [--sandbox]\n` +
+            `  webhook list [--product <p>]\n` +
+            `  webhook rotate <id>\n` +
+            `  webhook delete <id>`,
+        );
+      }
+      await dispatchWebhookSubcommand(subcmd, subargs);
       break;
     }
     default:

@@ -90,4 +90,52 @@ describe('buildWebhookHeaders', () => {
     expect(typeof headers['X-Idswyft-Delivery-Attempt']).toBe('string');
     expect(headers['X-Idswyft-Delivery-Attempt']).toBe('3');
   });
+
+  // Service-key context headers (Phase 2) — emitted only when payload.is_service is true
+  it('does NOT emit service-key headers when payload is omitted (regression: ik_* developer webhook)', () => {
+    const headers = buildWebhookHeaders({ is_sandbox: false }, 'd', 1);
+    expect(headers['X-Idswyft-Is-Service']).toBeUndefined();
+    expect(headers['X-Idswyft-Service-Product']).toBeUndefined();
+    expect(headers['X-Idswyft-Service-Environment']).toBeUndefined();
+  });
+
+  it('does NOT emit service-key headers when payload.is_service is false', () => {
+    const headers = buildWebhookHeaders(
+      { is_sandbox: false },
+      'd',
+      1,
+      { is_service: false, service_product: null, service_environment: null },
+    );
+    expect(headers['X-Idswyft-Is-Service']).toBeUndefined();
+    expect(headers['X-Idswyft-Service-Product']).toBeUndefined();
+    expect(headers['X-Idswyft-Service-Environment']).toBeUndefined();
+  });
+
+  it('emits all three X-Idswyft-Service-* headers when is_service is true', () => {
+    const headers = buildWebhookHeaders(
+      { is_sandbox: false },
+      'd',
+      1,
+      {
+        is_service: true,
+        service_product: 'gatepass',
+        service_environment: 'production',
+      },
+    );
+    expect(headers['X-Idswyft-Is-Service']).toBe('true');
+    expect(headers['X-Idswyft-Service-Product']).toBe('gatepass');
+    expect(headers['X-Idswyft-Service-Environment']).toBe('production');
+  });
+
+  it('omits Service-Product/Service-Environment when is_service=true but those fields are null', () => {
+    const headers = buildWebhookHeaders(
+      { is_sandbox: false },
+      'd',
+      1,
+      { is_service: true, service_product: null, service_environment: null },
+    );
+    expect(headers['X-Idswyft-Is-Service']).toBe('true');
+    expect(headers['X-Idswyft-Service-Product']).toBeUndefined();
+    expect(headers['X-Idswyft-Service-Environment']).toBeUndefined();
+  });
 });

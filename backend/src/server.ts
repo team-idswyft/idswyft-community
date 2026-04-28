@@ -174,6 +174,21 @@ if (process.env.IDSWYFT_EDITION === 'cloud') {
       { error: err instanceof Error ? err.message : String(err) },
     );
   }
+
+  // Platform webhook endpoints — register webhooks on shadow developer rows
+  // so service-key-driven verifications fire callbacks. Same dynamic-import
+  // pattern as service keys above.
+  const platformWebhooksPath = './routes/platform/webhooks.js';
+  try {
+    const mod: any = await import(platformWebhooksPath);
+    app.use('/api/platform/webhooks', mod.default);
+    logger.info('Platform webhooks endpoints mounted');
+  } catch (err: unknown) {
+    logger.warn(
+      'IDSWYFT_EDITION=cloud but platform webhooks module not present',
+      { error: err instanceof Error ? err.message : String(err) },
+    );
+  }
 }
 
 // Public asset serving (branding logos, avatars) — no auth, folder-scoped in handler
