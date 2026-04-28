@@ -35,10 +35,21 @@ const otpSendLimiter = rateLimit({
 });
 
 // Rate limiter for admin password login: 5 failed attempts per 15 min per IP.
-// `skipSuccessfulRequests` so a legitimate operator typing their password
-// correctly doesn't burn through the budget. Keyed per-IP, not per-account
-// — per-account lockout would leak account existence (attacker observes
-// "this email triggers lockout, that one doesn't").
+//
+// `skipSuccessfulRequests` skips res.status < 400. That's fine for the
+// success path. But TOTP-enabled admins hit a 401 with `requires_totp:
+// true` BEFORE the second factor is checked — that's not a real failed
+// attempt (the password was correct), it's a protocol step. Without the
+// `skip` callback below, a TOTP admin doing one normal login burns 2
+// attempts (one for the protocol-step 401, one if they fat-finger the
+// TOTP code). 5 attempts * 2 = self-lockout in 2-3 logins.
+//
+// The route handler sets `res.locals.requiresTotp = true` before
+// returning the protocol-step 401; this `skip` callback ignores those.
+// Real failed-credential 401s (wrong password) still count.
+//
+// Keyed per-IP, not per-account — per-account lockout would leak
+// account existence (attacker observes which emails trigger lockout).
 //
 // The OTP routes above already have their own limiters. This limiter
 // specifically protects the password-based admin login at /admin/login,
@@ -48,6 +59,7 @@ const adminLoginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   max: 5,
   skipSuccessfulRequests: true,
+  skip: (_req, res) => res.locals?.requiresTotp === true,
   message: { message: 'Too many failed login attempts. Please try again in 15 minutes.' },
   standardHeaders: true,
   legacyHeaders: false,
@@ -124,6 +136,11 @@ router.post('/admin/login',
         // Return 401 so the client knows to prompt for a TOTP code.
         // Using 401 (not 200) avoids leaking that the password was correct
         // before the second factor is verified.
+        //
+        // Set res.locals.requiresTotp so the rate limiter's `skip` callback
+        // doesn't count this protocol-step 401 against the per-IP attempt
+        // budget — otherwise TOTP-enabled admins self-lock after 2-3 logins.
+        res.locals.requiresTotp = true;
         return res.status(401).json({ requires_totp: true });
       }
       const totp = new TotpService();
