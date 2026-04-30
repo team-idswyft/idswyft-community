@@ -106,75 +106,53 @@ const FUNNEL_PALETTE: Record<string, string> = {
 
 function ChartCard({
   title,
+  meta,
   loading,
   empty,
   children,
 }: {
   title: string
+  meta?: string
   loading: boolean
   empty: boolean
   children: React.ReactNode
 }) {
   return (
-    <div
-      style={{
-        background: C.panel,
-        border: `1px solid ${C.border}`,
-        borderRadius: 10,
-        padding: '20px 20px 12px',
-        minHeight: 280,
-        display: 'flex',
-        flexDirection: 'column',
-      }}
-    >
-      <div
-        style={{
-          fontWeight: 600,
-          fontSize: 13,
-          color: C.text,
-          marginBottom: 16,
-          fontFamily: C.sans,
-        }}
-      >
-        {title}
+    <div className="chart">
+      <div className="chart-head">
+        <h3>{title}</h3>
+        {meta && <span className="meta">{meta}</span>}
       </div>
-
-      {loading ? (
-        <div
-          style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
+      <div className="chart-body">
+        {loading ? (
           <div
             style={{
               width: '100%',
               height: 180,
               background: `linear-gradient(90deg, ${C.surface} 25%, ${C.surfaceHover} 50%, ${C.surface} 75%)`,
-              borderRadius: 8,
               animation: 'pulse 1.5s ease-in-out infinite',
             }}
           />
-        </div>
-      ) : empty ? (
-        <div
-          style={{
-            flex: 1,
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            color: C.dim,
-            fontSize: 13,
-            fontFamily: C.mono,
-          }}
-        >
-          No data yet
-        </div>
-      ) : (
-        <div style={{ flex: 1, minHeight: 0 }}>{children}</div>
-      )}
+        ) : empty ? (
+          <div
+            style={{
+              width: '100%',
+              height: '100%',
+              minHeight: 180,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              color: C.dim,
+              fontSize: 12,
+              fontFamily: C.mono,
+            }}
+          >
+            no data yet
+          </div>
+        ) : (
+          children
+        )}
+      </div>
     </div>
   )
 }
@@ -472,28 +450,16 @@ export function AnalyticsCharts({ token }: { token: string }) {
   }, [token])
 
   return (
-    <div style={{ marginBottom: 32 }}>
-      <div
-        style={{
-          fontWeight: 600,
-          fontSize: 14,
-          color: C.text,
-          marginBottom: 16,
-          fontFamily: C.sans,
-        }}
-      >
-        Analytics
-      </div>
+    <>
       <style>{`@keyframes pulse { 0%,100% { opacity: 1 } 50% { opacity: 0.5 } }`}</style>
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(2, 1fr)',
-          gap: 16,
-        }}
-      >
+      <div className="section-title">
+        <h2><span className="num">§ 01</span>Analytics</h2>
+        <span className="meta">last 7 days · auto-refresh on load</span>
+      </div>
+      <div className="analytics">
         <ChartCard
           title="Verification Volume"
+          meta="total · success %"
           loading={loading}
           empty={!data?.daily_volume?.length}
         >
@@ -502,6 +468,7 @@ export function AnalyticsCharts({ token }: { token: string }) {
 
         <ChartCard
           title="Rejection Reasons"
+          meta="share of failed"
           loading={loading}
           empty={!data?.rejection_breakdown?.length}
         >
@@ -512,6 +479,7 @@ export function AnalyticsCharts({ token }: { token: string }) {
 
         <ChartCard
           title="API Response Time"
+          meta="p50 · p95 · ms"
           loading={loading}
           empty={!data?.daily_latency?.length}
         >
@@ -520,6 +488,7 @@ export function AnalyticsCharts({ token }: { token: string }) {
 
         <ChartCard
           title="Quota Usage"
+          meta="monthly"
           loading={loading}
           empty={!data?.quota}
         >
@@ -528,6 +497,7 @@ export function AnalyticsCharts({ token }: { token: string }) {
 
         <ChartCard
           title="Verification Funnel"
+          meta="conversion by step"
           loading={loading}
           empty={!data?.funnel?.length}
         >
@@ -536,12 +506,13 @@ export function AnalyticsCharts({ token }: { token: string }) {
 
         <ChartCard
           title="Webhook Deliveries"
+          meta="delivered · failed"
           loading={loading}
           empty={!data?.daily_webhooks?.length}
         >
           {data?.daily_webhooks && <WebhookChart data={data.daily_webhooks} />}
         </ChartCard>
       </div>
-    </div>
+    </>
   )
 }
