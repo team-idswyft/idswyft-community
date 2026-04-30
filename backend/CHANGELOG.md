@@ -5,6 +5,49 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.2] - 2026-04-30
+
+Frontend dev-portal redesign — adopts the spatial composition + component
+vocabulary from the Anthropic AIDesigner handoff while keeping the cyan
+brand accent. No backend changes.
+
+### Changed
+- **Dev portal** (`frontend/src/pages/DeveloperPage.tsx`) — sticky
+  sidebar (Developers + Account groups, status/region/plan footer),
+  topbar with breadcrumbs + theme toggle + mobile-only Settings/Sign-out
+  fallbacks, IntersectionObserver tracking which section is in view.
+  Outer `.app` is `max-width: 1320px` to align with the cloud-edition
+  navbar.
+- **API Keys section** — flat-bordered `.stats` strip, `.card` + `.tbl`
+  table with `.pill` type badges, `.code-block` Quick Start.
+- **Analytics** (6 charts: Volume, Rejection Reasons, Response Time,
+  Quota Usage, Funnel, Webhook Deliveries) — moved to a 3-col flat
+  `.analytics` grid; chart cells reduced to ~16:10 ratio for visual
+  rhythm. Recharts internals unchanged.
+- **Webhooks section** — config form uses the handoff `.field-grid`
+  pattern; events use `.events-list` 2-col with sev pills; active
+  webhooks render as `.endpoint` cards with `.led` status dots and
+  expandable `.ep-body` containing secret + events + delivery log.
+- Forge-pattern banner reused for the team-setup CTA + Page Builder card.
+
+### Added
+- **`frontend/src/styles/dev-portal.css`** — CSS variables for both
+  themes scoped under `.dev-portal`, plus all handoff component
+  classes. Native `<select>` chrome force-reset (`appearance: none` +
+  custom inline-SVG chevron + explicit `<option>` colors) so dark mode
+  doesn't fall back to OS-light dropdowns on Chromium.
+- Theme toggle button in the dev-portal topbar.
+
+### Known limitation
+- Light theme renders correctly for the shell + main content
+  (~80% of the visual surface) but inline-styled regions still
+  reference `C.*` JS constants in `frontend/src/theme.ts` that resolve
+  to fixed dark hex values at module load. Affected: Create Key /
+  API Call Debug / Verification Detail modals, expanded session-grouped
+  log subtable, webhook delivery rows, payload `<details>`,
+  SettingsModal. Filed as a follow-up to migrate those to `var(--*)`
+  strings.
+
 ## [1.12.1] - 2026-04-29
 
 Security hardening — RLS on `public._migrations`.
