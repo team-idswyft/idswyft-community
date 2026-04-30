@@ -168,7 +168,7 @@ function fmtDate(d: string) {
 
 function VolumeChart({ data }: { data: DailyVolume[] }) {
   return (
-    <ResponsiveContainer width="100%" height={220}>
+    <ResponsiveContainer width="100%" height={160}>
       <ComposedChart data={data}>
         <CartesianGrid {...CHART_THEME.grid} />
         <XAxis
@@ -226,7 +226,7 @@ function RejectionChart({ data }: { data: RejectionBreakdown[] }) {
     reason: d.reason.replace(/_/g, ' ').toLowerCase(),
   }))
   return (
-    <ResponsiveContainer width="100%" height={220}>
+    <ResponsiveContainer width="100%" height={160}>
       <BarChart data={formatted} layout="vertical" margin={{ left: 20 }}>
         <CartesianGrid {...CHART_THEME.grid} horizontal={false} />
         <XAxis type="number" tick={CHART_THEME.axis} axisLine={false} tickLine={false} />
@@ -251,7 +251,7 @@ function RejectionChart({ data }: { data: RejectionBreakdown[] }) {
 
 function LatencyChart({ data }: { data: DailyLatency[] }) {
   return (
-    <ResponsiveContainer width="100%" height={220}>
+    <ResponsiveContainer width="100%" height={160}>
       <LineChart data={data}>
         <CartesianGrid {...CHART_THEME.grid} />
         <XAxis
@@ -300,7 +300,7 @@ function QuotaChart({ data }: { data: { used: number; limit: number } }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-      <ResponsiveContainer width="100%" height={180}>
+      <ResponsiveContainer width="100%" height={150}>
         <RadialBarChart
           cx="50%"
           cy="50%"
@@ -347,7 +347,7 @@ function FunnelChart({ data }: { data: FunnelStep[] }) {
   const maxCount = formatted.reduce((m, d) => Math.max(m, d.count), 0)
   const domainMax = Math.max(maxCount * 1.15, 1)
   return (
-    <ResponsiveContainer width="100%" height={220}>
+    <ResponsiveContainer width="100%" height={160}>
       <BarChart data={formatted} layout="vertical" margin={{ left: 10, right: 24 }}>
         <CartesianGrid {...CHART_THEME.grid} horizontal={false} />
         <XAxis
@@ -384,7 +384,7 @@ function FunnelChart({ data }: { data: FunnelStep[] }) {
 
 function WebhookChart({ data }: { data: DailyWebhooks[] }) {
   return (
-    <ResponsiveContainer width="100%" height={220}>
+    <ResponsiveContainer width="100%" height={160}>
       <BarChart data={data}>
         <CartesianGrid {...CHART_THEME.grid} />
         <XAxis

@@ -206,12 +206,7 @@ export function DeveloperPage() {
       <div className="app">
         {/* ── sidebar ───────────────────────────────────────────── */}
         <aside className="side">
-          <div className="brand">
-            <span className="brand-mark"><span /><span /><span /><span /></span>
-            <span>idswyft<em>.dev</em></span>
-          </div>
-
-          <div className="side-group" style={{ paddingTop: 20 }}>
+          <div className="side-group" style={{ paddingTop: 24 }}>
             <div className="side-label">Developers</div>
             <button
               type="button"

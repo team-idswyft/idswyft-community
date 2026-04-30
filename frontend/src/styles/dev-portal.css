@@ -84,7 +84,15 @@ html[data-theme="light"] {
 }
 
 /* ── shell ───────────────────────────────────────────────────────────────── */
-.dev-portal .app { display: grid; grid-template-columns: 220px 1fr; min-height: 100vh; }
+/* Outer width matches the cloud-edition Layout navbar (max 1320px, centered)
+ * so the sidebar's left edge lines up with the navbar logo. */
+.dev-portal .app {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  min-height: 100vh;
+  max-width: 1320px;
+  margin: 0 auto;
+}
 .dev-portal .app > main { background: var(--paper); min-width: 0; }
 
 .dev-portal .side {
@@ -264,7 +272,7 @@ html[data-theme="light"] {
   padding: 18px;
   border-right: 1px solid var(--rule);
   border-bottom: 1px solid var(--rule);
-  min-height: 260px;
+  min-height: 210px;
   display: flex; flex-direction: column;
 }
 .dev-portal .chart:nth-child(3n) { border-right: none; }
@@ -394,6 +402,27 @@ html[data-theme="light"] {
 .dev-portal .input select,
 .dev-portal .input textarea {
   all: unset; flex: 1; min-width: 0; color: var(--ink);
+  /* `all: unset` doesn't fully reset native <select> chrome on Chrome/Edge —
+   * the dropdown arrow and the closed-state background still come from the OS.
+   * Force-disable native appearance and wire the colors explicitly. */
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  appearance: none;
+  background: transparent;
+}
+.dev-portal .input select {
+  cursor: pointer;
+  /* Custom caret — pure CSS chevron via inline SVG, tinted via currentColor */
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'><path d='M1 1l4 4 4-4' fill='none' stroke='%238a8a90' stroke-width='1.5' stroke-linecap='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: right 0 center;
+  padding-right: 16px;
+}
+/* Native <option> rendering is OS-themed — set explicit dark/light values
+ * so the open dropdown panel matches the closed-state input. */
+.dev-portal .input select option {
+  background: var(--panel);
+  color: var(--ink);
 }
 .dev-portal .input .scheme {
   color: var(--mid); user-select: none;
