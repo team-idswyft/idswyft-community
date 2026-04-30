@@ -375,15 +375,15 @@ export function ApiKeysSection({ token, apiKeys, setApiKeys, stats, newFullKey, 
     <>
       {/* Usage strip */}
       {stats && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 16, marginBottom: 32 }}>
+        <div className="stats">
           {[
             { label: 'Requests this month', value: stats.monthly_usage.toLocaleString() },
             { label: 'Verifications',        value: stats.successful_requests.toLocaleString() },
             { label: 'Limit remaining',      value: (stats.monthly_limit - stats.monthly_usage).toLocaleString() },
           ].map(({ label, value }) => (
-            <div key={label} style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 8, padding: '18px 20px' }}>
-              <div style={{ fontFamily: C.mono, fontSize: 24, fontWeight: 600, color: C.cyan }}>{value}</div>
-              <div style={{ color: C.muted, fontSize: 12, marginTop: 4 }}>{label}</div>
+            <div key={label} className="stat">
+              <div className="l">{label}</div>
+              <div className="v">{value}</div>
             </div>
           ))}
         </div>
@@ -396,121 +396,126 @@ export function ApiKeysSection({ token, apiKeys, setApiKeys, stats, newFullKey, 
       {newFullKey && (
         <div
           ref={newKeyBannerRef}
-          style={{ background: C.greenDim, border: `1px solid ${C.green}`, borderRadius: 8, padding: '14px 18px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 12 }}
+          style={{
+            background: C.accentSoft,
+            border: `1px solid ${C.cyanBorder}`,
+            padding: '14px 18px',
+            marginBottom: 12,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 12,
+          }}
         >
           <div style={{ flex: 1 }}>
-            <div style={{ fontSize: 12, color: C.green, fontWeight: 600, marginBottom: 4 }}>Key created - copy it now, it won't be shown again</div>
+            <div style={{ fontFamily: C.mono, fontSize: 11, color: C.accent, fontWeight: 500, letterSpacing: '0.04em', textTransform: 'uppercase', marginBottom: 4 }}>
+              Key created — copy now, it won't be shown again
+            </div>
             <code style={{ fontFamily: C.mono, fontSize: 13, color: C.text, wordBreak: 'break-all' }}>{newFullKey}</code>
           </div>
           <button
+            type="button"
+            className="btn primary sm"
             onClick={() => copyKey(newFullKey)}
-            style={{ background: C.green, color: C.bg, border: 'none', borderRadius: 6, padding: '8px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600, flexShrink: 0 }}
+            style={{ flexShrink: 0 }}
           >
             Copy
           </button>
           <button
+            type="button"
+            className="btn ghost sm"
             onClick={() => setNewFullKey(null)}
-            style={{ background: 'none', border: 'none', color: C.muted, cursor: 'pointer', fontSize: 18, padding: '0 4px' }}
+            style={{ flexShrink: 0 }}
           >
-            &times;
+            Dismiss
           </button>
         </div>
       )}
 
-      {/* API Keys table */}
-      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 10, overflow: 'hidden', marginBottom: 32 }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '16px 20px', borderBottom: `1px solid ${C.border}` }}>
-          <span style={{ fontWeight: 600, fontSize: 14, color: C.text }}>API Keys</span>
-          <button
-            onClick={() => setShowCreate(true)}
-            style={{ display: 'flex', alignItems: 'center', gap: 6, background: C.cyan, color: C.bg, border: 'none', borderRadius: 6, padding: '8px 14px', cursor: 'pointer', fontSize: 13, fontWeight: 600 }}
-          >
-            <PlusIcon style={{ width: 14, height: 14 }} />
-            Create Key
-          </button>
+      {/* API Keys section */}
+      <div className="section-title">
+        <h2><span className="num">§ 02</span>API Keys</h2>
+        <span className="meta">{apiKeys.length} {apiKeys.length === 1 ? 'key' : 'keys'}</span>
+      </div>
+      <section className="card" style={{ marginBottom: 32 }}>
+        <div className="card-head">
+          <h3>Your keys</h3>
+          <span className="sub">// rotate frequently · never commit to source</span>
+          <div className="right">
+            <button
+              type="button"
+              className="btn primary sm"
+              onClick={() => setShowCreate(true)}
+            >
+              <PlusIcon style={{ width: 12, height: 12 }} />
+              Create Key
+            </button>
+          </div>
         </div>
 
         {apiKeys.length === 0 ? (
-          <div style={{ padding: '32px 20px', textAlign: 'center', color: C.muted, fontSize: 14 }}>
+          <div style={{ padding: '32px 20px', textAlign: 'center', color: C.muted, fontSize: 14, fontFamily: C.mono }}>
             No API keys yet. Create one to get started.
           </div>
         ) : (
-          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+          <table className="tbl">
             <thead>
               <tr>
                 {['Name', 'Key', 'Type', 'Created', 'Last Used', ''].map(h => (
-                  <th key={h} style={{ padding: '10px 16px', textAlign: 'left', color: C.muted, fontSize: 11, fontWeight: 600, letterSpacing: '0.08em', textTransform: 'uppercase', borderBottom: `1px solid ${C.border}` }}>
-                    {h}
-                  </th>
+                  <th key={h}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
               {apiKeys.map(key => (
                 <React.Fragment key={key.id}>
-                  <tr style={{ borderBottom: expandedKeyId === key.id ? 'none' : `1px solid ${C.border}` }}>
-                    <td style={{ padding: '12px 16px', color: C.text, fontSize: 14 }}>{key.name}</td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                        <code style={{ fontFamily: C.mono, fontSize: 12, color: C.muted }}>{key.key_preview}</code>
+                  <tr style={{ borderBottom: expandedKeyId === key.id ? 'none' : undefined }}>
+                    <td className="name">{key.name}</td>
+                    <td>
+                      <div className="key">
+                        <code>{key.key_preview}</code>
                         <button
+                          type="button"
+                          className="copy"
                           onClick={() => copyKey(key.key_preview)}
-                          style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.dim, padding: 2 }}
+                          aria-label="Copy key preview"
                         >
-                          <ClipboardDocumentIcon style={{ width: 14, height: 14 }} />
+                          <ClipboardDocumentIcon style={{ width: 11, height: 11 }} />
                         </button>
                       </div>
                     </td>
-                    <td style={{ padding: '12px 16px' }}>
-                      <span style={{
-                        background: key.is_sandbox ? 'rgba(251,191,36,0.1)' : C.greenDim,
-                        color: key.is_sandbox ? C.amber : C.green,
-                        border: `1px solid ${key.is_sandbox ? C.amber : C.green}33`,
-                        borderRadius: 4, padding: '2px 8px', fontSize: 11, fontWeight: 500,
-                      }}>
+                    <td>
+                      <span className={`pill ${key.is_sandbox ? 'sandbox' : 'live'}`}>
                         {key.is_sandbox ? 'sandbox' : 'live'}
                       </span>
                     </td>
-                    <td style={{ padding: '12px 16px', color: C.muted, fontSize: 13 }}>
+                    <td className="mono" style={{ color: C.muted, fontSize: 12 }}>
                       {new Date(key.created_at).toLocaleDateString()}
                     </td>
-                    <td style={{ padding: '12px 16px', color: C.muted, fontSize: 13 }}>
-                      {key.last_used_at ? new Date(key.last_used_at).toLocaleDateString() : '-'}
+                    <td className="mono" style={{ color: C.muted, fontSize: 12 }}>
+                      {key.last_used_at ? new Date(key.last_used_at).toLocaleDateString() : '—'}
                     </td>
-                    <td style={{ padding: '12px 16px' }}>
+                    <td>
                       {deleteId === key.id ? (
-                        <div style={{ display: 'flex', gap: 6 }}>
-                          <button
-                            onClick={() => handleDelete(key.id)}
-                            style={{ background: C.redDim, color: C.red, border: `1px solid ${C.red}33`, borderRadius: 4, padding: '4px 10px', cursor: 'pointer', fontSize: 12 }}
-                          >
-                            Confirm
-                          </button>
-                          <button
-                            onClick={() => setDeleteId(null)}
-                            style={{ background: 'none', border: `1px solid ${C.border}`, color: C.muted, borderRadius: 4, padding: '4px 10px', cursor: 'pointer', fontSize: 12 }}
-                          >
-                            Cancel
-                          </button>
+                        <div className="row-actions">
+                          <button type="button" className="danger" onClick={() => handleDelete(key.id)}>Confirm</button>
+                          <button type="button" onClick={() => setDeleteId(null)}>Cancel</button>
                         </div>
                       ) : (
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <div className="row-actions">
                           <button
+                            type="button"
                             onClick={() => toggleKeyLogs(key.id)}
-                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'none', border: 'none', color: C.cyan, cursor: 'pointer', fontSize: 12, padding: 2, fontFamily: C.mono }}
+                            style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}
                           >
                             {expandedKeyId === key.id ? (
-                              <ChevronDownIcon style={{ width: 12, height: 12 }} />
+                              <ChevronDownIcon style={{ width: 11, height: 11 }} />
                             ) : (
-                              <ChevronRightIcon style={{ width: 12, height: 12 }} />
+                              <ChevronRightIcon style={{ width: 11, height: 11 }} />
                             )}
-                            logs
+                            Logs
                           </button>
-                          <button
-                            onClick={() => setDeleteId(key.id)}
-                            style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.dim, padding: 4 }}
-                          >
-                            <TrashIcon style={{ width: 15, height: 15 }} />
+                          <button type="button" className="danger" onClick={() => setDeleteId(key.id)}>
+                            <TrashIcon style={{ width: 11, height: 11 }} />
                           </button>
                         </div>
                       )}
@@ -693,19 +698,22 @@ export function ApiKeysSection({ token, apiKeys, setApiKeys, stats, newFullKey, 
             </tbody>
           </table>
         )}
-      </div>
+      </section>
 
       {/* Quick start */}
-      <div style={{ background: C.panel, border: `1px solid ${C.border}`, borderRadius: 10, padding: 24, marginBottom: 24 }}>
-        <div style={{ fontWeight: 600, fontSize: 14, color: C.text, marginBottom: 16 }}>Quick Start</div>
-        <pre style={{ background: C.codeBg, borderRadius: 6, padding: '16px 18px', margin: 0, fontFamily: C.mono, fontSize: 12, color: C.code, lineHeight: 1.7, overflowX: 'auto' }}>
-          <code>{curlSnippet}</code>
-        </pre>
-        <div style={{ marginTop: 12 }}>
-          <Link to="/docs" style={{ color: C.cyan, fontSize: 13, textDecoration: 'none' }}>
-            Full documentation &rarr;
-          </Link>
-        </div>
+      <div className="section-title">
+        <h2><span className="num">§ 03</span>Quick Start</h2>
+        <span className="meta">copy · paste · run</span>
+      </div>
+      <pre className="code-block">
+        <span className="c"># Create a verification — sandbox is identical to production</span>
+        {'\n'}
+        {curlSnippet}
+      </pre>
+      <div style={{ marginTop: 12, marginBottom: 8 }}>
+        <Link to="/docs" style={{ color: C.accent, fontSize: 13, fontFamily: C.mono }}>
+          Full documentation &rarr;
+        </Link>
       </div>
 
       {/* Create key modal */}
