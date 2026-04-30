@@ -1,12 +1,12 @@
-import React, { useState, useEffect } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { useState, useEffect, useRef } from 'react'
+import { useNavigate, Link } from 'react-router-dom'
 import { API_BASE_URL } from '../config/api'
 import { isCommunity } from '../config/edition'
 import { fetchCsrfToken, getCsrfToken, csrfHeader, clearCsrfToken } from '../lib/csrf'
-import { C, injectFonts } from '../theme'
+import { C, injectFonts, getTheme, toggleTheme } from '../theme'
 import '../styles/patterns.css'
+import '../styles/dev-portal.css'
 import { AnalyticsCharts } from '../components/developer/AnalyticsCharts'
-import { Cog6ToothIcon, PaintBrushIcon } from '@heroicons/react/24/outline'
 
 import type { ApiKey, DeveloperStats } from '../components/developer/types'
 import { AuthGate } from '../components/developer/AuthGate'
@@ -14,7 +14,7 @@ import { ApiKeysSection } from '../components/developer/ApiKeysSection'
 import { WebhooksSection } from '../components/developer/WebhooksSection'
 import { SettingsModal } from '../components/developer/SettingsModal'
 
-// --- Main portal ---
+type SectionKey = 'api-keys' | 'webhooks'
 
 export function DeveloperPage() {
   const navigate = useNavigate()
@@ -22,6 +22,11 @@ export function DeveloperPage() {
 
   const [token, setToken] = useState<string | null>(() => getCsrfToken() ? 'session' : null)
   const [setupNeeded, setSetupNeeded] = useState<boolean | null>(null)
+  const [theme, setTheme] = useState<'light' | 'dark'>(() => getTheme())
+  const [activeSection, setActiveSection] = useState<SectionKey>('api-keys')
+
+  const apiKeysAnchorRef = useRef<HTMLDivElement | null>(null)
+  const webhooksAnchorRef = useRef<HTMLDivElement | null>(null)
 
   // On mount, check if an auth cookie exists by probing a protected endpoint
   useEffect(() => {
@@ -33,7 +38,7 @@ export function DeveloperPage() {
       .catch(() => {})
   }, [])
 
-  // Community edition: redirect to /setup if no developers exist yet
+  // Community edition: redirect to /setup if no developers exist yet.
   // On API error (e.g. backend not ready during Docker startup), redirect
   // to /setup which has a retry UI, rather than showing the login form
   // for an account that doesn't exist yet.
@@ -60,7 +65,8 @@ export function DeveloperPage() {
     () => localStorage.getItem('idswyft:team-banner-dismissed') === 'true'
   )
 
-  const authHeaders = (t: string) => t === 'session' ? {} as Record<string, string> : { Authorization: `Bearer ${t}` } as Record<string, string>
+  const authHeaders = (t: string) =>
+    t === 'session' ? {} as Record<string, string> : { Authorization: `Bearer ${t}` } as Record<string, string>
 
   const fetchKeys = async () => {
     if (!token) return
@@ -71,7 +77,7 @@ export function DeveloperPage() {
       })
       if (res.status === 401) { setToken(null); return }
       if (res.ok) setApiKeys((await res.json()).api_keys ?? [])
-    } catch { /* network error - backend offline, show empty state */ }
+    } catch { /* network error */ }
   }
 
   const fetchStats = async () => {
@@ -108,6 +114,28 @@ export function DeveloperPage() {
     }
   }, [token])
 
+  // Track which section is in view so the sidebar highlights the right item
+  // as the user scrolls. Falls back to whichever was clicked last if both are
+  // visible (long viewports).
+  useEffect(() => {
+    if (!token) return
+    const observer = new IntersectionObserver(
+      (entries) => {
+        const visible = entries.filter(e => e.isIntersecting)
+        if (visible.length === 0) return
+        const winner = visible.reduce((a, b) =>
+          a.intersectionRatio > b.intersectionRatio ? a : b
+        )
+        const key = winner.target.getAttribute('data-section') as SectionKey | null
+        if (key) setActiveSection(key)
+      },
+      { rootMargin: '-30% 0px -50% 0px', threshold: [0, 0.25, 0.5, 0.75, 1] }
+    )
+    const targets = [apiKeysAnchorRef.current, webhooksAnchorRef.current].filter(Boolean) as Element[]
+    targets.forEach(t => observer.observe(t))
+    return () => observer.disconnect()
+  }, [token])
+
   const handleAuth = (t: string, apiKey?: string) => {
     setToken(t)
     fetchCsrfToken()
@@ -115,7 +143,11 @@ export function DeveloperPage() {
   }
 
   const handleLogout = () => {
-    fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include', headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...csrfHeader() } }).catch(() => {})
+    fetch(`${API_BASE_URL}/api/auth/logout`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { ...(token ? { Authorization: `Bearer ${token}` } : {}), ...csrfHeader() }
+    }).catch(() => {})
     clearCsrfToken()
     setToken(null)
     setApiKeys([])
@@ -132,8 +164,17 @@ export function DeveloperPage() {
     setToken(null)
   }
 
+  const handleScrollTo = (key: SectionKey) => {
+    const target = key === 'api-keys' ? apiKeysAnchorRef.current : webhooksAnchorRef.current
+    if (target) {
+      target.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      setActiveSection(key)
+    }
+  }
+
+  const handleToggleTheme = () => setTheme(toggleTheme())
+
   if (!token) {
-    // Community edition: show spinner while checking if setup is needed
     if (isCommunity && setupNeeded === null) {
       return (
         <div style={{ background: C.bg, fontFamily: C.sans, color: C.text, minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
@@ -148,102 +189,215 @@ export function DeveloperPage() {
     )
   }
 
-  return (
-    <div className="pattern-guilloche-rainbow pattern-full" style={{ background: C.bg, fontFamily: C.sans, color: C.text, fontSize: 14, minHeight: '100vh', '--pattern-opacity': '0.01' } as React.CSSProperties}>
-      <div style={{ maxWidth: 1080, margin: '0 auto', padding: '48px 32px' }}>
+  const sunIcon = (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <circle cx="12" cy="12" r="4" />
+      <path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41" />
+    </svg>
+  )
+  const moonIcon = (
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+      <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79Z" />
+    </svg>
+  )
 
-        {/* Header */}
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 40 }}>
-          <div>
-            <div style={{ fontFamily: C.mono, fontSize: 11, color: C.muted, letterSpacing: '0.08em', marginBottom: 8 }}>
-              idswyft / developer-portal
-            </div>
-            <h1 style={{ fontFamily: C.mono, fontSize: 24, fontWeight: 600, color: C.text }}>API Keys</h1>
-          </div>
-          <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+  return (
+    <div className="dev-portal">
+      <div className="app">
+        {/* ── sidebar ───────────────────────────────────────────── */}
+        <aside className="side">
+          <div className="side-group" style={{ paddingTop: 24 }}>
+            <div className="side-label">Developers</div>
             <button
+              type="button"
+              className={`side-link${activeSection === 'api-keys' ? ' on' : ''}`}
+              onClick={() => handleScrollTo('api-keys')}
+            >
+              <span className="ic" />API Keys
+            </button>
+            <button
+              type="button"
+              className={`side-link${activeSection === 'webhooks' ? ' on' : ''}`}
+              onClick={() => handleScrollTo('webhooks')}
+            >
+              <span className="ic" />Webhooks
+            </button>
+            <button
+              type="button"
+              className="side-link"
+              onClick={() => navigate('/developer/page-builder')}
+            >
+              <span className="ic" />Page Builder
+            </button>
+            <Link to="/docs" className="side-link" style={{ display: 'flex' }}>
+              <span className="ic" />Docs
+            </Link>
+          </div>
+
+          <div className="side-group">
+            <div className="side-label">Account</div>
+            <button
+              type="button"
+              className="side-link"
               onClick={() => setShowSettings(true)}
-              style={{ background: 'none', border: `1px solid ${C.borderStrong}`, color: C.muted, borderRadius: 0, padding: '8px', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+            >
+              <span className="ic" />Settings
+            </button>
+            <button
+              type="button"
+              className="side-link"
+              onClick={handleLogout}
+            >
+              <span className="ic" />Sign out
+            </button>
+          </div>
+
+          <div className="side-foot">
+            <div className="row"><span>status</span><span className="ok">● operational</span></div>
+            <div className="row"><span>region</span><span>iad-1</span></div>
+            <div className="row"><span>plan</span><span>starter</span></div>
+          </div>
+        </aside>
+
+        {/* ── main column ──────────────────────────────────────── */}
+        <main>
+          <header className="top">
+            <div className="crumbs">
+              <span>console</span>
+              <span className="sep">/</span>
+              <span>developers</span>
+              <span className="sep">/</span>
+              <span className="here">{activeSection === 'webhooks' ? 'webhooks' : 'api keys'}</span>
+            </div>
+            <div className="top-spacer" />
+            <button
+              className="icon-btn"
+              type="button"
+              onClick={handleToggleTheme}
+              aria-label={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+              title={theme === 'dark' ? 'Switch to light theme' : 'Switch to dark theme'}
+            >
+              {theme === 'dark' ? sunIcon : moonIcon}
+            </button>
+            {/* Mobile fallback for Settings + Sign out — sidebar hides ≤760px */}
+            <button
+              className="icon-btn mobile-only"
+              type="button"
+              onClick={() => setShowSettings(true)}
+              aria-label="Open settings"
               title="Settings"
             >
-              <Cog6ToothIcon style={{ width: 16, height: 16 }} />
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+              </svg>
             </button>
             <button
+              className="icon-btn mobile-only"
+              type="button"
               onClick={handleLogout}
-              style={{ background: 'none', border: `1px solid ${C.borderStrong}`, color: C.muted, borderRadius: 0, padding: '8px 14px', cursor: 'pointer', fontSize: 13, fontFamily: C.mono }}
+              aria-label="Sign out"
+              title="Sign out"
             >
-              Sign out
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                <path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4M16 17l5-5-5-5M21 12H9" />
+              </svg>
             </button>
-          </div>
-        </div>
+          </header>
 
-        {/* Team setup banner — shown when no org admin exists */}
-        {hasOrgAdmin === false && !teamBannerDismissed && (
-          <div style={{
-            background: C.accentSoft, border: `1px solid ${C.cyanBorder}`, borderRadius: 0,
-            padding: '16px 20px', marginBottom: 24, display: 'flex', alignItems: 'center', gap: 16,
-          }}>
-            <div style={{ flex: 1 }}>
-              <div style={{ color: C.text, fontSize: 14, fontWeight: 600, marginBottom: 4 }}>Set up your team</div>
-              <div style={{ color: C.muted, fontSize: 13, lineHeight: 1.5 }}>
-                Invite an Organization Admin to manage verifications from the Review Dashboard.
-                They can approve, reject, override, and access analytics — without needing your developer credentials.
+          <div className="page">
+            {/* page head */}
+            <div className="page-head">
+              <div>
+                <div className="eyebrow">// developers · api keys</div>
+                <h1 className="page-h1">API Keys</h1>
+                <p className="page-sub">
+                  Manage your verification keys, monitor live traffic, and configure webhooks for any verification event.
+                </p>
+              </div>
+              <div className="page-actions">
+                <button
+                  type="button"
+                  className="btn ghost"
+                  onClick={() => { fetchKeys(); fetchStats() }}
+                >
+                  ↻ Refresh
+                </button>
               </div>
             </div>
-            <button
-              onClick={() => setShowSettings(true)}
-              className="btn-accent"
-              style={{ whiteSpace: 'nowrap' }}
-            >
-              Invite Admin
-            </button>
-            <button
-              onClick={() => { setTeamBannerDismissed(true); localStorage.setItem('idswyft:team-banner-dismissed', 'true') }}
-              style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.dim, fontSize: 18, padding: '0 4px', lineHeight: 1 }}
-              title="Dismiss"
-            >
-              &times;
-            </button>
-          </div>
-        )}
 
-        <ApiKeysSection
-          token={token}
-          apiKeys={apiKeys}
-          setApiKeys={setApiKeys}
-          stats={stats}
-          newFullKey={newFullKey}
-          setNewFullKey={setNewFullKey}
-          onUnauthorized={handleUnauthorized}
-          renderAfterStats={token ? <AnalyticsCharts token={token} /> : undefined}
-        />
+            {/* team setup banner — uses .forge pattern */}
+            {hasOrgAdmin === false && !teamBannerDismissed && (
+              <div className="forge" style={{ marginTop: 0, marginBottom: 28 }}>
+                <span className="badge">team</span>
+                <div>
+                  <h4>Set up your team</h4>
+                  <p>
+                    Invite an Organization Admin to manage verifications from the Review Dashboard —
+                    approve, reject, override, and access analytics without your developer credentials.
+                  </p>
+                </div>
+                <div className="right" style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+                  <button
+                    type="button"
+                    className="btn primary sm"
+                    onClick={() => setShowSettings(true)}
+                  >
+                    Invite Admin
+                  </button>
+                  <button
+                    type="button"
+                    className="btn ghost sm"
+                    onClick={() => {
+                      setTeamBannerDismissed(true)
+                      localStorage.setItem('idswyft:team-banner-dismissed', 'true')
+                    }}
+                    aria-label="Dismiss"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            )}
 
-        <WebhooksSection token={token} apiKeys={apiKeys} />
+            {/* api keys section anchor */}
+            <div ref={apiKeysAnchorRef} data-section="api-keys" style={{ scrollMarginTop: 80 }}>
+              <ApiKeysSection
+                token={token}
+                apiKeys={apiKeys}
+                setApiKeys={setApiKeys}
+                stats={stats}
+                newFullKey={newFullKey}
+                setNewFullKey={setNewFullKey}
+                onUnauthorized={handleUnauthorized}
+                renderAfterStats={token ? <AnalyticsCharts token={token} /> : undefined}
+              />
+            </div>
 
-        {/* Page Builder card */}
-        <div style={{
-          background: C.panel, border: `1px solid ${C.border}`, borderRadius: 0,
-          padding: '20px 24px', marginTop: 24, display: 'flex', alignItems: 'center',
-          justifyContent: 'space-between',
-        }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-            <PaintBrushIcon style={{ width: 20, height: 20, color: C.accent }} />
-            <div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: C.text }}>Page Builder</div>
-              <div style={{ fontSize: 12, color: C.muted, marginTop: 2 }}>
-                Customize your hosted verification page — colors, text, steps, and more
+            {/* webhooks section anchor */}
+            <div ref={webhooksAnchorRef} data-section="webhooks" style={{ scrollMarginTop: 80 }}>
+              <WebhooksSection token={token} apiKeys={apiKeys} />
+            </div>
+
+            {/* page builder — .forge pattern */}
+            <div className="forge">
+              <span className="badge">builder</span>
+              <div>
+                <h4>Customize your hosted verification page</h4>
+                <p>Drag-and-drop document parsers, custom liveness prompts, and your own brand on the user-facing flow.</p>
+              </div>
+              <div className="right">
+                <button
+                  type="button"
+                  className="btn primary"
+                  onClick={() => navigate('/developer/page-builder')}
+                >
+                  Open Builder →
+                </button>
               </div>
             </div>
           </div>
-          <button
-            onClick={() => navigate('/developer/page-builder')}
-            className="btn-accent"
-            style={{ whiteSpace: 'nowrap' }}
-          >
-            Open Builder
-          </button>
-        </div>
-
+        </main>
       </div>
 
       {/* Settings modal */}
