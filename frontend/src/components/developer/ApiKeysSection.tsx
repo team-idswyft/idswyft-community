@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import toast from 'react-hot-toast'
 import { Link } from 'react-router-dom'
 import { API_BASE_URL, getDocumentationApiUrl } from '../../config/api'
+import { isCommunity } from '../../config/edition'
 import { csrfHeader } from '../../lib/csrf'
 import { C } from '../../theme'
 import {
@@ -374,20 +375,28 @@ export function ApiKeysSection({ token, apiKeys, setApiKeys, stats, newFullKey, 
   return (
     <>
       {/* Usage strip */}
-      {stats && (
-        <div className="stats">
-          {[
-            { label: 'Requests this month', value: stats.monthly_usage.toLocaleString() },
-            { label: 'Verifications',        value: stats.successful_requests.toLocaleString() },
-            { label: 'Limit remaining',      value: (stats.monthly_limit - stats.monthly_usage).toLocaleString() },
-          ].map(({ label, value }) => (
-            <div key={label} className="stat">
-              <div className="l">{label}</div>
-              <div className="v">{value}</div>
-            </div>
-          ))}
-        </div>
-      )}
+      {stats && (() => {
+        const cards = [
+          { label: 'Requests this month', value: stats.monthly_usage.toLocaleString() },
+          { label: 'Verified',            value: stats.successful_requests.toLocaleString() },
+          // Community edition has no quota — hide the limit card.
+          ...(isCommunity ? [] : [{
+            label: 'Limit remaining',
+            value: Math.max(0, stats.monthly_limit - stats.monthly_usage).toLocaleString(),
+          }]),
+        ]
+        const colsClass = cards.length === 2 ? ' cols-2' : ''
+        return (
+          <div className={`stats${colsClass}`}>
+            {cards.map(({ label, value }) => (
+              <div key={label} className="stat">
+                <div className="l">{label}</div>
+                <div className="v">{value}</div>
+              </div>
+            ))}
+          </div>
+        )
+      })()}
 
       {renderAfterStats}
 

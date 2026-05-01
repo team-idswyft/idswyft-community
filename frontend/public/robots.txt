@@ -1,0 +1,29 @@
+# https://www.idswyft.app robots.txt
+# Idswyft — open-source identity verification platform
+
+User-agent: *
+Allow: /
+
+# Auth / dashboard surfaces — never index
+Disallow: /admin
+Disallow: /developer
+Disallow: /setup
+
+# Per-session / per-credential dynamic surfaces.
+# /verify-credential is public but param-driven (JWT in query string) —
+# every shared credential URL is unique, no SEO value to crawl them.
+Disallow: /user-verification
+Disallow: /v/
+Disallow: /verify
+Disallow: /verify-credential
+
+# Capture-only flows — no SEO value, and these pages load OpenCV.js
+# (~8MB) which would tank Core Web Vitals if indexed as landing pages.
+Disallow: /live-capture
+
+# Programmatic / internal alt views
+Disallow: /docs/markdown
+Disallow: /patterns
+Disallow: /api
+
+Sitemap: https://www.idswyft.app/sitemap.xml

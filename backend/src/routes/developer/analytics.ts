@@ -41,15 +41,16 @@ router.get('/stats',
     if (!developer) {
       throw new AuthenticationError('Developer authentication required');
     }
-    const thirtyDaysAgo = new Date();
-    thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+    // Calendar-month-to-date so this endpoint agrees with /analytics quota.
+    const now = new Date();
+    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
+    monthStart.setHours(0, 0, 0, 0);
 
-    // Get verification request stats
     const { data: stats, error } = await supabase
       .from('verification_requests')
       .select('status, created_at')
       .eq('developer_id', developer.id)
-      .gte('created_at', thirtyDaysAgo.toISOString());
+      .gte('created_at', monthStart.toISOString());
 
     if (error) {
       logger.error('Failed to get developer stats:', error);
@@ -62,18 +63,21 @@ router.get('/stats',
     const pendingRequests = stats.filter((s: any) => s.status === 'pending').length;
     const manualReviewRequests = stats.filter((s: any) => s.status === 'manual_review').length;
 
+    const monthlyLimit = 50;
+
     res.json({
-      period: '30_days',
+      period: 'month',
+      period_start: monthStart.toISOString(),
       total_requests: totalRequests,
       successful_requests: successfulRequests,
       failed_requests: failedRequests,
       pending_requests: pendingRequests,
       manual_review_requests: manualReviewRequests,
       success_rate: totalRequests > 0 ? (successfulRequests / totalRequests * 100).toFixed(2) + '%' : '0%',
-      monthly_limit: 50,
+      monthly_limit: monthlyLimit,
       monthly_usage: totalRequests,
-      remaining_quota: Math.max(0, 50 - totalRequests),
-      quota_reset_date: new Date(new Date().getFullYear(), new Date().getMonth() + 1, 1).toISOString()
+      remaining_quota: Math.max(0, monthlyLimit - totalRequests),
+      quota_reset_date: new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()
     });
   })
 );
