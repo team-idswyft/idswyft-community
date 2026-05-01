@@ -266,10 +266,16 @@ export class StorageService {
       return `/api/public/assets/${folder}/${fileName}`;
 
     } else if (config.storage.provider === 'supabase') {
-      // Branding uses a dedicated public bucket; other assets use the default bucket
+      // Each public-asset folder maps to a dedicated PUBLIC bucket. The
+      // default `storageBucket` (identity-documents) is private — it holds
+      // end-user passport / driver's-license images — so anything written
+      // there ends up with a 404'ing public URL. See migration 60 for the
+      // avatars bucket and migration 53 for branding.
       const bucket = folder === 'branding'
         ? 'branding'
-        : config.supabase.storageBucket;
+        : folder === 'avatars'
+          ? 'avatars'
+          : config.supabase.storageBucket;
 
       const { error } = await supabase.storage
         .from(bucket)
