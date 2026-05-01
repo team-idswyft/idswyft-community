@@ -5,6 +5,68 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.3] - 2026-05-01
+
+Dev-portal stat strip accuracy fix and SEO foundation. No breaking
+changes; safe patch upgrade.
+
+### Fixed
+- **Dev portal stat strip** (`backend/src/routes/developer/analytics.ts`,
+  `frontend/src/components/developer/ApiKeysSection.tsx`) — the three
+  cards above the API Keys table now agree with the analytics charts
+  rendered just below.
+  - `GET /api/developer/stats` `monthly_usage` now counts the calendar
+    month to date instead of a trailing 30-day window. The adjacent
+    `/analytics` quota uses calendar-month math; the strip and charts
+    now agree.
+  - Response also exposes `period_start` and renames `period` from
+    `'30_days'` → `'month'`. SDK consumers type `period` as a generic
+    string, so this is non-breaking.
+  - Frontend renames the middle card "Verifications" → "Verified",
+    since the underlying value has always been
+    `status === 'verified'` only — excluding failed, pending, and
+    manual_review verifications.
+  - Frontend hides the "Limit remaining" card when `isCommunity` is
+    true (Community/self-hosted has no quota). Adds a new
+    `.stats.cols-2` CSS modifier mirroring the existing `.cols-4`
+    pattern, plus matching ≤760px responsive collapse.
+
+### Added
+- **SEO foundation** (`frontend/index.html`, `frontend/public/robots.txt`,
+  `frontend/public/sitemap.xml`) — site previously had no
+  crawl/indexing signals, no link-preview metadata, and no
+  structured data.
+  - New `robots.txt` allowing public marketing/docs surfaces and
+    disallowing auth, per-session, capture-only, and programmatic
+    routes; references absolute sitemap URL.
+  - New `sitemap.xml` covering 11 public URLs (/, /demo, /pricing,
+    five `/docs/*` routes, /legal, /status). Vercel serves these as
+    static files from `public/` before the SPA rewrite — verified
+    against the existing `/llms.txt` behavior; no `vercel.json`
+    change needed.
+  - `index.html` head now carries Open Graph and Twitter
+    `summary_large_image` meta tags so links shared on Slack,
+    Discord, LinkedIn, Twitter, and iMessage produce preview cards.
+  - JSON-LD blocks for `Organization` and `SoftwareApplication`
+    schema unlock rich-result eligibility.
+  - Improved `<title>` and meta description target the open-source /
+    self-host / Docker / GDPR-friendly / deterministic-decisions
+    keywords that match the platform's positioning.
+  - The `<link rel="alternate">` AI-search hooks (`llms.txt`,
+    `llms-full.txt`) remain unchanged. Removed a redundant
+    non-standard `<meta name="llms.txt">` tag — the alternate link
+    is the proper mechanism.
+
+### Notes
+- No `<link rel="canonical">` or per-route `<title>`/description
+  yet — those require react-helmet-async or vite-ssg. Tracked as a
+  follow-up.
+- Open Graph image is currently `vc-identity-card.png` (880×554) as
+  an interim. Below LinkedIn's 1200×627 large-card threshold and
+  Twitter's 1.91:1 recommendation, so previews will render but with
+  reduced fidelity. A proper 1200×630 social card design is tracked
+  separately.
+
 ## [1.12.2] - 2026-04-30
 
 Frontend dev-portal redesign — adopts the spatial composition + component
