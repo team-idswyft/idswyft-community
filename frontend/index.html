@@ -4,11 +4,60 @@
     <meta charset="UTF-8" />
     <link rel="icon" type="image/x-icon" href="/favicon.ico" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Idswyft - Identity Verification Platform</title>
-    <meta name="description" content="Secure, fast, and developer-friendly identity verification platform" />
-    <meta name="llms.txt" content="/llms.txt" />
+    <title>Idswyft — Open-source identity verification API</title>
+    <meta name="description" content="Open-source identity verification API with OCR, liveness detection, and face matching. Self-host via Docker or run on managed cloud. Deterministic decisions, GDPR-friendly." />
+
+    <!-- Open Graph (Facebook, LinkedIn, Slack, Discord, iMessage) -->
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Idswyft" />
+    <meta property="og:title" content="Idswyft — Open-source identity verification API" />
+    <meta property="og:description" content="OCR, liveness, and face matching with deterministic decisions. Self-host via Docker or run on managed cloud." />
+    <meta property="og:url" content="https://www.idswyft.app/" />
+    <meta property="og:image" content="https://www.idswyft.app/vc-identity-card.png" />
+    <meta property="og:image:width" content="880" />
+    <meta property="og:image:height" content="554" />
+    <meta property="og:locale" content="en_US" />
+
+    <!-- Twitter / X -->
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content="Idswyft — Open-source identity verification API" />
+    <meta name="twitter:description" content="OCR, liveness, and face matching with deterministic decisions. Self-host via Docker or run on managed cloud." />
+    <meta name="twitter:image" content="https://www.idswyft.app/vc-identity-card.png" />
+
+    <!-- LLM-readable docs (AI search: ChatGPT, Claude, Perplexity) -->
     <link rel="alternate" type="text/plain" href="/llms.txt" title="LLM-readable documentation summary" />
     <link rel="alternate" type="text/markdown" href="/llms-full.txt" title="LLM-readable full API documentation" />
+
+    <!-- Structured data: Organization -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "Organization",
+      "name": "Idswyft",
+      "url": "https://www.idswyft.app",
+      "logo": "https://www.idswyft.app/idswyft-logo.png",
+      "description": "Open-source identity verification platform. Verify government-issued IDs with OCR, cross-validation, liveness detection, and face matching.",
+      "sameAs": [
+        "https://github.com/team-idswyft/idswyft-community",
+        "https://www.npmjs.com/package/@idswyft/sdk",
+        "https://www.npmjs.com/package/@idswyft/react"
+      ]
+    }
+    </script>
+
+    <!-- Structured data: SoftwareApplication -->
+    <script type="application/ld+json">
+    {
+      "@context": "https://schema.org",
+      "@type": "SoftwareApplication",
+      "name": "Idswyft",
+      "applicationCategory": "DeveloperApplication",
+      "operatingSystem": "Cross-platform (Docker, Linux, macOS, Windows)",
+      "url": "https://www.idswyft.app",
+      "description": "Identity verification API: OCR, liveness detection, face matching, AML screening. Self-hostable open source (MIT) or managed cloud.",
+      "license": "https://opensource.org/licenses/MIT"
+    }
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap" rel="stylesheet">
