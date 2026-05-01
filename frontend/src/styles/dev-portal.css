@@ -226,6 +226,7 @@ html[data-theme="light"] {
   border: 1px solid var(--rule); margin-bottom: 28px;
   background: var(--panel);
 }
+.dev-portal .stats.cols-2 { grid-template-columns: repeat(2, 1fr); }
 .dev-portal .stats.cols-4 { grid-template-columns: repeat(4, 1fr); }
 .dev-portal .stat { padding: 18px 22px; border-right: 1px solid var(--rule); }
 .dev-portal .stat:last-child { border-right: none; }
@@ -606,6 +607,7 @@ html[data-theme="dark"] .dev-portal .forge .btn.primary {
   .dev-portal .side { display: none; }
   .dev-portal .icon-btn.mobile-only { display: grid; }
   .dev-portal .stats,
+  .dev-portal .stats.cols-2,
   .dev-portal .stats.cols-4,
   .dev-portal .analytics { grid-template-columns: 1fr; }
   .dev-portal .stat { border-right: none; border-bottom: 1px solid var(--rule); }
