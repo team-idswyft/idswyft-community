@@ -10,7 +10,7 @@ import { logger } from '@/utils/logger.js';
 import rateLimit from 'express-rate-limit';
 import { config } from '@/config/index.js';
 import { emailService } from '@/services/emailService.js';
-import { StorageService } from '@/services/storage.js';
+import { StorageService, resolvePublicAssetUrl } from '@/services/storage.js';
 
 const router = express.Router();
 
@@ -100,7 +100,7 @@ router.get('/profile',
         email: developer.email,
         name: developer.name,
         company: developer.company || null,
-        avatar_url: developer.avatar_url || null,
+        avatar_url: resolvePublicAssetUrl(developer.avatar_url),
         created_at: developer.created_at,
       },
     });
@@ -142,7 +142,13 @@ router.put('/profile',
       throw new Error('Failed to update profile');
     }
 
-    res.json({ success: true, data: updated });
+    res.json({
+      success: true,
+      data: {
+        ...updated,
+        avatar_url: resolvePublicAssetUrl((updated as any).avatar_url),
+      },
+    });
   })
 );
 
@@ -179,7 +185,7 @@ router.post('/avatar',
 
     logger.info('Developer avatar updated', { developerId: developer.id });
 
-    res.json({ success: true, data: { avatar_url: avatarUrl } });
+    res.json({ success: true, data: { avatar_url: resolvePublicAssetUrl(avatarUrl) } });
   })
 );
 
@@ -218,7 +224,7 @@ router.post('/branding/logo',
 
     logger.info('Developer branding logo updated', { developerId: developer.id });
 
-    res.json({ success: true, data: { logo_url: logoUrl } });
+    res.json({ success: true, data: { logo_url: resolvePublicAssetUrl(logoUrl) } });
   })
 );
 

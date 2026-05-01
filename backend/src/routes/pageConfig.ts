@@ -5,6 +5,7 @@ import config from '@/config/index.js';
 import { catchAsync } from '@/middleware/errorHandler.js';
 import { basicRateLimit } from '@/middleware/rateLimit.js';
 import { hashHandoffToken } from '@/middleware/auth.js';
+import { resolvePublicAssetUrl } from '@/services/storage.js';
 
 const router = express.Router();
 
@@ -61,7 +62,7 @@ router.get('/page-config',
     res.setHeader('Cache-Control', 'public, max-age=300');
     res.json({
       branding: {
-        logo_url: developer?.branding_logo_url || null,
+        logo_url: resolvePublicAssetUrl(developer?.branding_logo_url),
         accent_color: developer?.branding_accent_color || null,
         company_name: companyName,
       },
@@ -95,7 +96,7 @@ router.get('/page-config/slug/:slug',
     const companyName = developer.branding_company_name || developer.company || null;
     res.json({
       branding: {
-        logo_url: developer.branding_logo_url || null,
+        logo_url: resolvePublicAssetUrl(developer.branding_logo_url),
         accent_color: developer.branding_accent_color || null,
         company_name: companyName,
       },
@@ -156,7 +157,7 @@ router.get('/session-info',
       verification_mode: verification.verification_mode || 'full',
       ...(verification.age_threshold != null && { age_threshold: verification.age_threshold }),
       branding: {
-        logo_url: developer?.branding_logo_url || null,
+        logo_url: resolvePublicAssetUrl(developer?.branding_logo_url),
         accent_color: developer?.branding_accent_color || null,
         company_name: companyName,
       },

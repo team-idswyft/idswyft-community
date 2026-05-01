@@ -8,6 +8,30 @@ import type { VerificationSource } from '@/types/index.js';
 import { encryptBlob, maybeDecryptBlob } from './storageCrypto.js';
 
 /**
+ * Resolve a stored public-asset URL to an absolute URL when the deployment
+ * keeps the frontend and API on different origins.
+ *
+ * Inputs come from `developers.avatar_url` and `developers.branding_logo_url`,
+ * which can hold three populations:
+ *   - relative `/api/public/assets/...` paths emitted by `storePublicAsset` for
+ *     `local` and `s3` storage providers;
+ *   - absolute Supabase-storage public URLs from the `supabase` provider;
+ *   - absolute external URLs (GitHub avatars, branding URLs set via the
+ *     `PUT /api/developer/settings/branding` form which validates http/https).
+ *
+ * Apply this helper in every API response that exposes those columns, NOT at
+ * write time, so existing relative rows in the DB get the prefix automatically
+ * once `PUBLIC_ASSET_BASE_URL` is set in cloud production.
+ */
+export function resolvePublicAssetUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url)) return url;
+  const base = config.storage.publicAssetBaseUrl;
+  if (!base) return url;
+  return base.replace(/\/+$/, '') + url;
+}
+
+/**
  * Build the master-key candidate list for envelope decryption.
  * Order: current ENCRYPTION_KEY first, then ENCRYPTION_KEY_PREVIOUS if set.
  * During key rotation both are configured; new files use the current key,

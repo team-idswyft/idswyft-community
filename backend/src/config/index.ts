@@ -34,6 +34,13 @@ export const config: AppConfig = {
   
   storage: {
     provider: (process.env.STORAGE_PROVIDER as 'supabase' | 'local' | 's3') || 'supabase',
+    // Absolute base URL for public-asset paths returned by storePublicAsset.
+    // Set this in cloud deployments where the frontend and API live on
+    // different origins (e.g. www.idswyft.app vs api.idswyft.app) so
+    // <img src> resolves to the API host and not the frontend host.
+    // Leave unset for community/self-host where nginx proxies /api/* to the
+    // backend on the same origin — relative URLs work as-is there.
+    publicAssetBaseUrl: process.env.PUBLIC_ASSET_BASE_URL || '',
     awsAccessKey: process.env.AWS_ACCESS_KEY_ID,
     awsSecretKey: process.env.AWS_SECRET_ACCESS_KEY,
     awsRegion: process.env.AWS_REGION || 'us-east-1',
