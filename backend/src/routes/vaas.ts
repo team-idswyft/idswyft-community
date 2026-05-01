@@ -5,6 +5,7 @@ import { catchAsync } from '@/middleware/errorHandler.js';
 import { validate } from '@/middleware/validate.js';
 import { supabase } from '@/config/database.js';
 import { logger } from '@/utils/logger.js';
+import { resolvePublicAssetUrl } from '@/services/storage.js';
 
 const router = express.Router();
 
@@ -192,6 +193,7 @@ router.get('/developers', authenticateServiceToken, catchAsync(async (req: Reque
 
   const enriched = (developers || []).map((d: any) => ({
     ...d,
+    avatar_url: resolvePublicAssetUrl(d.avatar_url),
     api_key_count: apiKeyCounts[d.id] || 0,
     verification_count: verificationCounts[d.id] || 0,
   }));
@@ -231,6 +233,7 @@ router.get('/developers/:id', authenticateServiceToken, [param('id').isUUID()], 
     success: true,
     data: {
       ...developer,
+      avatar_url: resolvePublicAssetUrl((developer as any).avatar_url),
       api_key_count: keyResult.count || 0,
       verification_count: verResult.count || 0,
     },

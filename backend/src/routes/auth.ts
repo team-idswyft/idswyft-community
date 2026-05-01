@@ -15,6 +15,7 @@ import * as githubOAuth from '@/services/githubOAuthService.js';
 import { Developer } from '@/types/index.js';
 import { logger } from '@/utils/logger.js';
 import { generateToken } from '@/middleware/csrf.js';
+import { resolvePublicAssetUrl } from '@/services/storage.js';
 
 // Rate limiter for OTP verify: 10 attempts per 15 minutes per IP
 const otpVerifyLimiter = rateLimit({
@@ -621,7 +622,7 @@ router.post('/developer/github/callback',
               name: developer.name,
               company: developer.company,
               is_verified: developer.is_verified,
-              avatar_url: developer.avatar_url,
+              avatar_url: resolvePublicAssetUrl(developer.avatar_url),
               created_at: developer.created_at,
             },
             api_key: apiKey ? { key, id: apiKey.id, name: apiKey.name, is_sandbox: apiKey.is_sandbox, created_at: apiKey.created_at } : undefined,
@@ -647,7 +648,7 @@ router.post('/developer/github/callback',
         name: developer.name,
         company: developer.company,
         is_verified: developer.is_verified,
-        avatar_url: developer.avatar_url,
+        avatar_url: resolvePublicAssetUrl(developer.avatar_url),
         created_at: developer.created_at,
       },
       is_new: isNew,
