@@ -5,6 +5,78 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.4] - 2026-05-01
+
+Avatar / public-asset URL fixes for cloud production. No breaking
+changes; safe patch upgrade. Two related fixes shipped together.
+
+### Fixed
+- **Avatars routed to wrong (private) Supabase bucket**
+  (`backend/src/services/storage.ts`,
+  `supabase/migrations/60_create_avatars_bucket.sql`) — avatar uploads
+  with `STORAGE_PROVIDER=supabase` (the cloud production setting) were
+  written to the default `identity-documents` bucket, which is private
+  by design (it holds end-user passport / driver's-license images per
+  GDPR Article 9). The resulting `getPublicUrl()` always 404'd
+  ("Bucket not found") because the bucket isn't public-readable. New
+  migration creates a dedicated public `avatars` bucket mirroring the
+  pattern from migration 53 (branding bucket), with three RLS policies
+  for public read + insert + update. The `storePublicAsset` switch in
+  `storage.ts` now routes `folder === 'avatars'` to the new bucket.
+  Cleanup nulls broken `developers.avatar_url` rows so the placeholder
+  renders until users re-upload.
+- **Cross-origin public-asset URL resolution for `local` and `s3`
+  providers** (`backend/src/services/storage.ts`,
+  `backend/src/routes/{auth,handoff,pageConfig,vaas}.ts`,
+  `backend/src/routes/developer/{profile,settings}.ts`,
+  `backend/src/config/index.ts`,
+  `backend/src/types/index.ts`) — `storePublicAsset` returns relative
+  `/api/public/assets/...` paths for the `local` and `s3` providers.
+  In any deployment where the frontend and API live on different
+  origins (e.g. `staging.idswyft.app` vs `staging.api.idswyft.app`),
+  `<img src>` resolved to the frontend host and 404'd. New helper
+  `resolvePublicAssetUrl()` reads `PUBLIC_ASSET_BASE_URL` and prepends
+  it to relative URLs at API response boundary. Read-time resolution
+  (rather than write-time) means any legacy relative URL in the DB
+  gets fixed automatically once the env var is set, with no DB
+  migration. Helper passes absolute http(s) URLs through unchanged
+  (GitHub OAuth avatars, Supabase storage URLs, branding URLs set via
+  PUT settings/branding, etc.). 8-test unit suite at
+  `services/__tests__/publicAssetUrl.test.ts`. The team-idswyft cloud
+  deployment uses `supabase` storage so this path is dormant in
+  production, but it's the right fix for self-hosters on `s3` and for
+  any future move off Supabase.
+
+### Changed
+- **CLAUDE.md compliance section** corrected: previously said "Cloud
+  edition uses S3" — that was incorrect doc drift. Cloud edition uses
+  Supabase storage (the `supabase` provider). Verification documents
+  and selfies → private `identity-documents` bucket; developer
+  avatars → public `avatars` bucket (new in this release); branding
+  logos → public `branding` bucket. The `s3` provider is supported in
+  code for self-hosters but not used on team-idswyft infrastructure.
+
+### Operational notes
+- Migration 60 was applied to the shared Supabase DB
+  (`kcjugatpfhccjroyliku`, single-DB across staging+production) before
+  this version was tagged. No DB work needed on deploy.
+- Railway env: `STORAGE_PROVIDER` was reset to `supabase` on both
+  `staging` and `production` environments for service
+  `idswyfts-main-api` (replacing a stale `local` value that had been
+  writing to ephemeral container disk with no volume mount). The new
+  value activates on the next Railway redeploy, which this version
+  bump triggers.
+- Three orphan files still sit in `identity-documents/avatars/` on
+  the live storage. Supabase blocks raw-SQL DELETE on
+  `storage.objects` via a `protect_delete()` trigger, so the
+  migration's cleanup is wrapped in an EXCEPTION-handling DO block
+  that succeeds either way. Remove the orphans manually via Studio
+  or the Storage API (tracked separately).
+- `PUBLIC_ASSET_BASE_URL` is set on Railway staging
+  (`https://staging.api.idswyft.app`). Setting it on production is
+  optional — it's a no-op when storage returns absolute URLs, which
+  the `supabase` provider always does.
+
 ## [1.12.3] - 2026-05-01
 
 Dev-portal stat strip accuracy fix and SEO foundation. No breaking

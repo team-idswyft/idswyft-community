@@ -5,6 +5,7 @@ import { authenticateDeveloperJWT } from '@/middleware/auth.js';
 import { catchAsync, ValidationError } from '@/middleware/errorHandler.js';
 import { validate } from '@/middleware/validate.js';
 import { config } from '@/config/index.js';
+import { resolvePublicAssetUrl } from '@/services/storage.js';
 import { encryptSecret, decryptSecret, maskApiKey } from '@idswyft/shared';
 
 const router = express.Router();
@@ -203,7 +204,7 @@ router.get('/settings/branding',
 
     res.json({
       configured: hasAny,
-      logo_url: data?.branding_logo_url || null,
+      logo_url: resolvePublicAssetUrl(data?.branding_logo_url),
       accent_color: data?.branding_accent_color || null,
       company_name: data?.branding_company_name || null,
     });
@@ -239,7 +240,11 @@ router.put('/settings/branding',
 
     res.json({
       success: true,
-      logo_url: logo_url ?? null,
+      // Resolve for symmetry with GET — even though the validator forces
+      // absolute http(s) URLs here, helper is a no-op for those, so this
+      // keeps the response shape consistent if the field ever holds a
+      // relative path (e.g. via a future code path).
+      logo_url: resolvePublicAssetUrl(logo_url) ?? null,
       accent_color: accent_color ?? null,
       company_name: company_name ?? null,
     });

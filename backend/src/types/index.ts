@@ -281,6 +281,7 @@ export interface AppConfig {
   };
   storage: {
     provider: 'supabase' | 'local' | 's3';
+    publicAssetBaseUrl: string;
     awsAccessKey?: string;
     awsSecretKey?: string;
     awsRegion?: string;

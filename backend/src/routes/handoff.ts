@@ -7,6 +7,7 @@ import { supabase } from '@/config/database.js';
 import { logger } from '@/utils/logger.js';
 import config from '@/config/index.js';
 import { basicRateLimit } from '@/middleware/rateLimit.js';
+import { resolvePublicAssetUrl } from '@/services/storage.js';
 
 const router = express.Router();
 
@@ -165,7 +166,7 @@ router.get('/:token/session', catchAsync(async (req: Request, res: Response) => 
 
       if (dev) {
         branding = {
-          logo_url: dev.branding_logo_url || null,
+          logo_url: resolvePublicAssetUrl(dev.branding_logo_url),
           accent_color: dev.branding_accent_color || null,
           company_name: dev.branding_company_name || dev.company || null,
         };

@@ -8,6 +8,30 @@ import type { VerificationSource } from '@/types/index.js';
 import { encryptBlob, maybeDecryptBlob } from './storageCrypto.js';
 
 /**
+ * Resolve a stored public-asset URL to an absolute URL when the deployment
+ * keeps the frontend and API on different origins.
+ *
+ * Inputs come from `developers.avatar_url` and `developers.branding_logo_url`,
+ * which can hold three populations:
+ *   - relative `/api/public/assets/...` paths emitted by `storePublicAsset` for
+ *     `local` and `s3` storage providers;
+ *   - absolute Supabase-storage public URLs from the `supabase` provider;
+ *   - absolute external URLs (GitHub avatars, branding URLs set via the
+ *     `PUT /api/developer/settings/branding` form which validates http/https).
+ *
+ * Apply this helper in every API response that exposes those columns, NOT at
+ * write time, so existing relative rows in the DB get the prefix automatically
+ * once `PUBLIC_ASSET_BASE_URL` is set in cloud production.
+ */
+export function resolvePublicAssetUrl(url: string | null | undefined): string | null {
+  if (!url) return null;
+  if (/^https?:\/\//i.test(url)) return url;
+  const base = config.storage.publicAssetBaseUrl;
+  if (!base) return url;
+  return base.replace(/\/+$/, '') + url;
+}
+
+/**
  * Build the master-key candidate list for envelope decryption.
  * Order: current ENCRYPTION_KEY first, then ENCRYPTION_KEY_PREVIOUS if set.
  * During key rotation both are configured; new files use the current key,
@@ -242,10 +266,16 @@ export class StorageService {
       return `/api/public/assets/${folder}/${fileName}`;
 
     } else if (config.storage.provider === 'supabase') {
-      // Branding uses a dedicated public bucket; other assets use the default bucket
+      // Each public-asset folder maps to a dedicated PUBLIC bucket. The
+      // default `storageBucket` (identity-documents) is private — it holds
+      // end-user passport / driver's-license images — so anything written
+      // there ends up with a 404'ing public URL. See migration 60 for the
+      // avatars bucket and migration 53 for branding.
       const bucket = folder === 'branding'
         ? 'branding'
-        : config.supabase.storageBucket;
+        : folder === 'avatars'
+          ? 'avatars'
+          : config.supabase.storageBucket;
 
       const { error } = await supabase.storage
         .from(bucket)
