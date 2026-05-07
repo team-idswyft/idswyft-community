@@ -5,6 +5,57 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.7] - 2026-05-07
+
+Bug fix release. Surfaces camera errors and restructures the iOS
+camera-initialization lifecycle in the active-liveness flow. Reporter
+[@dttran93](https://github.com/dttran93) on `idswyft-community#37`.
+
+### Fixed
+- **Active liveness camera silently fell back to static photo on iOS**
+  (`frontend/src/components/liveness/ActiveLivenessCapture.tsx`) —
+  three silent-failure paths in the active-liveness component were
+  stranding iOS users on the legacy static-photo capture, which can
+  never pass anti-spoofing thresholds (scores 0.62-0.67 vs ~0.85+
+  needed):
+  1. The `getUserMedia` catch logged to console and silently called
+     `onFallback()`, with no UI signal to the user.
+  2. `video.play().catch(() => {})` swallowed `play()` rejections — a
+     documented iOS Safari failure mode the existing comment already
+     acknowledged for desktop browsers.
+  3. If either of the above happened, `streamReady` never flipped, the
+     liveness hook stayed disabled, and the user stared at a frozen
+     black video forever.
+
+  Fix:
+  - New `mapCameraError(err)` helper classifies errors into
+    `{ message, allowFallback }`. Only `NotFoundError` (no camera
+    hardware) takes the legacy fallback path — every other class
+    (`NotAllowedError`, `NotReadableError`, `OverconstrainedError`,
+    default) shows a UI error message and a Try Again button.
+  - `play().catch()` now surfaces a UI error and clears the readiness
+    timer so the 8-second stream-readiness timeout can't later
+    overwrite the more specific message.
+  - New 8-second stream-readiness timeout — if the `playing` event
+    doesn't fire within 8 seconds after stream acquisition, surface
+    "Camera failed to start within 8 seconds" rather than leaving
+    the user with no signal.
+  - Restructured component lifecycle: renders a "Start camera" intro
+    screen first, then defers `getUserMedia()` to the button's
+    `onClick` handler. This is the iOS-spec-compliant pattern for
+    preserving the user-gesture context across the gUM call (iOS
+    Safari rejects gUM calls that happen after any awaited microtask
+    in an async handler). Applied always, not iOS-conditional, for
+    a unified code path.
+  - New camera-error retry button distinct from the existing
+    challenge-failed retry — different stage of failure.
+
+### Notes
+- The deeper hygiene fix in `useActiveLiveness.ts` (the hook accepts
+  an `onFallback` parameter it never invokes — a dead pass-through)
+  was deliberately deferred to a separate Trello card to keep this
+  patch focused on the iOS regression.
+
 ## [1.12.6] - 2026-05-07
 
 Internal refactor — no behavior change. Patch release to keep the
