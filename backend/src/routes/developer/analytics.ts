@@ -18,6 +18,7 @@ import {
   getDailyWebhookDeliveries,
   getDefaultPeriod,
 } from '@/services/analyticsService.js';
+import { getMonthStart, getNextMonthStart } from '@/utils/timeRanges.js';
 
 const router = express.Router();
 
@@ -43,8 +44,7 @@ router.get('/stats',
     }
     // Calendar-month-to-date so this endpoint agrees with /analytics quota.
     const now = new Date();
-    const monthStart = new Date(now.getFullYear(), now.getMonth(), 1);
-    monthStart.setHours(0, 0, 0, 0);
+    const monthStart = getMonthStart(now);
 
     const { data: stats, error } = await supabase
       .from('verification_requests')
@@ -77,7 +77,7 @@ router.get('/stats',
       monthly_limit: monthlyLimit,
       monthly_usage: totalRequests,
       remaining_quota: Math.max(0, monthlyLimit - totalRequests),
-      quota_reset_date: new Date(now.getFullYear(), now.getMonth() + 1, 1).toISOString()
+      quota_reset_date: getNextMonthStart(now).toISOString()
     });
   })
 );
@@ -281,9 +281,7 @@ router.get('/analytics',
       ]);
 
     // Quota: count verification_requests this month
-    const monthStart = new Date();
-    monthStart.setDate(1);
-    monthStart.setHours(0, 0, 0, 0);
+    const monthStart = getMonthStart(new Date());
 
     const { count } = await supabase
       .from('verification_requests')

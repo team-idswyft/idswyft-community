@@ -5,6 +5,27 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.6] - 2026-05-07
+
+Internal refactor — no behavior change. Patch release to keep the
+`main` commit ↔ tagged-version invariant after the time-range helper
+extraction landed on `dev`.
+
+### Changed
+- **Calendar-month range helpers** extracted from
+  `backend/src/routes/developer/analytics.ts` into
+  `backend/src/utils/timeRanges.ts` — exports `getMonthStart(now)`
+  and `getNextMonthStart(now)`. The `/api/developer/stats` and
+  `/api/developer/analytics` routes previously had two subtly
+  different inline shapes for "first instant of this calendar
+  month" (one used the 3-arg `Date` constructor, the other used
+  `setDate(1)`). Folding them into shared helpers means a future
+  timezone or month-boundary fix lands in one place. 10 unit tests
+  cover edge cases (January/December boundaries, day-1
+  idempotence, input non-mutation, `getNextMonthStart >
+  getMonthStart` ordering invariant). Source: Trello card #114
+  cheap-first-step (https://trello.com/c/92EKdHLs).
+
 ## [1.12.5] - 2026-05-07
 
 Hotfix for staging + production crash on boot. Both Railway main API
