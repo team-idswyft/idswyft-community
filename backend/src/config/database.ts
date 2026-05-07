@@ -9,6 +9,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import ws from 'ws';
 import { PgClient } from '@/adapters/pg/PgClient.js';
 
 // ─── Mode detection ──────────────────────────────────────────
@@ -35,6 +36,12 @@ if (USE_SUPABASE) {
       auth: {
         autoRefreshToken: false,
         persistSession: false,
+      },
+      // @supabase/realtime-js requires native WebSocket on Node 22+ or an
+      // explicit transport on Node < 22. The runtime image is node:20-slim,
+      // so wire `ws` in. Safe to keep after a future Node 22 upgrade.
+      realtime: {
+        transport: ws as any,
       },
     }
   );
