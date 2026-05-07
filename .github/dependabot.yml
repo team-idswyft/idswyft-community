@@ -1,9 +1,13 @@
 # ─────────────────────────────────────────────────
-# Dependabot — security updates only
+# Dependabot configuration
 # ─────────────────────────────────────────────────
-# Grouped updates, weekly schedule. Workspace packages
-# (@idswyft/*) are ignored since they are resolved
-# locally via npm workspaces, not from the registry.
+# Patch and minor bumps are grouped into one weekly PR per
+# ecosystem so routine maintenance lands as a single review.
+# Major bumps fall through to individual PRs so each
+# breaking-change review can be scoped properly.
+#
+# Workspace packages (@idswyft/*) are ignored since they are
+# resolved locally via npm workspaces, not from the registry.
 # ─────────────────────────────────────────────────
 
 version: 2
@@ -15,11 +19,12 @@ updates:
     schedule:
       interval: weekly
     groups:
-      npm_and_yarn:
+      non-major:
         patterns: ["*"]
+        update-types: ["minor", "patch"]
     ignore:
       - dependency-name: "@idswyft/*"
-    open-pull-requests-limit: 5
+    open-pull-requests-limit: 10
 
   # Frontend (separate lockfile)
   - package-ecosystem: npm
@@ -27,9 +32,10 @@ updates:
     schedule:
       interval: weekly
     groups:
-      npm_and_yarn:
+      non-major:
         patterns: ["*"]
-    open-pull-requests-limit: 5
+        update-types: ["minor", "patch"]
+    open-pull-requests-limit: 10
 
   # GitHub Actions
   - package-ecosystem: github-actions
