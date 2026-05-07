@@ -9,6 +9,74 @@ interface ActiveLivenessCaptureProps {
   isProcessing?: boolean;
 }
 
+// ─── Camera error mapping ──────────────────────────────────────
+//
+// Map a thrown getUserMedia / play() error to a user-facing message.
+// Only NotFoundError (no camera hardware) is a legitimate fallback to
+// the legacy static-photo capture — every other class shows a visible
+// error and lets the user retry. Falling back on permission/setup
+// errors silently strands iOS users on a path that can never pass
+// liveness anti-spoofing (Community #37).
+
+interface CameraErrorInfo {
+  message: string;
+  allowFallback: boolean;
+}
+
+function mapCameraError(err: unknown): CameraErrorInfo {
+  if (err instanceof Error) {
+    switch (err.name) {
+      case 'NotAllowedError':
+        return {
+          message: 'Camera permission denied. Please grant camera access in your browser settings and try again.',
+          allowFallback: false,
+        };
+      case 'NotFoundError':
+        return {
+          message: 'No camera detected on this device.',
+          allowFallback: true,
+        };
+      case 'NotReadableError':
+        return {
+          message: 'Camera is in use by another app. Close other apps using the camera and try again.',
+          allowFallback: false,
+        };
+      case 'OverconstrainedError':
+        return {
+          message: 'Camera does not meet requirements (a front-facing camera is needed).',
+          allowFallback: false,
+        };
+      default:
+        return {
+          message: `Camera access failed (${err.name}): ${err.message}`,
+          allowFallback: false,
+        };
+    }
+  }
+  return {
+    message: 'Camera access failed for an unknown reason.',
+    allowFallback: false,
+  };
+}
+
+// Stream-readiness timeout — if the `playing` event hasn't fired
+// within this window after acquiring the stream, surface an error
+// rather than leaving the user staring at a frozen video forever.
+const STREAM_READY_TIMEOUT_MS = 8000;
+
+// Frame styling shared across pre-camera, error, and streaming UI.
+const FRAME_STYLE: React.CSSProperties = {
+  position: 'relative',
+  width: '100%',
+  maxWidth: 520,
+  margin: '0 auto',
+  background: 'var(--paper)',
+  border: '1px solid var(--rule)',
+  overflow: 'hidden',
+  fontFamily: 'var(--sans)',
+  color: 'var(--ink)',
+};
+
 export function ActiveLivenessCapture({
   onComplete,
   onCancel,
@@ -17,60 +85,109 @@ export function ActiveLivenessCapture({
 }: ActiveLivenessCaptureProps) {
   const videoRef = useRef<HTMLVideoElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
+  const streamRef = useRef<MediaStream | null>(null);
+  const readyTimerRef = useRef<ReturnType<typeof setTimeout> | undefined>(undefined);
+
+  const [cameraRequested, setCameraRequested] = useState(false);
   const [streamReady, setStreamReady] = useState(false);
+  const [cameraError, setCameraError] = useState<string | null>(null);
+
   // Always portrait — objectFit:'cover' crops landscape webcam feeds to fit.
   // Keeping portrait ensures the oval face guide frames faces correctly on all devices.
   const videoDims = { w: 480, h: 640 };
 
-  // Start camera — use `playing` event for readiness instead of awaiting play(),
-  // because the async gap after getUserMedia can expire the user-gesture context
-  // on some desktop browsers, causing play() to reject and silently falling back.
-  useEffect(() => {
-    let stream: MediaStream | null = null;
-    let cancelled = false;
+  // Cleanup any active stream on unmount or before retry.
+  const stopStream = useCallback(() => {
+    if (streamRef.current) {
+      streamRef.current.getTracks().forEach(t => t.stop());
+      streamRef.current = null;
+    }
+    if (readyTimerRef.current) {
+      clearTimeout(readyTimerRef.current);
+      readyTimerRef.current = undefined;
+    }
+  }, []);
 
-    (async () => {
-      try {
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user' },
-          audio: false,
-        });
-        if (cancelled) {
+  useEffect(() => stopStream, [stopStream]);
+
+  // Request camera access. CRITICAL: this must be invoked synchronously
+  // from a user-gesture handler (button onClick) — iOS Safari rejects
+  // getUserMedia calls that happen after any `await` in an async handler
+  // because the gesture context expires across the microtask. Calling
+  // it inside useEffect (the previous shape) was the iOS root cause.
+  const requestCamera = useCallback(() => {
+    stopStream();
+    setCameraError(null);
+    setCameraRequested(true);
+    setStreamReady(false);
+
+    // Synchronous getUserMedia call — no awaited code can run before this line
+    // when this function is invoked from a button onClick.
+    navigator.mediaDevices
+      .getUserMedia({ video: { facingMode: 'user' }, audio: false })
+      .then((stream) => {
+        streamRef.current = stream;
+        const video = videoRef.current;
+        if (!video) {
+          // Component unmounted between the gesture and the resolved promise.
           stream.getTracks().forEach(t => t.stop());
+          streamRef.current = null;
           return;
         }
-        const video = videoRef.current;
-        if (video) {
-          video.srcObject = stream;
-          video.addEventListener('loadedmetadata', () => {
-            // Dims used for canvas capture only — container stays portrait
-          });
-          // Listen for the video to actually start rendering frames
-          video.addEventListener('playing', () => {
-            if (!cancelled) setStreamReady(true);
-          }, { once: true });
-          // Kick play — autoPlay attribute is the primary trigger, this is a safety net
-          video.play().catch(() => {});
-        }
-      } catch (err) {
+        video.srcObject = stream;
+
+        // Wait for the video to actually start rendering frames before
+        // letting the liveness state machine begin its challenge.
+        video.addEventListener(
+          'playing',
+          () => {
+            if (readyTimerRef.current) {
+              clearTimeout(readyTimerRef.current);
+              readyTimerRef.current = undefined;
+            }
+            setStreamReady(true);
+          },
+          { once: true },
+        );
+
+        // Surface play() rejections instead of swallowing them — on iOS this
+        // is one of the failure modes that previously left the user stranded.
+        // Clear the readiness timer too so the 8s timeout doesn't later
+        // overwrite this more specific message.
+        video.play().catch(() => {
+          if (readyTimerRef.current) {
+            clearTimeout(readyTimerRef.current);
+            readyTimerRef.current = undefined;
+          }
+          setCameraError('Could not start the video preview. Please try again.');
+        });
+
+        // If `playing` doesn't fire within the timeout, surface an error
+        // rather than leaving the user staring at a frozen black video.
+        readyTimerRef.current = setTimeout(() => {
+          setCameraError('Camera failed to start within 8 seconds. Please try again.');
+        }, STREAM_READY_TIMEOUT_MS);
+      })
+      .catch((err: unknown) => {
+        const { message, allowFallback } = mapCameraError(err);
+        // Keep the original error in the console for support diagnostics.
         console.error('Camera access failed:', err);
-        if (!cancelled) onFallback();
-      }
-    })();
+        if (allowFallback) {
+          // No camera hardware — the legacy static-photo capture is our only path.
+          onFallback();
+        } else {
+          setCameraError(message);
+        }
+      });
+  }, [onFallback, stopStream]);
 
-    return () => {
-      cancelled = true;
-      if (stream) stream.getTracks().forEach(t => t.stop());
-    };
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
-
-  const handleComplete = useCallback((blob: Blob, metadata: LivenessMetadata) => {
-    // Stop the camera
-    if (videoRef.current?.srcObject) {
-      (videoRef.current.srcObject as MediaStream).getTracks().forEach(t => t.stop());
-    }
-    onComplete(blob, metadata);
-  }, [onComplete]);
+  const handleComplete = useCallback(
+    (blob: Blob, metadata: LivenessMetadata) => {
+      stopStream();
+      onComplete(blob, metadata);
+    },
+    [onComplete, stopStream],
+  );
 
   const {
     phase,
@@ -86,6 +203,48 @@ export function ActiveLivenessCapture({
     onComplete: handleComplete,
     onFallback,
   });
+
+  // ── Pre-camera intro screen — gates getUserMedia behind an explicit user gesture ──
+  if (!cameraRequested) {
+    return (
+      <div style={FRAME_STYLE}>
+        <style>{LIVENESS_CSS}</style>
+        <div className="lv-intro">
+          <h2 className="lv-intro-title">Camera access required</h2>
+          <p className="lv-intro-body">
+            We&apos;ll use your front-facing camera for a quick liveness check
+            to verify it&apos;s really you. Your video is processed for the
+            check and not stored as a recording.
+          </p>
+          <button onClick={requestCamera} className="lv-btn-primary">
+            Start camera
+          </button>
+          <button onClick={onCancel} className="lv-btn-ghost">
+            Skip
+          </button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── Camera error screen — surfaces NotAllowed / NotReadable / play() / timeout ──
+  if (cameraError) {
+    return (
+      <div style={FRAME_STYLE}>
+        <style>{LIVENESS_CSS}</style>
+        <div className="lv-intro">
+          <h2 className="lv-intro-title lv-intro-title--err">Camera error</h2>
+          <p className="lv-intro-body">{cameraError}</p>
+          <button onClick={requestCamera} className="lv-btn-primary">
+            Try again
+          </button>
+          <button onClick={onCancel} className="lv-btn-ghost">
+            Skip
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   // ── Dot state computation ──
   // 4 progress dots: turn 1 + return 1 + turn 2 + return 2
@@ -117,7 +276,7 @@ export function ActiveLivenessCapture({
   const challengeActive = phase === 'turn' || phase === 'return_center';
 
   // ── Tip text ──
-  const tipText = phase === 'ready' ? 'Good lighting \u00B7 Face uncovered \u00B7 No sunglasses'
+  const tipText = phase === 'ready' ? 'Good lighting · Face uncovered · No sunglasses'
     : phase === 'failed' ? 'Ensure good lighting and face is centred'
     : phase === 'completed' ? 'Verification complete'
     : 'Keep your face visible throughout';
@@ -129,17 +288,7 @@ export function ActiveLivenessCapture({
     : '#00d4b4';
 
   return (
-    <div style={{
-      position: 'relative',
-      width: '100%',
-      maxWidth: 520,
-      margin: '0 auto',
-      background: 'var(--paper)',
-      border: '1px solid var(--rule)',
-      overflow: 'hidden',
-      fontFamily: 'var(--sans)',
-      color: 'var(--ink)',
-    }}>
+    <div style={FRAME_STYLE}>
       <style>{LIVENESS_CSS}</style>
 
       {/* Video + Overlays */}
@@ -318,6 +467,53 @@ export function ActiveLivenessCapture({
 // ─── Injected CSS ──────────────────────────────────────
 
 const LIVENESS_CSS = `
+/* ── Pre-camera intro + camera-error screens ── */
+.lv-intro {
+  display: flex; flex-direction: column; align-items: center;
+  text-align: center; gap: 14px;
+  padding: 48px 28px;
+}
+.lv-intro-title {
+  margin: 0;
+  font-family: var(--sans);
+  font-size: 20px; font-weight: 600;
+  letter-spacing: -0.01em;
+  color: var(--ink);
+}
+.lv-intro-title--err { color: #ff3b5c; }
+.lv-intro-body {
+  margin: 0;
+  max-width: 360px;
+  font-family: var(--sans);
+  font-size: 14px; line-height: 1.5;
+  color: var(--mid);
+}
+.lv-btn-primary {
+  margin-top: 10px;
+  padding: 12px 32px;
+  border: 1px solid var(--ink);
+  background: var(--ink);
+  color: var(--paper);
+  font-family: var(--mono);
+  font-size: 13px; font-weight: 500;
+  letter-spacing: 0.05em; text-transform: uppercase;
+  cursor: pointer;
+  transition: transform 0.18s;
+}
+.lv-btn-primary:hover { transform: translateY(-1px); }
+.lv-btn-ghost {
+  padding: 8px 20px;
+  border: 1px solid var(--rule);
+  background: transparent;
+  color: var(--mid);
+  font-family: var(--mono);
+  font-size: 11px;
+  letter-spacing: 0.07em;
+  cursor: pointer;
+  transition: all 0.18s;
+}
+.lv-btn-ghost:hover { border-color: var(--ink); color: var(--ink); }
+
 /* ── Ambient Glow (removed for v2 -- kept as invisible placeholder) ── */
 .lv-glow {
   position: absolute; pointer-events: none; z-index: 0; display: none;
