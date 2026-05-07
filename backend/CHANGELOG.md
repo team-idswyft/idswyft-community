@@ -5,6 +5,46 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.5] - 2026-05-07
+
+Hotfix for staging + production crash on boot. Both Railway main API
+deploys had been crashing on every fresh build with
+`Error: Node.js 20 detected without native WebSocket support`. Patch
+upgrade, no behavior change for healthy deploys.
+
+### Fixed
+- **Supabase client crash on Node 20**
+  (`backend/src/config/database.ts`, `backend/package.json`) — recent
+  versions of `@supabase/realtime-js` (a transitive of
+  `@supabase/supabase-js`) require either native WebSocket (Node 22+)
+  or an explicit `transport` option to be passed in `RealtimeClient`
+  options. Our Railway runtime image is `node:20-slim`, so the new
+  library version threw on `createClient(...)` at module init,
+  crashing the process before any HTTP route registered. Fix wires
+  the `ws` package as the realtime transport
+  (`realtime: { transport: ws }`) and promotes `ws` from a transitive
+  to an explicit `dependencies` entry so it can't disappear with
+  future transitive churn. Forward-compatible — the transport option
+  is a no-op once the runtime moves to Node 22+ with native
+  WebSocket.
+
+### Operational notes
+- The deeper root cause is `RUN npm install` in `backend/Dockerfile`
+  (line 27) — it re-resolves transitive deps from `package.json`
+  ranges on every build, ignoring the lockfile. That's how a new
+  `@supabase/realtime-js` version drifted in without any Idswyft
+  code change. Switching to `RUN npm ci` is the right long-term fix
+  but is deliberately out of scope here — `npm ci` would fail loudly
+  on any `package.json` ↔ `package-lock.json` drift, which is the
+  correct behavior but not what we want to discover during a prod
+  incident. Tracked as a follow-up.
+- A Node 22 upgrade would also remove the need for the shim
+  (`@supabase/realtime-js` requires `transport` only on Node < 22),
+  but Node 22 changes runtime defaults across TLS, streams, and
+  module resolution, and the engine container's `onnxruntime-node`
+  compatibility hasn't been validated on Node 22. Not a hotfix-tier
+  change.
+
 ## [1.12.4] - 2026-05-01
 
 Avatar / public-asset URL fixes for cloud production. No breaking
