@@ -226,10 +226,14 @@ export class StorageService {
 
     const client = new S3Client({
       region: config.storage.awsRegion ?? 'us-east-1',
-      credentials: {
-        accessKeyId: config.storage.awsAccessKey!,
-        secretAccessKey: config.storage.awsSecretKey!,
-      },
+      ...(config.storage.awsAccessKey && config.storage.awsSecretKey
+        ? {
+            credentials: {
+              accessKeyId: config.storage.awsAccessKey,
+              secretAccessKey: config.storage.awsSecretKey,
+            },
+          }
+        : {}),
     });
 
     const key = `${folder}/${fileName}`;
@@ -329,10 +333,14 @@ export class StorageService {
 
         const client = new S3Client({
           region: config.storage.awsRegion ?? 'us-east-1',
-          credentials: {
-            accessKeyId: config.storage.awsAccessKey!,
-            secretAccessKey: config.storage.awsSecretKey!,
-          },
+          ...(config.storage.awsAccessKey && config.storage.awsSecretKey
+            ? {
+                credentials: {
+                  accessKeyId: config.storage.awsAccessKey,
+                  secretAccessKey: config.storage.awsSecretKey,
+                },
+              }
+            : {}),
         });
 
         return await getSignedUrl(
@@ -373,10 +381,14 @@ export class StorageService {
 
         const client = new S3Client({
           region: config.storage.awsRegion ?? 'us-east-1',
-          credentials: {
-            accessKeyId: config.storage.awsAccessKey!,
-            secretAccessKey: config.storage.awsSecretKey!,
-          },
+          ...(config.storage.awsAccessKey && config.storage.awsSecretKey
+            ? {
+                credentials: {
+                  accessKeyId: config.storage.awsAccessKey,
+                  secretAccessKey: config.storage.awsSecretKey,
+                },
+              }
+            : {}),
         });
 
         const response = await client.send(new GetObjectCommand({
@@ -424,10 +436,14 @@ export class StorageService {
 
         const client = new S3Client({
           region: config.storage.awsRegion ?? 'us-east-1',
-          credentials: {
-            accessKeyId: config.storage.awsAccessKey!,
-            secretAccessKey: config.storage.awsSecretKey!,
-          },
+          ...(config.storage.awsAccessKey && config.storage.awsSecretKey
+            ? {
+                credentials: {
+                  accessKeyId: config.storage.awsAccessKey,
+                  secretAccessKey: config.storage.awsSecretKey,
+                },
+              }
+            : {}),
         });
 
         await client.send(new DeleteObjectCommand({
