@@ -1,6 +1,6 @@
 -- Create the webhook_deliveries table (was defined in schema.sql but never migrated)
 CREATE TABLE IF NOT EXISTS webhook_deliveries (
-    id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     webhook_id UUID NOT NULL REFERENCES webhooks(id) ON DELETE CASCADE,
     verification_request_id UUID NOT NULL REFERENCES verification_requests(id) ON DELETE CASCADE,
     payload JSONB NOT NULL,

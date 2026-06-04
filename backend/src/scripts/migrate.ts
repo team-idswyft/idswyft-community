@@ -49,11 +49,25 @@ const MIGRATIONS_DIR = process.env.MIGRATIONS_DIR || join(__dirname, '../../../s
 
 // ── Main ────────────────────────────────────────────────────────────────────
 async function main() {
-  // Only use SSL for cloud-hosted Postgres (e.g. Supabase)
-  const useSSL = DATABASE_URL.includes('supabase.co') || process.env.DB_SSL === 'true';
+  // SSL handling: aligned with PgClient (backend/src/adapters/pg/PgClient.ts).
+  // Auto-enabled for non-local connections; opt-out via DATABASE_SSL=false.
+  // Cert verification follows DATABASE_SSL_REJECT_UNAUTHORIZED (default true).
+  //
+  // Backward compatibility: DB_SSL was the original env var name for this script;
+  // honor it if DATABASE_SSL is unset, but log a deprecation notice so operators
+  // migrate to the standard name used by the API server and docker-compose.
+  if (process.env.DB_SSL && !process.env.DATABASE_SSL) {
+    console.warn('⚠️  DB_SSL is deprecated — use DATABASE_SSL instead (matches docker-compose.yml).');
+  }
+  const databaseSsl = process.env.DATABASE_SSL ?? process.env.DB_SSL;
+  const isLocalConnection = DATABASE_URL.includes('localhost') ||
+    DATABASE_URL.includes('127.0.0.1') ||
+    DATABASE_URL.includes('@postgres:');
+  const useSSL = databaseSsl !== 'false' && (databaseSsl === 'true' || !isLocalConnection);
+  const rejectUnauthorized = process.env.DATABASE_SSL_REJECT_UNAUTHORIZED !== 'false';
   const client = new pg.Client({
     connectionString: DATABASE_URL,
-    ...(useSSL ? { ssl: { rejectUnauthorized: false } } : {}),
+    ...(useSSL ? { ssl: { rejectUnauthorized } } : {}),
   });
 
   // Postgres advisory lock key — fixed integer specific to Idswyft's
