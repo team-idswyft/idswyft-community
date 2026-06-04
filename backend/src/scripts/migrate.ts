@@ -96,23 +96,34 @@ async function main() {
     await client.query('SELECT pg_advisory_lock($1)', [ADVISORY_LOCK_KEY]);
     console.log('🔒 Lock acquired');
 
-    // Ensure tracking table exists, with RLS locked down at the same time.
-    // RLS + service_role-only policy match the pattern from migration 57
-    // for every other public.* table, and pre-empts the Supabase lint
-    // "RLS Disabled in Public" warning on fresh databases. service_role
-    // bypasses RLS, so the runner itself is unaffected.
+    // Ensure tracking table exists. The RLS + service_role-only policy
+    // matches the pattern from migration 57 for every other public.* table
+    // and pre-empts the Supabase lint "RLS Disabled in Public" warning on
+    // fresh databases. But service_role is Supabase-specific — on stock
+    // Postgres it doesn't exist and the policy creation fails outright,
+    // blocking every other migration from running. Split into a base
+    // table-create (always) and a Supabase-only RLS pass (conditional).
     await client.query(`
       CREATE TABLE IF NOT EXISTS _migrations (
         name TEXT PRIMARY KEY,
         applied_at TIMESTAMPTZ DEFAULT NOW()
       );
-      ALTER TABLE _migrations ENABLE ROW LEVEL SECURITY;
-      DROP POLICY IF EXISTS service_role_all_migrations ON _migrations;
-      CREATE POLICY service_role_all_migrations
-        ON _migrations FOR ALL TO service_role USING (true) WITH CHECK (true);
-      REVOKE ALL ON _migrations FROM anon;
-      REVOKE ALL ON _migrations FROM authenticated;
     `);
+
+    const { rows: roleRows } = await client.query<{ exists: boolean }>(
+      `SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'service_role') AS exists`,
+    );
+    const isSupabase = roleRows[0]?.exists === true;
+    if (isSupabase) {
+      await client.query(`
+        ALTER TABLE _migrations ENABLE ROW LEVEL SECURITY;
+        DROP POLICY IF EXISTS service_role_all_migrations ON _migrations;
+        CREATE POLICY service_role_all_migrations
+          ON _migrations FOR ALL TO service_role USING (true) WITH CHECK (true);
+        REVOKE ALL ON _migrations FROM anon;
+        REVOKE ALL ON _migrations FROM authenticated;
+      `);
+    }
 
     // Get already-applied migrations
     const { rows: applied } = await client.query('SELECT name FROM _migrations ORDER BY name');
@@ -148,6 +159,18 @@ async function main() {
         ranCount++;
       } catch (err: any) {
         await client.query('ROLLBACK');
+        // Self-skip sentinel — a migration that detects it's Supabase-only
+        // and the current DB isn't Supabase raises SUPABASE_ONLY_MIGRATION_SKIPPED
+        // at the top of its body. Record as applied so the runner doesn't
+        // retry on every boot; the body never executes on stock Postgres.
+        // Cleaner than MIGRATIONS_LENIENT because it's a deliberate
+        // self-identification rather than a blanket error swallow.
+        if (typeof err.message === 'string' && err.message.includes('SUPABASE_ONLY_MIGRATION_SKIPPED')) {
+          await client.query('INSERT INTO _migrations (name) VALUES ($1)', [file]);
+          console.log(`  ⏭️  ${file} (skipped — Supabase-only, recorded as applied)`);
+          skippedCount++;
+          continue;
+        }
         if (lenient) {
           console.warn(`  ⚠️  ${file} skipped: ${err.message}`);
           skippedCount++;

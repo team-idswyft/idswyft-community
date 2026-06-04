@@ -1,3 +1,16 @@
+-- Supabase-only migration. Self-skips on stock Postgres so community
+-- self-hosters (STORAGE_PROVIDER=local) can run the migration set cleanly.
+-- The runner catches SUPABASE_ONLY_MIGRATION_SKIPPED and records the
+-- migration as applied without executing the body — see migrate.ts.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'service_role') THEN
+    RAISE EXCEPTION 'SUPABASE_ONLY_MIGRATION_SKIPPED'
+      USING ERRCODE = 'P0001',
+            HINT = 'Migration 60 manages Supabase Storage avatar buckets; not applicable on stock Postgres.';
+  END IF;
+END $$;
+
 -- Create a dedicated public bucket for developer profile avatars.
 -- Previously avatars were written to the default `identity-documents` bucket
 -- (which holds end-user passport / driver's-license images and is correctly
