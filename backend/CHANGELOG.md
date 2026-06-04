@@ -5,6 +5,65 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.8] - 2026-06-04
+
+Self-host bug-fix release. Unblocks community deployments outside the
+docker-compose + Supabase happy path — AWS / ECS Fargate / RDS Aurora /
+stock-Postgres operators previously hit three independent blockers in
+sequence. Reporter [@miyachan](https://github.com/miyachan) on
+`idswyft-community#38` and `#39`; S3 patch contributed by @miyachan via
+PR `idswyft-community#41`.
+
+### Fixed
+- **S3 default credential chain support** on AWS deployments
+  (`backend/src/services/storage.ts`) — the S3 client passed
+  `credentials: { accessKeyId: config.storage.awsAccessKey!, ... }`
+  unconditionally at all four call sites (store, getSignedUrl, download,
+  delete). When deploying on AWS with IAM-role / EC2 instance profile /
+  ECS task role / EKS IRSA, `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY`
+  are unset and the non-null assertions let `undefined` flow into the SDK,
+  which rejected with "Resolved credential object is not valid" before
+  any request was attempted. The `credentials` key is now included only
+  when both env vars are present; otherwise the SDK falls through to the
+  default provider chain (env → shared config → IMDSv2 → ECS metadata →
+  STS). Patch contributed by [@miyachan](https://github.com/miyachan) via
+  `idswyft-community#41`.
+
+- **Migration runner SSL handling**
+  (`backend/src/scripts/migrate.ts`) — `migrate.ts` was the only file in
+  `backend/` reading the `DB_SSL` env var; every other Postgres consumer
+  (`PgClient` adapter, `docker-compose.yml`) already uses `DATABASE_SSL`.
+  Self-hosters who set `DATABASE_SSL=true` per the docker-compose
+  convention found `npm run migrate` ignored it and refused to enable SSL
+  against cloud Postgres like RDS Aurora. Accept `DATABASE_SSL` as the
+  canonical name, fall back to `DB_SSL` with a deprecation warning,
+  auto-enable SSL for non-local connections (matches PgClient's
+  behaviour), and respect `DATABASE_SSL_REJECT_UNAUTHORIZED` for cert
+  verification so the migrator and the API server behave identically
+  end-to-end. Reported by [@miyachan](https://github.com/miyachan).
+
+- **Stock-Postgres `uuid` function compatibility**
+  (`supabase/migrations/20260319_add_webhook_deliveries.sql`) — the lone
+  migration using `uuid_generate_v4()` (requires the `uuid-ossp`
+  extension, not installed by default on stock Postgres or most managed
+  Postgres services). Switched to `gen_random_uuid()` which ships in
+  every Postgres ≥13 release. Every other migration in the directory
+  already used the latter. Stock-Postgres self-hosters previously hit
+  `function uuid_generate_v4() does not exist` and had to either install
+  the extension manually or rely on `MIGRATIONS_LENIENT=true` to skip —
+  the latter silently disabled webhook persistence on their stack.
+  Existing installations are unaffected (changes the column `DEFAULT` for
+  new inserts only; tables already created with the old definition keep
+  it).
+
+### Notes
+- The remaining parts of `idswyft-community#38` (Supabase-specific RLS
+  policies in migrations 53 / 57 / 59 / 60, and the `service_role`
+  reference in `migrate.ts`'s `_migrations` table init) still rely on
+  `MIGRATIONS_LENIENT=true` in docker-compose to mask the failures. A
+  proper migration split for non-Supabase self-hosters is tracked
+  separately.
+
 ## [1.12.7] - 2026-05-07
 
 Bug fix release. Surfaces camera errors and restructures the iOS
