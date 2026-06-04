@@ -1,3 +1,19 @@
+-- Supabase-only migration. Self-skips on stock Postgres so community
+-- self-hosters can run the migration set cleanly. The runner catches
+-- SUPABASE_ONLY_MIGRATION_SKIPPED and records the migration as applied
+-- without executing the body — see migrate.ts. (The _migrations table
+-- itself is created unconditionally by migrate.ts; only the RLS layer
+-- is Supabase-specific, and migrate.ts already gates the same statements
+-- by the same role check.)
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'service_role') THEN
+    RAISE EXCEPTION 'SUPABASE_ONLY_MIGRATION_SKIPPED'
+      USING ERRCODE = 'P0001',
+            HINT = 'Migration 59 enables RLS on _migrations with a service_role policy; not applicable on stock Postgres.';
+  END IF;
+END $$;
+
 -- Enable RLS on public._migrations + service-role-only policy.
 --
 -- Closes the Supabase lint finding "RLS Disabled in Public" for the

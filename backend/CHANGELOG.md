@@ -5,6 +5,56 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.11] - 2026-06-04
+
+Self-host release. Closes the remaining Supabase-specific blockers in
+[`idswyft-community#38`](https://github.com/team-idswyft/idswyft-community/issues/38) —
+the four migrations and the `migrate.ts` `_migrations` table init that
+referenced `service_role` / `storage.buckets` and failed outright on
+stock Postgres. v1.12.8 fixed the env-var mismatch and the lone
+`uuid_generate_v4()` outlier; this release takes care of the rest.
+Reporter [@miyachan](https://github.com/miyachan) on
+[`idswyft-community#38`](https://github.com/team-idswyft/idswyft-community/issues/38).
+
+### Fixed
+- **Supabase-only migrations now self-skip on stock Postgres**
+  (`supabase/migrations/53_create_branding_bucket.sql`,
+  `57_add_rls_policies_all_tables.sql`,
+  `59_enable_rls_migrations.sql`,
+  `60_create_avatars_bucket.sql`). Each starts with a guard `DO` block
+  that raises `SUPABASE_ONLY_MIGRATION_SKIPPED` if the `service_role`
+  role isn't present. The runner catches this specific exception and
+  records the migration as applied without executing the body — log
+  line becomes `⏭️ <file> (skipped — Supabase-only, recorded as
+  applied)` instead of the previous `⚠️ <file> skipped: <error>`
+  produced by `MIGRATIONS_LENIENT=true`'s blanket error swallow.
+
+  Cleaner audit trail (only Supabase-only migrations skip, not
+  whatever else might fail), and the runner doesn't retry on every
+  boot — the `_migrations` table records them as applied on first run.
+  `MIGRATIONS_LENIENT="true"` remains in `docker-compose.yml` as
+  belt-and-suspenders for any future migration that needs but forgets
+  the guard.
+
+- **`migrate.ts` `_migrations` table init split** —
+  `backend/src/scripts/migrate.ts`. The table-create runs
+  unconditionally; the RLS + `service_role` policy block now runs only
+  when a role check (`SELECT EXISTS (SELECT 1 FROM pg_catalog.pg_roles
+  WHERE rolname = 'service_role')`) returns true. Previously the
+  unconditional `CREATE POLICY ... TO service_role` failed before any
+  migration file ran, leaving stock-Postgres installations in a
+  half-initialized state.
+
+### Notes
+- Zero behavior change on cloud edition (Supabase): all four
+  migrations are already in `_migrations`, runner skips by filename
+  before reading SQL. Smoke-tested with `npm run migrate` against
+  production — no new rows, no errors, no behavior delta.
+- Existing self-host installations on stock Postgres with
+  `MIGRATIONS_LENIENT=true`: these four migrations were being
+  lenient-skipped on every boot. After this release they're cleanly
+  recorded as applied on first run and never retry.
+
 ## [1.12.10] - 2026-06-04
 
 Docs-only release. Closes four community-reported documentation gaps —

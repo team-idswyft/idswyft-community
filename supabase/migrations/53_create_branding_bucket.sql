@@ -1,3 +1,16 @@
+-- Supabase-only migration. Self-skips on stock Postgres so community
+-- self-hosters (STORAGE_PROVIDER=local) can run the migration set cleanly.
+-- The runner catches SUPABASE_ONLY_MIGRATION_SKIPPED and records the
+-- migration as applied without executing the body — see migrate.ts.
+DO $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM pg_catalog.pg_roles WHERE rolname = 'service_role') THEN
+    RAISE EXCEPTION 'SUPABASE_ONLY_MIGRATION_SKIPPED'
+      USING ERRCODE = 'P0001',
+            HINT = 'Migration 53 manages Supabase Storage buckets; not applicable on stock Postgres.';
+  END IF;
+END $$;
+
 -- Create a dedicated public bucket for developer branding assets (logos, etc.)
 -- The identity-documents bucket is private (sensitive ID photos), so branding
 -- logos uploaded there were inaccessible via public URLs.
