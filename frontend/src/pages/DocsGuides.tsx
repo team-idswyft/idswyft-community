@@ -102,23 +102,39 @@ export const DocsGuides: React.FC = () => {
         <a href="/docs" style={{ color: C.cyan, textDecoration: 'none', fontFamily: C.mono, fontSize: 'inherit' }}>REST API</a> section.
       </p>
 
+      <div style={{ background: C.surface, border: `1px solid ${C.amber}`, borderLeft: `3px solid ${C.amber}`, borderRadius: 0, padding: '16px 20px', marginBottom: 24 }}>
+        <p style={{ fontFamily: C.sans, fontSize: '0.83rem', color: C.text, margin: 0, lineHeight: 1.65 }}>
+          <strong>⚠ Never put your API key in the browser.</strong> Initialize the verification session on your backend with <code style={{ fontFamily: C.mono, color: C.cyan, fontSize: '0.82rem' }}>POST /api/v2/verify/initialize</code>, then pass the returned <code style={{ fontFamily: C.mono, color: C.cyan, fontSize: '0.82rem' }}>verification_url</code> to the user. The URL contains a single-use <code style={{ fontFamily: C.mono, color: C.cyan, fontSize: '0.82rem' }}>session</code> token scoped to one verification and valid for one hour — exposing it is bounded; exposing your <code style={{ fontFamily: C.mono, color: C.cyan, fontSize: '0.82rem' }}>ik_*</code> key would let anyone create or bypass verifications under your account.
+        </p>
+      </div>
+
+      <Pre label="Step 1: Initialize on your backend (server-side, with the API key)" code={`// Server-side — your API key never touches the browser
+const init = await fetch('${apiUrl}/api/v2/verify/initialize', {
+  method: 'POST',
+  headers: {
+    'X-API-Key': 'ik_your_api_key',
+    'Content-Type': 'application/json',
+  },
+  body: JSON.stringify({
+    user_id: 'user-123',
+    redirect_url: 'https://yourapp.com/done',
+  }),
+});
+const { verification_id, verification_url, session_token } = await init.json();
+// verification_url looks like:
+//   ${siteUrl}/user-verification?session=<64-char-hex-token>`} />
+
       <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, overflow: 'hidden', marginBottom: 24 }}>
-        <div style={{ padding: '12px 20px', borderBottom: `1px solid ${C.border}`, fontFamily: C.mono, fontSize: '0.72rem', color: C.muted, letterSpacing: '0.07em', textTransform: 'uppercase' }}>URL parameters</div>
+        <div style={{ padding: '12px 20px', borderBottom: `1px solid ${C.border}`, fontFamily: C.mono, fontSize: '0.72rem', color: C.muted, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Optional query parameters (append to verification_url)</div>
         <div style={{ padding: '8px 20px' }}>
-          <FieldRow name="api_key" type="string" req={true} desc="Your Idswyft API key." />
-          <FieldRow name="user_id" type="UUID string" req={true} desc="Unique identifier for the user being verified." />
-          <FieldRow name="redirect_url" type="URL string" req={false} desc="Where to redirect after verification completes. Required for redirect integration; optional for iframe/embed." />
           <FieldRow name="theme" type="'light' | 'dark'" req={false} desc="UI color theme. Defaults to dark." />
           <FieldRow name="address_verif" type="'true'" req={false} desc="When set to 'true', adds an optional proof-of-address step after identity verification. Users can upload a utility bill, bank statement, or tax document. The name is cross-referenced against the verified ID." />
         </div>
       </div>
 
-      <Pre label="Option 1: Redirect (link or window.location)" code={`// Redirect the user to the hosted verification page
-window.location.href = '${siteUrl}/user-verification'
-  + '?api_key=ik_your_api_key'
-  + '&user_id=user-123'
-  + '&redirect_url=' + encodeURIComponent('https://yourapp.com/done')
-  + '&theme=dark';`} />
+      <Pre label="Step 2 — Option 1: Redirect (link or window.location)" code={`// Pass verification_url to your frontend, then redirect.
+// The ?session= token in the URL scopes this verification — no API key needed.
+window.location.href = verification_url + '&theme=dark';`} />
 
       <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 0, overflow: 'hidden', marginBottom: 24 }}>
         <div style={{ padding: '12px 20px', borderBottom: `1px solid ${C.border}`, fontFamily: C.mono, fontSize: '0.72rem', color: C.muted, letterSpacing: '0.07em', textTransform: 'uppercase' }}>Redirect callback parameters</div>
@@ -139,22 +155,35 @@ const status = params.get('status');   // 'verified', 'failed', or 'manual_revie
 const userId = params.get('user_id');
 
 if (status === 'verified' && verificationId) {
-  // Fetch full results from your backend
+  // Fetch full results from your backend — includes ocr_data, cross_validation_results,
+  // face_match_results, liveness_results, risk_score, age_verification, and more.
+  // See "Polling Status" in the End-to-End Tutorial below for the full response shape.
   const res = await fetch('/api/verification-result?id=' + encodeURIComponent(verificationId));
+  const data = await res.json();
+  // data.ocr_data.full_name, data.ocr_data.date_of_birth, etc.
   // Update your user record, grant access, etc.
 } else if (status === 'manual_review') {
   // Verification needs human review — poll GET /api/v2/verify/:id/status
   // or wait for a webhook to get the final decision
 }`} />
 
-      <Pre label="Option 2: Iframe embed (HTML)" code={`<!-- Embed the verification page inline on your site -->
+      <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderLeft: `3px solid ${C.cyan}`, borderRadius: 0, padding: '14px 18px', marginBottom: 24 }}>
+        <p style={{ fontFamily: C.sans, fontSize: '0.82rem', color: C.muted, margin: 0, lineHeight: 1.65 }}>
+          <strong style={{ color: C.text }}>Extracted ID fields are in <code style={{ fontFamily: C.mono, color: C.cyan, fontSize: '0.82rem' }}>ocr_data</code></strong>{' '}
+          on the status response — <code style={{ fontFamily: C.mono, color: C.cyan, fontSize: '0.82rem' }}>full_name</code>, <code style={{ fontFamily: C.mono, color: C.cyan, fontSize: '0.82rem' }}>date_of_birth</code>, <code style={{ fontFamily: C.mono, color: C.cyan, fontSize: '0.82rem' }}>document_number</code>, <code style={{ fontFamily: C.mono, color: C.cyan, fontSize: '0.82rem' }}>nationality</code>, <code style={{ fontFamily: C.mono, color: C.cyan, fontSize: '0.82rem' }}>address</code>, and more, with confidence scores. Available as soon as the front document is processed, regardless of whether the user has uploaded the back document or completed liveness. Use it to cross-check against user-supplied form data (e.g. ensure entered name matches OCR).
+        </p>
+      </div>
+
+      <Pre label="Step 2 — Option 2: Iframe embed (HTML)" code={`<!-- Render verification_url from your backend into the iframe src.
+     The ?session= token in the URL scopes this verification — never put
+     your API key in an iframe src, it would be visible in DevTools. -->
 <iframe
-  src="${siteUrl}/user-verification?api_key=ik_your_api_key&user_id=user-123&theme=dark"
+  src="<%= verification_url %>&theme=dark"
   width="100%" height="700" frameborder="0"
   allow="camera; microphone"
   style="border: none; border-radius: 8px;"
 ></iframe>`} />
-      <Pre label="Option 3: SDK embed (see SDK & Embed docs)" code={`import { IdswyftEmbed } from '@idswyft/sdk';
+      <Pre label="Step 2 — Option 3: SDK embed (see SDK & Embed docs)" code={`import { IdswyftEmbed } from '@idswyft/sdk';
 
 const embed = new IdswyftEmbed({ mode: 'modal', theme: 'dark' });
 embed.open(sessionToken, {

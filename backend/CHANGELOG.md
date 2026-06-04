@@ -5,6 +5,77 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.10] - 2026-06-04
+
+Docs-only release. Closes four community-reported documentation gaps —
+no runtime behavior changes. Reporters
+[@miyachan](https://github.com/miyachan) on
+[`idswyft-community#40`](https://github.com/team-idswyft/idswyft-community/issues/40)
+and [@own3mall](https://github.com/own3mall) on
+[`idswyft-community#42`](https://github.com/team-idswyft/idswyft-community/issues/42),
+[`#43`](https://github.com/team-idswyft/idswyft-community/issues/43),
+[`#45`](https://github.com/team-idswyft/idswyft-community/issues/45).
+
+### Docs
+- **Hosted-page integration guide rewritten to use the secure
+  `verification_url` flow** (`frontend/src/pages/DocsGuides.tsx`).
+  Options 1 (Redirect) and 2 (Iframe) previously documented `api_key`
+  as a required URL parameter on the hosted verification page,
+  teaching integrators an insecure pattern that exposed `ik_*` keys
+  to browser history, referrer headers, server logs, and screenshots —
+  and let the user call the backend directly with the leaked key,
+  fully bypassing the verification flow. The backend has correctly
+  implemented the secure flow since at least v1.7: `POST
+  /api/v2/verify/initialize` returns a `verification_url` containing a
+  single-use `session` token scoped to that verification, valid for
+  one hour. Option 3 (SDK embed) was already using this pattern.
+  The guide now leads with an amber security warning, a server-side
+  Step 1 showing `POST /api/v2/verify/initialize` with `X-API-Key` in
+  the header, and Steps 2-Option-1/Option-2 using the backend-issued
+  `verification_url`. Reported by
+  [@miyachan](https://github.com/miyachan).
+
+- **`ocr_data` field discoverability**
+  (`frontend/src/pages/DocsGuides.tsx`). `ocr_data` has been returned
+  on the verification status response since v1.2, but the public guide
+  never surfaced this. Added a cyan callout block listing the fields
+  available in `ocr_data` (`full_name`, `date_of_birth`,
+  `document_number`, `nationality`, `address`, with confidence scores)
+  and the canonical use case ("cross-check against user-supplied form
+  data"). Sample code in the redirect-callback example now dereferences
+  `data.ocr_data.full_name` so the field name appears in copy-pastable
+  code. Reported by [@own3mall](https://github.com/own3mall).
+
+- **Self-host README — Custom Ports section** (`README.md`). The
+  `verification_url` is built from `FRONTEND_URL`; if the operator
+  picks a non-standard `IDSWYFT_PORT` in `.env` but doesn't update
+  `FRONTEND_URL` to match, generated outbound URLs miss the port. The
+  `install.sh` script does not auto-populate `FRONTEND_URL`. New
+  subsection under the HTTPS section documents the `.env` shape and
+  the `install.sh` gap. Reported by
+  [@own3mall](https://github.com/own3mall).
+
+- **Self-host README — Email (OTP login, credential delivery)
+  section** (`README.md`). Self-host email goes through Resend; there
+  is no SMTP path. The codebase reads only `RESEND_API_KEY`, but a
+  reporter (helped by an AI assistant) tried inventing `SMTP_*` env
+  vars that don't exist. New subsection spells out the Resend-only
+  path with a four-step setup walkthrough, the
+  `docker compose logs api | grep -i OTP` workaround for inspecting
+  codes while Resend isn't yet configured, and an explicit note that
+  the AI-hallucinated registration-allowlist env vars
+  (`ALLOWED_ADMIN_EMAILS`, `AUTH_WHITELIST_EMAILS`) don't exist, with
+  the reverse-proxy workaround and an invitation to file a feature
+  request if a built-in allowlist would help. Reported by
+  [@own3mall](https://github.com/own3mall).
+
+### Internal
+- **`CLAUDE.md` Git Workflow section** updated with a brief note
+  explaining the expected `dev` vs `main` commit-graph divergence on
+  the community mirror (synthetic sync commits + one-way deploy
+  merges) so future investigations of "why is dev N commits behind?"
+  land on the documented answer rather than re-investigating.
+
 ## [1.12.9] - 2026-06-04
 
 Security + self-host release. Three internal SSRF findings closed

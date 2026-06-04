@@ -118,6 +118,15 @@ postgres:16-alpine → engine (ML, port 3002) → api (port 3001) → frontend (
 - Docker images are built on `v*` tag push (not on merge to main)
 - CODEOWNERS requires `@doobee46` approval on all changes
 
+### `dev` vs `main` divergence on the community mirror is expected
+
+GitHub will report community `dev` as "N ahead, M behind" community `main` even right after a successful deploy. **This is commit-graph noise, not a content divergence** — both branches' tree SHAs are identical at the same release point. Two things compound to produce the structural drift:
+
+1. The `sync-community.yml` workflow appends a synthetic `sync: mirror from idswyft @ <sha>` commit on each push, then **force-pushes** that branch to the community mirror. The synthetic commit only lives on whichever branch was just pushed.
+2. The deploy sequence merges `dev → main` (step 6 below) but never back-merges `main → dev` (step 9 puts us back on `dev` without merging). Each release adds a `Merge dev into main: vX.Y.Z` commit on `main` that `dev` never sees.
+
+To verify content parity when the count drifts, compare tree SHAs via `gh api repos/team-idswyft/idswyft-community/commits/{main,dev} --jq '.commit.tree.sha'` — equal SHAs mean identical files regardless of how many commits the GitHub UI counts. Don't fix the count; the trunk-based pattern is intentional.
+
 ## Deployment
 
 When the user says "deploy", follow this sequence:
