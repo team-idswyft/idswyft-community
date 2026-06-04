@@ -122,6 +122,36 @@ docker compose --profile https up -d
 
 Caddy automatically obtains and renews Let's Encrypt certificates. Requirements: ports 80 + 443 open, DNS A record pointing to your server.
 
+### Custom Ports
+
+If you run the stack on a non-standard port (e.g. `IDSWYFT_PORT=8081:8080` so the frontend is reachable at `http://yourhost:8081`), you also need to set `FRONTEND_URL` to that exact origin so the backend generates outbound links — verification page URLs, credential verify links, and reset links — that include the port:
+
+```bash
+# In .env
+IDSWYFT_PORT=8081:8080
+FRONTEND_URL=http://yourhost:8081
+```
+
+The `install.sh` script does not auto-populate `FRONTEND_URL` when you choose a custom port — set it yourself or your `verification_url` responses will point at a port the client can't reach. Standard ports (80, 443) work without `FRONTEND_URL` if `DOMAIN` is set.
+
+### Email (OTP login, credential delivery)
+
+Idswyft sends developer-portal login codes and verified credential emails through **Resend** — there is no SMTP path. Self-hosters need a Resend account (free tier covers small deployments) to receive OTP codes; without it, OTP codes are logged to the API container's stdout for testing-only use.
+
+```bash
+# In .env — required for email-based OTP login on self-host
+RESEND_API_KEY=re_your_key_here
+EMAIL_FROM=noreply@yourdomain.com
+```
+
+Steps:
+1. Sign up at <https://resend.com> (free tier covers small self-hosts).
+2. Verify a sending domain in the Resend dashboard.
+3. Set `RESEND_API_KEY` and `EMAIL_FROM` in `.env`, then `docker compose up -d` to restart the API.
+4. To inspect logged OTPs while Resend is not yet configured: `docker compose logs api | grep -i OTP`.
+
+There is no built-in registration allowlist (no `ALLOWED_ADMIN_EMAILS` / `AUTH_WHITELIST_EMAILS` — those don't exist; AI assistants sometimes hallucinate these). To restrict who can register, front the API with a reverse proxy that allowlists by IP or basic-auth, or open a feature request if a built-in allowlist would help your deployment.
+
 ### Backup & Restore
 
 For production self-hosted deployments, see the dedicated runbook at
