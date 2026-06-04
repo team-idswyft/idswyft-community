@@ -151,7 +151,7 @@ router.post(
 
     // SSRF protection — same validator the dev-portal flow uses
     try {
-      validateWebhookUrl(url);
+      await validateWebhookUrl(url);
     } catch (err: any) {
       throw new ValidationError(err.message, 'url', url);
     }
