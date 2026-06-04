@@ -5,6 +5,7 @@ import config from '@/config/index.js';
 import { logger, logWebhookDelivery } from '@/utils/logger.js';
 import { Webhook, WebhookDelivery, WebhookPayload } from '@/types/index.js';
 import { encryptSecret, decryptSecret } from '@idswyft/shared';
+import { validateWebhookUrl, getSafeHttpAgent, getSafeHttpsAgent, SsrfError } from '@/utils/validateUrl.js';
 
 /**
  * Build the headers attached to every webhook delivery. Pure function —
@@ -248,10 +249,29 @@ export class WebhookService {
           }
         }
         
+        // Re-validate at delivery time (closes the DNS-rebinding window
+        // between webhook creation and now). Safe Agents pin the lookup at
+        // connect time as a second layer in case the resolved IP flips
+        // between this check and the socket open. maxRedirects: 0 because
+        // webhooks should target a fixed endpoint — a 3xx response means
+        // the operator's webhook config is broken, not that we should
+        // chase the redirect.
+        try {
+          await validateWebhookUrl(webhook.url);
+        } catch (validateErr) {
+          if (validateErr instanceof SsrfError) {
+            throw new Error(`Webhook URL rejected by SSRF guard: ${validateErr.message}`);
+          }
+          throw validateErr;
+        }
+
         // Send webhook
         const response = await axios.post(webhook.url, delivery.payload, {
           headers,
           timeout: config.webhooks.timeoutMs,
+          maxRedirects: 0,
+          httpAgent: getSafeHttpAgent(),
+          httpsAgent: getSafeHttpsAgent(),
           validateStatus: (status) => status < 500 // Only retry on 5xx errors
         });
         

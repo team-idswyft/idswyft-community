@@ -10,7 +10,7 @@ import crypto from 'crypto';
 import { WEBHOOK_EVENT_NAMES } from '@/constants/webhookEvents.js';
 import { WebhookService, createWebhookSignature } from '@/services/webhook.js';
 import axios from 'axios';
-import { validateWebhookUrl } from '@/utils/validateUrl.js';
+import { validateWebhookUrl, getSafeHttpAgent, getSafeHttpsAgent, SsrfError } from '@/utils/validateUrl.js';
 
 const webhookService = new WebhookService();
 
@@ -97,9 +97,11 @@ router.post('/webhooks',
 
     const { url, is_sandbox = false, events, secret, api_key_id } = req.body;
 
-    // SSRF protection: block private/reserved network URLs
+    // SSRF protection: block private/reserved network URLs. Awaits DNS
+    // resolution so DNS-pinning bypasses (`evil.example A 127.0.0.1`) are
+    // caught here, not just at delivery time.
     try {
-      validateWebhookUrl(url);
+      await validateWebhookUrl(url);
     } catch (err: any) {
       throw new ValidationError(err.message, 'url', url);
     }
@@ -321,6 +323,24 @@ router.post('/webhooks/:webhookId/test',
         headers['X-Idswyft-Signature'] = createWebhookSignature(body, signingSecret);
       }
 
+      // Re-validate at test time (closes the DNS-rebinding window since the
+      // webhook was registered). SsrfError is a developer-visible reason;
+      // anything else gets a generic message so internal IPs/ports
+      // surfaced by `err.message` don't become a port-scan oracle.
+      // Done BEFORE the abort timer is set up — no timer to clear if this
+      // short-circuits.
+      try {
+        await validateWebhookUrl(webhook.url);
+      } catch (validateErr: any) {
+        return res.json({
+          success: false,
+          status_code: null,
+          error: validateErr instanceof SsrfError
+            ? `Refused to send: ${validateErr.message}`
+            : 'Webhook URL validation failed',
+        });
+      }
+
       const controller = new AbortController();
       const abortTimer = setTimeout(() => controller.abort(), 8000);
 
@@ -328,6 +348,9 @@ router.post('/webhooks/:webhookId/test',
         headers,
         timeout: 10000,
         signal: controller.signal,
+        maxRedirects: 0,
+        httpAgent: getSafeHttpAgent(),
+        httpsAgent: getSafeHttpsAgent(),
         validateStatus: () => true,
       });
 
@@ -340,13 +363,16 @@ router.post('/webhooks/:webhookId/test',
     } catch (err: any) {
       const isTimeout = err.code === 'ECONNABORTED' || err.code === 'ERR_CANCELED'
         || err.message?.includes('timeout') || err.message?.includes('aborted');
-      logger.error('Webhook test failed:', { url: webhook.url, code: err.code, message: err.message });
+      // Log url+code internally but DON'T echo err.message — it contains
+      // ECONNREFUSED <internal-ip>:<port> on failures, which turns this
+      // endpoint into a developer-accessible internal port scanner.
+      logger.error('Webhook test failed:', { url: webhook.url, code: err.code });
       res.json({
         success: false,
         status_code: null,
         error: isTimeout
           ? 'Connection timed out — verify the webhook URL is reachable'
-          : (err.message || 'Test delivery failed'),
+          : 'Delivery failed — verify the webhook URL is reachable',
       });
     }
   })

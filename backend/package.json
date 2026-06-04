@@ -1,6 +1,6 @@
 {
   "name": "idswyft-backend",
-  "version": "1.12.8",
+  "version": "1.12.9",
   "description": "Backend API for Idswyft identity verification platform",
   "type": "module",
   "main": "dist/server.js",
@@ -42,6 +42,7 @@
     "geoip-lite": "^2.0.1",
     "helmet": "^7.1.0",
     "image-size": "^1.0.2",
+    "ipaddr.js": "^1.9.1",
     "jsonwebtoken": "^9.0.2",
     "morgan": "^1.10.0",
     "mrz": "^5.0.2",

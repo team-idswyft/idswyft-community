@@ -5,6 +5,107 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.9] - 2026-06-04
+
+Security + self-host release. Three internal SSRF findings closed
+(`deepsec #125/#126/#127`), the API-key rotation endpoint brought to
+parity with the create endpoint's security stack (`deepsec #129`), and a
+self-host opt-in flag added for sandbox keys
+([`idswyft-community#44`](https://github.com/team-idswyft/idswyft-community/issues/44)
+reported by [@own3mall](https://github.com/own3mall)).
+
+### Security
+- **SSRF triple — three layers of defense against private-network
+  egress** (`backend/src/utils/validateUrl.ts` rewrite +
+  `backend/src/routes/batch.ts` + `backend/src/services/webhook.ts` +
+  `backend/src/routes/{developer,platform,webhooks.ts}`). The original
+  `validateWebhookUrl` / `validateDownloadUrl` inspected `URL.hostname`
+  only as a string, so DNS pinning (`evil.example A 169.254.169.254`),
+  redirect chasing (`https://attacker.com/r → 302 → 10.x.x.x`), DNS
+  rebinding, decimal-encoded IPv4 (`http://2130706433/` = 127.0.0.1),
+  and IPv4-mapped IPv6 (`[::ffff:127.0.0.1]`) all bypassed it. The
+  webhook test handler additionally leaked `err.message` (containing
+  `ECONNREFUSED <internal-ip>:<port>`) to the caller, turning it into a
+  developer-accessible internal port scanner.
+
+  Three layers replace the single broken layer:
+  1. **Write-time validation** — validators are now async and call
+     `dns.lookup({ all: true })`, rejecting if ANY resolved address is
+     in a private/reserved range. CIDR-aware private-IP detection
+     delegates to `ipaddr.js` (added as explicit dep — was already in
+     `node_modules` transitively via Express). Decimal-IPv4 decoder
+     handles the `URL.hostname` parser gap.
+  2. **Use-time re-validation** — webhook delivery and webhook test
+     re-run `validateWebhookUrl` immediately before sending, closing the
+     window between registration and send where DNS could flip.
+  3. **Connect-time gating** — `getSafeHttpAgent` / `getSafeHttpsAgent`
+     return `http`/`https` Agents with a custom `lookup` callback that
+     gates the kernel DNS result against `isPrivateIp` per socket. axios
+     uses them via `httpAgent` / `httpsAgent`. This is the layer that
+     defeats DNS rebinding — the IP is checked at connect time, not
+     parse time.
+
+  Plus `maxRedirects: 0` on every axios call and `redirect: 'manual'`
+  on `fetch()` (via the new `safeFetch` wrapper) so application code
+  never silently chases a 302 to an internal target. The webhook test
+  handler no longer echoes `err.message` to the response — clients get a
+  generic `"Delivery failed — verify the webhook URL is reachable"` and
+  the structured `err.code` is logged internally only.
+
+  46 new tests in `backend/src/utils/__tests__/validateUrl.test.ts`
+  cover the private-IP detector across the standard IPv4/IPv6 ranges,
+  every documented bypass vector, and `safeFetch`'s redirect refusal.
+
+- **`/api-key/:id/rotate` brought to parity with the create endpoint's
+  security stack** (`backend/src/routes/developer/apiKeys.ts`). The
+  rotate endpoint was missing every guard the sibling create endpoint
+  enforces: no `apiKeyRateLimit`, no `param('id').isUUID()` validation,
+  no `validate` middleware, no `maxKeys` cap, no `NODE_ENV` / `is_sandbox`
+  gate, and crucially no chained-rotation block — calling rotate
+  repeatedly on the same key id minted unbounded active keys around one
+  logical slot, each with a future-`expires_at`, all authenticating in
+  parallel until staggered expirations fired. `gracePeriodHours` also
+  silently coerced non-numeric input (e.g. `"abc"`) to the 168-hour cap
+  via `Number(...) || 168` instead of rejecting it.
+
+  Fixes: full middleware stack added (`apiKeyRateLimit` + `param`/`body`
+  validators + `validate`); chained rotation refused if old key's
+  `expires_at` is already in the future; `maxKeys` check counts active
+  non-rotating keys of the same `is_sandbox` type, rejecting if the
+  developer would exceed the 3-prod / 10-sandbox cap even ignoring the
+  temporary grace-period overlap.
+
+### Added
+- **`IDSWYFT_ALLOW_SANDBOX` env var for self-host operators**
+  (`backend/src/routes/developer/apiKeys.ts`, `.env.example`).
+  Cloud edition enforces strict separation —
+  `NODE_ENV=production` stacks mint only production keys,
+  `NODE_ENV=development` stacks mint only sandbox keys. Self-host
+  operators also run `NODE_ENV=production` but legitimately want sandbox
+  keys for testing without polluting their real verification metrics.
+  Setting `IDSWYFT_ALLOW_SANDBOX=true` in `.env` bypasses both directions
+  of the gate (in both `POST /api-key` and `POST /api-key/:id/rotate`).
+  Default unset preserves cloud-edition behavior unchanged. Documented in
+  `.env.example` as a commented self-host option. Reported by
+  [@own3mall](https://github.com/own3mall) on
+  [`idswyft-community#44`](https://github.com/team-idswyft/idswyft-community/issues/44).
+
+### Fixed
+- **`webhook_deliveries.id` column default backfilled to `gen_random_uuid()`
+  on existing installations**
+  (`supabase/migrations/20260604_fix_webhook_deliveries_id_default.sql`).
+  v1.12.8 changed the historical `20260319_add_webhook_deliveries.sql` to
+  use `gen_random_uuid()` instead of `uuid_generate_v4()` so new
+  installations work on stock Postgres without the `uuid-ossp` extension,
+  but installations where 20260319 was already applied (cloud production
+  on Supabase; self-hosters who installed `uuid-ossp` manually) still had
+  the old DEFAULT recorded on the column — the migration runner skips
+  already-applied entries by filename. This follow-up migration brings
+  every existing installation to parity via `ALTER COLUMN ... SET DEFAULT
+  gen_random_uuid()`, which is metadata-only (no table rewrite, no row
+  scan). Cloud production was applied manually on 2026-06-04; self-hosters
+  and dev environments pick it up on the next `npm run migrate`.
+
 ## [1.12.8] - 2026-06-04
 
 Self-host bug-fix release. Unblocks community deployments outside the
