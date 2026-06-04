@@ -48,23 +48,35 @@ router.post('/api-key',
       throw new AuthenticationError('Developer authentication required');
     }
 
-    // Environment-based API key restrictions
+    // Environment-based API key restrictions.
+    //
+    // Cloud edition runs NODE_ENV=production and enforces a strict separation:
+    // prod env mints only production keys, dev env mints only sandbox keys.
+    // Self-host operators also run NODE_ENV=production but legitimately want
+    // sandbox keys for testing without polluting their real verification
+    // metrics. Setting IDSWYFT_ALLOW_SANDBOX=true in .env bypasses both
+    // directions of the gate so self-hosters can choose either type per key.
+    // Reported by @own3mall in team-idswyft/idswyft-community#44.
     const isProductionEnv = process.env.NODE_ENV === 'production';
+    const allowMixed = process.env.IDSWYFT_ALLOW_SANDBOX === 'true';
 
-    if (isProductionEnv && is_sandbox) {
-      throw new ValidationError(
-        'Sandbox API keys cannot be created in production environment. Use production keys only.',
-        'is_sandbox',
-        'Production environment requires production keys only'
-      );
-    }
+    if (!allowMixed) {
+      if (isProductionEnv && is_sandbox) {
+        throw new ValidationError(
+          'Sandbox API keys cannot be created in production environment. ' +
+            'Self-hosters can set IDSWYFT_ALLOW_SANDBOX=true in .env to enable both key types.',
+          'is_sandbox',
+          'Production environment requires production keys only'
+        );
+      }
 
-    if (!isProductionEnv && !is_sandbox) {
-      throw new ValidationError(
-        'Production API keys cannot be created in development/local environment. Use sandbox keys only.',
-        'is_sandbox',
-        'Development environment requires sandbox keys only'
-      );
+      if (!isProductionEnv && !is_sandbox) {
+        throw new ValidationError(
+          'Production API keys cannot be created in development/local environment. Use sandbox keys only.',
+          'is_sandbox',
+          'Development environment requires sandbox keys only'
+        );
+      }
     }
 
     // Check if developer has reached API key limit
@@ -281,31 +293,124 @@ router.delete('/api-key/:keyId',
 
 // POST /api/developer/api-key/:id/rotate
 // Creates a new key with the same settings and gives the old key a grace period
-// (default 7 days) before it expires, so integrations have time to update.
+// (default 7 days, capped at 168 hours) before it expires, so integrations have
+// time to update.
+//
+// Mirrors the create endpoint's security stack — apiKeyRateLimit, body/param
+// validators, maxKeys check, NODE_ENV/is_sandbox gate — so that rotation can't
+// be used to bypass any of the create-side guardrails. Chained rotation is
+// blocked by refusing to rotate a key that is already in its grace period.
 router.post('/api-key/:id/rotate',
+  apiKeyRateLimit,
+  [
+    param('id')
+      .isUUID()
+      .withMessage('Invalid API key ID format'),
+    body('gracePeriodHours')
+      .optional()
+      .isInt({ min: 1, max: 168 })
+      .withMessage('gracePeriodHours must be an integer between 1 and 168'),
+  ],
   authenticateDeveloperJWT,
+  validate,
   catchAsync(async (req: Request, res: Response) => {
     const { id } = req.params;
-    const hours = Math.max(1, Math.min(168, Number(req.body.gracePeriodHours) || 168));
+    const hours: number = req.body.gracePeriodHours ?? 168;
+    const developer = req.developer;
+    if (!developer) {
+      throw new AuthenticationError('Developer authentication required');
+    }
 
     // Verify the key belongs to this developer and is currently active
     const { data: oldKey, error } = await supabase
       .from('api_keys')
       .select('*')
       .eq('id', id)
-      .eq('developer_id', (req as any).developer!.id)
+      .eq('developer_id', developer.id)
       .eq('is_active', true)
       .single();
 
-    if (error || !oldKey) throw new NotFoundError('API key not found');
+    if (error || !oldKey) throw new NotFoundError('API key');
+
+    // Block chained rotation. If the old key already has a future expires_at,
+    // it has been rotated before and is sitting in its grace period — rotating
+    // again would mint a fresh key against the same logical slot, defeating
+    // the maxKeys cap. Force the developer to use the existing new key or
+    // revoke this one explicitly.
+    if (oldKey.expires_at && new Date(oldKey.expires_at) > new Date()) {
+      throw new ValidationError(
+        'This key has already been rotated and is in its grace period. ' +
+          'Use the new key instead, or revoke this one and create a fresh key.',
+        'already_rotated',
+        { expires_at: oldKey.expires_at },
+      );
+    }
+
+    // Environment gate — same logic as create. Self-hosters opt in via
+    // IDSWYFT_ALLOW_SANDBOX=true (see community#44).
+    const isProductionEnv = process.env.NODE_ENV === 'production';
+    const allowMixed = process.env.IDSWYFT_ALLOW_SANDBOX === 'true';
+    if (!allowMixed) {
+      if (isProductionEnv && oldKey.is_sandbox) {
+        throw new ValidationError(
+          'Sandbox API keys cannot be rotated in production environment. ' +
+            'Revoke this key and create a production key instead, or set ' +
+            'IDSWYFT_ALLOW_SANDBOX=true in .env for self-host stacks.',
+          'is_sandbox',
+          'Production environment requires production keys only',
+        );
+      }
+      if (!isProductionEnv && !oldKey.is_sandbox) {
+        throw new ValidationError(
+          'Production API keys cannot be rotated in development/local environment. ' +
+            'Revoke this key and create a sandbox key instead.',
+          'is_sandbox',
+          'Development environment requires sandbox keys only',
+        );
+      }
+    }
+
+    // maxKeys check, excluding the key being rotated. After rotation, the
+    // developer ends up with the same logical number of slots (old → grace
+    // period, new → active replacement), but we don't want rotation to be a
+    // way to grow the active set permanently — if the count of OTHER active
+    // keys of the same type is already at the cap, refuse.
+    const { count: nonRotatingCount, error: countError } = await supabase
+      .from('api_keys')
+      .select('*', { count: 'exact', head: true })
+      .eq('developer_id', developer.id)
+      .eq('is_active', true)
+      .eq('is_sandbox', oldKey.is_sandbox)
+      .neq('id', id);
+
+    if (countError) {
+      logger.error('Failed to count API keys:', countError);
+      throw new Error('Failed to check API key limits');
+    }
+
+    const maxKeys = oldKey.is_sandbox ? 10 : 3;
+    if ((nonRotatingCount ?? 0) >= maxKeys) {
+      throw new ValidationError(
+        `Cannot rotate: you already have ${nonRotatingCount} active ` +
+          `${oldKey.is_sandbox ? 'sandbox' : 'production'} ` +
+          `key${nonRotatingCount === 1 ? '' : 's'} besides this one, at the ` +
+          `${maxKeys}-key limit. Revoke unused keys before rotating.`,
+        'api_key_limit_exceeded',
+        {
+          current_non_rotating_count: nonRotatingCount,
+          max_allowed: maxKeys,
+          key_type: oldKey.is_sandbox ? 'sandbox' : 'production',
+        },
+      );
+    }
 
     // Generate a fresh key
     const { key, hash, prefix } = generateAPIKey();
 
-    const { data: newKey } = await supabase
+    const { data: newKey, error: insertError } = await supabase
       .from('api_keys')
       .insert({
-        developer_id: (req as any).developer!.id,
+        developer_id: developer.id,
         key_hash: hash,
         key_prefix: prefix,
         name: `${oldKey.name} (rotated)`,
@@ -315,23 +420,39 @@ router.post('/api-key/:id/rotate',
       .select()
       .single();
 
+    if (insertError || !newKey) {
+      logger.error('Failed to insert rotated API key:', insertError);
+      throw new Error(
+        `Failed to insert rotated API key: ${insertError?.message ?? 'Unknown error'}`,
+      );
+    }
+
     // Mark the old key to expire after the grace period (still usable until then)
     const expiresAt = new Date(Date.now() + hours * 60 * 60 * 1000);
-    await supabase
+    const { error: updateError } = await supabase
       .from('api_keys')
       .update({ expires_at: expiresAt.toISOString() })
       .eq('id', id);
 
+    if (updateError) {
+      // The new key is already created and active. Log the update failure but
+      // don't fail the request — the developer would otherwise hold a new key
+      // they think failed to mint. Worst case the old key remains usable until
+      // manually revoked.
+      logger.error('Failed to set expires_at on rotated key:', updateError);
+    }
+
     logger.info('API key rotated', {
-      developerId: (req as any).developer!.id,
+      developerId: developer.id,
       oldKeyId: id,
-      newKeyId: newKey?.id,
+      newKeyId: newKey.id,
       gracePeriodHours: hours,
+      isSandbox: oldKey.is_sandbox,
     });
 
     res.status(201).json({
       new_key: key,                              // shown once — store securely
-      new_key_id: newKey?.id,
+      new_key_id: newKey.id,
       old_key_expires_at: expiresAt.toISOString(),
       grace_period_hours: hours,
       message: `Old key will remain active until ${expiresAt.toISOString()}. Update your integration before then.`,
