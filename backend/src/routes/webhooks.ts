@@ -35,7 +35,7 @@ router.post('/register',
 
     // SSRF protection: block private/reserved network URLs
     try {
-      validateWebhookUrl(url);
+      await validateWebhookUrl(url);
     } catch (err: any) {
       throw new ValidationError(err.message, 'url', url);
     }
@@ -131,7 +131,7 @@ router.put('/:webhookId',
 
     // SSRF validation on URL updates
     if (updates.url) {
-      validateWebhookUrl(updates.url as string);
+      await validateWebhookUrl(updates.url as string);
     }
 
     // Update webhook

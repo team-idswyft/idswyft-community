@@ -33,7 +33,7 @@ import { VerificationStatus } from '@idswyft/shared';
 import type { FrontExtractionResult, BackExtractionResult, SessionState } from '@idswyft/shared';
 import { computeFaceMatch } from '@/verification/face/faceMatchService.js';
 import { getFaceMatchingThresholdSync } from '@/config/verificationThresholds.js';
-import { validateDownloadUrl } from '@/utils/validateUrl.js';
+import { safeFetch } from '@/utils/validateUrl.js';
 
 const router = express.Router();
 const storageService = new StorageService();
@@ -44,13 +44,18 @@ const verificationService = new VerificationService();
 const DOWNLOAD_TIMEOUT = 30_000; // 30 seconds
 const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
 
-/** Download a file from a URL and return its buffer. */
+/** Download a file from a URL and return its buffer. Uses safeFetch so:
+ *   - the URL is pre-validated (DNS resolved, private IPs rejected),
+ *   - redirects are refused at the transport layer (no 302 → internal target),
+ *   - if the resolved hostname later flips to a private IP via DNS rebinding,
+ *     the resolved-IP check inside validateDownloadUrl catches it before
+ *     fetch() ever opens a socket.
+ */
 async function downloadFile(url: string): Promise<Buffer> {
-  validateDownloadUrl(url);
   const controller = new AbortController();
   const timeout = setTimeout(() => controller.abort(), DOWNLOAD_TIMEOUT);
   try {
-    const response = await fetch(url, { signal: controller.signal });
+    const response = await safeFetch(url, { signal: controller.signal });
     if (!response.ok) throw new Error(`Download failed: HTTP ${response.status}`);
     const contentLength = parseInt(response.headers.get('content-length') || '0', 10);
     if (contentLength > MAX_FILE_SIZE) throw new Error('File exceeds 10MB limit');
