@@ -5,6 +5,42 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.14] - 2026-06-05
+
+Closes Sentry issue
+[NODE-EXPRESS-7](https://idswyft.sentry.io/issues/NODE-EXPRESS-7) — 14
+events across 3 verification IDs and 2 client classes (Android `okhttp`
++ iOS Safari) all the same race: client POSTs `/front-document`, server
+starts ~15-30s OCR pipeline, client read-timeout fires before response,
+client retries. Server processes the retry, but state has already
+transitioned past `AWAITING_FRONT`, so `session.submitFront()`'s
+`assertStep` throws `SessionFlowError` → 409 + Sentry alert + duplicate
+storage upload + duplicate engine OCR call.
+
+### Fixed
+- **`POST /api/v2/verify/:id/front-document` is now idempotent on
+  retry** (`backend/src/routes/newVerification.ts`). The handler now
+  hydrates session state BEFORE the storage upload and engine OCR call.
+  If state is past `AWAITING_FRONT` (and not `FRONT_PROCESSING` or
+  `HARD_REJECTED`), the handler returns the cached state with
+  `idempotent_retry: true` and HTTP 200 instead of re-running OCR and
+  throwing `SessionFlowError`. The retry-after-timeout pattern that
+  previously produced duplicate work + a 409 now produces zero wasted
+  work and lets the client recover its UI. Real out-of-order flow
+  violations (calling front-document while the session is at a later
+  step in a fresh session — currently impossible but theoretical) still
+  surface as 409. The `HARD_REJECTED` 409 handler is unchanged.
+
+- **`VE_FLOW` / `SessionFlowError` events no longer captured in Sentry**
+  (`backend/src/instrument.ts`). The `beforeSend` hook now returns
+  `null` for any `SessionFlowError`. With the idempotency fix in place,
+  the remaining 409s would be real client bugs — the 409 response is
+  the correct user-facing signal, not a Sentry alert to us.
+
+### Added test
+- New regression test in `routes.integration` covering the idempotent
+  retry path (15/15 in suite, was 14/14).
+
 ## [1.12.13] - 2026-06-05
 
 Maintenance release. Absorbs the Dependabot non-major dep-update bundle

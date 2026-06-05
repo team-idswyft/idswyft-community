@@ -1118,6 +1118,53 @@ router.post('/:verification_id/front-document',
     const isSandbox = (verification as any).is_sandbox || false;
     const source: VerificationSource = (verification as any).source || 'api';
 
+    // Idempotent guard: if a previous POST already accepted the front document
+    // and advanced the session beyond AWAITING_FRONT, return the cached result
+    // instead of re-processing. Without this, a client retry triggered by a
+    // read timeout shorter than our OCR latency (Android okhttp's ~10s default
+    // vs typical 15-30s extraction) would re-run the full storage upload +
+    // engine OCR pipeline, then throw SessionFlowError → 409 because state has
+    // already transitioned. The cached return costs nothing extra, lets the
+    // client recover its UI, and stops the retry storm from filling Sentry
+    // with VE_FLOW captures (see NODE-EXPRESS-7).
+    //
+    // Excluded states:
+    //   - AWAITING_FRONT (the normal case — proceed with processing)
+    //   - FRONT_PROCESSING (an in-flight first request is mid-OCR; the second
+    //     request still needs to wait/retry rather than return stale data)
+    //   - HARD_REJECTED (handled below — produces a structured 409 explaining
+    //     why the session is dead, which is more useful than a cached state)
+    const earlyState = await loadSessionState(verification_id);
+    if (earlyState &&
+        earlyState.current_step !== VerificationStatus.AWAITING_FRONT &&
+        earlyState.current_step !== VerificationStatus.FRONT_PROCESSING &&
+        earlyState.current_step !== VerificationStatus.HARD_REJECTED) {
+      const { data: vrEarly } = await supabase
+        .from('verification_requests')
+        .select('verification_mode, addons')
+        .eq('id', verification_id)
+        .single();
+      const earlyMode = (vrEarly?.verification_mode as VerificationMode) || 'full';
+      const earlyFlow = FLOW_PRESETS[earlyMode] ?? INLINE_FLOW_FALLBACKS[earlyMode] ?? FLOW_PRESETS.full;
+      const cached = buildVerificationResponse({
+        verificationId: verification_id,
+        state: earlyState,
+        verification: {
+          status: (verification as any).status,
+          verification_mode: earlyMode,
+          is_sandbox: isSandbox,
+          addons: vrEarly?.addons,
+        },
+        riskScore: null,
+        flow: earlyFlow,
+      });
+      logger.info('Front document idempotent retry — returning cached result', {
+        verification_id,
+        current_step: earlyState.current_step,
+      });
+      return res.status(200).json({ ...cached, idempotent_retry: true });
+    }
+
     // Store document in the source-appropriate bucket
     const documentPath = await storageService.storeDocument(
       req.file.buffer,

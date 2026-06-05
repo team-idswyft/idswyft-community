@@ -316,6 +316,28 @@ describe('V2 Verification Routes — Integration', () => {
       expect(state.front_extraction).toBeDefined();
       expect(state.front_extraction.ocr.full_name).toBe('JOHN DOE');
     });
+
+    it('idempotent retry: returns cached 200 instead of running OCR again (NODE-EXPRESS-7)', async () => {
+      // First POST advances state to AWAITING_BACK
+      const first = await request(app)
+        .post('/api/v2/verify/a0a0a0a0-b1b1-c2c2-d3d3-e4e4e4e4e4e4/front-document')
+        .attach('document', fakeJpegBuffer(), 'front.jpg');
+      expect(first.status).toBe(200);
+      expect(first.body.idempotent_retry).toBeUndefined();
+
+      // Second POST (simulating client retry after read-timeout race) must not
+      // throw SessionFlowError → 409 and must not re-run extractFront. Returns
+      // cached state with idempotent_retry: true so the client can advance UI.
+      const second = await request(app)
+        .post('/api/v2/verify/a0a0a0a0-b1b1-c2c2-d3d3-e4e4e4e4e4e4/front-document')
+        .attach('document', fakeJpegBuffer(), 'front.jpg');
+      expect(second.status).toBe(200);
+      expect(second.body.idempotent_retry).toBe(true);
+      expect(second.body.current_step).toBe(2);
+      expect(second.body.front_document_uploaded).toBe(true);
+      // OCR result is preserved from the first call
+      expect(second.body.ocr_data?.full_name).toBe('JOHN DOE');
+    });
   });
 
   describe('POST /api/v2/verify/:id/back-document', () => {
