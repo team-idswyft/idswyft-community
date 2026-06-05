@@ -80,6 +80,7 @@
     "@types/supertest": "^7.2.0",
     "@types/uuid": "^9.0.7",
     "@types/validator": "^13.11.0",
+    "@types/ws": "^8.18.1",
     "supertest": "^7.2.2",
     "tsc-alias": "^1.8.16",
     "tsx": "^4.6.0",
