@@ -5,6 +5,26 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.12] - 2026-06-05
+
+Hotfix release. Restores `staging.api.idswyft.app` and `api.idswyft.app`
+after a Railway clean rebuild surfaced a latent TypeScript dependency
+gap.
+
+### Fixed
+- **`@types/ws` added as explicit `devDependency`**
+  (`backend/package.json`). `backend/src/config/database.ts:12` has
+  `import ws from 'ws'` (the @supabase/realtime-js Node 20 shim from
+  v1.12.4's `84373c1`). `@types/ws` was being resolved transitively in
+  local `node_modules` and in Railway's cached build layers — typecheck
+  passed everywhere and nobody noticed. After a Railway billing-resume
+  cache purge on 2026-06-05, a clean rebuild fell back to a transitive
+  resolution that no longer carries `@types/ws` and tsc failed at build
+  step 14 with `error TS7016: Could not find a declaration file for
+  module 'ws'`. Both production and staging main-api had been failing
+  to redeploy since. Making the dep explicit closes the gap against any
+  future cache purge or npm registry churn. No runtime change.
+
 ## [1.12.11] - 2026-06-04
 
 Self-host release. Closes the remaining Supabase-specific blockers in
