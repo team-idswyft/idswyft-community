@@ -1,7 +1,6 @@
 import { Routes, Route, Navigate } from 'react-router-dom'
 import { ErrorBoundary } from './components/ErrorBoundary'
 import { Layout } from './components/layout/Layout'
-import { HomePageV2 } from './pages/HomePageV2'
 import { DeveloperPage } from './pages/DeveloperPage'
 import { DemoPage } from './pages/DemoPage'
 import UserVerificationPage from './pages/UserVerificationPage'
@@ -20,34 +19,26 @@ import { ReviewDashboardDocs } from './pages/ReviewDashboardDocs'
 import { MarkdownDocsPage } from './pages/MarkdownDocsPage'
 import { NotFoundPage } from './pages/NotFoundPage'
 import { LegalPage } from './pages/LegalPage'
-import { PricingPage } from './pages/PricingPage'
-import { Status } from './pages/Status'
 import { SetupPage } from './pages/SetupPage'
-import { PatternShowcase } from './components/PatternShowcase'
 import { VerifyCredentialPage } from './pages/VerifyCredentialPage'
-import { isCommunity, isCloud } from './config/edition'
 
 function App() {
   return (
     <ErrorBoundary>
     <Layout>
       <Routes>
-        {/* Root route: community → Dev Portal, cloud → Glassmorphic homepage */}
-        <Route path="/" element={isCommunity ? <DeveloperPage /> : <HomePageV2 />} />
+        {/* Root route: Dev Portal */}
+        <Route path="/" element={<DeveloperPage />} />
 
-        {/* Dev Portal — always available */}
+        {/* Dev Portal */}
         <Route path="/developer" element={<DeveloperPage />} />
 
-        {/* Demo — available in both editions */}
+        {/* Demo */}
         <Route path="/demo" element={<DemoPage />} />
         <Route path="/verify" element={<Navigate to="/demo" replace />} />
         <Route path="/verify-credential" element={<VerifyCredentialPage />} />
 
-        {/* Cloud-only marketing routes — redirect to portal in community */}
-        <Route path="/pricing" element={isCloud ? <PricingPage /> : <Navigate to="/" replace />} />
-        <Route path="/patterns" element={isCloud ? <PatternShowcase /> : <Navigate to="/" replace />} />
-
-        {/* Shared routes — both editions */}
+        {/* Shared routes */}
         <Route path="/user-verification" element={<UserVerificationPage />} />
         <Route path="/v/:slug" element={<UserVerificationPage />} />
         <Route path="/developer/page-builder" element={<PageBuilderPage />} />
@@ -60,9 +51,7 @@ function App() {
         <Route path="/docs/features" element={<DocsFeatures />} />
         <Route path="/docs/reference" element={<DocsReference />} />
         <Route path="/docs" element={<DocsPage />} />
-        {/* Community-only setup wizard — redirect to portal in cloud */}
-        <Route path="/setup" element={isCommunity ? <SetupPage /> : <Navigate to="/" replace />} />
-        <Route path="/status" element={<Status />} />
+        <Route path="/setup" element={<SetupPage />} />
         <Route path="/legal" element={<LegalPage />} />
         <Route path="/admin/login" element={<AdminLogin />} />
         <Route path="/admin/verifications" element={<VerificationManagement />} />
