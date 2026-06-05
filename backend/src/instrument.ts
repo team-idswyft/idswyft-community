@@ -20,7 +20,19 @@ if (isProduction && sentryDsn) {
     profileSessionSampleRate: 1.0,
     profileLifecycle: 'trace',
     sendDefaultPii: false,
-    beforeSend(event) {
+    beforeSend(event, hint) {
+      // Drop VE_FLOW (SessionFlowError) captures — these fire when a client
+      // POSTs a step that's already been processed (typical cause: client read
+      // timeout shorter than OCR latency, retry races our state transition).
+      // The route already maps these to a useful 409 response, and the
+      // idempotency guard in /front-document returns 200 on the common retry
+      // path. The Sentry events were noise, not bugs. See NODE-EXPRESS-7.
+      const err = hint?.originalException;
+      if (err && typeof err === 'object' &&
+          (('code' in err && (err as { code?: string }).code === 'VE_FLOW') ||
+           ('name' in err && (err as { name?: string }).name === 'SessionFlowError'))) {
+        return null;
+      }
       return scrubSentryEvent(event);
     },
   });
