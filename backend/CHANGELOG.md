@@ -5,6 +5,43 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.13] - 2026-06-05
+
+Maintenance release. Absorbs the Dependabot non-major dep-update bundle
+that had accumulated during the Railway billing-suspended window. 41
+minor/patch bumps across backend, engine, frontend, and shared. No
+source code changes. `npm audit` cleared for the first time in months.
+
+### Updated (non-major)
+Backend — `@sentry/node`/`@sentry/profiling-node` 10.48 → 10.56,
+`@supabase/supabase-js` 2.55 → 2.107, `axios` 1.15 → 1.17,
+`@aws-sdk/client-s3`/`s3-request-presigner` 3.1000 → 3.1062, `pg` 8.20
+→ 8.21, `@types/pg` 8.18 → 8.20, `sharp` 0.33 → 0.34, `ws` 8.18.3 →
+8.21, `jsonwebtoken` 9.0.2 → 9.0.3, `validator` 13.15.26 → 13.15.35,
+`dotenv` 17.3.1 → 17.4.2, `morgan` 1.10.1 → 1.11.0, `cors` 2.8.5 →
+2.8.6, `express-validator` 7.3.1 → 7.3.2, `tsx` 4.21 → 4.22,
+`@noble/ed25519` 3.0.1 → 3.1.0, `@noble/hashes` 2.0.1 → 2.2.0,
+`tsc-alias` 1.8.16 → 1.8.17, `geoip-lite` 2.0.1 → 2.0.2.
+
+Frontend — `@tanstack/react-query` 5.85 → 5.101, `react-hook-form`
+7.62 → 7.77, `react-router-dom` 7.13 → 7.17, `react-qr-code` 2.0.18
+→ 2.0.21, `@remotion/*` 4.0.435 → 4.0.472, `logrocket` 12.1.0 →
+12.1.1, `autoprefixer` 10.4 → 10.5, `postcss` 8.5.12 → 8.5.15,
+`terser` 5.43 → 5.48, `@typescript-eslint/eslint-plugin` 8.58 →
+8.60, `eslint-plugin-react-refresh` 0.4.20 → 0.5.2.
+
+Engine — `@zxing/library` 0.21 → 0.23, `onnxruntime-node` 1.24 →
+1.26, `sherpa-onnx-node` 1.12 → 1.13, `canvas` 3.2.2 → 3.2.3.
+
+### Verified
+- ✅ `tsc --noEmit` clean against new lockfile (all 4 workspaces)
+- ✅ `vitest run` — 1213 / 1215 pass; 2 pre-existing parallel-CPU
+  timeout flakes (`brandingSettings`, `routes.integration`) confirmed
+  passing in isolation
+- ✅ `npm audit` clean
+- ✅ Vercel preview deploys succeed
+- No source code touched — only `package.json` × 4 + `package-lock.json`
+
 ## [1.12.12] - 2026-06-05
 
 Hotfix release. Restores `staging.api.idswyft.app` and `api.idswyft.app`
