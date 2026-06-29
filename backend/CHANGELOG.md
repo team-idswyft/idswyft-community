@@ -5,6 +5,34 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.15] - 2026-06-29
+
+### Added
+- **`GET /api/v2/verify/:id/selfie` — developer-scoped live-capture selfie URL**
+  (`backend/src/routes/newVerification.ts`). Returns a short-lived (300s) signed
+  URL for a verification's live-capture selfie so integrations can run a
+  downstream face match on their own side, without needing the
+  `authenticateAdminOrReviewer`-gated admin detail endpoint. Auth mirrors the
+  rest of `/api/v2/verify/*` (`authenticateAPIKeyOrHandoff`); the lookup is
+  scoped to the authenticated developer (`developer_id`) and resolves the URL
+  via the existing `storageService.getFileUrl(file_path, 300)`. Response shape:
+  `{ verification_id, selfie_url, expires_in: 300 }`. Returns only the selfie
+  URL — no OCR, PII, or other documents.
+
+### Security
+- The selfie endpoint returns **404 (never 403)** for unknown or non-owned
+  verification ids, so it cannot be used to enumerate other developers'
+  verification ids. It also replicates the handoff session-token binding guard
+  (`req.sessionVerificationId`) used by the sibling routes, so a handoff token
+  scoped to one verification cannot read a sibling verification's selfie even
+  when both belong to the same developer. An owned verification with no selfie
+  on file yet returns `404 { selfie_url: null }`.
+
+### Docs
+- Documented the new endpoint in the API reference
+  (`frontend/src/pages/DocsPage.tsx`), `frontend/public/llms.txt`, and
+  `frontend/public/llms-full.txt`.
+
 ## [1.12.14] - 2026-06-05
 
 Closes Sentry issue

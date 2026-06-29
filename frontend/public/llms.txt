@@ -35,6 +35,7 @@ POST /api/v2/verify/:id/live-capture    → Liveness + face match
 POST /api/v2/verify/:id/voice-challenge → Generate voice challenge digits (optional)
 POST /api/v2/verify/:id/voice-capture   → Speaker verification (optional)
 GET  /api/v2/verify/:id/status          → Poll for final result
+GET  /api/v2/verify/:id/selfie          → Live-capture selfie URL (300s signed, owner-scoped)
 ```
 
 All POST endpoints accept an `Idempotency-Key` header for safe retry on network failures. Same key replays the original response within 24 hours. See llms-full.txt § Idempotency.

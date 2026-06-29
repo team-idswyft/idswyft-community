@@ -319,6 +319,36 @@ Returns the full verification record: OCR data, cross-validation, liveness, face
 
 ---
 
+## Retrieve the Live-Capture Selfie
+
+Fetch a short-lived signed URL for a verification's live-capture selfie — useful when you want to run a downstream face match on your own side. Uses the same developer API key (`X-API-Key`) as the rest of `/api/v2/verify/*`, and is scoped to the authenticated key: the verification must belong to you.
+
+```
+GET /api/v2/verify/:id/selfie
+```
+
+**Response (200):**
+
+```json
+{
+  "verification_id": "550e8400-e29b-41d4-a716-446655440001",
+  "selfie_url": "https://storage.idswyft.app/selfies/…?token=…",
+  "expires_in": 300
+}
+```
+
+- `selfie_url` is a signed URL valid for **300 seconds** — long enough to fetch once, short enough to not be a durable link. Re-call the endpoint for a fresh URL.
+- Returns **only** the selfie URL — no OCR, PII, or other documents.
+
+**404 responses:**
+
+- `{ "selfie_url": null }` — the verification is yours but no live-capture selfie is on file yet (live capture not completed, or a mode without a live-capture step).
+- `{ "error": "Verification request not found" }` — unknown verification id, or one owned by a different developer. Non-owned ids return **404 (never 403)** so the endpoint can't be used to enumerate other developers' verification ids.
+
+> **Note:** The `identity` verification mode includes a live-capture step, so a selfie is always present once such a verification succeeds.
+
+---
+
 ## Optional: Phone OTP Verification
 
 Add SMS-based phone verification as an optional step during any verification session. Requires the developer to configure their own SMS provider (Twilio or Vonage) via the Developer Settings API.

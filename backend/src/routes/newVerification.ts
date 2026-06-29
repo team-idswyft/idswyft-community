@@ -2404,6 +2404,64 @@ router.get('/:verification_id/status',
   })
 );
 
+// ─── Live-capture selfie retrieval (developer-scoped) ───────────────────────
+/**
+ * Returns a short-lived signed URL for a verification's live-capture selfie so a
+ * developer can run a downstream face match on their own side. Ownership-scoped
+ * to the authenticated developer: unknown ids, ids owned by a different developer,
+ * and handoff tokens bound to a different verification all return 404 (never 403)
+ * to prevent enumeration of other developers' verification ids. Returns only the
+ * selfie URL — no OCR, PII, or other documents.
+ */
+router.get('/:verification_id/selfie',
+  authenticateAPIKeyOrHandoff,
+  [
+    param('verification_id').isUUID().withMessage('Invalid verification ID'),
+  ],
+  validate,
+  catchAsync(async (req: Request, res: Response) => {
+    const { verification_id } = req.params;
+
+    // Handoff session tokens are bound to a single verification — block cross-id reads.
+    if (req.sessionVerificationId && req.sessionVerificationId !== verification_id) {
+      return res.status(404).json({ error: 'Verification request not found' });
+    }
+
+    const developerId = (req as any).developer.id;
+
+    // Ownership-scoped lookup with the same selfie join the admin detail route uses.
+    const { data: verification, error } = await supabase
+      .from('verification_requests')
+      .select('id, selfie:selfies!verification_requests_selfie_id_fkey(file_path)')
+      .eq('id', verification_id)
+      .eq('developer_id', developerId)
+      .single();
+
+    if (error) {
+      // PGRST116 = no row: unknown id, or owned by a different developer → 404 (not 403).
+      if (error.code === 'PGRST116') {
+        return res.status(404).json({ error: 'Verification request not found' });
+      }
+      logger.error('Failed to look up verification for selfie retrieval', { verification_id, error: error.message });
+      throw new Error('Failed to retrieve selfie');
+    }
+
+    const filePath = (verification as any).selfie?.file_path;
+    if (!filePath) {
+      // Owned, but no live-capture selfie on file yet (or a mode without live capture).
+      return res.status(404).json({ selfie_url: null });
+    }
+
+    // Short-lived signed URL: long enough to fetch once, short enough to not be durable.
+    const selfieUrl = await storageService.getFileUrl(filePath, 300);
+    res.json({
+      verification_id,
+      selfie_url: selfieUrl,
+      expires_in: 300,
+    });
+  })
+);
+
 // ─── Phone OTP (optional verification step) ─────────────────────────────────
 
 /**
