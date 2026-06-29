@@ -619,6 +619,46 @@ export const authenticateDeveloperJWT = catchAsync(async (req: Request, res: Res
   }
 });
 
+// Flexible middleware for webhook self-management: accepts EITHER a developer
+// portal JWT (idswyft_token cookie / Bearer) OR a SERVICE API key (isk_*) via
+// the X-API-Key header.
+//
+// Why: a keyless server-to-server integration authenticates only with an isk_*
+// service key — it has no portal session — so it otherwise can't list, create,
+// or read the signing secret for its own webhook. This middleware opens that
+// door on the webhook-management routes without touching the JWT-portal flow.
+//
+// Scope rules enforced here:
+//   - X-API-Key present → must resolve to a SERVICE key (is_service === true).
+//     Regular ik_* developer keys are rejected: they already have portal access,
+//     and accepting them would let a leaked dev key read/set webhook signing
+//     secrets it otherwise cannot. Direct callers to the portal instead.
+//   - No X-API-Key → fall back to the developer JWT.
+//
+// Per-KEY isolation (api_key_id scoping) is enforced in the route handlers, not
+// here: many service keys share one shadow developer row, so developer_id alone
+// is not a tenant boundary between keys.
+export const authenticateDeveloperJWTOrServiceKey = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    if (req.headers['x-api-key']) {
+      // Delegate to the existing API-key auth, then gate on is_service.
+      return authenticateAPIKey(req, res, (err?: any) => {
+        if (err) return next(err);
+        if (!req.apiKey?.is_service) {
+          return next(
+            new AuthorizationError(
+              'This endpoint accepts the developer portal session or a service API key (isk_*). ' +
+                'Regular API keys must manage webhooks via the developer portal.',
+            ),
+          );
+        }
+        return next();
+      });
+    }
+    return authenticateDeveloperJWT(req, res, next);
+  },
+);
+
 // HMAC-SHA256 hash a handoff token — same secret as API keys.
 // Used by handoff routes (storage/lookup) and authenticateHandoffToken (auth).
 export const hashHandoffToken = (token: string): string => {
@@ -838,6 +878,7 @@ export default {
   authenticateAPIKeyOrHandoff,
   authenticateJWT,
   authenticateDeveloperJWT,
+  authenticateDeveloperJWTOrServiceKey,
   authenticateReviewerJWT,
   authenticateAdminOrReviewer,
   authenticateUser,

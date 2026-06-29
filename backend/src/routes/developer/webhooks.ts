@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { body, param } from 'express-validator';
 import { supabase } from '@/config/database.js';
-import { authenticateDeveloperJWT } from '@/middleware/auth.js';
+import { authenticateDeveloperJWT, authenticateDeveloperJWTOrServiceKey } from '@/middleware/auth.js';
 import { catchAsync, ValidationError, NotFoundError, AuthenticationError } from '@/middleware/errorHandler.js';
 import { validate } from '@/middleware/validate.js';
 import { logger } from '@/utils/logger.js';
@@ -27,20 +27,47 @@ const apiKeyRateLimit = rateLimit({
   legacyHeaders: false
 });
 
-// List webhooks for developer (JWT-authenticated developer portal)
+/**
+ * Resolve the ownership scope for a webhook-management request.
+ *
+ * The flexible auth (authenticateDeveloperJWTOrServiceKey) admits two principals:
+ *   - Developer portal JWT → scope by developer_id only (apiKeyId = null). This
+ *     preserves the original portal behaviour: a developer sees every webhook on
+ *     their account regardless of which key created it.
+ *   - Service API key (isk_*) → scope by developer_id AND api_key_id. Service
+ *     keys share one shadow developer row per product, so developer_id alone is
+ *     NOT a tenant boundary; api_key_id is the only thing isolating one key's
+ *     webhooks from another's. Every read/write below MUST apply this filter.
+ */
+function ownerScope(req: Request): { developerId: string; apiKeyId: string | null } {
+  const developer = req.developer;
+  if (!developer) {
+    throw new AuthenticationError('Developer authentication required');
+  }
+  if (req.apiKey?.is_service) {
+    return { developerId: developer.id, apiKeyId: req.apiKey.id };
+  }
+  return { developerId: developer.id, apiKeyId: null };
+}
+
+// List webhooks for the calling principal (developer portal JWT or isk_* service key)
 router.get('/webhooks',
   apiKeyRateLimit,
-  authenticateDeveloperJWT,
+  authenticateDeveloperJWTOrServiceKey,
   catchAsync(async (req: Request, res: Response) => {
-    const developer = req.developer;
-    if (!developer) {
-      throw new AuthenticationError('Developer authentication required');
-    }
+    const { developerId, apiKeyId } = ownerScope(req);
 
-    const { data: webhooks, error } = await supabase
+    let query = supabase
       .from('webhooks')
       .select('id, url, is_sandbox, is_active, created_at, events, secret_key, api_key_id, api_key:api_keys!api_key_id(key_prefix, name)')
-      .eq('developer_id', developer.id)
+      .eq('developer_id', developerId);
+
+    // Service keys only ever see their OWN webhooks (see ownerScope).
+    if (apiKeyId) {
+      query = query.eq('api_key_id', apiKeyId);
+    }
+
+    const { data: webhooks, error } = await query
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -63,10 +90,10 @@ router.get('/webhooks',
   })
 );
 
-// Create webhook for developer (JWT-authenticated developer portal)
+// Create webhook for the calling principal (developer portal JWT or isk_* service key)
 router.post('/webhooks',
   apiKeyRateLimit,
-  authenticateDeveloperJWT,
+  authenticateDeveloperJWTOrServiceKey,
   [
     body('url')
       .isURL({ protocols: ['https'] })
@@ -95,7 +122,22 @@ router.post('/webhooks',
       throw new AuthenticationError('Developer authentication required');
     }
 
+    const isServiceKey = !!req.apiKey?.is_service;
     const { url, is_sandbox = false, events, secret, api_key_id } = req.body;
+
+    // Resolve the effective scope of the webhook being created.
+    //   - is_sandbox: service keys force production (they have no sandbox mode;
+    //     see checkSandboxMode). A body value is ignored for them.
+    //   - api_key_id: for a service key this is HARD-SET to the calling key's id
+    //     and any body value is ignored. This is security-critical: service keys
+    //     share a shadow developer, so honouring a body api_key_id would let key
+    //     K1 register a webhook scoped to key K2 and exfiltrate K2's verification
+    //     PII. The portal JWT path keeps the original behaviour (body-supplied,
+    //     validated below).
+    const effectiveSandbox = isServiceKey ? false : is_sandbox;
+    const scopedApiKeyId: string | null = isServiceKey
+      ? req.apiKey!.id
+      : (api_key_id || null);
 
     // SSRF protection: block private/reserved network URLs. Awaits DNS
     // resolution so DNS-pinning bypasses (`evil.example A 127.0.0.1`) are
@@ -106,18 +148,19 @@ router.post('/webhooks',
       throw new ValidationError(err.message, 'url', url);
     }
 
-    // If api_key_id is provided, validate it belongs to this developer
-    if (api_key_id) {
+    // For the JWT path, a body-supplied api_key_id must belong to this developer.
+    // (Skipped for service keys — scopedApiKeyId is the authenticated key itself.)
+    if (!isServiceKey && scopedApiKeyId) {
       const { data: ownedKey, error: keyError } = await supabase
         .from('api_keys')
         .select('id')
-        .eq('id', api_key_id)
+        .eq('id', scopedApiKeyId)
         .eq('developer_id', developer.id)
         .eq('is_active', true)
         .single();
 
       if (keyError || !ownedKey) {
-        throw new ValidationError('API key not found or does not belong to this developer', 'api_key_id', api_key_id);
+        throw new ValidationError('API key not found or does not belong to this developer', 'api_key_id', scopedApiKeyId);
       }
     }
 
@@ -135,10 +178,10 @@ router.post('/webhooks',
       .select('id')
       .eq('developer_id', developer.id)
       .eq('url', url)
-      .eq('is_sandbox', is_sandbox);
+      .eq('is_sandbox', effectiveSandbox);
 
-    if (api_key_id) {
-      dupQuery = dupQuery.eq('api_key_id', api_key_id);
+    if (scopedApiKeyId) {
+      dupQuery = dupQuery.eq('api_key_id', scopedApiKeyId);
     } else {
       dupQuery = dupQuery.is('api_key_id', null);
     }
@@ -162,10 +205,10 @@ router.post('/webhooks',
       .insert({
         developer_id: developer.id,
         url,
-        is_sandbox,
+        is_sandbox: effectiveSandbox,
         events: events && events.length > 0 ? events : WEBHOOK_EVENT_NAMES,
         secret_key: secretKey,
-        api_key_id: api_key_id || null,
+        api_key_id: scopedApiKeyId,
       })
       .select('id, url, is_sandbox, is_active, created_at, events, secret_key, api_key_id')
       .single();
@@ -185,10 +228,10 @@ router.post('/webhooks',
   })
 );
 
-// Reveal full webhook signing secret
+// Reveal full webhook signing secret (developer portal JWT or isk_* service key)
 router.get('/webhooks/:webhookId/secret',
   apiKeyRateLimit,
-  authenticateDeveloperJWT,
+  authenticateDeveloperJWTOrServiceKey,
   [
     param('webhookId')
       .isUUID()
@@ -196,27 +239,31 @@ router.get('/webhooks/:webhookId/secret',
   ],
   validate,
   catchAsync(async (req: Request, res: Response) => {
-    const developer = req.developer;
-    if (!developer) {
-      throw new AuthenticationError('Developer authentication required');
-    }
+    const { developerId, apiKeyId } = ownerScope(req);
 
     const { webhookId } = req.params;
 
-    const { data: webhook, error } = await supabase
+    let query = supabase
       .from('webhooks')
       .select('id, secret_key')
       .eq('id', webhookId)
-      .eq('developer_id', developer.id)
-      .single();
+      .eq('developer_id', developerId);
+
+    // A service key may only read the secret of its OWN webhook (see ownerScope).
+    if (apiKeyId) {
+      query = query.eq('api_key_id', apiKeyId);
+    }
+
+    const { data: webhook, error } = await query.single();
 
     if (error || !webhook) {
       throw new NotFoundError('Webhook');
     }
 
     logger.info('Webhook secret revealed', {
-      developerId: developer.id,
+      developerId,
       webhookId,
+      viaServiceKey: !!apiKeyId,
     });
 
     res.json({ secret_key: webhook.secret_key });
@@ -445,10 +492,10 @@ router.post('/webhooks/:webhookId/deliveries/:deliveryId/resend',
   })
 );
 
-// Delete webhook for developer (JWT-authenticated developer portal)
+// Delete webhook for the calling principal (developer portal JWT or isk_* service key)
 router.delete('/webhooks/:webhookId',
   apiKeyRateLimit,
-  authenticateDeveloperJWT,
+  authenticateDeveloperJWTOrServiceKey,
   [
     param('webhookId')
       .isUUID()
@@ -456,29 +503,38 @@ router.delete('/webhooks/:webhookId',
   ],
   validate,
   catchAsync(async (req: Request, res: Response) => {
-    const developer = req.developer;
-    if (!developer) {
-      throw new AuthenticationError('Developer authentication required');
-    }
+    const { developerId, apiKeyId } = ownerScope(req);
 
     const { webhookId } = req.params;
 
-    const { data: existingWebhook, error: checkError } = await supabase
+    // A service key may only delete its OWN webhook (see ownerScope). Apply the
+    // api_key_id filter to BOTH the existence check and the delete so the scope
+    // can never widen between the two queries.
+    let checkQuery = supabase
       .from('webhooks')
       .select('id')
       .eq('id', webhookId)
-      .eq('developer_id', developer.id)
-      .single();
+      .eq('developer_id', developerId);
+    if (apiKeyId) {
+      checkQuery = checkQuery.eq('api_key_id', apiKeyId);
+    }
+
+    const { data: existingWebhook, error: checkError } = await checkQuery.single();
 
     if (checkError || !existingWebhook) {
       throw new NotFoundError('Webhook');
     }
 
-    const { error } = await supabase
+    let deleteQuery = supabase
       .from('webhooks')
       .delete()
       .eq('id', webhookId)
-      .eq('developer_id', developer.id);
+      .eq('developer_id', developerId);
+    if (apiKeyId) {
+      deleteQuery = deleteQuery.eq('api_key_id', apiKeyId);
+    }
+
+    const { error } = await deleteQuery;
 
     if (error) {
       logger.error('Failed to delete webhook:', error);
