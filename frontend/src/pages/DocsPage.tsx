@@ -20,6 +20,7 @@ const NAV: NavItem[] = [
   { id: 'step-4', label: '4 · Live Capture', depth: 1 },
   { id: 'step-5', label: '5 · Get Results', depth: 1 },
   { id: 'selfie', label: 'Cross-Validation', depth: 1 },
+  { id: 'selfie-url', label: 'Get Selfie URL', depth: 1 },
 ];
 
 export const DocsPage: React.FC = () => {
@@ -837,6 +838,46 @@ data = res.json()`} />
     "failures": []
   }
 }`} />
+      </EndpointCard>
+
+      {/* Live-capture selfie URL (optional) */}
+      <SectionAnchor id="selfie-url" />
+      <EndpointCard method="GET" path="/api/v2/verify/:id/selfie" title="Get Live-Capture Selfie URL"
+        badge={{ label: 'optional', color: C.dim, bg: 'rgba(74,85,104,0.13)' }}>
+        <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: C.muted, lineHeight: 1.7, marginBottom: 16 }}>
+          Returns a short-lived <strong style={{ color: C.text }}>signed URL</strong> for the verification's
+          live-capture selfie — handy when you want to run a downstream face match on your own side. Scoped to
+          the authenticated API key: a verification you don't own (or an unknown ID) returns{' '}
+          <code style={{ fontFamily: C.mono, color: C.cyan }}>404</code> (never 403), so the endpoint can't be
+          used to enumerate other developers' verification IDs. Returns only the selfie URL — no OCR, PII, or
+          other documents.
+        </p>
+        <CodeTabs tab={tab} onChange={setTab}
+          curl={`curl -X GET ${apiUrl}/api/v2/verify/550e8400-e29b-41d4-a716-446655440001/selfie \\
+  -H "X-API-Key: your-key"`}
+          js={`const res = await fetch(
+  \`${apiUrl}/api/v2/verify/\${verification_id}/selfie\`,
+  { headers: { 'X-API-Key': 'your-key' } },
+);
+const data = await res.json();`}
+          python={`import requests
+
+res = requests.get(
+    f'${apiUrl}/api/v2/verify/{verification_id}/selfie',
+    headers={ 'X-API-Key': 'your-key' },
+)
+data = res.json()`} />
+        <Pre label="Response  —  HTTP 200" code={`{
+  "verification_id": "550e8400-e29b-41d4-a716-446655440001",
+  "selfie_url": "https://storage.idswyft.app/selfies/…?token=…",
+  "expires_in": 300
+}`} />
+        <Callout type="note">
+          The signed URL is valid for <strong>300 seconds</strong> — long enough to fetch once, short enough to
+          not be a durable link. Re-call the endpoint for a fresh URL. If no live-capture selfie is on file yet,
+          the endpoint returns <strong>HTTP 404</strong> with{' '}
+          <code style={{ fontFamily: C.mono }}>{`{ "selfie_url": null }`}</code>.
+        </Callout>
       </EndpointCard>
 
     </DocLayout>
