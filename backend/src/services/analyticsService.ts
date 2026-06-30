@@ -91,6 +91,7 @@ export function getDefaultPeriod(): PeriodFilter {
 export async function getConversionFunnel(
   period?: PeriodFilter,
   developerId?: string,
+  apiKeyId?: string | null,
 ): Promise<FunnelStep[]> {
   const p = period || getDefaultPeriod();
 
@@ -99,14 +100,16 @@ export async function getConversionFunnel(
     .from('verification_requests')
     .select('id')
     .gte('created_at', p.start_date)
-    .lte('created_at', p.end_date)
-    .limit(ANALYTICS_ROW_LIMIT);
+    .lte('created_at', p.end_date);
 
   if (developerId) {
     reqQuery = reqQuery.eq('developer_id', developerId);
   }
+  if (apiKeyId) {
+    reqQuery = reqQuery.eq('api_key_id', apiKeyId);
+  }
 
-  const { data: requests, error: reqError } = await reqQuery;
+  const { data: requests, error: reqError } = await reqQuery.limit(ANALYTICS_ROW_LIMIT);
   if (reqError || !requests) return [];
 
   const total = requests.length;
@@ -164,18 +167,22 @@ export async function getConversionFunnel(
 export async function getGateRejectionBreakdown(
   period?: PeriodFilter,
   developerId?: string,
+  apiKeyId?: string | null,
 ): Promise<RejectionBreakdown[]> {
   const p = period || getDefaultPeriod();
 
   if (developerId) {
     // Scope to developer's verifications first
-    const { data: requests, error: reqError } = await supabase
+    let reqQuery = supabase
       .from('verification_requests')
       .select('id')
       .eq('developer_id', developerId)
       .gte('created_at', p.start_date)
-      .lte('created_at', p.end_date)
-      .limit(ANALYTICS_ROW_LIMIT);
+      .lte('created_at', p.end_date);
+    if (apiKeyId) {
+      reqQuery = reqQuery.eq('api_key_id', apiKeyId);
+    }
+    const { data: requests, error: reqError } = await reqQuery.limit(ANALYTICS_ROW_LIMIT);
 
     if (reqError || !requests || requests.length === 0) return [];
 
@@ -343,6 +350,7 @@ export interface DailyWebhooks {
 export async function getDailyVerificationVolume(
   period?: PeriodFilter,
   developerId?: string,
+  apiKeyId?: string | null,
 ): Promise<DailyVolume[]> {
   const p = period || getDefaultPeriod();
 
@@ -350,14 +358,16 @@ export async function getDailyVerificationVolume(
     .from('verification_requests')
     .select('created_at, status')
     .gte('created_at', p.start_date)
-    .lte('created_at', p.end_date)
-    .limit(ANALYTICS_ROW_LIMIT);
+    .lte('created_at', p.end_date);
 
   if (developerId) {
     query = query.eq('developer_id', developerId);
   }
+  if (apiKeyId) {
+    query = query.eq('api_key_id', apiKeyId);
+  }
 
-  const { data, error } = await query;
+  const { data, error } = await query.limit(ANALYTICS_ROW_LIMIT);
   if (error || !data) return [];
 
   const buckets: Record<string, { total: number; verified: number; failed: number }> = {};
@@ -388,6 +398,7 @@ export async function getDailyVerificationVolume(
 export async function getDailyResponseTimes(
   period?: PeriodFilter,
   developerId?: string,
+  apiKeyId?: string | null,
 ): Promise<DailyLatency[]> {
   const p = period || getDefaultPeriod();
 
@@ -395,14 +406,16 @@ export async function getDailyResponseTimes(
     .from('api_activity_logs')
     .select('timestamp, response_time_ms')
     .gte('timestamp', p.start_date)
-    .lte('timestamp', p.end_date)
-    .limit(ANALYTICS_ROW_LIMIT);
+    .lte('timestamp', p.end_date);
 
   if (developerId) {
     query = query.eq('developer_id', developerId);
   }
+  if (apiKeyId) {
+    query = query.eq('api_key_id', apiKeyId);
+  }
 
-  const { data, error } = await query;
+  const { data, error } = await query.limit(ANALYTICS_ROW_LIMIT);
   if (error || !data) return [];
 
   const buckets: Record<string, number[]> = {};
@@ -434,16 +447,18 @@ export async function getDailyResponseTimes(
 export async function getDailyWebhookDeliveries(
   period?: PeriodFilter,
   developerId?: string,
+  apiKeyId?: string | null,
 ): Promise<DailyWebhooks[]> {
   if (!developerId) return [];
 
   const p = period || getDefaultPeriod();
 
   // Get developer's webhook IDs
-  const { data: webhooks, error: whError } = await supabase
-    .from('webhooks')
-    .select('id')
-    .eq('developer_id', developerId);
+  let whQuery = supabase.from('webhooks').select('id').eq('developer_id', developerId);
+  if (apiKeyId) {
+    whQuery = whQuery.eq('api_key_id', apiKeyId);
+  }
+  const { data: webhooks, error: whError } = await whQuery;
 
   if (whError || !webhooks || webhooks.length === 0) return [];
 
