@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { body, param } from 'express-validator';
 import { supabase } from '@/config/database.js';
-import { generateAPIKey, authenticateDeveloperJWT } from '@/middleware/auth.js';
+import { generateAPIKey, authenticateDeveloperJWT, authenticateDashboard, scopeForRequest } from '@/middleware/auth.js';
 import { catchAsync, ValidationError, NotFoundError, AuthenticationError } from '@/middleware/errorHandler.js';
 import { validate } from '@/middleware/validate.js';
 import { logger } from '@/utils/logger.js';
@@ -169,20 +169,22 @@ router.post('/api-key',
 // List API keys for developer
 router.get('/api-keys',
   apiKeyRateLimit,
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   catchAsync(async (req: Request, res: Response) => {
-    const developer = req.developer;
-    if (!developer) {
-      throw new AuthenticationError('Developer authentication required');
-    }
+    const { developerId, apiKeyId } = scopeForRequest(req);
 
     // Get API keys with additional security info (only active keys)
-    const { data: apiKeys, error } = await supabase
+    let query = supabase
       .from('api_keys')
       .select('id, key_prefix, name, is_sandbox, is_active, last_used_at, created_at, expires_at')
-      .eq('developer_id', developer.id)
-      .eq('is_active', true)
-      .order('created_at', { ascending: false });
+      .eq('developer_id', developerId)
+      .eq('is_active', true);
+
+    if (apiKeyId) {
+      query = query.eq('id', apiKeyId); // operator/service key → only their own key
+    }
+
+    const { data: apiKeys, error } = await query.order('created_at', { ascending: false });
 
     if (error) {
       logger.error('Failed to get API keys:', error);
