@@ -10,7 +10,7 @@
  *
  * Endpoints (mounted at /api/auth):
  *   POST /service-operator/otp/send    → email a 6-digit code
- *   POST /service-operator/otp/verify  → 0 keys: 403; 1 key: set cookie; >1: selection token + list
+ *   POST /service-operator/otp/verify  → 0 keys: 401; 1 key: set cookie; >1: selection token + list
  *   POST /service-operator/otp/select  → selection token + chosen api_key_id → set cookie
  */
 
@@ -134,7 +134,7 @@ router.post('/service-operator/otp/verify',
       });
       setAuthCookie(res, token);
       logger.info('Service operator logged in', { operatorEmail: email, apiKeyId: k.id });
-      return res.json({ token, scope: 'service-operator', operator: { email, ...publicKey(k) } });
+      return res.json({ scope: 'service-operator', operator: { email, ...publicKey(k) } });
     }
 
     // Multiple keys → picker
@@ -185,7 +185,7 @@ router.post('/service-operator/otp/select',
     });
     setAuthCookie(res, token);
     logger.info('Service operator selected key + logged in', { operatorEmail: email, apiKeyId: key.id });
-    res.json({ token, scope: 'service-operator', operator: { email, ...publicKey(key) } });
+    res.json({ scope: 'service-operator', operator: { email, ...publicKey(key) } });
   }),
 );
 
