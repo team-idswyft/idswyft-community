@@ -2,7 +2,7 @@ import express, { Request, Response } from 'express';
 import { param } from 'express-validator';
 import validator from 'validator';
 import { supabase } from '@/config/database.js';
-import { authenticateDeveloperJWT } from '@/middleware/auth.js';
+import { authenticateDeveloperJWT, authenticateDashboard, scopeForRequest } from '@/middleware/auth.js';
 import { catchAsync, ValidationError, NotFoundError, AuthenticationError } from '@/middleware/errorHandler.js';
 import { validate } from '@/middleware/validate.js';
 import { logger } from '@/utils/logger.js';
@@ -36,21 +36,21 @@ const apiKeyRateLimit = rateLimit({
 // Get developer usage statistics
 router.get('/stats',
   apiKeyRateLimit,
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   catchAsync(async (req: Request, res: Response) => {
-    const developer = req.developer;
-    if (!developer) {
-      throw new AuthenticationError('Developer authentication required');
-    }
+    const { developerId, apiKeyId } = scopeForRequest(req);
     // Calendar-month-to-date so this endpoint agrees with /analytics quota.
     const now = new Date();
     const monthStart = getMonthStart(now);
 
-    const { data: stats, error } = await supabase
+    let q = supabase
       .from('verification_requests')
       .select('status, created_at')
-      .eq('developer_id', developer.id)
+      .eq('developer_id', developerId)
       .gte('created_at', monthStart.toISOString());
+    if (apiKeyId) q = q.eq('api_key_id', apiKeyId);
+
+    const { data: stats, error } = await q;
 
     if (error) {
       logger.error('Failed to get developer stats:', error);
@@ -85,50 +85,42 @@ router.get('/stats',
 // Get API activity logs
 router.get('/activity',
   apiKeyRateLimit,
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   catchAsync(async (req: Request, res: Response) => {
-    const developer = req.developer;
-    if (!developer) {
-      throw new AuthenticationError('Developer authentication required');
-    }
+    const { developerId, apiKeyId } = scopeForRequest(req);
 
-    const apiKeyIdParam = typeof req.query.api_key_id === 'string' ? req.query.api_key_id : undefined;
-
-    // If filtering by key, verify it belongs to the authenticated developer
-    if (apiKeyIdParam) {
-      if (!validator.isUUID(apiKeyIdParam)) {
-        throw new ValidationError('Invalid API key ID format', 'api_key_id', apiKeyIdParam);
-      }
-
-      const { data: ownedKey, error: keyError } = await supabase
-        .from('api_keys')
-        .select('id')
-        .eq('id', apiKeyIdParam)
-        .eq('developer_id', developer.id)
-        .eq('is_active', true)
-        .single();
-
-      if (keyError || !ownedKey) {
-        throw new NotFoundError('API key not found or does not belong to this developer');
+    // Developers may filter by a specific key via ?api_key_id=; operators are
+    // hard-scoped to their own key and the query param is ignored.
+    let effectiveKeyId: string | null = apiKeyId;
+    if (!apiKeyId) {
+      const apiKeyIdParam = typeof req.query.api_key_id === 'string' ? req.query.api_key_id : undefined;
+      if (apiKeyIdParam) {
+        if (!validator.isUUID(apiKeyIdParam)) {
+          throw new ValidationError('Invalid API key ID format', 'api_key_id', apiKeyIdParam);
+        }
+        const { data: ownedKey, error: keyError } = await supabase
+          .from('api_keys').select('id')
+          .eq('id', apiKeyIdParam).eq('developer_id', developerId).eq('is_active', true).single();
+        if (keyError || !ownedKey) {
+          throw new NotFoundError('API key not found or does not belong to this developer');
+        }
+        effectiveKeyId = apiKeyIdParam;
       }
     }
 
-    // Query persisted activity logs from DB (survives server restarts)
     let activityQuery = supabase
       .from('api_activity_logs')
       .select('api_key_id, timestamp, method, endpoint, status_code, response_time_ms, user_agent, ip_address, error_message')
-      .eq('developer_id', developer.id)
+      .eq('developer_id', developerId)
       .order('timestamp', { ascending: false })
       .limit(100);
+    if (effectiveKeyId) activityQuery = activityQuery.eq('api_key_id', effectiveKeyId);
 
-    if (apiKeyIdParam) {
-      activityQuery = activityQuery.eq('api_key_id', apiKeyIdParam);
-    }
+    let statsQuery = supabase.from('verification_requests').select('status').eq('developer_id', developerId);
+    if (effectiveKeyId) statsQuery = statsQuery.eq('api_key_id', effectiveKeyId);
 
-    const [{ data: activityRows, error: activityError }, { data: verificationStats, error: statsError }] = await Promise.all([
-      activityQuery,
-      supabase.from('verification_requests').select('status').eq('developer_id', developer.id),
-    ]);
+    const [{ data: activityRows, error: activityError }, { data: verificationStats, error: statsError }] =
+      await Promise.all([activityQuery, statsQuery]);
 
     if (activityError) {
       logger.error('Failed to get activity logs:', activityError);
@@ -171,11 +163,13 @@ router.get('/activity',
 
     let sessionOutcomes: Record<string, string> = {};
     if (sessionIds.length > 0) {
-      const { data: verificationRows, error: sessionError } = await supabase
+      let vQ = supabase
         .from('verification_requests')
         .select('id, status')
-        .eq('developer_id', developer.id)
+        .eq('developer_id', developerId)
         .in('id', sessionIds);
+      if (effectiveKeyId) vQ = vQ.eq('api_key_id', effectiveKeyId);
+      const { data: verificationRows, error: sessionError } = await vQ;
 
       if (sessionError) {
         logger.error('Failed to fetch session outcomes:', sessionError);
@@ -196,7 +190,7 @@ router.get('/activity',
   })
 );
 
-// Get full verification detail for a session (JWT-authenticated developer portal)
+// Get full verification detail for a session (dashboard-authenticated developer portal or operator)
 router.get('/verifications/:verificationId',
   apiKeyRateLimit,
   [
@@ -204,23 +198,21 @@ router.get('/verifications/:verificationId',
       .isUUID()
       .withMessage('Invalid verification ID format')
   ],
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   validate,
   catchAsync(async (req: Request, res: Response) => {
-    const developer = req.developer;
-    if (!developer) {
-      throw new AuthenticationError('Developer authentication required');
-    }
-
+    const { developerId, apiKeyId } = scopeForRequest(req);
     const { verificationId } = req.params;
 
-    // Ownership check: verification must belong to this developer
-    const { data: verification, error: verErr } = await supabase
+    // Ownership check: verification must belong to this developer (and key for operators)
+    let vq = supabase
       .from('verification_requests')
       .select('id, is_sandbox, duplicate_flags, verification_mode, manual_review_reason, status')
       .eq('id', verificationId)
-      .eq('developer_id', developer.id)
-      .single();
+      .eq('developer_id', developerId);
+    if (apiKeyId) vq = vq.eq('api_key_id', apiKeyId);
+
+    const { data: verification, error: verErr } = await vq.single();
 
     if (verErr || !verification) {
       throw new NotFoundError('Verification not found or does not belong to this developer');

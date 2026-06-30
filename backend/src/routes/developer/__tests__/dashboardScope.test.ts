@@ -29,15 +29,19 @@ const K2 = 'bbbbbbbb-2222-4222-8222-bbbbbbbbbbbb';
 // ─── Shared mutable state (hoisted so vi.mock factories can reference it) ────
 const state = vi.hoisted(() => ({
   apiKeyRows: [] as any[],
+  verificationRows: [] as any[],
+  activityRows: [] as any[],
 }));
 
-// ─── Supabase mock: filter-applying engine for `api_keys` ────────────────────
+// ─── Supabase mock: filter-applying engine for all tables ────────────────────
 vi.mock('@/config/database.js', () => {
   const applyFilters = (rows: any[], filters: Array<[string, any]>) =>
     rows.filter((r) =>
       filters.every(([col, val]) => (val === null ? r[col] == null : r[col] === val)),
     );
 
+  // Returns a builder that is thenable (so `await chain` works), supports
+  // `.eq()`, `.gte()`, `.order()`, `.limit()`, `.in()`, and `.single()`.
   const makeSelectChain = (rows: any[]) => {
     const filters: Array<[string, any]> = [];
     const chain: any = {
@@ -45,7 +49,10 @@ vi.mock('@/config/database.js', () => {
         filters.push([col, val]);
         return chain;
       },
-      order: () => Promise.resolve({ data: applyFilters(rows, filters), error: null }),
+      gte: (_col: string, _val: any) => chain,
+      order: (_col: string, _opts?: any) => chain,
+      limit: (_n: number) => chain,
+      in: (_col: string, _vals: any[]) => chain,
       single: () => {
         const matched = applyFilters(rows, filters);
         if (matched.length === 0) {
@@ -53,6 +60,9 @@ vi.mock('@/config/database.js', () => {
         }
         return Promise.resolve({ data: matched[0], error: null });
       },
+      // Makes `await chain` and `Promise.all([chain, ...])` resolve directly.
+      then: (resolve_fn: (v: any) => any, reject_fn?: (e: any) => any) =>
+        Promise.resolve({ data: applyFilters(rows, filters), error: null }).then(resolve_fn, reject_fn),
     };
     return chain;
   };
@@ -63,10 +73,14 @@ vi.mock('@/config/database.js', () => {
         if (table === 'api_keys') {
           return { select: () => makeSelectChain(state.apiKeyRows) };
         }
-        // No other table is touched by the routes under test.
-        return {
-          select: () => ({ eq: () => ({ single: () => Promise.resolve({ data: null, error: null }) }) }),
-        };
+        if (table === 'verification_requests') {
+          return { select: () => makeSelectChain(state.verificationRows) };
+        }
+        if (table === 'api_activity_logs') {
+          return { select: () => makeSelectChain(state.activityRows) };
+        }
+        // verification_contexts and any other table: empty rows (single() → null)
+        return { select: () => makeSelectChain([]) };
       },
     },
     connectDB: vi.fn(),
@@ -117,12 +131,14 @@ vi.mock('@/utils/logger.js', () => ({
 let app: Express;
 
 async function buildApp() {
-  const profileMod  = await import('../profile.js');
-  const apiKeysMod  = await import('../apiKeys.js');
+  const profileMod   = await import('../profile.js');
+  const apiKeysMod   = await import('../apiKeys.js');
+  const analyticsMod = await import('../analytics.js');
   const a = express();
   a.use(express.json());
   a.use('/api/developer', profileMod.default);
   a.use('/api/developer', apiKeysMod.default);
+  a.use('/api/developer', analyticsMod.default);
   a.use((err: any, _req: any, res: any, _next: any) => {
     res.status(err.statusCode || 500).json({ error: err.message, code: err.code });
   });
@@ -131,6 +147,8 @@ async function buildApp() {
 
 beforeEach(async () => {
   state.apiKeyRows = [];
+  state.verificationRows = [];
+  state.activityRows = [];
   app = await buildApp();
 });
 
@@ -217,5 +235,135 @@ describe('GET /api/developer/api-keys — developer principal (no narrowing)', (
     expect(res.body.api_keys.map((k: any) => k.id)).toEqual(
       expect.arrayContaining([D1, D2]),
     );
+  });
+});
+
+// ─── GET /stats ───────────────────────────────────────────────────────────────
+
+describe('GET /api/developer/stats — operator principal (scoped to api_key_id)', () => {
+  it('counts only verifications belonging to the operator key (not the other key under same dev)', async () => {
+    // 2 verified rows for K1, 1 verified row for K2 — all share SHADOW_DEV.
+    // If the api_key_id filter is missing, total_requests would be 3.
+    state.verificationRows = [
+      { developer_id: SHADOW_DEV, api_key_id: K1, status: 'verified', created_at: '2026-06-01T00:00:00Z' },
+      { developer_id: SHADOW_DEV, api_key_id: K1, status: 'verified', created_at: '2026-06-02T00:00:00Z' },
+      { developer_id: SHADOW_DEV, api_key_id: K2, status: 'verified', created_at: '2026-06-03T00:00:00Z' },
+    ];
+
+    const res = await request(app)
+      .get('/api/developer/stats')
+      .set('x-test-principal', 'operator');
+
+    expect(res.status).toBe(200);
+    expect(res.body.total_requests).toBe(2);
+    expect(res.body.successful_requests).toBe(2);
+  });
+});
+
+describe('GET /api/developer/stats — developer principal (no api_key_id filter)', () => {
+  it('counts ALL verifications for the developer regardless of api_key_id', async () => {
+    state.verificationRows = [
+      { developer_id: REAL_DEV, api_key_id: K1, status: 'verified', created_at: '2026-06-01T00:00:00Z' },
+      { developer_id: REAL_DEV, api_key_id: null, status: 'failed',  created_at: '2026-06-02T00:00:00Z' },
+      { developer_id: REAL_DEV, api_key_id: K2,   status: 'pending', created_at: '2026-06-03T00:00:00Z' },
+    ];
+
+    const res = await request(app)
+      .get('/api/developer/stats')
+      .set('x-test-principal', 'developer');
+
+    expect(res.status).toBe(200);
+    expect(res.body.total_requests).toBe(3);
+  });
+});
+
+// ─── GET /activity ────────────────────────────────────────────────────────────
+
+describe('GET /api/developer/activity — operator principal (both queries scoped; ?api_key_id ignored)', () => {
+  it('scopes recent_activities and statistics to operator key; ignores ?api_key_id=K2', async () => {
+    // Activity rows: 2 for K1, 1 for K2, all under SHADOW_DEV.
+    // No UUID-shaped endpoints so sessionIds stays empty (no session-outcomes query).
+    state.activityRows = [
+      { developer_id: SHADOW_DEV, api_key_id: K1, timestamp: '2026-06-01T01:00:00Z', method: 'POST', endpoint: '/api/v2/verify/initialize', status_code: 200, response_time_ms: 50, user_agent: null, ip_address: null, error_message: null },
+      { developer_id: SHADOW_DEV, api_key_id: K1, timestamp: '2026-06-01T02:00:00Z', method: 'GET',  endpoint: '/api/v2/verify/status',     status_code: 200, response_time_ms: 30, user_agent: null, ip_address: null, error_message: null },
+      { developer_id: SHADOW_DEV, api_key_id: K2, timestamp: '2026-06-01T03:00:00Z', method: 'POST', endpoint: '/api/v2/verify/initialize', status_code: 200, response_time_ms: 45, user_agent: null, ip_address: null, error_message: null },
+    ];
+    // Verification stats: 2 for K1, 1 for K2.
+    state.verificationRows = [
+      { developer_id: SHADOW_DEV, api_key_id: K1, status: 'verified' },
+      { developer_id: SHADOW_DEV, api_key_id: K1, status: 'failed' },
+      { developer_id: SHADOW_DEV, api_key_id: K2, status: 'verified' },
+    ];
+
+    // Pass ?api_key_id=K2 — operator must ignore it and use K1 (their own key).
+    const res = await request(app)
+      .get(`/api/developer/activity?api_key_id=${K2}`)
+      .set('x-test-principal', 'operator');
+
+    expect(res.status).toBe(200);
+    // Only K1's 2 activity rows returned
+    expect(res.body.recent_activities).toHaveLength(2);
+    expect(res.body.recent_activities.every((a: any) => a.api_key_id === K1)).toBe(true);
+    // Statistics also scoped to K1 (2 rows)
+    expect(res.body.statistics.total_requests).toBe(2);
+  });
+});
+
+describe('GET /api/developer/activity — developer principal (no api_key_id filter)', () => {
+  it('returns all activities and stats for the developer without narrowing', async () => {
+    state.activityRows = [
+      { developer_id: REAL_DEV, api_key_id: K1,   timestamp: '2026-06-01T01:00:00Z', method: 'POST', endpoint: '/api/v2/verify/initialize', status_code: 200, response_time_ms: 50, user_agent: null, ip_address: null, error_message: null },
+      { developer_id: REAL_DEV, api_key_id: null,  timestamp: '2026-06-01T02:00:00Z', method: 'GET',  endpoint: '/api/v2/verify/status',     status_code: 200, response_time_ms: 30, user_agent: null, ip_address: null, error_message: null },
+    ];
+    state.verificationRows = [
+      { developer_id: REAL_DEV, api_key_id: K1,  status: 'verified' },
+      { developer_id: REAL_DEV, api_key_id: null, status: 'pending'  },
+    ];
+
+    const res = await request(app)
+      .get('/api/developer/activity')
+      .set('x-test-principal', 'developer');
+
+    expect(res.status).toBe(200);
+    expect(res.body.recent_activities).toHaveLength(2);
+    expect(res.body.statistics.total_requests).toBe(2);
+  });
+});
+
+// ─── GET /verifications/:id ───────────────────────────────────────────────────
+
+// Valid UUIDs required — param validator rejects non-UUIDs with 400.
+const V_K1 = '11111111-aaaa-4aaa-8aaa-111111111111'; // belongs to K1
+const V_K2 = '22222222-bbbb-4bbb-8bbb-222222222222'; // belongs to K2
+
+describe('GET /api/developer/verifications/:id — operator cross-key (404)', () => {
+  it('returns 404 when the verification belongs to a different key', async () => {
+    state.verificationRows = [
+      { id: V_K2, developer_id: SHADOW_DEV, api_key_id: K2, status: 'verified', verification_mode: 'full', is_sandbox: false, duplicate_flags: null, manual_review_reason: null },
+    ];
+
+    const res = await request(app)
+      .get(`/api/developer/verifications/${V_K2}`)
+      .set('x-test-principal', 'operator'); // authenticated as K1
+
+    expect(res.status).toBe(404);
+  });
+});
+
+describe('GET /api/developer/verifications/:id — operator own key (200)', () => {
+  it('returns 200 and pending status when the verification belongs to the operator key', async () => {
+    state.verificationRows = [
+      { id: V_K1, developer_id: SHADOW_DEV, api_key_id: K1, status: 'pending', verification_mode: 'full', is_sandbox: false, duplicate_flags: null, manual_review_reason: null },
+    ];
+    // verification_contexts returns empty (via mock fallback) → loadSessionState returns null
+    // → handler early-returns { status: 'pending' }
+
+    const res = await request(app)
+      .get(`/api/developer/verifications/${V_K1}`)
+      .set('x-test-principal', 'operator'); // authenticated as K1
+
+    expect(res.status).toBe(200);
+    expect(res.body.status).toBe('pending');
+    expect(res.body.verification_id).toBe(V_K1);
   });
 });
