@@ -5,6 +5,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Request, Response, NextFunction } from 'express';
+import jwt from 'jsonwebtoken';
 
 const mockState = vi.hoisted(() => ({ apiKeyRow: null as any }));
 
@@ -44,6 +45,7 @@ import {
   verifyServiceOperatorSelectionToken,
   authenticateServiceOperatorJWT,
 } from '../auth.js';
+import { AuthenticationError } from '../errorHandler.js';
 
 const makeRes = (): Response => ({} as Response);
 const makeNext = (): NextFunction & { called: number; lastError?: any } => {
@@ -109,6 +111,22 @@ describe('service-operator token + middleware', () => {
 
   it('rejects a developer/admin token (wrong audience)', async () => {
     mockState.apiKeyRow = goodKeyRow;
+    // Build a real JWT with the correct secret but a developer audience —
+    // this exercises the actual audience rejection path, not just a parse error.
+    const wrongAud = jwt.sign(
+      { email: 'obed@idswyft.app', type: 'developer' },
+      'test-jwt-secret',
+      { issuer: 'idswyft-api', audience: 'idswyft-developer', expiresIn: '7d' },
+    );
+    const req = makeReq(wrongAud);
+    const next = makeNext();
+    await (authenticateServiceOperatorJWT as any)(req, makeRes(), next);
+    expect(next.lastError).toBeDefined();
+    expect(next.lastError.message).toMatch(/invalid token/i);
+  });
+
+  it('rejects a malformed string token', async () => {
+    mockState.apiKeyRow = goodKeyRow;
     const req = makeReq('not-a-service-operator-token');
     const next = makeNext();
     await (authenticateServiceOperatorJWT as any)(req, makeRes(), next);
@@ -119,6 +137,6 @@ describe('service-operator token + middleware', () => {
   it('round-trips the selection token email and rejects a tampered one', () => {
     const tok = generateServiceOperatorSelectionToken('obed@idswyft.app');
     expect(verifyServiceOperatorSelectionToken(tok)).toBe('obed@idswyft.app');
-    expect(() => verifyServiceOperatorSelectionToken('garbage')).toThrow();
+    expect(() => verifyServiceOperatorSelectionToken('garbage')).toThrow(AuthenticationError);
   });
 });

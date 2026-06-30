@@ -820,10 +820,18 @@ export const generateServiceOperatorSelectionToken = (email: string): string => 
 };
 
 export const verifyServiceOperatorSelectionToken = (token: string): string => {
-  const decoded = jwt.verify(token, config.jwtSecret, {
-    issuer: 'idswyft-api',
-    audience: 'idswyft-service-operator-select',
-  }) as { email: string; type: string };
+  let decoded: { email: string; type: string };
+  try {
+    decoded = jwt.verify(token, config.jwtSecret, {
+      issuer: 'idswyft-api',
+      audience: 'idswyft-service-operator-select',
+    }) as { email: string; type: string };
+  } catch (error) {
+    if (error instanceof jwt.TokenExpiredError) {
+      throw new AuthenticationError('Selection token has expired');
+    }
+    throw new AuthenticationError('Invalid selection token');
+  }
   if (decoded.type !== 'service-operator-select') {
     throw new AuthenticationError('Invalid selection token');
   }
@@ -866,7 +874,7 @@ export const authenticateServiceOperatorJWT = catchAsync(
     if (error || !apiKeyRecord) {
       throw new AuthenticationError('Service key is no longer active');
     }
-    if ((apiKeyRecord.operator_email ?? null) !== decoded.email) {
+    if (!decoded.email || (apiKeyRecord.operator_email ?? null) !== decoded.email) {
       throw new AuthenticationError('Operator is no longer bound to this service key');
     }
 
