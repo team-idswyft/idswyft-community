@@ -893,6 +893,64 @@ export const authenticateServiceOperatorJWT = catchAsync(
   },
 );
 
+// Flexible auth for the reused developer dashboard: accepts a developer portal
+// JWT, a service-operator cookie, OR a service key (X-API-Key). A cookie/bearer
+// is routed to the correct verifier by its UNVERIFIED audience (jwt.decode) —
+// the chosen verifier then cryptographically verifies it. The decoded audience
+// is used only for routing, never as a trusted claim.
+export const authenticateDashboard = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    if (req.headers['x-api-key']) {
+      return authenticateAPIKey(req, res, (err?: any) => {
+        if (err) return next(err);
+        if (!req.apiKey?.is_service) {
+          return next(new AuthorizationError(
+            'This endpoint accepts the developer portal session or a service principal. ' +
+            'Regular API keys must use the developer portal.',
+          ));
+        }
+        return next();
+      });
+    }
+
+    const token = req.headers.authorization?.replace('Bearer ', '') || req.cookies?.idswyft_token;
+    if (!token) {
+      throw new AuthenticationError('Access token is required');
+    }
+
+    let aud: string | undefined;
+    try {
+      aud = (jwt.decode(token) as any)?.aud;
+    } catch {
+      aud = undefined;
+    }
+
+    if (aud === 'idswyft-service-operator') {
+      return authenticateServiceOperatorJWT(req, res, next);
+    }
+    return authenticateDeveloperJWT(req, res, next);
+  },
+);
+
+// Ownership scope for a dashboard request. apiKeyId is set ONLY for principals
+// that must be isolated to one key (service operators, service keys); it is null
+// for developer-portal sessions, which keeps their queries identical to today.
+// Every operator-scoped query MUST apply `.eq('api_key_id', apiKeyId)` when set —
+// the shared shadow developer is not a tenant boundary; api_key_id is.
+export function scopeForRequest(req: Request): { developerId: string; apiKeyId: string | null } {
+  const developer = req.developer;
+  if (!developer) {
+    throw new AuthenticationError('Authentication required');
+  }
+  if (req.operatorKeyId) {
+    return { developerId: developer.id, apiKeyId: req.operatorKeyId };
+  }
+  if (req.apiKey?.is_service) {
+    return { developerId: developer.id, apiKeyId: req.apiKey.id };
+  }
+  return { developerId: developer.id, apiKeyId: null };
+}
+
 // Flexible middleware: accepts admin JWT OR reviewer JWT
 // Sets req.user (admin) or req.reviewer (reviewer with developer_id scope)
 export const authenticateAdminOrReviewer = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
@@ -993,6 +1051,8 @@ export default {
   authenticateDeveloperJWTOrServiceKey,
   authenticateReviewerJWT,
   authenticateServiceOperatorJWT,
+  authenticateDashboard,
+  scopeForRequest,
   generateServiceOperatorToken,
   generateServiceOperatorSelectionToken,
   verifyServiceOperatorSelectionToken,
