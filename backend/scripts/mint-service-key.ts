@@ -316,6 +316,7 @@ async function cmdMint(product: string, env: string, label: string, operatorEmai
     product,
     env,
     label,
+    ...(operatorEmail ? { operator_email: operatorEmail } : {}),
     file: fpath,
   });
 
@@ -940,6 +941,7 @@ async function main(): Promise<void> {
         const a = args[i];
         if (a === '--operator') {
           operatorEmail = args[++i];
+          if (!operatorEmail) fail('--operator requires an email argument');
         } else if (a.startsWith('--operator=')) {
           operatorEmail = a.slice('--operator='.length);
         } else {

@@ -114,7 +114,7 @@ router.post(
       .isLength({ min: 3, max: 100 })
       .withMessage('label must be 3-100 characters'),
     body('operator_email')
-      .optional()
+      .optional({ nullable: true })
       .isEmail()
       .withMessage('operator_email must be a valid email'),
   ],
@@ -144,7 +144,7 @@ router.post(
         service_label: label,
         operator_email: operatorEmail,
       })
-      .select('id, key_prefix, service_product, service_environment, service_label, created_at')
+      .select('id, key_prefix, service_product, service_environment, service_label, operator_email, created_at')
       .single();
 
     if (error || !data) {
@@ -166,6 +166,7 @@ router.post(
       service_product: data.service_product,
       service_environment: data.service_environment,
       service_label: data.service_label,
+      operator_email: data.operator_email,
       created_at: data.created_at,
       warning:
         'This is the only time the plaintext key will be shown. Store it now in your secrets vault.',

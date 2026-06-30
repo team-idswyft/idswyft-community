@@ -79,6 +79,7 @@ vi.mock('@/config/database.js', () => {
                       service_product: row.service_product,
                       service_environment: row.service_environment,
                       service_label: row.service_label,
+                      operator_email: row.operator_email ?? null,
                       created_at: new Date().toISOString(),
                     },
                 error: state.insertError,
@@ -294,6 +295,8 @@ describe('POST /api/platform/api-keys/service — mint', () => {
     expect(res.status).toBe(201);
     expect(state.insertedKeys).toHaveLength(1);
     expect(state.insertedKeys[0].operator_email).toBe('obed@idswyft.app');
+    // Response echoes the bound operator from server state
+    expect(res.body.operator_email).toBe('obed@idswyft.app');
   });
 
   it('defaults operator_email to null when omitted', async () => {
@@ -307,7 +310,9 @@ describe('POST /api/platform/api-keys/service — mint', () => {
       });
 
     expect(res.status).toBe(201);
+    expect(state.insertedKeys).toHaveLength(1);
     expect(state.insertedKeys[0].operator_email).toBeNull();
+    expect(res.body.operator_email).toBeNull();
   });
 
   it('rejects an invalid operator_email (400)', async () => {
