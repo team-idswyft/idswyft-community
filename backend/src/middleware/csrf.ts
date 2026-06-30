@@ -29,6 +29,9 @@ const CSRF_EXEMPT_PATHS = [
   '/api/auth/developer/otp/verify',      // pre-auth flow, protected by OTP + rate limiting
   '/api/auth/reviewer/otp/send',         // pre-auth flow, protected by rate limiting
   '/api/auth/reviewer/otp/verify',       // pre-auth flow, protected by OTP + rate limiting
+  '/api/auth/service-operator/otp/send',     // pre-auth flow, protected by rate limiting + OTP
+  '/api/auth/service-operator/otp/verify',   // pre-auth flow, protected by rate limiting + OTP
+  '/api/auth/service-operator/otp/select',   // short-lived selection token + rate limiting
 ];
 
 /**
