@@ -323,4 +323,45 @@ router.delete(
   }),
 );
 
+/**
+ * PATCH /api/platform/api-keys/service/:id/operator
+ * Bind, re-bind, or clear (operator_email: null) the human operator for a
+ * service key. The operator logs in via email OTP (Phase 2) to get an
+ * api_key_id-scoped session. Clearing revokes that access on the next request.
+ */
+router.patch(
+  '/:id/operator',
+  [
+    param('id').isUUID().withMessage('id must be a UUID'),
+    body('operator_email')
+      .optional({ nullable: true })
+      .isEmail()
+      .withMessage('operator_email must be a valid email or null'),
+  ],
+  catchAsync(async (req: Request, res: Response) => {
+    validate(req);
+
+    const operatorEmail = (req.body.operator_email as string | null | undefined) ?? null;
+
+    const { data, error } = await supabase
+      .from('api_keys')
+      .update({ operator_email: operatorEmail })
+      .eq('id', req.params.id)
+      .eq('is_service', true)
+      .select('id, operator_email')
+      .single();
+
+    if (error || !data) {
+      throw new NotFoundError(`Service key ${req.params.id} not found`);
+    }
+
+    logger.info('Service key operator updated', {
+      id: req.params.id,
+      bound: operatorEmail !== null,
+    });
+
+    res.status(200).json({ id: data.id, operator_email: data.operator_email });
+  }),
+);
+
 export default router;

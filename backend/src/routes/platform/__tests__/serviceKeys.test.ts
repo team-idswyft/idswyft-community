@@ -26,6 +26,7 @@ const state = vi.hoisted(() => ({
   rotateLookupRow: null as any,
   rotateRevokeError: null as any,
   deleteFoundRow: null as any,
+  operatorRow: null as any,
 }));
 
 vi.mock('@/config/database.js', () => {
@@ -90,8 +91,8 @@ vi.mock('@/config/database.js', () => {
             const updateChain = make();
             updateChain.single = vi.fn(() =>
               Promise.resolve({
-                data: state.deleteFoundRow,
-                error: state.deleteFoundRow ? null : { message: 'not found' },
+                data: state.operatorRow ?? state.deleteFoundRow,
+                error: (state.operatorRow ?? state.deleteFoundRow) ? null : { message: 'not found' },
               }),
             );
             return updateChain;
@@ -169,6 +170,7 @@ beforeEach(async () => {
   state.rotateLookupRow = null;
   state.rotateRevokeError = null;
   state.deleteFoundRow = null;
+  state.operatorRow = null;
   app = await buildApp();
 });
 
@@ -428,5 +430,53 @@ describe('POST /api/platform/api-keys/service/:id/rotate', () => {
     expect(inserted.service_product).toBe('gatepass');
     expect(inserted.service_environment).toBe('production');
     expect(inserted.is_service).toBe(true);
+  });
+});
+
+describe('PATCH /api/platform/api-keys/service/:id/operator — set operator', () => {
+  it('binds an operator_email to a service key (200)', async () => {
+    state.operatorRow = { id: 'key-1', operator_email: 'obed@idswyft.app' };
+    const res = await request(app)
+      .patch('/api/platform/api-keys/service/11111111-1111-4111-8111-111111111111/operator')
+      .set('X-Platform-Service-Token', TEST_TOKEN)
+      .send({ operator_email: 'obed@idswyft.app' });
+    expect(res.status).toBe(200);
+    expect(res.body.operator_email).toBe('obed@idswyft.app');
+  });
+
+  it('clears the operator_email when null is sent (200)', async () => {
+    state.operatorRow = { id: 'key-1', operator_email: null };
+    const res = await request(app)
+      .patch('/api/platform/api-keys/service/11111111-1111-4111-8111-111111111111/operator')
+      .set('X-Platform-Service-Token', TEST_TOKEN)
+      .send({ operator_email: null });
+    expect(res.status).toBe(200);
+    expect(res.body.operator_email).toBeNull();
+  });
+
+  it('returns 404 for a non-service / unknown id', async () => {
+    state.operatorRow = null;
+    state.deleteFoundRow = null;
+    const res = await request(app)
+      .patch('/api/platform/api-keys/service/22222222-2222-4222-8222-222222222222/operator')
+      .set('X-Platform-Service-Token', TEST_TOKEN)
+      .send({ operator_email: 'x@y.com' });
+    expect(res.status).toBe(404);
+  });
+
+  it('rejects an invalid operator_email (400)', async () => {
+    const res = await request(app)
+      .patch('/api/platform/api-keys/service/11111111-1111-4111-8111-111111111111/operator')
+      .set('X-Platform-Service-Token', TEST_TOKEN)
+      .send({ operator_email: 'bad' });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a non-UUID id (400)', async () => {
+    const res = await request(app)
+      .patch('/api/platform/api-keys/service/not-a-uuid/operator')
+      .set('X-Platform-Service-Token', TEST_TOKEN)
+      .send({ operator_email: 'x@y.com' });
+    expect(res.status).toBe(400);
   });
 });
