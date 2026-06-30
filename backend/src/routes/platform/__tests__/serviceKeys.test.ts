@@ -277,6 +277,50 @@ describe('POST /api/platform/api-keys/service — mint', () => {
 
     expect(res.status).toBe(500);
   });
+
+  it('stores operator_email when provided', async () => {
+    const res = await request(app)
+      .post('/api/platform/api-keys/service')
+      .set('X-Platform-Service-Token', TEST_TOKEN)
+      .send({
+        service_product: 'gatepass',
+        service_environment: 'production',
+        label: 'GatePass production',
+        operator_email: 'obed@idswyft.app',
+      });
+
+    expect(res.status).toBe(201);
+    expect(state.insertedKeys).toHaveLength(1);
+    expect(state.insertedKeys[0].operator_email).toBe('obed@idswyft.app');
+  });
+
+  it('defaults operator_email to null when omitted', async () => {
+    const res = await request(app)
+      .post('/api/platform/api-keys/service')
+      .set('X-Platform-Service-Token', TEST_TOKEN)
+      .send({
+        service_product: 'gatepass',
+        service_environment: 'production',
+        label: 'GatePass production',
+      });
+
+    expect(res.status).toBe(201);
+    expect(state.insertedKeys[0].operator_email).toBeNull();
+  });
+
+  it('rejects an invalid operator_email (400)', async () => {
+    const res = await request(app)
+      .post('/api/platform/api-keys/service')
+      .set('X-Platform-Service-Token', TEST_TOKEN)
+      .send({
+        service_product: 'gatepass',
+        service_environment: 'production',
+        label: 'GatePass production',
+        operator_email: 'not-an-email',
+      });
+
+    expect(res.status).toBe(400);
+  });
 });
 
 describe('GET /api/platform/api-keys/service — list', () => {

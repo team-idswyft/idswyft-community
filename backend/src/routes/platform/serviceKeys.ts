@@ -113,6 +113,10 @@ router.post(
       .isString()
       .isLength({ min: 3, max: 100 })
       .withMessage('label must be 3-100 characters'),
+    body('operator_email')
+      .optional()
+      .isEmail()
+      .withMessage('operator_email must be a valid email'),
   ],
   catchAsync(async (req: Request, res: Response) => {
     validate(req);
@@ -120,6 +124,7 @@ router.post(
     const product = req.body.service_product as ServiceProduct;
     const environment = req.body.service_environment as ServiceEnvironment;
     const label = req.body.label as string;
+    const operatorEmail = (req.body.operator_email as string | undefined) ?? null;
 
     const shadowDeveloperId = await resolveShadowDeveloperId(product);
     const { key, hash, prefix } = generatePrefixedAPIKey('isk');
@@ -137,6 +142,7 @@ router.post(
         service_product: product,
         service_environment: environment,
         service_label: label,
+        operator_email: operatorEmail,
       })
       .select('id, key_prefix, service_product, service_environment, service_label, created_at')
       .single();
