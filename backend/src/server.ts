@@ -25,7 +25,6 @@ import developerRoutes from './routes/developer/index.js';
 import adminRoutes from './routes/admin.js';
 import adminThresholdsRoutes from './routes/admin-thresholds.js';
 import authRoutes from './routes/auth.js';
-import serviceOperatorAuthRoutes from './routes/serviceOperatorAuth.js';
 import healthRoutes from './routes/health.js';
 import webhookRoutes from './routes/webhooks.js';
 import vaasRoutes from './routes/vaas.js';
@@ -136,7 +135,6 @@ app.use('/api/developer', conditionalCsrf, developerRoutes);
 app.use('/api/admin', conditionalCsrf, adminRoutes);
 app.use('/api/admin/thresholds', conditionalCsrf, adminThresholdsRoutes);
 app.use('/api/auth', conditionalCsrf, authRoutes);
-app.use('/api/auth', conditionalCsrf, serviceOperatorAuthRoutes);
 app.use('/api/health', healthRoutes);
 app.use('/api/webhooks', webhookRoutes);
 app.use('/api/vaas', vaasRoutes);
@@ -188,6 +186,23 @@ if (process.env.IDSWYFT_EDITION === 'cloud') {
   } catch (err: unknown) {
     logger.warn(
       'IDSWYFT_EDITION=cloud but platform webhooks module not present',
+      { error: err instanceof Error ? err.message : String(err) },
+    );
+  }
+
+  // Service-operator OTP login (operators bound to isk_* keys via
+  // operator_email). Cloud-only — same guarded dynamic-import pattern as the
+  // platform routes above so the community build (where the file is stripped
+  // via .community-ignore) neither fails tsc nor crashes at boot. Uses
+  // conditionalCsrf to match the sibling /api/auth mount.
+  const serviceOperatorAuthPath = './routes/serviceOperatorAuth.js';
+  try {
+    const mod: any = await import(serviceOperatorAuthPath);
+    app.use('/api/auth', conditionalCsrf, mod.default);
+    logger.info('Service-operator auth endpoints mounted');
+  } catch (err: unknown) {
+    logger.warn(
+      'IDSWYFT_EDITION=cloud but service-operator auth module not present',
       { error: err instanceof Error ? err.message : String(err) },
     );
   }
