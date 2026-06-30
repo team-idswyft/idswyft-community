@@ -783,6 +783,108 @@ export const authenticateReviewerJWT = catchAsync(async (req: Request, res: Resp
   }
 });
 
+// ─── Service-operator session (Phase 2) ──────────────────────────────────────
+// A human bound to a single service key via api_keys.operator_email logs in by
+// email OTP and receives this api_key_id-scoped session. The dashboard + review
+// endpoints (Phase 3+) accept it and scope all queries to req.operatorKeyId.
+
+export const generateServiceOperatorToken = (p: {
+  apiKeyId: string;
+  email: string;
+  developerId: string;
+  serviceProduct?: string | null;
+  serviceEnvironment?: string | null;
+}): string => {
+  return jwt.sign(
+    {
+      api_key_id: p.apiKeyId,
+      email: p.email,
+      developer_id: p.developerId,
+      service_product: p.serviceProduct ?? null,
+      service_environment: p.serviceEnvironment ?? null,
+      type: 'service-operator',
+    },
+    config.jwtSecret,
+    { expiresIn: '7d', issuer: 'idswyft-api', audience: 'idswyft-service-operator' },
+  );
+};
+
+// Short-lived token issued when one email operates >1 key, so the picker can
+// finalize a key choice without a second OTP.
+export const generateServiceOperatorSelectionToken = (email: string): string => {
+  return jwt.sign(
+    { email, type: 'service-operator-select' },
+    config.jwtSecret,
+    { expiresIn: '10m', issuer: 'idswyft-api', audience: 'idswyft-service-operator-select' },
+  );
+};
+
+export const verifyServiceOperatorSelectionToken = (token: string): string => {
+  const decoded = jwt.verify(token, config.jwtSecret, {
+    issuer: 'idswyft-api',
+    audience: 'idswyft-service-operator-select',
+  }) as { email: string; type: string };
+  if (decoded.type !== 'service-operator-select') {
+    throw new AuthenticationError('Invalid selection token');
+  }
+  return decoded.email;
+};
+
+export const authenticateServiceOperatorJWT = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const token = req.headers.authorization?.replace('Bearer ', '') || req.cookies?.idswyft_token;
+    if (!token) {
+      throw new AuthenticationError('Access token is required');
+    }
+
+    let decoded: any;
+    try {
+      decoded = jwt.verify(token, config.jwtSecret, {
+        issuer: 'idswyft-api',
+        audience: 'idswyft-service-operator',
+      });
+    } catch (error) {
+      if (error instanceof jwt.TokenExpiredError) {
+        throw new AuthenticationError('Token has expired');
+      }
+      throw new AuthenticationError('Invalid token');
+    }
+
+    if (decoded.type !== 'service-operator') {
+      throw new AuthenticationError('Invalid service operator token');
+    }
+
+    // Reload the key every request: revocation / re-bind takes effect immediately.
+    const { data: apiKeyRecord, error } = await supabase
+      .from('api_keys')
+      .select('*, developer:developers(*)')
+      .eq('id', decoded.api_key_id)
+      .eq('is_service', true)
+      .eq('is_active', true)
+      .single();
+
+    if (error || !apiKeyRecord) {
+      throw new AuthenticationError('Service key is no longer active');
+    }
+    if ((apiKeyRecord.operator_email ?? null) !== decoded.email) {
+      throw new AuthenticationError('Operator is no longer bound to this service key');
+    }
+
+    req.apiKey = apiKeyRecord as APIKey;
+    req.developer = apiKeyRecord.developer as Developer;
+    req.operatorKeyId = apiKeyRecord.id;
+    req.operatorEmail = decoded.email;
+
+    logger.info('Service operator authenticated', {
+      operatorEmail: decoded.email,
+      apiKeyId: apiKeyRecord.id,
+      serviceProduct: apiKeyRecord.service_product,
+    });
+
+    next();
+  },
+);
+
 // Flexible middleware: accepts admin JWT OR reviewer JWT
 // Sets req.user (admin) or req.reviewer (reviewer with developer_id scope)
 export const authenticateAdminOrReviewer = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
@@ -866,6 +968,8 @@ declare global {
       isSandbox?: boolean;
       isPremium?: boolean;
       serviceAuthenticated?: boolean;
+      operatorKeyId?: string;
+      operatorEmail?: string;
     }
   }
 }
@@ -880,6 +984,10 @@ export default {
   authenticateDeveloperJWT,
   authenticateDeveloperJWTOrServiceKey,
   authenticateReviewerJWT,
+  authenticateServiceOperatorJWT,
+  generateServiceOperatorToken,
+  generateServiceOperatorSelectionToken,
+  verifyServiceOperatorSelectionToken,
   authenticateAdminOrReviewer,
   authenticateUser,
   requireAdminRole,
