@@ -116,6 +116,7 @@ router.post(
     body('operator_email')
       .optional({ nullable: true })
       .isEmail()
+      .normalizeEmail()
       .withMessage('operator_email must be a valid email'),
   ],
   catchAsync(async (req: Request, res: Response) => {
@@ -337,6 +338,7 @@ router.patch(
     body('operator_email')
       .optional({ nullable: true })
       .isEmail()
+      .normalizeEmail()
       .withMessage('operator_email must be a valid email or null'),
   ],
   catchAsync(async (req: Request, res: Response) => {

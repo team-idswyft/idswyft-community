@@ -328,6 +328,23 @@ describe('POST /api/platform/api-keys/service — mint', () => {
 
     expect(res.status).toBe(400);
   });
+
+  it('normalizes operator_email to lowercase on mint', async () => {
+    const res = await request(app)
+      .post('/api/platform/api-keys/service')
+      .set('X-Platform-Service-Token', TEST_TOKEN)
+      .send({
+        service_product: 'gatepass',
+        service_environment: 'production',
+        label: 'GatePass production',
+        operator_email: 'Obed@Idswyft.APP',
+      });
+
+    expect(res.status).toBe(201);
+    expect(state.insertedKeys).toHaveLength(1);
+    expect(state.insertedKeys[0].operator_email).toBe('obed@idswyft.app');
+    expect(res.body.operator_email).toBe('obed@idswyft.app');
+  });
 });
 
 describe('GET /api/platform/api-keys/service — list', () => {
@@ -483,5 +500,15 @@ describe('PATCH /api/platform/api-keys/service/:id/operator — set operator', (
       .set('X-Platform-Service-Token', TEST_TOKEN)
       .send({ operator_email: 'x@y.com' });
     expect(res.status).toBe(400);
+  });
+
+  it('normalizes operator_email to lowercase on set-operator', async () => {
+    state.operatorRow = { id: 'key-1', operator_email: 'obed@idswyft.app' };
+    const res = await request(app)
+      .patch('/api/platform/api-keys/service/11111111-1111-4111-8111-111111111111/operator')
+      .set('X-Platform-Service-Token', TEST_TOKEN)
+      .send({ operator_email: 'Obed@Idswyft.APP' });
+    expect(res.status).toBe(200);
+    expect(res.body.operator_email).toBe('obed@idswyft.app');
   });
 });
