@@ -70,6 +70,7 @@ export class WebhookService {
     is_sandbox: boolean;
     secret_token?: string;
     events?: string[];
+    api_key_id?: string | null;
   }): Promise<Webhook> {
     // Encrypt secret_token before persisting
     const insertData = { ...data };
