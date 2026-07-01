@@ -1,6 +1,8 @@
 # Service-key minting — operating procedure
 
 > **Cloud-only.** This file is in `.community-ignore` and never ships to the public mirror. The endpoints described here only exist when `IDSWYFT_EDITION=cloud` is set on the backend.
+>
+> **Related:** to give the *human* who operates a key access to the dashboard + review queue, bind an operator email (`mint … --operator <email>` or `set-operator <id> <email>`) and see `service-operator-access.md` (how it works) and `service-operator-staging-test.md` (end-to-end test checklist).
 
 Service keys (`isk_*`) let internal Idswyft products call the verification API without hitting customer-facing rate limits, quotas, or plan gates. The minting UI lives in `idswyft-vaas/platform-admin/` (separate repo, deferred until vaas deploys). Until then, this is the operating procedure.
 
