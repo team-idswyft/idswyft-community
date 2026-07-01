@@ -301,13 +301,14 @@ export class VerificationService {
     filters: {
       status?: VerificationStatus;
       developerId?: string;
+      apiKeyId?: string;
       page?: number;
       limit?: number;
     } = {}
   ): Promise<{ verifications: VerificationRequest[]; total: number }> {
-    const { status, developerId, page = 1, limit = 50 } = filters;
+    const { status, developerId, apiKeyId, page = 1, limit = 50 } = filters;
     const offset = (page - 1) * limit;
-    
+
     let query = supabase
       .from('verification_requests')
       .select(`
@@ -317,32 +318,40 @@ export class VerificationService {
         document:documents!verification_requests_document_id_fkey(*),
         selfie:selfies!verification_requests_selfie_id_fkey(*)
       `);
-    
+
     if (status) {
       query = query.eq('status', status);
     }
-    
+
     if (developerId) {
       query = query.eq('developer_id', developerId);
     }
-    
+
+    if (apiKeyId) {
+      query = query.eq('api_key_id', apiKeyId);
+    }
+
     const { data: verifications, error } = await query
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
-    
+
     // Get total count
     let countQuery = supabase
       .from('verification_requests')
       .select('*', { count: 'exact', head: true });
-    
+
     if (status) {
       countQuery = countQuery.eq('status', status);
     }
-    
+
     if (developerId) {
       countQuery = countQuery.eq('developer_id', developerId);
     }
-    
+
+    if (apiKeyId) {
+      countQuery = countQuery.eq('api_key_id', apiKeyId);
+    }
+
     const { count, error: countError } = await countQuery;
     
     if (error || countError) {
@@ -357,63 +366,67 @@ export class VerificationService {
   }
   
   async approveVerification(
-    verificationId: string, 
-    adminUserId: string
+    verificationId: string,
+    reviewedBy: string
   ): Promise<VerificationRequest> {
     const { data: verification, error } = await supabase
       .from('verification_requests')
       .update({
         status: 'verified',
-        manual_review_reason: `Manually approved by admin ${adminUserId}`
+        reviewed_by: reviewedBy,
+        reviewed_at: new Date().toISOString(),
+        manual_review_reason: `Manually approved by ${reviewedBy}`
       })
       .eq('id', verificationId)
       .select('*')
       .single();
-    
+
     if (error) {
       logger.error('Failed to approve verification:', error);
       throw new Error('Failed to approve verification');
     }
-    
+
     logger.info('Verification manually approved', {
       verificationId,
-      adminUserId
+      reviewedBy
     });
-    
+
     return verification as VerificationRequest;
   }
-  
+
   async rejectVerification(
-    verificationId: string, 
-    adminUserId: string, 
+    verificationId: string,
+    reviewedBy: string,
     reason: string
   ): Promise<VerificationRequest> {
     const { data: verification, error } = await supabase
       .from('verification_requests')
       .update({
         status: 'failed',
-        manual_review_reason: `Manually rejected by admin ${adminUserId}: ${reason}`
+        reviewed_by: reviewedBy,
+        reviewed_at: new Date().toISOString(),
+        manual_review_reason: `Manually rejected by ${reviewedBy}: ${reason}`
       })
       .eq('id', verificationId)
       .select('*')
       .single();
-    
+
     if (error) {
       logger.error('Failed to reject verification:', error);
       throw new Error('Failed to reject verification');
     }
-    
+
     logger.info('Verification manually rejected', {
       verificationId,
-      adminUserId,
+      reviewedBy,
       reason
     });
-    
+
     return verification as VerificationRequest;
   }
   
   // Analytics methods
-  async getVerificationStats(developerId?: string): Promise<{
+  async getVerificationStats(developerId?: string, apiKeyId?: string | null): Promise<{
     total: number;
     verified: number;
     failed: number;
@@ -423,18 +436,23 @@ export class VerificationService {
     let query = supabase
       .from('verification_requests')
       .select('status');
-    
+
     if (developerId) {
       query = query.eq('developer_id', developerId);
     }
-    
-    const { data: verifications, error } = await query;
-    
+
+    if (apiKeyId) {
+      query = query.eq('api_key_id', apiKeyId);
+    }
+
+    const { data, error } = await query;
+    const verifications = data ?? [];
+
     if (error) {
       logger.error('Failed to get verification stats:', error);
       throw new Error('Failed to get verification stats');
     }
-    
+
     const stats = {
       total: verifications.length,
       verified: 0,
@@ -442,7 +460,7 @@ export class VerificationService {
       pending: 0,
       manual_review: 0
     };
-    
+
     verifications.forEach((v: any) => {
       stats[v.status as keyof typeof stats]++;
     });
