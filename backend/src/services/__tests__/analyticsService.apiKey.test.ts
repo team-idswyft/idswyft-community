@@ -52,9 +52,21 @@ describe('analyticsService apiKeyId scoping', () => {
     expect(calls.filters).toContainEqual(['api_key_id', 'key-1']);
   });
 
+  it('getDailyResponseTimes omits api_key_id when not provided', async () => {
+    await getDailyResponseTimes(period, 'dev-1');
+    expect(calls.filters).toContainEqual(['developer_id', 'dev-1']);
+    expect(calls.filters.find(([c]) => c === 'api_key_id')).toBeUndefined();
+  });
+
   it('getConversionFunnel filters by api_key_id', async () => {
     await getConversionFunnel(period, 'dev-1', 'key-1');
     expect(calls.filters).toContainEqual(['api_key_id', 'key-1']);
+  });
+
+  it('getConversionFunnel omits api_key_id when not provided', async () => {
+    await getConversionFunnel(period, 'dev-1');
+    expect(calls.filters).toContainEqual(['developer_id', 'dev-1']);
+    expect(calls.filters.find(([c]) => c === 'api_key_id')).toBeUndefined();
   });
 
   it('getGateRejectionBreakdown filters by api_key_id', async () => {
@@ -62,8 +74,20 @@ describe('analyticsService apiKeyId scoping', () => {
     expect(calls.filters).toContainEqual(['api_key_id', 'key-1']);
   });
 
+  it('getGateRejectionBreakdown omits api_key_id when not provided', async () => {
+    await getGateRejectionBreakdown(period, 'dev-1');
+    expect(calls.filters).toContainEqual(['developer_id', 'dev-1']);
+    expect(calls.filters.find(([c]) => c === 'api_key_id')).toBeUndefined();
+  });
+
   it('getDailyWebhookDeliveries filters webhooks by api_key_id', async () => {
     await getDailyWebhookDeliveries(period, 'dev-1', 'key-1');
     expect(calls.filters).toContainEqual(['api_key_id', 'key-1']);
+  });
+
+  it('getDailyWebhookDeliveries omits api_key_id when not provided', async () => {
+    await getDailyWebhookDeliveries(period, 'dev-1');
+    expect(calls.filters).toContainEqual(['developer_id', 'dev-1']);
+    expect(calls.filters.find(([c]) => c === 'api_key_id')).toBeUndefined();
   });
 });
