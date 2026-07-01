@@ -25,6 +25,7 @@ import { Status } from './pages/Status'
 import { SetupPage } from './pages/SetupPage'
 import { PatternShowcase } from './components/PatternShowcase'
 import { VerifyCredentialPage } from './pages/VerifyCredentialPage'
+import { OperatorLogin } from './pages/OperatorLogin'
 import { isCommunity, isCloud } from './config/edition'
 
 function App() {
@@ -46,6 +47,7 @@ function App() {
         {/* Cloud-only marketing routes — redirect to portal in community */}
         <Route path="/pricing" element={isCloud ? <PricingPage /> : <Navigate to="/" replace />} />
         <Route path="/patterns" element={isCloud ? <PatternShowcase /> : <Navigate to="/" replace />} />
+        <Route path="/operator/login" element={isCloud ? <OperatorLogin /> : <Navigate to="/" replace />} />
 
         {/* Shared routes — both editions */}
         <Route path="/user-verification" element={<UserVerificationPage />} />
