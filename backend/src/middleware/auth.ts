@@ -1014,6 +1014,34 @@ export const authenticateAdminOrReviewer = catchAsync(async (req: Request, res: 
   throw new AuthenticationError('Invalid or expired token');
 });
 
+// Flexible middleware for the REVIEW SURFACE ONLY (queue, dashboard, detail,
+// review action). Accepts the same admin/reviewer principals as
+// authenticateAdminOrReviewer, PLUS the service-operator cookie/bearer.
+//
+// This is deliberately SEPARATE from authenticateAdminOrReviewer: that
+// middleware also gates audit-export and GDPR-erasure routes, which operators
+// must never reach. Applying a distinct middleware only to the review routes
+// keeps operator access fail-safe (opt-in per route) rather than fail-open.
+export const authenticateReviewPrincipal = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const token = req.headers.authorization?.replace('Bearer ', '') || req.cookies?.idswyft_token;
+
+    let aud: string | undefined;
+    if (token) {
+      try {
+        aud = (jwt.decode(token) as any)?.aud;
+      } catch {
+        aud = undefined;
+      }
+    }
+
+    if (aud === 'idswyft-service-operator') {
+      return authenticateServiceOperatorJWT(req, res, next);
+    }
+    return authenticateAdminOrReviewer(req, res, next);
+  },
+);
+
 // Middleware to log authentication events
 export const logAuthEvent = (event: string) => {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -1057,6 +1085,7 @@ export default {
   generateServiceOperatorSelectionToken,
   verifyServiceOperatorSelectionToken,
   authenticateAdminOrReviewer,
+  authenticateReviewPrincipal,
   authenticateUser,
   requireAdminRole,
   requireOrgAdminOrPlatformAdmin,
