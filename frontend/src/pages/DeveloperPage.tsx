@@ -30,6 +30,9 @@ export function DeveloperPage() {
   const apiKeysAnchorRef = useRef<HTMLDivElement | null>(null)
   const webhooksAnchorRef = useRef<HTMLDivElement | null>(null)
 
+  const [isOperator, setIsOperator] = useState(false)
+  const [operator, setOperator] = useState<OperatorBlock | null>(null)
+
   // On mount, check if an auth cookie exists by probing a protected endpoint.
   // Uses fetchDashboardProfile() to also detect operator mode in one call.
   useEffect(() => {
@@ -67,9 +70,6 @@ export function DeveloperPage() {
       })
       .catch(() => navigate('/setup', { replace: true }))
   }, [token, navigate])
-
-  const [isOperator, setIsOperator] = useState(false)
-  const [operator, setOperator] = useState<OperatorBlock | null>(null)
 
   const [apiKeys, setApiKeys] = useState<ApiKey[]>([])
   const [stats, setStats] = useState<DeveloperStats | null>(null)
@@ -167,16 +167,22 @@ export function DeveloperPage() {
     setToken(null)
     setApiKeys([])
     setStats(null)
+    setIsOperator(false)
+    setOperator(null)
   }
 
   const handleAccountDeleted = () => {
     setToken(null)
     setApiKeys([])
     setStats(null)
+    setIsOperator(false)
+    setOperator(null)
   }
 
   const handleUnauthorized = () => {
     setToken(null)
+    setIsOperator(false)
+    setOperator(null)
   }
 
   const handleScrollTo = (key: SectionKey) => {
