@@ -37,7 +37,13 @@ const state = vi.hoisted(() => ({
 vi.mock('@/config/database.js', () => {
   const applyFilters = (rows: any[], filters: Array<[string, any]>) =>
     rows.filter((r) =>
-      filters.every(([col, val]) => (val === null ? r[col] == null : r[col] === val)),
+      filters.every(([col, val]) => {
+        if (col.startsWith('__in__')) {
+          const actualCol = col.slice(6); // '__in__' is 6 chars
+          return Array.isArray(val) && val.includes(r[actualCol]);
+        }
+        return val === null ? r[col] == null : r[col] === val;
+      }),
     );
 
   // Returns a builder that is thenable (so `await chain` works), supports
@@ -52,7 +58,10 @@ vi.mock('@/config/database.js', () => {
       gte: (_col: string, _val: any) => chain,
       order: (_col: string, _opts?: any) => chain,
       limit: (_n: number) => chain,
-      in: (_col: string, _vals: any[]) => chain,
+      in: (col: string, vals: any[]) => {
+        filters.push([`__in__${col}`, vals] as [string, any]);
+        return chain;
+      },
       single: () => {
         const matched = applyFilters(rows, filters);
         if (matched.length === 0) {
@@ -327,6 +336,69 @@ describe('GET /api/developer/activity — developer principal (no api_key_id fil
     expect(res.status).toBe(200);
     expect(res.body.recent_activities).toHaveLength(2);
     expect(res.body.statistics.total_requests).toBe(2);
+  });
+});
+
+describe('GET /api/developer/activity — operator session-outcomes api_key_id scoping (query 3)', () => {
+  // The /activity handler derives session UUIDs from activity-log endpoint paths,
+  // then fetches verification outcomes with:
+  //   .in('id', sessionIds).eq('api_key_id', effectiveKeyId)
+  //
+  // To confirm the api_key_id guard is load-bearing (not just the .in() filter),
+  // K2's UUID must enter sessionIds.  We seed two activity-log rows, both under
+  // K1, whose endpoint paths contain two distinct session UUIDs — one belonging
+  // to K1's verification and one to K2's.  The .eq('api_key_id', K1) guard on
+  // query (3) is then the ONLY thing that prevents K2's outcome from leaking.
+  // (If that guard were absent, session_outcomes[S_K2] would flip to 'failed'.)
+  //
+  // Note: the task spec suggests a single activity row + K2-different-id, which
+  // cannot lock this guard once .in() is fixed (K2 would already be excluded by
+  // .in() before reaching api_key_id).  Two activity rows is the minimal seeding
+  // that forces the api_key_id guard to be the discriminating exclusion.
+  const S_K1 = '11111111-aaaa-4aaa-8aaa-111111111111';
+  const S_K2 = '22222222-bbbb-4bbb-8bbb-222222222222';
+
+  it('excludes K2 session outcome even when K2 UUID appears in scoped activity endpoints', async () => {
+    state.activityRows = [
+      // K1 operator called its own session:
+      {
+        developer_id: SHADOW_DEV, api_key_id: K1,
+        timestamp: '2026-06-01T01:00:00Z', method: 'GET',
+        endpoint: `/api/v2/verify/${S_K1}/status`,
+        status_code: 200, response_time_ms: 30,
+        user_agent: null, ip_address: null, error_message: null,
+      },
+      // K1 operator also queried a session whose UUID belongs to K2's verification.
+      // This row is load-bearing: it puts S_K2 into sessionIds so the api_key_id
+      // guard is what excludes the K2 row (not the .in() filter).
+      {
+        developer_id: SHADOW_DEV, api_key_id: K1,
+        timestamp: '2026-06-01T01:01:00Z', method: 'GET',
+        endpoint: `/api/v2/verify/${S_K2}/status`,
+        status_code: 200, response_time_ms: 25,
+        user_agent: null, ip_address: null, error_message: null,
+      },
+    ];
+    state.verificationRows = [
+      { id: S_K1, developer_id: SHADOW_DEV, api_key_id: K1, status: 'verified' },
+      // K2's verification: id is in sessionIds (via the second activity row above),
+      // but api_key_id=K2 so the .eq('api_key_id', K1) guard must exclude it.
+      { id: S_K2, developer_id: SHADOW_DEV, api_key_id: K2, status: 'failed' },
+    ];
+
+    const res = await request(app)
+      .get('/api/developer/activity')
+      .set('x-test-principal', 'operator');
+
+    expect(res.status).toBe(200);
+
+    // K1's own session outcome is present
+    expect(res.body.session_outcomes[S_K1]).toBe('verified');
+
+    // K2's session outcome must be absent — blocked by .eq('api_key_id', K1)
+    // on the session-outcomes query.  If that guard were removed, S_K2 would
+    // appear with status 'failed' because its id IS in sessionIds.
+    expect(res.body.session_outcomes[S_K2]).toBeUndefined();
   });
 });
 
