@@ -90,7 +90,7 @@ export function DeveloperPage() {
         headers: authHeaders(token),
         credentials: 'include' as RequestCredentials,
       })
-      if (res.status === 401) { setToken(null); return }
+      if (res.status === 401) { handleUnauthorized(); return }
       if (res.ok) setApiKeys((await res.json()).api_keys ?? [])
     } catch { /* network error */ }
   }
@@ -152,6 +152,8 @@ export function DeveloperPage() {
   }, [token])
 
   const handleAuth = (t: string, apiKey?: string) => {
+    setIsOperator(false)
+    setOperator(null)
     setToken(t)
     fetchCsrfToken()
     if (apiKey) setNewFullKey(apiKey)
