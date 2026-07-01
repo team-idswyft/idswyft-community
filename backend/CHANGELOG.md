@@ -5,6 +5,66 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.16] - 2026-07-01
+
+Service Operator Access — a bound human operator can log into the existing
+developer dashboard and admin review queue, scoped to a single `isk_*` service
+key, plus the service key can self-manage its own webhook. Everything is
+hard-scoped by `api_key_id` (the shared shadow developer is **not** a tenant
+boundary). Cloud-only; inert in the community edition.
+
+### Added
+- **Service key self-manages its own webhook** over `X-API-Key` (no portal
+  login) — `authenticateDeveloperJWTOrServiceKey` on the webhook routes,
+  scoped to the calling key's own webhooks.
+- **Operator identity + auth.** `operator_email` bound at mint (`--operator`,
+  `set-operator`, `PATCH /api/platform/api-keys/service/:id/operator`),
+  normalized on write. Email-OTP login at `/api/auth/service-operator/otp/{send,
+  verify,select}` (0 keys → 401, 1 → cookie, >1 → selection token), issuing an
+  `idswyft-service-operator` JWT. `authenticateServiceOperatorJWT` reloads the
+  key every request so revocation/re-bind takes effect immediately.
+- **Dashboard scoping.** `authenticateDashboard` + `scopeForRequest`
+  (developer · service-operator cookie · service key). `GET /profile` returns
+  an operator block; `/api-keys`, `/stats`, `/activity`, `/analytics`,
+  `/verifications/:id`, and the webhook routes are scoped to the operator's
+  `api_key_id`. Service keys / operators have **no quota** (unlimited);
+  developers keep the 50/mo limit.
+- **Review wiring.** `authenticateReviewPrincipal` (admin · reviewer ·
+  operator), applied only to the review-surface routes — audit-export and
+  GDPR-erasure stay admin/reviewer-only. Queue, dashboard, detail, and the
+  approve/reject/override action are scoped to the operator's key; the decision
+  is attributed via new `reviewed_by`/`reviewed_at` columns.
+- **Frontend (cloud edition).** Cloud-gated `/operator/login` (OTP + multi-key
+  picker); `DeveloperPage` operator mode (owner-only affordances hidden, key
+  read-only, review-queue link); operator role in the review queue (override
+  kept, admin-only bits hidden).
+- **Migrations.** `api_keys.operator_email`; `verification_requests.api_key_id`
+  (+ partial index, FK `ON DELETE SET NULL`); `verification_requests.reviewed_by`
+  / `reviewed_at`.
+
+### Fixed
+- **Cross-key webhook leak (legacy `/register`).** The legacy webhook-register
+  route created NULL-`api_key_id` (product-wide) webhooks for service keys,
+  letting one key receive a sibling key's verification PII. It now hard-sets
+  `api_key_id` to the calling service key.
+- **Rotation dropped the operator binding.** `POST …/service/:id/rotate` now
+  carries `operator_email` to the new key (was NULL → operator locked out).
+- **Per-key webhook delivery on manual review.** The admin review action now
+  passes the verification's own `api_key_id` to `getActiveWebhooksForDeveloper`,
+  so only that key's webhook fires (also fixed a latent admin/reviewer
+  fan-out).
+- **Operator UI navigation & session:** review-page Back/Sign-out/expiry route
+  operators to `/developer` / `/operator/login` (not `/admin/login`); operator
+  mode resets on logout and every session-clear path; `verifyOperatorOtp`
+  returns a structured error on network failure.
+
+### Security
+- Per-key isolation everywhere via `.eq('api_key_id', …)`; operators are
+  hard-scoped and ignore client-supplied `?developer_id`/`?api_key_id`. The
+  operator token is reloaded and re-checked (active + `is_service` + email
+  binding) on every request. Least privilege: operators cannot reach
+  audit-export, GDPR-erasure, developer listing, or admin analytics.
+
 ## [1.12.15] - 2026-06-29
 
 ### Added
