@@ -291,6 +291,9 @@ describe('GET /api/developer/stats — operator principal (scoped to api_key_id)
     expect(res.status).toBe(200);
     expect(res.body.total_requests).toBe(2);
     expect(res.body.successful_requests).toBe(2);
+    // Operators / service keys have no quota → unlimited (null), remaining also null.
+    expect(res.body.monthly_limit).toBeNull();
+    expect(res.body.remaining_quota).toBeNull();
   });
 });
 
@@ -308,6 +311,8 @@ describe('GET /api/developer/stats — developer principal (no api_key_id filter
 
     expect(res.status).toBe(200);
     expect(res.body.total_requests).toBe(3);
+    // Developers keep the 50/mo quota (unchanged behaviour).
+    expect(res.body.monthly_limit).toBe(50);
   });
 });
 
@@ -493,7 +498,8 @@ describe('GET /api/developer/analytics — operator principal (scoped to api_key
 
     // Quota count scoped to K1 → only the 2 K1 rows are counted (K2 excluded).
     expect(res.body.quota.used).toBe(2);
-    expect(res.body.quota.limit).toBe(50);
+    // Operators / service keys have NO quota — limit is null (unlimited), not 50.
+    expect(res.body.quota.limit).toBeNull();
   });
 });
 
@@ -522,5 +528,7 @@ describe('GET /api/developer/analytics — developer principal (no api_key_id na
 
     // No api_key_id filter on the count → all 3 REAL_DEV rows counted.
     expect(res.body.quota.used).toBe(3);
+    // Developers keep the 50/mo quota (unchanged behaviour).
+    expect(res.body.quota.limit).toBe(50);
   });
 });

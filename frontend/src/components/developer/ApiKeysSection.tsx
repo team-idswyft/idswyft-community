@@ -382,10 +382,15 @@ export function ApiKeysSection({ token, apiKeys, setApiKeys, stats, newFullKey, 
           { label: 'Requests this month', value: stats.monthly_usage.toLocaleString() },
           { label: 'Verified',            value: stats.successful_requests.toLocaleString() },
           // Community edition has no quota — hide the limit card.
-          ...(isCommunity ? [] : [{
-            label: 'Limit remaining',
-            value: Math.max(0, stats.monthly_limit - stats.monthly_usage).toLocaleString(),
-          }]),
+          // Service keys / operators have no quota (monthly_limit null) — show "Unlimited".
+          ...(isCommunity ? [] : [
+            stats.monthly_limit === null
+              ? { label: 'Quota', value: 'Unlimited' }
+              : {
+                  label: 'Limit remaining',
+                  value: Math.max(0, stats.monthly_limit - stats.monthly_usage).toLocaleString(),
+                },
+          ]),
         ]
         const colsClass = cards.length === 2 ? ' cols-2' : ''
         return (

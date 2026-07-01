@@ -63,7 +63,9 @@ router.get('/stats',
     const pendingRequests = stats.filter((s: any) => s.status === 'pending').length;
     const manualReviewRequests = stats.filter((s: any) => s.status === 'manual_review').length;
 
-    const monthlyLimit = 50;
+    // Service keys / operators (api_key_id scoped) have no plan quota — that is
+    // the point of service keys. Developers (apiKeyId null) keep the 50/mo limit.
+    const monthlyLimit = apiKeyId ? null : 50;
 
     res.json({
       period: 'month',
@@ -76,7 +78,7 @@ router.get('/stats',
       success_rate: totalRequests > 0 ? (successfulRequests / totalRequests * 100).toFixed(2) + '%' : '0%',
       monthly_limit: monthlyLimit,
       monthly_usage: totalRequests,
-      remaining_quota: Math.max(0, monthlyLimit - totalRequests),
+      remaining_quota: monthlyLimit === null ? null : Math.max(0, monthlyLimit - totalRequests),
       quota_reset_date: getNextMonthStart(now).toISOString()
     });
   })
@@ -282,7 +284,8 @@ router.get('/analytics',
     const { count } = await cq;
 
     const used = count ?? 0;
-    const limit = 50;
+    // Service keys / operators (api_key_id scoped) have no quota; developers keep 50/mo.
+    const limit = apiKeyId ? null : 50;
 
     res.json({
       daily_volume,
