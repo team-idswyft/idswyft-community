@@ -1,6 +1,6 @@
 import express, { Request, Response } from 'express';
 import { body, query, param } from 'express-validator';
-import { authenticateJWT, requireAdminRole, authenticateAdminOrReviewer, requireOrgAdminOrPlatformAdmin } from '@/middleware/auth.js';
+import { authenticateJWT, requireAdminRole, authenticateAdminOrReviewer, authenticateReviewPrincipal, requireOrgAdminOrPlatformAdmin } from '@/middleware/auth.js';
 import { catchAsync, ValidationError, NotFoundError, AuthorizationError } from '@/middleware/errorHandler.js';
 import { validate } from '@/middleware/validate.js';
 import { VerificationService } from '@/services/verification.js';
@@ -25,10 +25,16 @@ const storageService = new StorageService();
 
 // Get dashboard overview
 router.get('/dashboard',
-  authenticateAdminOrReviewer,
+  authenticateReviewPrincipal,
   catchAsync(async (req: Request, res: Response) => {
-    // Scope to developer's data when a reviewer
-    const developerId = req.reviewer?.developer_id;
+    // Principal scoping:
+    //   - operator  → hard-scoped to their key (shadow developer + api_key_id)
+    //   - reviewer  → scoped to their developer
+    //   - admin     → all data
+    const scopedDeveloperId = req.operatorKeyId
+      ? req.developer!.id
+      : req.reviewer?.developer_id;
+    const scopedApiKeyId = req.operatorKeyId || null;
 
     const [
       verificationStats,
@@ -36,10 +42,10 @@ router.get('/dashboard',
       developerCount,
       systemHealth
     ] = await Promise.all([
-      verificationService.getVerificationStats(developerId),
-      verificationService.getVerificationRequestsForAdmin({ limit: 10, developerId }),
-      developerId ? Promise.resolve(1) : getDeveloperCount(),
-      developerId ? Promise.resolve({ overall_status: 'healthy' }) : getSystemHealth()
+      verificationService.getVerificationStats(scopedDeveloperId, scopedApiKeyId),
+      verificationService.getVerificationRequestsForAdmin({ limit: 10, developerId: scopedDeveloperId, apiKeyId: scopedApiKeyId || undefined }),
+      scopedDeveloperId ? Promise.resolve(1) : getDeveloperCount(),
+      scopedDeveloperId ? Promise.resolve({ overall_status: 'healthy' }) : getSystemHealth()
     ]);
 
     res.json({
@@ -53,7 +59,7 @@ router.get('/dashboard',
 
 // Get verification requests with filtering
 router.get('/verifications',
-  authenticateAdminOrReviewer,
+  authenticateReviewPrincipal,
   [
     query('status')
       .optional()
@@ -74,14 +80,21 @@ router.get('/verifications',
   ],
   validate,
   catchAsync(async (req: Request, res: Response) => {
-    // Reviewer: always scoped to their developer — never trust query param
-    const scopedDeveloperId = req.reviewer
-      ? req.reviewer.developer_id
-      : (req.query.developer_id as string | undefined);
+    // Principal scoping:
+    //   - operator  → hard-scoped to their key (shadow developer + api_key_id); query params ignored
+    //   - reviewer  → scoped to their developer; query param ignored
+    //   - admin     → optional ?developer_id filter
+    const scopedDeveloperId = req.operatorKeyId
+      ? req.developer!.id
+      : req.reviewer
+        ? req.reviewer.developer_id
+        : (req.query.developer_id as string | undefined);
+    const scopedApiKeyId = req.operatorKeyId || undefined;
 
     const filters = {
       status: req.query.status as any,
       developerId: scopedDeveloperId,
+      apiKeyId: scopedApiKeyId,
       page: parseInt(req.query.page as string) || 1,
       limit: parseInt(req.query.limit as string) || 50
     };
@@ -132,7 +145,7 @@ router.get('/verifications',
 
 // Get specific verification request details
 router.get('/verification/:id',
-  authenticateAdminOrReviewer,
+  authenticateReviewPrincipal,
   [
     param('id')
       .isUUID()
@@ -157,6 +170,11 @@ router.get('/verification/:id',
     // Scope to developer when reviewer
     if (req.reviewer) {
       verificationQuery = verificationQuery.eq('developer_id', req.reviewer.developer_id);
+    }
+
+    // Operators may only view their own key's verification
+    if (req.operatorKeyId) {
+      verificationQuery = verificationQuery.eq('api_key_id', req.operatorKeyId);
     }
 
     const { data: verification, error } = await verificationQuery.single();
@@ -358,7 +376,7 @@ router.get('/verification/:id/duplicates',
 // Manual review decision (approve/reject/override)
 // Fires webhooks to the developer's downstream systems after status change.
 router.put('/verification/:id/review',
-  authenticateAdminOrReviewer,
+  authenticateReviewPrincipal,
   [
     param('id')
       .isUUID()
@@ -380,7 +398,7 @@ router.put('/verification/:id/review',
   catchAsync(async (req: Request, res: Response) => {
     const { id } = req.params;
     const { decision, reason, new_status } = req.body;
-    const adminUserId = req.user?.id || req.reviewer?.id || '';
+    const actorId = req.user?.id || req.reviewer?.id || req.operatorEmail || '';
 
     // If reviewer, verify the verification belongs to their developer
     if (req.reviewer) {
@@ -389,6 +407,17 @@ router.put('/verification/:id/review',
         .select('id')
         .eq('id', id)
         .eq('developer_id', req.reviewer.developer_id)
+        .single();
+      if (!check) throw new NotFoundError('Verification request');
+    }
+
+    // If operator, verify the verification belongs to their key
+    if (req.operatorKeyId) {
+      const { data: check } = await supabase
+        .from('verification_requests')
+        .select('id')
+        .eq('id', id)
+        .eq('api_key_id', req.operatorKeyId)
         .single();
       if (!check) throw new NotFoundError('Verification request');
     }
@@ -407,11 +436,11 @@ router.put('/verification/:id/review',
     let finalStatus: string;
 
     if (decision === 'approve') {
-      updatedVerification = await verificationService.approveVerification(id, adminUserId);
+      updatedVerification = await verificationService.approveVerification(id, actorId);
       finalStatus = 'verified';
     } else if (decision === 'reject') {
       const reviewReason = reason || 'Rejected by admin review';
-      updatedVerification = await verificationService.rejectVerification(id, adminUserId, reviewReason);
+      updatedVerification = await verificationService.rejectVerification(id, actorId, reviewReason);
       finalStatus = 'failed';
     } else {
       // Override — set any valid status directly
@@ -419,7 +448,7 @@ router.put('/verification/:id/review',
         .from('verification_requests')
         .update({
           status: new_status,
-          reviewed_by: adminUserId,
+          reviewed_by: actorId,
           reviewed_at: new Date().toISOString(),
           failure_reason: new_status === 'failed' ? (reason || 'Status overridden by reviewer') : null,
         })
@@ -450,8 +479,10 @@ router.put('/verification/:id/review',
         : finalStatus === 'manual_review' ? 'verification.manual_review'
         : null;
 
+      const apiKeyId = updatedVerification.api_key_id || undefined;
+
       if (eventType && developerId) {
-        const webhooks = await webhookService.getActiveWebhooksForDeveloper(developerId, isSandbox, eventType);
+        const webhooks = await webhookService.getActiveWebhooksForDeveloper(developerId, isSandbox, eventType, apiKeyId);
         for (const webhook of webhooks) {
           webhookService.sendWebhook(webhook, id, {
             event: eventType,
