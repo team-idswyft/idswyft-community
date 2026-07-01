@@ -134,6 +134,7 @@ vi.mock('@/middleware/auth.js', async (importOriginal) => {
     ...actual,
     authenticateDeveloperJWTOrServiceKey: setPrincipal,
     authenticateDeveloperJWT: setPrincipal,
+    authenticateDashboard: setPrincipal,
   };
 });
 

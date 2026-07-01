@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { body, param } from 'express-validator';
 import { supabase } from '@/config/database.js';
-import { authenticateDeveloperJWT, authenticateDeveloperJWTOrServiceKey } from '@/middleware/auth.js';
+import { authenticateDeveloperJWT, authenticateDashboard, scopeForRequest } from '@/middleware/auth.js';
 import { catchAsync, ValidationError, NotFoundError, AuthenticationError } from '@/middleware/errorHandler.js';
 import { validate } from '@/middleware/validate.js';
 import { logger } from '@/utils/logger.js';
@@ -27,35 +27,24 @@ const apiKeyRateLimit = rateLimit({
   legacyHeaders: false
 });
 
-/**
- * Resolve the ownership scope for a webhook-management request.
- *
- * The flexible auth (authenticateDeveloperJWTOrServiceKey) admits two principals:
- *   - Developer portal JWT → scope by developer_id only (apiKeyId = null). This
- *     preserves the original portal behaviour: a developer sees every webhook on
- *     their account regardless of which key created it.
- *   - Service API key (isk_*) → scope by developer_id AND api_key_id. Service
- *     keys share one shadow developer row per product, so developer_id alone is
- *     NOT a tenant boundary; api_key_id is the only thing isolating one key's
- *     webhooks from another's. Every read/write below MUST apply this filter.
- */
-function ownerScope(req: Request): { developerId: string; apiKeyId: string | null } {
-  const developer = req.developer;
-  if (!developer) {
-    throw new AuthenticationError('Developer authentication required');
-  }
-  if (req.apiKey?.is_service) {
-    return { developerId: developer.id, apiKeyId: req.apiKey.id };
-  }
-  return { developerId: developer.id, apiKeyId: null };
-}
+// Ownership scoping for webhook-management requests uses the shared
+// scopeForRequest(req) helper (see @/middleware/auth). It admits three
+// principals via authenticateDashboard:
+//   - Developer portal JWT → scope by developer_id only (apiKeyId = null),
+//     preserving the original portal behaviour: a developer sees every webhook
+//     on their account regardless of which key created it.
+//   - Service API key (isk_*) and service-operator session → scope by
+//     developer_id AND api_key_id. Service keys share one shadow developer row
+//     per product, so developer_id alone is NOT a tenant boundary; api_key_id
+//     is the only thing isolating one key's webhooks from another's. Every
+//     read/write below MUST apply this filter.
 
-// List webhooks for the calling principal (developer portal JWT or isk_* service key)
+// List webhooks for the calling principal (developer portal JWT, isk_* service key, or operator session)
 router.get('/webhooks',
   apiKeyRateLimit,
-  authenticateDeveloperJWTOrServiceKey,
+  authenticateDashboard,
   catchAsync(async (req: Request, res: Response) => {
-    const { developerId, apiKeyId } = ownerScope(req);
+    const { developerId, apiKeyId } = scopeForRequest(req);
 
     let query = supabase
       .from('webhooks')
@@ -90,10 +79,10 @@ router.get('/webhooks',
   })
 );
 
-// Create webhook for the calling principal (developer portal JWT or isk_* service key)
+// Create webhook for the calling principal (developer portal JWT, isk_* service key, or operator session)
 router.post('/webhooks',
   apiKeyRateLimit,
-  authenticateDeveloperJWTOrServiceKey,
+  authenticateDashboard,
   [
     body('url')
       .isURL({ protocols: ['https'] })
@@ -228,10 +217,10 @@ router.post('/webhooks',
   })
 );
 
-// Reveal full webhook signing secret (developer portal JWT or isk_* service key)
+// Reveal full webhook signing secret (developer portal JWT, isk_* service key, or operator session)
 router.get('/webhooks/:webhookId/secret',
   apiKeyRateLimit,
-  authenticateDeveloperJWTOrServiceKey,
+  authenticateDashboard,
   [
     param('webhookId')
       .isUUID()
@@ -239,7 +228,7 @@ router.get('/webhooks/:webhookId/secret',
   ],
   validate,
   catchAsync(async (req: Request, res: Response) => {
-    const { developerId, apiKeyId } = ownerScope(req);
+    const { developerId, apiKeyId } = scopeForRequest(req);
 
     const { webhookId } = req.params;
 
@@ -492,10 +481,10 @@ router.post('/webhooks/:webhookId/deliveries/:deliveryId/resend',
   })
 );
 
-// Delete webhook for the calling principal (developer portal JWT or isk_* service key)
+// Delete webhook for the calling principal (developer portal JWT, isk_* service key, or operator session)
 router.delete('/webhooks/:webhookId',
   apiKeyRateLimit,
-  authenticateDeveloperJWTOrServiceKey,
+  authenticateDashboard,
   [
     param('webhookId')
       .isUUID()
@@ -503,7 +492,7 @@ router.delete('/webhooks/:webhookId',
   ],
   validate,
   catchAsync(async (req: Request, res: Response) => {
-    const { developerId, apiKeyId } = ownerScope(req);
+    const { developerId, apiKeyId } = scopeForRequest(req);
 
     const { webhookId } = req.params;
 

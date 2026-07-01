@@ -2,8 +2,8 @@ import express, { Request, Response } from 'express';
 import { param } from 'express-validator';
 import validator from 'validator';
 import { supabase } from '@/config/database.js';
-import { authenticateDeveloperJWT, authenticateDashboard, scopeForRequest } from '@/middleware/auth.js';
-import { catchAsync, ValidationError, NotFoundError, AuthenticationError } from '@/middleware/errorHandler.js';
+import { authenticateDashboard, scopeForRequest } from '@/middleware/auth.js';
+import { catchAsync, ValidationError, NotFoundError } from '@/middleware/errorHandler.js';
 import { validate } from '@/middleware/validate.js';
 import { logger } from '@/utils/logger.js';
 import rateLimit from 'express-rate-limit';
@@ -254,32 +254,32 @@ router.get('/verifications/:verificationId',
 
 router.get('/analytics',
   apiKeyRateLimit,
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   catchAsync(async (req: Request, res: Response) => {
-    const developer = req.developer;
-    if (!developer) {
-      throw new AuthenticationError('Developer authentication required');
-    }
+    const { developerId, apiKeyId } = scopeForRequest(req);
 
     const period = getDefaultPeriod();
 
     const [daily_volume, rejection_breakdown, daily_latency, funnel, daily_webhooks] =
       await Promise.all([
-        getDailyVerificationVolume(period, developer.id),
-        getGateRejectionBreakdown(period, developer.id),
-        getDailyResponseTimes(period, developer.id),
-        getConversionFunnel(period, developer.id),
-        getDailyWebhookDeliveries(period, developer.id),
+        getDailyVerificationVolume(period, developerId, apiKeyId),
+        getGateRejectionBreakdown(period, developerId, apiKeyId),
+        getDailyResponseTimes(period, developerId, apiKeyId),
+        getConversionFunnel(period, developerId, apiKeyId),
+        getDailyWebhookDeliveries(period, developerId, apiKeyId),
       ]);
 
     // Quota: count verification_requests this month
     const monthStart = getMonthStart(new Date());
 
-    const { count } = await supabase
+    let cq = supabase
       .from('verification_requests')
       .select('*', { count: 'exact', head: true })
-      .eq('developer_id', developer.id)
+      .eq('developer_id', developerId)
       .gte('created_at', monthStart.toISOString());
+    if (apiKeyId) cq = cq.eq('api_key_id', apiKeyId);
+
+    const { count } = await cq;
 
     const used = count ?? 0;
     const limit = 50;

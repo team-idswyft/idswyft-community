@@ -19,6 +19,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import express, { type Express } from 'express';
 import request from 'supertest';
+import {
+  getDailyVerificationVolume,
+  getGateRejectionBreakdown,
+  getDailyResponseTimes,
+  getConversionFunnel,
+  getDailyWebhookDeliveries,
+} from '@/services/analyticsService.js';
 
 // ─── Principals ──────────────────────────────────────────────────────────────
 const SHADOW_DEV = 'shadow-dev-uuid-0001';
@@ -70,8 +77,12 @@ vi.mock('@/config/database.js', () => {
         return Promise.resolve({ data: matched[0], error: null });
       },
       // Makes `await chain` and `Promise.all([chain, ...])` resolve directly.
-      then: (resolve_fn: (v: any) => any, reject_fn?: (e: any) => any) =>
-        Promise.resolve({ data: applyFilters(rows, filters), error: null }).then(resolve_fn, reject_fn),
+      // Also surfaces `count` (matched-row count) so head:true count queries
+      // like the /analytics monthly quota resolve with a real number.
+      then: (resolve_fn: (v: any) => any, reject_fn?: (e: any) => any) => {
+        const matched = applyFilters(rows, filters);
+        return Promise.resolve({ data: matched, error: null, count: matched.length }).then(resolve_fn, reject_fn);
+      },
     };
     return chain;
   };
@@ -134,6 +145,20 @@ vi.mock('@/middleware/auth.js', async (importOriginal) => {
 
 vi.mock('@/utils/logger.js', () => ({
   logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn() },
+}));
+
+// ─── analyticsService stub ────────────────────────────────────────────────────
+// Replace the 5 aggregation functions with vi.fn()s returning benign empty
+// shapes so the /analytics handler runs without touching real aggregation SQL.
+// The tests assert the 3rd arg (apiKeyId) each receives. getDefaultPeriod is
+// kept as a stub returning a fixed period so the handler has a value to pass.
+vi.mock('@/services/analyticsService.js', () => ({
+  getDefaultPeriod: vi.fn(() => ({ start_date: '2026-06-24T00:00:00Z', end_date: '2026-07-01T00:00:00Z' })),
+  getDailyVerificationVolume: vi.fn(async () => []),
+  getGateRejectionBreakdown: vi.fn(async () => []),
+  getDailyResponseTimes: vi.fn(async () => []),
+  getConversionFunnel: vi.fn(async () => []),
+  getDailyWebhookDeliveries: vi.fn(async () => []),
 }));
 
 // ─── App factory ─────────────────────────────────────────────────────────────
@@ -437,5 +462,65 @@ describe('GET /api/developer/verifications/:id — operator own key (200)', () =
     expect(res.status).toBe(200);
     expect(res.body.status).toBe('pending');
     expect(res.body.verification_id).toBe(V_K1);
+  });
+});
+
+// ─── GET /analytics ───────────────────────────────────────────────────────────
+
+describe('GET /api/developer/analytics — operator principal (scoped to api_key_id)', () => {
+  it('passes the operator key (K1) as the 3rd arg to every aggregation and scopes the quota count', async () => {
+    // 2 verified rows for K1, 1 for K2 — all share SHADOW_DEV. The quota count
+    // must apply .eq('api_key_id', K1) so used === 2, not 3.
+    state.verificationRows = [
+      { developer_id: SHADOW_DEV, api_key_id: K1, status: 'verified', created_at: '2026-07-01T00:00:00Z' },
+      { developer_id: SHADOW_DEV, api_key_id: K1, status: 'verified', created_at: '2026-07-01T00:00:00Z' },
+      { developer_id: SHADOW_DEV, api_key_id: K2, status: 'verified', created_at: '2026-07-01T00:00:00Z' },
+    ];
+
+    const res = await request(app)
+      .get('/api/developer/analytics')
+      .set('x-test-principal', 'operator');
+
+    expect(res.status).toBe(200);
+
+    // Every aggregation function received K1 as its 3rd (apiKeyId) argument,
+    // and SHADOW_DEV as its 2nd (developerId) argument.
+    expect(getDailyVerificationVolume).toHaveBeenCalledWith(expect.anything(), SHADOW_DEV, K1);
+    expect(getGateRejectionBreakdown).toHaveBeenCalledWith(expect.anything(), SHADOW_DEV, K1);
+    expect(getDailyResponseTimes).toHaveBeenCalledWith(expect.anything(), SHADOW_DEV, K1);
+    expect(getConversionFunnel).toHaveBeenCalledWith(expect.anything(), SHADOW_DEV, K1);
+    expect(getDailyWebhookDeliveries).toHaveBeenCalledWith(expect.anything(), SHADOW_DEV, K1);
+
+    // Quota count scoped to K1 → only the 2 K1 rows are counted (K2 excluded).
+    expect(res.body.quota.used).toBe(2);
+    expect(res.body.quota.limit).toBe(50);
+  });
+});
+
+describe('GET /api/developer/analytics — developer principal (no api_key_id narrowing)', () => {
+  it('passes null as the 3rd arg to every aggregation and counts ALL developer verifications', async () => {
+    // 3 rows for REAL_DEV across different keys — none must be narrowed out.
+    state.verificationRows = [
+      { developer_id: REAL_DEV, api_key_id: K1,   status: 'verified', created_at: '2026-07-01T00:00:00Z' },
+      { developer_id: REAL_DEV, api_key_id: null, status: 'failed',   created_at: '2026-07-01T00:00:00Z' },
+      { developer_id: REAL_DEV, api_key_id: K2,   status: 'pending',  created_at: '2026-07-01T00:00:00Z' },
+    ];
+
+    const res = await request(app)
+      .get('/api/developer/analytics')
+      .set('x-test-principal', 'developer');
+
+    expect(res.status).toBe(200);
+
+    // Developer path: apiKeyId is null → aggregations receive null as 3rd arg,
+    // proving developer behaviour is unchanged.
+    expect(getDailyVerificationVolume).toHaveBeenCalledWith(expect.anything(), REAL_DEV, null);
+    expect(getGateRejectionBreakdown).toHaveBeenCalledWith(expect.anything(), REAL_DEV, null);
+    expect(getDailyResponseTimes).toHaveBeenCalledWith(expect.anything(), REAL_DEV, null);
+    expect(getConversionFunnel).toHaveBeenCalledWith(expect.anything(), REAL_DEV, null);
+    expect(getDailyWebhookDeliveries).toHaveBeenCalledWith(expect.anything(), REAL_DEV, null);
+
+    // No api_key_id filter on the count → all 3 REAL_DEV rows counted.
+    expect(res.body.quota.used).toBe(3);
   });
 });
