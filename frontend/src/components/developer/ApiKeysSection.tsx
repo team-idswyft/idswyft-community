@@ -186,9 +186,11 @@ interface ApiKeysSectionProps {
   onUnauthorized: () => void
   /** Rendered between the usage stats strip and the API keys table */
   renderAfterStats?: React.ReactNode
+  /** When true, hides Create Key and delete actions (operator sees keys read-only) */
+  isOperator?: boolean
 }
 
-export function ApiKeysSection({ token, apiKeys, setApiKeys, stats, newFullKey, setNewFullKey, onUnauthorized, renderAfterStats }: ApiKeysSectionProps) {
+export function ApiKeysSection({ token, apiKeys, setApiKeys, stats, newFullKey, setNewFullKey, onUnauthorized, renderAfterStats, isOperator = false }: ApiKeysSectionProps) {
   const authHeaders = (token === 'session' ? {} : { Authorization: `Bearer ${token}` }) as Record<string, string>
   const [showCreate, setShowCreate] = useState(false)
   const [deleteId, setDeleteId] = useState<string | null>(null)
@@ -449,16 +451,18 @@ export function ApiKeysSection({ token, apiKeys, setApiKeys, stats, newFullKey, 
         <div className="card-head">
           <h3>Your keys</h3>
           <span className="sub">// rotate frequently · never commit to source</span>
-          <div className="right">
-            <button
-              type="button"
-              className="btn primary sm"
-              onClick={() => setShowCreate(true)}
-            >
-              <PlusIcon style={{ width: 12, height: 12 }} />
-              Create Key
-            </button>
-          </div>
+          {!isOperator && (
+            <div className="right">
+              <button
+                type="button"
+                className="btn primary sm"
+                onClick={() => setShowCreate(true)}
+              >
+                <PlusIcon style={{ width: 12, height: 12 }} />
+                Create Key
+              </button>
+            </div>
+          )}
         </div>
 
         {apiKeys.length === 0 ? (
@@ -504,7 +508,7 @@ export function ApiKeysSection({ token, apiKeys, setApiKeys, stats, newFullKey, 
                       {key.last_used_at ? new Date(key.last_used_at).toLocaleDateString() : '—'}
                     </td>
                     <td>
-                      {deleteId === key.id ? (
+                      {!isOperator && deleteId === key.id ? (
                         <div className="row-actions">
                           <button type="button" className="danger" onClick={() => handleDelete(key.id)}>Confirm</button>
                           <button type="button" onClick={() => setDeleteId(null)}>Cancel</button>
@@ -523,9 +527,11 @@ export function ApiKeysSection({ token, apiKeys, setApiKeys, stats, newFullKey, 
                             )}
                             Logs
                           </button>
-                          <button type="button" className="danger" onClick={() => setDeleteId(key.id)}>
-                            <TrashIcon style={{ width: 11, height: 11 }} />
-                          </button>
+                          {!isOperator && (
+                            <button type="button" className="danger" onClick={() => setDeleteId(key.id)}>
+                              <TrashIcon style={{ width: 11, height: 11 }} />
+                            </button>
+                          )}
                         </div>
                       )}
                     </td>
@@ -725,8 +731,8 @@ export function ApiKeysSection({ token, apiKeys, setApiKeys, stats, newFullKey, 
         </Link>
       </div>
 
-      {/* Create key modal */}
-      {showCreate && token && (
+      {/* Create key modal — unreachable for operators (button hidden), but guarded here too */}
+      {!isOperator && showCreate && token && (
         <CreateKeyModal
           onClose={() => setShowCreate(false)}
           onCreated={handleCreated}
