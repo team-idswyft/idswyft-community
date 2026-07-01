@@ -269,7 +269,7 @@ export function VerificationManagement() {
 
       const res = await fetch(`${API_BASE_URL}/api/admin/verifications?${params}`, authFetchOpts())
       if (res.status === 401) {
-        navigate('/admin/login')
+        navigate(userRole === 'operator' ? '/operator/login' : '/admin/login')
         return
       }
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -282,7 +282,7 @@ export function VerificationManagement() {
     } finally {
       setLoading(false)
     }
-  }, [page, statusFilter, navigate])
+  }, [page, statusFilter, navigate, userRole])
 
   // ── Fetch stats ──
   const fetchStats = useCallback(async () => {
@@ -410,9 +410,9 @@ export function VerificationManagement() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <button
-              onClick={() => navigate('/admin/login')}
+              onClick={() => navigate(userRole === 'operator' ? '/developer' : '/admin/login')}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, display: 'flex', padding: 4 }}
-              title="Back"
+              title={userRole === 'operator' ? 'Back to dashboard' : 'Back'}
             >
               <ArrowLeftIcon style={{ width: 20, height: 20 }} />
             </button>
@@ -459,7 +459,7 @@ export function VerificationManagement() {
               onClick={() => {
                 fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include', headers: csrfHeader() }).catch(() => {})
                 clearCsrfToken()
-                navigate('/admin/login')
+                navigate(userRole === 'operator' ? '/operator/login' : '/admin/login')
               }}
               className="btn-outline"
               style={{ padding: '8px 16px', fontSize: 13 }}
