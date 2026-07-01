@@ -216,7 +216,7 @@ router.post(
 
     const { data: existing, error: lookupErr } = await supabase
       .from('api_keys')
-      .select('id, developer_id, service_product, service_environment, service_label')
+      .select('id, developer_id, service_product, service_environment, service_label, operator_email')
       .eq('id', oldId)
       .eq('is_service', true)
       .single();
@@ -241,6 +241,10 @@ router.post(
         service_product: existing.service_product,
         service_environment: existing.service_environment,
         service_label: existing.service_label,
+        // Preserve the operator binding across rotation — otherwise the new key
+        // has a NULL operator_email and the bound operator is locked out (401
+        // "Operator is no longer bound") until someone re-runs set-operator.
+        operator_email: existing.operator_email ?? null,
       })
       .select('id, key_prefix, service_product, service_environment, service_label, created_at')
       .single();

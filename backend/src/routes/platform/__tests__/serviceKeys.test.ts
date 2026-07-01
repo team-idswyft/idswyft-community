@@ -453,6 +453,46 @@ describe('POST /api/platform/api-keys/service/:id/rotate', () => {
     expect(inserted.service_environment).toBe('production');
     expect(inserted.is_service).toBe(true);
   });
+
+  it('preserves operator_email on the rotated key (does not unbind the operator)', async () => {
+    // An operator-bound key: rotation must carry the binding to the new key,
+    // otherwise the operator is silently locked out (401 on next login).
+    state.rotateLookupRow = {
+      id: 'old-key-uuid',
+      developer_id: 'shadow-uuid-gatepass',
+      service_product: 'gatepass',
+      service_environment: 'production',
+      service_label: 'GatePass production',
+      operator_email: 'obed@idswyft.app',
+    };
+
+    const res = await request(app)
+      .post('/api/platform/api-keys/service/22222222-2222-4222-8222-222222222222/rotate')
+      .set('X-Platform-Service-Token', TEST_TOKEN);
+
+    expect(res.status).toBe(200);
+    const inserted = state.insertedKeys[state.insertedKeys.length - 1];
+    expect(inserted.operator_email).toBe('obed@idswyft.app');
+  });
+
+  it('leaves operator_email null when the rotated key had no operator bound', async () => {
+    state.rotateLookupRow = {
+      id: 'old-key-uuid',
+      developer_id: 'shadow-uuid-gatepass',
+      service_product: 'gatepass',
+      service_environment: 'production',
+      service_label: 'GatePass production',
+      operator_email: null,
+    };
+
+    const res = await request(app)
+      .post('/api/platform/api-keys/service/22222222-2222-4222-8222-222222222222/rotate')
+      .set('X-Platform-Service-Token', TEST_TOKEN);
+
+    expect(res.status).toBe(200);
+    const inserted = state.insertedKeys[state.insertedKeys.length - 1];
+    expect(inserted.operator_email ?? null).toBeNull();
+  });
 });
 
 describe('PATCH /api/platform/api-keys/service/:id/operator — set operator', () => {
