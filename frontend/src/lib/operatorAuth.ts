@@ -28,11 +28,13 @@ export interface OperatorKeyOption {
  *   authed   — single key; cookie was set server-side
  *   select   — multiple keys; consumer must call selectOperatorKey
  *   no-key   — 0 active keys for email, or invalid/expired OTP (both 401)
+ *   error    — network failure (fetch threw before a response arrived)
  */
 export type VerifyResult =
   | { status: 'authed' }
   | { status: 'select'; selectionToken: string; keys: OperatorKeyOption[] }
-  | { status: 'no-key'; message: string };
+  | { status: 'no-key'; message: string }
+  | { status: 'error'; message: string };
 
 /** POST /api/auth/service-operator/otp/send */
 export async function sendOperatorOtp(
@@ -61,27 +63,31 @@ export async function sendOperatorOtp(
  * 200 without selection_token → authed (single key, cookie already set)
  */
 export async function verifyOperatorOtp(email: string, code: string): Promise<VerifyResult> {
-  const res = await fetch(`${BASE}/verify`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...csrfHeader() },
-    credentials: 'include',
-    body: JSON.stringify({ email, code }),
-  });
-  const data = await res.json();
+  try {
+    const res = await fetch(`${BASE}/verify`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...csrfHeader() },
+      credentials: 'include',
+      body: JSON.stringify({ email, code }),
+    });
+    const data = await res.json();
 
-  if (!res.ok) {
-    return { status: 'no-key', message: data.message || data.error || 'No service access' };
+    if (!res.ok) {
+      return { status: 'no-key', message: data.message || data.error || 'No service access' };
+    }
+
+    if (data.selection_token) {
+      return {
+        status: 'select',
+        selectionToken: data.selection_token,
+        keys: data.keys as OperatorKeyOption[],
+      };
+    }
+
+    return { status: 'authed' };
+  } catch {
+    return { status: 'error', message: 'Network error' };
   }
-
-  if (data.selection_token) {
-    return {
-      status: 'select',
-      selectionToken: data.selection_token,
-      keys: data.keys as OperatorKeyOption[],
-    };
-  }
-
-  return { status: 'authed' };
 }
 
 /**

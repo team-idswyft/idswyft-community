@@ -62,6 +62,15 @@ describe('verifyOperatorOtp', () => {
       expect(r.message).toBe('No service access for this email');
     }
   });
+
+  it('network failure → resolves to error (does NOT reject)', async () => {
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new Error('network'); }) as any);
+    const r = await verifyOperatorOtp('op@x.com', '123456');
+    expect(r.status).toBe('error');
+    if (r.status === 'error') {
+      expect(r.message).toBeTruthy();
+    }
+  });
 });
 
 // Real backend select response (200): { scope: 'service-operator', operator: { email, api_key_id, ... } }
