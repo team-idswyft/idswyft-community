@@ -2,6 +2,8 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { API_BASE_URL } from '../config/api'
 import { fetchCsrfToken, getCsrfToken, csrfHeader, clearCsrfToken } from '../lib/csrf'
+import { fetchDashboardProfile } from '../lib/operatorSession'
+import { deriveReviewRole } from '../lib/reviewRole'
 import { C, injectFonts } from '../theme'
 import { isCloud } from '../config/edition'
 import { ComplianceSection } from '../components/admin/ComplianceSection'
@@ -210,7 +212,7 @@ export function VerificationManagement() {
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const [duplicateRefs, setDuplicateRefs] = useState<Record<string, LinkedVerification[]>>({})
   const [authReady, setAuthReady] = useState(() => !!getCsrfToken())
-  const [userRole, setUserRole] = useState<'admin' | 'reviewer' | 'platform'>('reviewer')
+  const [userRole, setUserRole] = useState<'admin' | 'reviewer' | 'platform' | 'operator'>('reviewer')
   const [isMobile, setIsMobile] = useState(false)
   const [activeTab, setActiveTab] = useState<'verifications' | 'compliance'>('verifications')
 
@@ -235,22 +237,19 @@ export function VerificationManagement() {
       .catch(() => { clearCsrfToken(); navigate('/admin/login') })
   }, [navigate])
 
-  // ── Detect user role (org admin vs reviewer vs platform admin) ──
+  // ── Detect user role (operator / org admin / reviewer / platform admin) ──
   useEffect(() => {
     if (!authReady) return
-    // Probe analytics — org admins and platform admins get 200, regular reviewers get 403
-    fetch(`${API_BASE_URL}/api/admin/analytics?period=7d`, { credentials: 'include' })
-      .then(res => {
-        if (res.ok) {
-          // Could be org admin or platform admin — try developers list to distinguish
-          fetch(`${API_BASE_URL}/api/admin/developers?limit=1`, { credentials: 'include' })
-            .then(r => setUserRole(r.ok ? 'platform' : 'admin'))
-            .catch(() => setUserRole('admin'))
-        } else {
-          setUserRole('reviewer')
-        }
-      })
-      .catch(() => setUserRole('reviewer'))
+    // Probe operator signal (developer/profile) AND existing admin probes in parallel.
+    // An operator 401s on admin probes → analyticsOk/developersOk false → deriveReviewRole
+    // returns 'operator' because isOperator wins first.
+    Promise.all([
+      fetchDashboardProfile().then(p => p.authed && p.isOperator).catch(() => false),
+      fetch(`${API_BASE_URL}/api/admin/analytics?period=7d`, { credentials: 'include' }).then(r => r.ok).catch(() => false),
+      fetch(`${API_BASE_URL}/api/admin/developers?limit=1`, { credentials: 'include' }).then(r => r.ok).catch(() => false),
+    ]).then(([isOperator, analyticsOk, developersOk]) => {
+      setUserRole(deriveReviewRole({ isOperator, analyticsOk, developersOk }))
+    }).catch(() => { /* keep default 'reviewer' on unexpected error */ })
   }, [authReady])
 
   // ── Toast auto-dismiss ──
@@ -270,7 +269,7 @@ export function VerificationManagement() {
 
       const res = await fetch(`${API_BASE_URL}/api/admin/verifications?${params}`, authFetchOpts())
       if (res.status === 401) {
-        navigate('/admin/login')
+        navigate(userRole === 'operator' ? '/operator/login' : '/admin/login')
         return
       }
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -283,7 +282,7 @@ export function VerificationManagement() {
     } finally {
       setLoading(false)
     }
-  }, [page, statusFilter, navigate])
+  }, [page, statusFilter, navigate, userRole])
 
   // ── Fetch stats ──
   const fetchStats = useCallback(async () => {
@@ -411,9 +410,9 @@ export function VerificationManagement() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <button
-              onClick={() => navigate('/admin/login')}
+              onClick={() => navigate(userRole === 'operator' ? '/developer' : '/admin/login')}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, display: 'flex', padding: 4 }}
-              title="Back"
+              title={userRole === 'operator' ? 'Back to dashboard' : 'Back'}
             >
               <ArrowLeftIcon style={{ width: 20, height: 20 }} />
             </button>
@@ -442,11 +441,11 @@ export function VerificationManagement() {
             )}
             {/* Role badge */}
             <span className="badge" style={{
-              background: userRole === 'platform' ? C.purpleDim : userRole === 'admin' ? C.cyanDim : C.surface,
-              color: userRole === 'platform' ? C.purple : userRole === 'admin' ? C.cyan : C.muted,
-              borderColor: userRole === 'platform' ? 'rgba(167,139,250,0.3)' : userRole === 'admin' ? C.cyanBorder : C.border,
+              background: userRole === 'platform' ? C.purpleDim : userRole === 'admin' ? C.cyanDim : userRole === 'operator' ? C.greenDim : C.surface,
+              color: userRole === 'platform' ? C.purple : userRole === 'admin' ? C.cyan : userRole === 'operator' ? C.green : C.muted,
+              borderColor: userRole === 'platform' ? 'rgba(167,139,250,0.3)' : userRole === 'admin' ? C.cyanBorder : userRole === 'operator' ? 'rgba(52,211,153,0.3)' : C.border,
             }}>
-              {userRole === 'platform' ? 'Platform Admin' : userRole === 'admin' ? 'Org Admin' : 'Reviewer'}
+              {userRole === 'platform' ? 'Platform Admin' : userRole === 'admin' ? 'Org Admin' : userRole === 'operator' ? 'Operator' : 'Reviewer'}
             </span>
             <button
               onClick={() => { fetchVerifications(); fetchStats() }}
@@ -460,7 +459,7 @@ export function VerificationManagement() {
               onClick={() => {
                 fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include', headers: csrfHeader() }).catch(() => {})
                 clearCsrfToken()
-                navigate('/admin/login')
+                navigate(userRole === 'operator' ? '/operator/login' : '/admin/login')
               }}
               className="btn-outline"
               style={{ padding: '8px 16px', fontSize: 13 }}

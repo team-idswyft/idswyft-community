@@ -3,7 +3,7 @@ import { body, param } from 'express-validator';
 import multer from 'multer';
 import path from 'path';
 import { supabase } from '@/config/database.js';
-import { authenticateDeveloperJWT } from '@/middleware/auth.js';
+import { authenticateDeveloperJWT, authenticateDashboard } from '@/middleware/auth.js';
 import { catchAsync, ValidationError, NotFoundError, AuthenticationError } from '@/middleware/errorHandler.js';
 import { validate } from '@/middleware/validate.js';
 import { logger } from '@/utils/logger.js';
@@ -88,11 +88,26 @@ const avatarUpload = multer({
 
 // GET /api/developer/profile — return authenticated developer's record
 router.get('/profile',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   catchAsync(async (req: Request, res: Response) => {
+    // Service operator: return the key context, not the (shared) shadow developer.
+    if (req.operatorKeyId) {
+      return res.json({
+        success: true,
+        scope: 'service-operator',
+        operator: {
+          email: req.operatorEmail,
+          api_key_id: req.operatorKeyId,
+          key_prefix: req.apiKey?.key_prefix ?? null,
+          service_label: (req.apiKey as any)?.service_label ?? null,
+          service_product: (req.apiKey as any)?.service_product ?? null,
+          service_environment: (req.apiKey as any)?.service_environment ?? null,
+        },
+      });
+    }
+
     const developer = req.developer;
     if (!developer) throw new AuthenticationError('Developer authentication required');
-
     res.json({
       success: true,
       data: {

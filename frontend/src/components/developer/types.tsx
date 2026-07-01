@@ -20,7 +20,7 @@ export interface DeveloperStats {
   successful_requests: number
   failed_requests: number
   monthly_usage: number
-  monthly_limit: number
+  monthly_limit: number | null  // null = no quota (service keys / operators)
 }
 
 export interface ApiActivity {

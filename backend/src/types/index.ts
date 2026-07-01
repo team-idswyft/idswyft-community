@@ -25,6 +25,9 @@ export interface VerificationRequest {
   manual_review_reason?: string;
   failure_reason?: string;
   external_verification_id?: string;
+  // Manual-review attribution (set by the admin/reviewer/operator review action)
+  reviewed_by?: string;
+  reviewed_at?: string;
   // Enhanced verification fields
   back_of_id_uploaded?: boolean;
   cross_validation_score?: number;

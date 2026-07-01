@@ -113,6 +113,11 @@ router.post(
       .isString()
       .isLength({ min: 3, max: 100 })
       .withMessage('label must be 3-100 characters'),
+    body('operator_email')
+      .optional({ nullable: true })
+      .isEmail()
+      .normalizeEmail()
+      .withMessage('operator_email must be a valid email'),
   ],
   catchAsync(async (req: Request, res: Response) => {
     validate(req);
@@ -120,6 +125,7 @@ router.post(
     const product = req.body.service_product as ServiceProduct;
     const environment = req.body.service_environment as ServiceEnvironment;
     const label = req.body.label as string;
+    const operatorEmail = (req.body.operator_email as string | undefined) ?? null;
 
     const shadowDeveloperId = await resolveShadowDeveloperId(product);
     const { key, hash, prefix } = generatePrefixedAPIKey('isk');
@@ -137,8 +143,9 @@ router.post(
         service_product: product,
         service_environment: environment,
         service_label: label,
+        operator_email: operatorEmail,
       })
-      .select('id, key_prefix, service_product, service_environment, service_label, created_at')
+      .select('id, key_prefix, service_product, service_environment, service_label, operator_email, created_at')
       .single();
 
     if (error || !data) {
@@ -160,6 +167,7 @@ router.post(
       service_product: data.service_product,
       service_environment: data.service_environment,
       service_label: data.service_label,
+      operator_email: data.operator_email,
       created_at: data.created_at,
       warning:
         'This is the only time the plaintext key will be shown. Store it now in your secrets vault.',
@@ -208,7 +216,7 @@ router.post(
 
     const { data: existing, error: lookupErr } = await supabase
       .from('api_keys')
-      .select('id, developer_id, service_product, service_environment, service_label')
+      .select('id, developer_id, service_product, service_environment, service_label, operator_email')
       .eq('id', oldId)
       .eq('is_service', true)
       .single();
@@ -233,6 +241,10 @@ router.post(
         service_product: existing.service_product,
         service_environment: existing.service_environment,
         service_label: existing.service_label,
+        // Preserve the operator binding across rotation — otherwise the new key
+        // has a NULL operator_email and the bound operator is locked out (401
+        // "Operator is no longer bound") until someone re-runs set-operator.
+        operator_email: existing.operator_email ?? null,
       })
       .select('id, key_prefix, service_product, service_environment, service_label, created_at')
       .single();
@@ -314,6 +326,48 @@ router.delete(
 
     logger.info('Service key revoked', { id: req.params.id });
     res.status(204).send();
+  }),
+);
+
+/**
+ * PATCH /api/platform/api-keys/service/:id/operator
+ * Bind, re-bind, or clear (operator_email: null) the human operator for a
+ * service key. The operator logs in via email OTP (Phase 2) to get an
+ * api_key_id-scoped session. Clearing revokes that access on the next request.
+ */
+router.patch(
+  '/:id/operator',
+  [
+    param('id').isUUID().withMessage('id must be a UUID'),
+    body('operator_email')
+      .optional({ nullable: true })
+      .isEmail()
+      .normalizeEmail()
+      .withMessage('operator_email must be a valid email or null'),
+  ],
+  catchAsync(async (req: Request, res: Response) => {
+    validate(req);
+
+    const operatorEmail = (req.body.operator_email as string | null | undefined) ?? null;
+
+    const { data, error } = await supabase
+      .from('api_keys')
+      .update({ operator_email: operatorEmail })
+      .eq('id', req.params.id)
+      .eq('is_service', true)
+      .select('id, operator_email')
+      .single();
+
+    if (error || !data) {
+      throw new NotFoundError(`Service key ${req.params.id} not found`);
+    }
+
+    logger.info('Service key operator updated', {
+      id: req.params.id,
+      bound: operatorEmail !== null,
+    });
+
+    res.status(200).json({ id: data.id, operator_email: data.operator_email });
   }),
 );
 

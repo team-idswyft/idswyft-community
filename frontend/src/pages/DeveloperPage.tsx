@@ -7,6 +7,8 @@ import { C, injectFonts, getTheme, toggleTheme } from '../theme'
 import '../styles/patterns.css'
 import '../styles/dev-portal.css'
 import { AnalyticsCharts } from '../components/developer/AnalyticsCharts'
+import { fetchDashboardProfile } from '../lib/operatorSession'
+import type { OperatorBlock } from '../lib/operatorSession'
 
 import type { ApiKey, DeveloperStats } from '../components/developer/types'
 import { AuthGate } from '../components/developer/AuthGate'
@@ -28,14 +30,27 @@ export function DeveloperPage() {
   const apiKeysAnchorRef = useRef<HTMLDivElement | null>(null)
   const webhooksAnchorRef = useRef<HTMLDivElement | null>(null)
 
-  // On mount, check if an auth cookie exists by probing a protected endpoint
+  const [isOperator, setIsOperator] = useState(false)
+  const [operator, setOperator] = useState<OperatorBlock | null>(null)
+
+  // On mount, check if an auth cookie exists by probing a protected endpoint.
+  // Uses fetchDashboardProfile() to also detect operator mode in one call.
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/developer/profile`, { credentials: 'include' })
-      .then(res => {
-        if (res.ok) { setToken('session'); fetchCsrfToken(); }
-        else { setToken(null); clearCsrfToken(); }
+    fetchDashboardProfile()
+      .then(result => {
+        if (result.authed) {
+          setToken('session')
+          setIsOperator(result.isOperator)
+          setOperator(result.operator)
+          fetchCsrfToken()
+        } else {
+          setToken(null)
+          clearCsrfToken()
+        }
       })
-      .catch(() => {})
+      .catch(() => {
+        // Network error — leave token state unchanged; isOperator stays false
+      })
   }, [])
 
   // Community edition: redirect to /setup if no developers exist yet.
@@ -75,7 +90,7 @@ export function DeveloperPage() {
         headers: authHeaders(token),
         credentials: 'include' as RequestCredentials,
       })
-      if (res.status === 401) { setToken(null); return }
+      if (res.status === 401) { handleUnauthorized(); return }
       if (res.ok) setApiKeys((await res.json()).api_keys ?? [])
     } catch { /* network error */ }
   }
@@ -137,6 +152,8 @@ export function DeveloperPage() {
   }, [token])
 
   const handleAuth = (t: string, apiKey?: string) => {
+    setIsOperator(false)
+    setOperator(null)
     setToken(t)
     fetchCsrfToken()
     if (apiKey) setNewFullKey(apiKey)
@@ -152,16 +169,22 @@ export function DeveloperPage() {
     setToken(null)
     setApiKeys([])
     setStats(null)
+    setIsOperator(false)
+    setOperator(null)
   }
 
   const handleAccountDeleted = () => {
     setToken(null)
     setApiKeys([])
     setStats(null)
+    setIsOperator(false)
+    setOperator(null)
   }
 
   const handleUnauthorized = () => {
     setToken(null)
+    setIsOperator(false)
+    setOperator(null)
   }
 
   const handleScrollTo = (key: SectionKey) => {
@@ -232,17 +255,28 @@ export function DeveloperPage() {
             <Link to="/docs" className="side-link" style={{ display: 'flex' }}>
               <span className="ic" />Docs
             </Link>
+            {isOperator && (
+              <button
+                type="button"
+                className="side-link"
+                onClick={() => navigate('/admin/verifications')}
+              >
+                <span className="ic" />Review queue
+              </button>
+            )}
           </div>
 
           <div className="side-group">
             <div className="side-label">Account</div>
-            <button
-              type="button"
-              className="side-link"
-              onClick={() => setShowSettings(true)}
-            >
-              <span className="ic" />Settings
-            </button>
+            {!isOperator && (
+              <button
+                type="button"
+                className="side-link"
+                onClick={() => setShowSettings(true)}
+              >
+                <span className="ic" />Settings
+              </button>
+            )}
             <button
               type="button"
               className="side-link"
@@ -270,6 +304,21 @@ export function DeveloperPage() {
               <span className="here">{activeSection === 'webhooks' ? 'webhooks' : 'api keys'}</span>
             </div>
             <div className="top-spacer" />
+            {isOperator && operator && (
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginRight: 8, fontFamily: C.mono, fontSize: 11, color: C.muted }}>
+                {operator.service_product && (
+                  <span style={{ color: C.accent }}>{operator.service_product}</span>
+                )}
+                {operator.service_environment && (
+                  <span style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 4, padding: '1px 6px', fontSize: 10, color: C.text }}>
+                    {operator.service_environment}
+                  </span>
+                )}
+                {operator.key_prefix && (
+                  <code style={{ color: C.dim, fontSize: 10 }}>{operator.key_prefix}…</code>
+                )}
+              </div>
+            )}
             <button
               className="icon-btn"
               type="button"
@@ -280,18 +329,20 @@ export function DeveloperPage() {
               {theme === 'dark' ? sunIcon : moonIcon}
             </button>
             {/* Mobile fallback for Settings + Sign out — sidebar hides ≤760px */}
-            <button
-              className="icon-btn mobile-only"
-              type="button"
-              onClick={() => setShowSettings(true)}
-              aria-label="Open settings"
-              title="Settings"
-            >
-              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                <circle cx="12" cy="12" r="3" />
-                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
-              </svg>
-            </button>
+            {!isOperator && (
+              <button
+                className="icon-btn mobile-only"
+                type="button"
+                onClick={() => setShowSettings(true)}
+                aria-label="Open settings"
+                title="Settings"
+              >
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <circle cx="12" cy="12" r="3" />
+                  <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33h.01a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v.01a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+                </svg>
+              </button>
+            )}
             <button
               className="icon-btn mobile-only"
               type="button"
@@ -326,8 +377,8 @@ export function DeveloperPage() {
               </div>
             </div>
 
-            {/* team setup banner — uses .forge pattern */}
-            {hasOrgAdmin === false && !teamBannerDismissed && (
+            {/* team setup banner — uses .forge pattern; operators have no team to set up */}
+            {!isOperator && hasOrgAdmin === false && !teamBannerDismissed && (
               <div className="forge" style={{ marginTop: 0, marginBottom: 28 }}>
                 <span className="badge">team</span>
                 <div>
@@ -371,6 +422,7 @@ export function DeveloperPage() {
                 setNewFullKey={setNewFullKey}
                 onUnauthorized={handleUnauthorized}
                 renderAfterStats={token ? <AnalyticsCharts token={token} /> : undefined}
+                isOperator={isOperator}
               />
             </div>
 
@@ -400,8 +452,8 @@ export function DeveloperPage() {
         </main>
       </div>
 
-      {/* Settings modal */}
-      {showSettings && (
+      {/* Settings modal — hidden for operators (operator profile has no data block; SettingsModal.fetchProfile crashes) */}
+      {!isOperator && showSettings && (
         <SettingsModal
           token={token}
           onClose={() => setShowSettings(false)}

@@ -864,6 +864,7 @@ router.post('/initialize',
       verification_mode: resolvedMode,
       client_ip: req.ip || req.socket?.remoteAddress || null,
       step_timestamps: { init: new Date().toISOString() },
+      ...((req as any).apiKey?.id && { api_key_id: (req as any).apiKey.id }),
       ...(resolvedAgeThreshold !== null && { age_threshold: resolvedAgeThreshold }),
       ...((resolvedAddons as any).compliance_force_manual_review && {
         manual_review_reason: 'Compliance rule: force_manual_review',

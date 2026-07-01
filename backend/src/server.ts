@@ -189,6 +189,23 @@ if (process.env.IDSWYFT_EDITION === 'cloud') {
       { error: err instanceof Error ? err.message : String(err) },
     );
   }
+
+  // Service-operator OTP login (operators bound to isk_* keys via
+  // operator_email). Cloud-only — same guarded dynamic-import pattern as the
+  // platform routes above so the community build (where the file is stripped
+  // via .community-ignore) neither fails tsc nor crashes at boot. Uses
+  // conditionalCsrf to match the sibling /api/auth mount.
+  const serviceOperatorAuthPath = './routes/serviceOperatorAuth.js';
+  try {
+    const mod: any = await import(serviceOperatorAuthPath);
+    app.use('/api/auth', conditionalCsrf, mod.default);
+    logger.info('Service-operator auth endpoints mounted');
+  } catch (err: unknown) {
+    logger.warn(
+      'IDSWYFT_EDITION=cloud but service-operator auth module not present',
+      { error: err instanceof Error ? err.message : String(err) },
+    );
+  }
 }
 
 // Public asset serving (branding logos, avatars) — no auth, folder-scoped in handler

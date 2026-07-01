@@ -214,7 +214,7 @@ interface ServiceKeyResponse {
 }
 
 async function platformRequestRaw<T>(
-  method: 'GET' | 'POST' | 'DELETE',
+  method: 'GET' | 'POST' | 'DELETE' | 'PATCH',
   fullPath: string,
   body?: unknown,
 ): Promise<{ status: number; body: T | { status: 'error'; message: string; code?: string } }> {
@@ -244,7 +244,7 @@ async function platformRequestRaw<T>(
 
 // Service-keys endpoints (/api/platform/api-keys/service)
 async function platformRequest<T>(
-  method: 'GET' | 'POST' | 'DELETE',
+  method: 'GET' | 'POST' | 'DELETE' | 'PATCH',
   pathPart: string,
   body?: unknown,
 ) {
@@ -282,7 +282,7 @@ function writeKeyFile(record: ServiceKeyResponse): string {
 // Commands
 // ───────────────────────────────────────────────────────────────
 
-async function cmdMint(product: string, env: string, label: string): Promise<void> {
+async function cmdMint(product: string, env: string, label: string, operatorEmail?: string): Promise<void> {
   if (!VALID_PRODUCTS.includes(product as Product)) {
     fail(`product must be one of: ${VALID_PRODUCTS.join(', ')} (got ${JSON.stringify(product)})`);
   }
@@ -300,6 +300,7 @@ async function cmdMint(product: string, env: string, label: string): Promise<voi
     service_product: product,
     service_environment: env,
     label,
+    ...(operatorEmail ? { operator_email: operatorEmail } : {}),
   });
 
   if (status !== 201 || !('key' in body) || !body.key) {
@@ -315,6 +316,7 @@ async function cmdMint(product: string, env: string, label: string): Promise<voi
     product,
     env,
     label,
+    ...(operatorEmail ? { operator_email: operatorEmail } : {}),
     file: fpath,
   });
 
@@ -323,6 +325,9 @@ async function cmdMint(product: string, env: string, label: string): Promise<voi
   info(`${C.dim}Also saved to ${fpath} (chmod 0600)${C.reset}`);
   info(`Set on the consumer's Railway service: ${C.bold}IDSWYFT_API_KEY=${body.key.slice(0, 8)}…${C.reset}`);
   info(``);
+  if (operatorEmail) {
+    info(`Operator bound: ${C.bold}${operatorEmail}${C.reset} (can log in via email OTP — Phase 2)`);
+  }
   info(`${C.dim}Verifying via list:${C.reset}`);
   await listKeysSummary({ filterId: body.id });
 }
@@ -480,6 +485,38 @@ async function cmdRevoke(id: string): Promise<void> {
   });
 
   ok(`Revoked ${existing.key_prefix}... — subsequent calls will return 401 immediately.`);
+}
+
+async function cmdSetOperator(id: string, emailOrClear: string): Promise<void> {
+  if (!isUuid(id)) fail(`id must be a UUID (got ${id})`);
+
+  const clearing = emailOrClear === '--clear';
+  const operatorEmail = clearing ? null : emailOrClear;
+  if (!clearing && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(operatorEmail!)) {
+    fail(`Expected an email or --clear (got ${JSON.stringify(emailOrClear)})`);
+  }
+
+  process.stdout.write(
+    `${clearing ? 'Clearing' : 'Setting'} operator for ${id}${clearing ? '' : ` → ${operatorEmail}`} ... `,
+  );
+  const { status, body } = await platformRequest<{ id: string; operator_email: string | null }>(
+    'PATCH',
+    `/${id}/operator`,
+    { operator_email: operatorEmail },
+  );
+
+  if (status !== 200) {
+    process.stdout.write('failed\n');
+    fail(`set-operator returned ${status}: ${JSON.stringify(body)}`);
+  }
+  process.stdout.write('ok\n');
+
+  audit('set-operator', { id, operator_email: operatorEmail });
+  ok(
+    clearing
+      ? `Cleared operator for ${C.dim}${id}${C.reset}.`
+      : `Bound operator ${C.bold}${operatorEmail}${C.reset} to ${C.dim}${id}${C.reset}.`,
+  );
 }
 
 interface RevokeAllOpts {
@@ -780,10 +817,11 @@ function printHelp(): void {
     `Usage:\n` +
     `  tsx mint-service-key.ts <command> [args]\n\n` +
     `Commands:\n` +
-    `  mint <product> <env> <label>    Mint a new service key (plaintext shown in highlighted box + saved to file)\n` +
+    `  mint <product> <env> <label> [--operator <email>]    Mint a new service key (optionally bind an operator email)\n` +
     `  list [--all]                    List service keys (active by default; --all includes revoked)\n` +
     `  rotate <id>                     Mint a fresh key with same product/env, revoke the old\n` +
     `  revoke <id>                     Mark key inactive — subsequent calls return 401\n` +
+    `  set-operator <id> <email|--clear>  Bind/clear the human operator email on a service key\n` +
     `  revoke-all [--service-env <e>] [--product <p>] [--yes]\n` +
     `                                  Bulk-revoke active keys (with confirmation; production needs extra confirm)\n` +
     `  launch-gatepass                 Mint dev + staging + prod GatePass keys (one-shot launch)\n` +
@@ -897,12 +935,25 @@ async function main(): Promise<void> {
 
   switch (cmd) {
     case 'mint': {
-      const [product, env, ...labelParts] = args;
+      let operatorEmail: string | undefined;
+      const rest: string[] = [];
+      for (let i = 0; i < args.length; i++) {
+        const a = args[i];
+        if (a === '--operator') {
+          operatorEmail = args[++i];
+          if (!operatorEmail) fail('--operator requires an email argument');
+        } else if (a.startsWith('--operator=')) {
+          operatorEmail = a.slice('--operator='.length);
+        } else {
+          rest.push(a);
+        }
+      }
+      const [product, env, ...labelParts] = rest;
       const label = labelParts.join(' ');
       if (!product || !env || !label) {
-        fail(`Usage: mint <product> <env> <label>\nValid products: ${VALID_PRODUCTS.join(', ')}\nValid envs: ${VALID_ENVS.join(', ')}`);
+        fail(`Usage: mint <product> <env> <label> [--operator <email>]\nValid products: ${VALID_PRODUCTS.join(', ')}\nValid envs: ${VALID_ENVS.join(', ')}`);
       }
-      await cmdMint(product, env, label);
+      await cmdMint(product, env, label, operatorEmail);
       break;
     }
     case 'list': {
@@ -919,6 +970,12 @@ async function main(): Promise<void> {
       const [id] = args;
       if (!id) fail('Usage: revoke <id>');
       await cmdRevoke(id);
+      break;
+    }
+    case 'set-operator': {
+      const [id, emailOrClear] = args;
+      if (!id || !emailOrClear) fail('Usage: set-operator <id> <email|--clear>');
+      await cmdSetOperator(id, emailOrClear);
       break;
     }
     case 'revoke-all': {

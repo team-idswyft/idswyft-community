@@ -26,6 +26,7 @@ const state = vi.hoisted(() => ({
   rotateLookupRow: null as any,
   rotateRevokeError: null as any,
   deleteFoundRow: null as any,
+  operatorRow: null as any,
 }));
 
 vi.mock('@/config/database.js', () => {
@@ -78,6 +79,7 @@ vi.mock('@/config/database.js', () => {
                       service_product: row.service_product,
                       service_environment: row.service_environment,
                       service_label: row.service_label,
+                      operator_email: row.operator_email ?? null,
                       created_at: new Date().toISOString(),
                     },
                 error: state.insertError,
@@ -90,8 +92,8 @@ vi.mock('@/config/database.js', () => {
             const updateChain = make();
             updateChain.single = vi.fn(() =>
               Promise.resolve({
-                data: state.deleteFoundRow,
-                error: state.deleteFoundRow ? null : { message: 'not found' },
+                data: state.operatorRow ?? state.deleteFoundRow,
+                error: (state.operatorRow ?? state.deleteFoundRow) ? null : { message: 'not found' },
               }),
             );
             return updateChain;
@@ -169,6 +171,7 @@ beforeEach(async () => {
   state.rotateLookupRow = null;
   state.rotateRevokeError = null;
   state.deleteFoundRow = null;
+  state.operatorRow = null;
   app = await buildApp();
 });
 
@@ -277,6 +280,71 @@ describe('POST /api/platform/api-keys/service — mint', () => {
 
     expect(res.status).toBe(500);
   });
+
+  it('stores operator_email when provided', async () => {
+    const res = await request(app)
+      .post('/api/platform/api-keys/service')
+      .set('X-Platform-Service-Token', TEST_TOKEN)
+      .send({
+        service_product: 'gatepass',
+        service_environment: 'production',
+        label: 'GatePass production',
+        operator_email: 'obed@idswyft.app',
+      });
+
+    expect(res.status).toBe(201);
+    expect(state.insertedKeys).toHaveLength(1);
+    expect(state.insertedKeys[0].operator_email).toBe('obed@idswyft.app');
+    // Response echoes the bound operator from server state
+    expect(res.body.operator_email).toBe('obed@idswyft.app');
+  });
+
+  it('defaults operator_email to null when omitted', async () => {
+    const res = await request(app)
+      .post('/api/platform/api-keys/service')
+      .set('X-Platform-Service-Token', TEST_TOKEN)
+      .send({
+        service_product: 'gatepass',
+        service_environment: 'production',
+        label: 'GatePass production',
+      });
+
+    expect(res.status).toBe(201);
+    expect(state.insertedKeys).toHaveLength(1);
+    expect(state.insertedKeys[0].operator_email).toBeNull();
+    expect(res.body.operator_email).toBeNull();
+  });
+
+  it('rejects an invalid operator_email (400)', async () => {
+    const res = await request(app)
+      .post('/api/platform/api-keys/service')
+      .set('X-Platform-Service-Token', TEST_TOKEN)
+      .send({
+        service_product: 'gatepass',
+        service_environment: 'production',
+        label: 'GatePass production',
+        operator_email: 'not-an-email',
+      });
+
+    expect(res.status).toBe(400);
+  });
+
+  it('normalizes operator_email to lowercase on mint', async () => {
+    const res = await request(app)
+      .post('/api/platform/api-keys/service')
+      .set('X-Platform-Service-Token', TEST_TOKEN)
+      .send({
+        service_product: 'gatepass',
+        service_environment: 'production',
+        label: 'GatePass production',
+        operator_email: 'Obed@Idswyft.APP',
+      });
+
+    expect(res.status).toBe(201);
+    expect(state.insertedKeys).toHaveLength(1);
+    expect(state.insertedKeys[0].operator_email).toBe('obed@idswyft.app');
+    expect(res.body.operator_email).toBe('obed@idswyft.app');
+  });
 });
 
 describe('GET /api/platform/api-keys/service — list', () => {
@@ -384,5 +452,103 @@ describe('POST /api/platform/api-keys/service/:id/rotate', () => {
     expect(inserted.service_product).toBe('gatepass');
     expect(inserted.service_environment).toBe('production');
     expect(inserted.is_service).toBe(true);
+  });
+
+  it('preserves operator_email on the rotated key (does not unbind the operator)', async () => {
+    // An operator-bound key: rotation must carry the binding to the new key,
+    // otherwise the operator is silently locked out (401 on next login).
+    state.rotateLookupRow = {
+      id: 'old-key-uuid',
+      developer_id: 'shadow-uuid-gatepass',
+      service_product: 'gatepass',
+      service_environment: 'production',
+      service_label: 'GatePass production',
+      operator_email: 'obed@idswyft.app',
+    };
+
+    const res = await request(app)
+      .post('/api/platform/api-keys/service/22222222-2222-4222-8222-222222222222/rotate')
+      .set('X-Platform-Service-Token', TEST_TOKEN);
+
+    expect(res.status).toBe(200);
+    const inserted = state.insertedKeys[state.insertedKeys.length - 1];
+    expect(inserted.operator_email).toBe('obed@idswyft.app');
+  });
+
+  it('leaves operator_email null when the rotated key had no operator bound', async () => {
+    state.rotateLookupRow = {
+      id: 'old-key-uuid',
+      developer_id: 'shadow-uuid-gatepass',
+      service_product: 'gatepass',
+      service_environment: 'production',
+      service_label: 'GatePass production',
+      operator_email: null,
+    };
+
+    const res = await request(app)
+      .post('/api/platform/api-keys/service/22222222-2222-4222-8222-222222222222/rotate')
+      .set('X-Platform-Service-Token', TEST_TOKEN);
+
+    expect(res.status).toBe(200);
+    const inserted = state.insertedKeys[state.insertedKeys.length - 1];
+    expect(inserted.operator_email ?? null).toBeNull();
+  });
+});
+
+describe('PATCH /api/platform/api-keys/service/:id/operator — set operator', () => {
+  it('binds an operator_email to a service key (200)', async () => {
+    state.operatorRow = { id: 'key-1', operator_email: 'obed@idswyft.app' };
+    const res = await request(app)
+      .patch('/api/platform/api-keys/service/11111111-1111-4111-8111-111111111111/operator')
+      .set('X-Platform-Service-Token', TEST_TOKEN)
+      .send({ operator_email: 'obed@idswyft.app' });
+    expect(res.status).toBe(200);
+    expect(res.body.operator_email).toBe('obed@idswyft.app');
+  });
+
+  it('clears the operator_email when null is sent (200)', async () => {
+    state.operatorRow = { id: 'key-1', operator_email: null };
+    const res = await request(app)
+      .patch('/api/platform/api-keys/service/11111111-1111-4111-8111-111111111111/operator')
+      .set('X-Platform-Service-Token', TEST_TOKEN)
+      .send({ operator_email: null });
+    expect(res.status).toBe(200);
+    expect(res.body.operator_email).toBeNull();
+  });
+
+  it('returns 404 for a non-service / unknown id', async () => {
+    state.operatorRow = null;
+    state.deleteFoundRow = null;
+    const res = await request(app)
+      .patch('/api/platform/api-keys/service/22222222-2222-4222-8222-222222222222/operator')
+      .set('X-Platform-Service-Token', TEST_TOKEN)
+      .send({ operator_email: 'x@y.com' });
+    expect(res.status).toBe(404);
+  });
+
+  it('rejects an invalid operator_email (400)', async () => {
+    const res = await request(app)
+      .patch('/api/platform/api-keys/service/11111111-1111-4111-8111-111111111111/operator')
+      .set('X-Platform-Service-Token', TEST_TOKEN)
+      .send({ operator_email: 'bad' });
+    expect(res.status).toBe(400);
+  });
+
+  it('rejects a non-UUID id (400)', async () => {
+    const res = await request(app)
+      .patch('/api/platform/api-keys/service/not-a-uuid/operator')
+      .set('X-Platform-Service-Token', TEST_TOKEN)
+      .send({ operator_email: 'x@y.com' });
+    expect(res.status).toBe(400);
+  });
+
+  it('normalizes operator_email to lowercase on set-operator', async () => {
+    state.operatorRow = { id: 'key-1', operator_email: 'obed@idswyft.app' };
+    const res = await request(app)
+      .patch('/api/platform/api-keys/service/11111111-1111-4111-8111-111111111111/operator')
+      .set('X-Platform-Service-Token', TEST_TOKEN)
+      .send({ operator_email: 'Obed@Idswyft.APP' });
+    expect(res.status).toBe(200);
+    expect(res.body.operator_email).toBe('obed@idswyft.app');
   });
 });

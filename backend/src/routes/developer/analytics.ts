@@ -2,8 +2,8 @@ import express, { Request, Response } from 'express';
 import { param } from 'express-validator';
 import validator from 'validator';
 import { supabase } from '@/config/database.js';
-import { authenticateDeveloperJWT } from '@/middleware/auth.js';
-import { catchAsync, ValidationError, NotFoundError, AuthenticationError } from '@/middleware/errorHandler.js';
+import { authenticateDashboard, scopeForRequest } from '@/middleware/auth.js';
+import { catchAsync, ValidationError, NotFoundError } from '@/middleware/errorHandler.js';
 import { validate } from '@/middleware/validate.js';
 import { logger } from '@/utils/logger.js';
 import rateLimit from 'express-rate-limit';
@@ -36,21 +36,21 @@ const apiKeyRateLimit = rateLimit({
 // Get developer usage statistics
 router.get('/stats',
   apiKeyRateLimit,
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   catchAsync(async (req: Request, res: Response) => {
-    const developer = req.developer;
-    if (!developer) {
-      throw new AuthenticationError('Developer authentication required');
-    }
+    const { developerId, apiKeyId } = scopeForRequest(req);
     // Calendar-month-to-date so this endpoint agrees with /analytics quota.
     const now = new Date();
     const monthStart = getMonthStart(now);
 
-    const { data: stats, error } = await supabase
+    let q = supabase
       .from('verification_requests')
       .select('status, created_at')
-      .eq('developer_id', developer.id)
+      .eq('developer_id', developerId)
       .gte('created_at', monthStart.toISOString());
+    if (apiKeyId) q = q.eq('api_key_id', apiKeyId);
+
+    const { data: stats, error } = await q;
 
     if (error) {
       logger.error('Failed to get developer stats:', error);
@@ -63,7 +63,9 @@ router.get('/stats',
     const pendingRequests = stats.filter((s: any) => s.status === 'pending').length;
     const manualReviewRequests = stats.filter((s: any) => s.status === 'manual_review').length;
 
-    const monthlyLimit = 50;
+    // Service keys / operators (api_key_id scoped) have no plan quota — that is
+    // the point of service keys. Developers (apiKeyId null) keep the 50/mo limit.
+    const monthlyLimit = apiKeyId ? null : 50;
 
     res.json({
       period: 'month',
@@ -76,7 +78,7 @@ router.get('/stats',
       success_rate: totalRequests > 0 ? (successfulRequests / totalRequests * 100).toFixed(2) + '%' : '0%',
       monthly_limit: monthlyLimit,
       monthly_usage: totalRequests,
-      remaining_quota: Math.max(0, monthlyLimit - totalRequests),
+      remaining_quota: monthlyLimit === null ? null : Math.max(0, monthlyLimit - totalRequests),
       quota_reset_date: getNextMonthStart(now).toISOString()
     });
   })
@@ -85,50 +87,42 @@ router.get('/stats',
 // Get API activity logs
 router.get('/activity',
   apiKeyRateLimit,
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   catchAsync(async (req: Request, res: Response) => {
-    const developer = req.developer;
-    if (!developer) {
-      throw new AuthenticationError('Developer authentication required');
-    }
+    const { developerId, apiKeyId } = scopeForRequest(req);
 
-    const apiKeyIdParam = typeof req.query.api_key_id === 'string' ? req.query.api_key_id : undefined;
-
-    // If filtering by key, verify it belongs to the authenticated developer
-    if (apiKeyIdParam) {
-      if (!validator.isUUID(apiKeyIdParam)) {
-        throw new ValidationError('Invalid API key ID format', 'api_key_id', apiKeyIdParam);
-      }
-
-      const { data: ownedKey, error: keyError } = await supabase
-        .from('api_keys')
-        .select('id')
-        .eq('id', apiKeyIdParam)
-        .eq('developer_id', developer.id)
-        .eq('is_active', true)
-        .single();
-
-      if (keyError || !ownedKey) {
-        throw new NotFoundError('API key not found or does not belong to this developer');
+    // Developers may filter by a specific key via ?api_key_id=; operators are
+    // hard-scoped to their own key and the query param is ignored.
+    let effectiveKeyId: string | null = apiKeyId;
+    if (!apiKeyId) {
+      const apiKeyIdParam = typeof req.query.api_key_id === 'string' ? req.query.api_key_id : undefined;
+      if (apiKeyIdParam) {
+        if (!validator.isUUID(apiKeyIdParam)) {
+          throw new ValidationError('Invalid API key ID format', 'api_key_id', apiKeyIdParam);
+        }
+        const { data: ownedKey, error: keyError } = await supabase
+          .from('api_keys').select('id')
+          .eq('id', apiKeyIdParam).eq('developer_id', developerId).eq('is_active', true).single();
+        if (keyError || !ownedKey) {
+          throw new NotFoundError('API key not found or does not belong to this developer');
+        }
+        effectiveKeyId = apiKeyIdParam;
       }
     }
 
-    // Query persisted activity logs from DB (survives server restarts)
     let activityQuery = supabase
       .from('api_activity_logs')
       .select('api_key_id, timestamp, method, endpoint, status_code, response_time_ms, user_agent, ip_address, error_message')
-      .eq('developer_id', developer.id)
+      .eq('developer_id', developerId)
       .order('timestamp', { ascending: false })
       .limit(100);
+    if (effectiveKeyId) activityQuery = activityQuery.eq('api_key_id', effectiveKeyId);
 
-    if (apiKeyIdParam) {
-      activityQuery = activityQuery.eq('api_key_id', apiKeyIdParam);
-    }
+    let statsQuery = supabase.from('verification_requests').select('status').eq('developer_id', developerId);
+    if (effectiveKeyId) statsQuery = statsQuery.eq('api_key_id', effectiveKeyId);
 
-    const [{ data: activityRows, error: activityError }, { data: verificationStats, error: statsError }] = await Promise.all([
-      activityQuery,
-      supabase.from('verification_requests').select('status').eq('developer_id', developer.id),
-    ]);
+    const [{ data: activityRows, error: activityError }, { data: verificationStats, error: statsError }] =
+      await Promise.all([activityQuery, statsQuery]);
 
     if (activityError) {
       logger.error('Failed to get activity logs:', activityError);
@@ -171,11 +165,13 @@ router.get('/activity',
 
     let sessionOutcomes: Record<string, string> = {};
     if (sessionIds.length > 0) {
-      const { data: verificationRows, error: sessionError } = await supabase
+      let vQ = supabase
         .from('verification_requests')
         .select('id, status')
-        .eq('developer_id', developer.id)
+        .eq('developer_id', developerId)
         .in('id', sessionIds);
+      if (effectiveKeyId) vQ = vQ.eq('api_key_id', effectiveKeyId);
+      const { data: verificationRows, error: sessionError } = await vQ;
 
       if (sessionError) {
         logger.error('Failed to fetch session outcomes:', sessionError);
@@ -196,7 +192,7 @@ router.get('/activity',
   })
 );
 
-// Get full verification detail for a session (JWT-authenticated developer portal)
+// Get full verification detail for a session (dashboard-authenticated developer portal or operator)
 router.get('/verifications/:verificationId',
   apiKeyRateLimit,
   [
@@ -204,23 +200,21 @@ router.get('/verifications/:verificationId',
       .isUUID()
       .withMessage('Invalid verification ID format')
   ],
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   validate,
   catchAsync(async (req: Request, res: Response) => {
-    const developer = req.developer;
-    if (!developer) {
-      throw new AuthenticationError('Developer authentication required');
-    }
-
+    const { developerId, apiKeyId } = scopeForRequest(req);
     const { verificationId } = req.params;
 
-    // Ownership check: verification must belong to this developer
-    const { data: verification, error: verErr } = await supabase
+    // Ownership check: verification must belong to this developer (and key for operators)
+    let vq = supabase
       .from('verification_requests')
       .select('id, is_sandbox, duplicate_flags, verification_mode, manual_review_reason, status')
       .eq('id', verificationId)
-      .eq('developer_id', developer.id)
-      .single();
+      .eq('developer_id', developerId);
+    if (apiKeyId) vq = vq.eq('api_key_id', apiKeyId);
+
+    const { data: verification, error: verErr } = await vq.single();
 
     if (verErr || !verification) {
       throw new NotFoundError('Verification not found or does not belong to this developer');
@@ -262,35 +256,36 @@ router.get('/verifications/:verificationId',
 
 router.get('/analytics',
   apiKeyRateLimit,
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   catchAsync(async (req: Request, res: Response) => {
-    const developer = req.developer;
-    if (!developer) {
-      throw new AuthenticationError('Developer authentication required');
-    }
+    const { developerId, apiKeyId } = scopeForRequest(req);
 
     const period = getDefaultPeriod();
 
     const [daily_volume, rejection_breakdown, daily_latency, funnel, daily_webhooks] =
       await Promise.all([
-        getDailyVerificationVolume(period, developer.id),
-        getGateRejectionBreakdown(period, developer.id),
-        getDailyResponseTimes(period, developer.id),
-        getConversionFunnel(period, developer.id),
-        getDailyWebhookDeliveries(period, developer.id),
+        getDailyVerificationVolume(period, developerId, apiKeyId),
+        getGateRejectionBreakdown(period, developerId, apiKeyId),
+        getDailyResponseTimes(period, developerId, apiKeyId),
+        getConversionFunnel(period, developerId, apiKeyId),
+        getDailyWebhookDeliveries(period, developerId, apiKeyId),
       ]);
 
     // Quota: count verification_requests this month
     const monthStart = getMonthStart(new Date());
 
-    const { count } = await supabase
+    let cq = supabase
       .from('verification_requests')
       .select('*', { count: 'exact', head: true })
-      .eq('developer_id', developer.id)
+      .eq('developer_id', developerId)
       .gte('created_at', monthStart.toISOString());
+    if (apiKeyId) cq = cq.eq('api_key_id', apiKeyId);
+
+    const { count } = await cq;
 
     const used = count ?? 0;
-    const limit = 50;
+    // Service keys / operators (api_key_id scoped) have no quota; developers keep 50/mo.
+    const limit = apiKeyId ? null : 50;
 
     res.json({
       daily_volume,

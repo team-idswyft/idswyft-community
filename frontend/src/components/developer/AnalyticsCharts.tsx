@@ -58,7 +58,7 @@ interface AnalyticsData {
   daily_volume: DailyVolume[]
   rejection_breakdown: RejectionBreakdown[]
   daily_latency: DailyLatency[]
-  quota: { used: number; limit: number }
+  quota: { used: number; limit: number | null }
   funnel: FunnelStep[]
   daily_webhooks: DailyWebhooks[]
 }
@@ -293,10 +293,12 @@ function LatencyChart({ data }: { data: DailyLatency[] }) {
   )
 }
 
-function QuotaChart({ data }: { data: { used: number; limit: number } }) {
-  const pct = data.limit > 0 ? Math.round((data.used / data.limit) * 100) : 0
-  const fill = pct > 80 ? C.red : pct > 50 ? C.amber : C.cyan
-  const chartData = [{ name: 'Quota', value: pct, fill }]
+function QuotaChart({ data }: { data: { used: number; limit: number | null } }) {
+  // Service keys / operators have no quota (limit null) → show "Unlimited".
+  const unlimited = data.limit === null
+  const pct = !unlimited && (data.limit as number) > 0 ? Math.round((data.used / (data.limit as number)) * 100) : 0
+  const fill = unlimited ? C.cyan : pct > 80 ? C.red : pct > 50 ? C.amber : C.cyan
+  const chartData = [{ name: 'Quota', value: unlimited ? 100 : pct, fill }]
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
@@ -325,9 +327,11 @@ function QuotaChart({ data }: { data: { used: number; limit: number } }) {
           fontFamily: C.mono,
         }}
       >
-        <div style={{ fontSize: 28, fontWeight: 700, color: fill }}>{pct}%</div>
+        <div style={{ fontSize: 28, fontWeight: 700, color: fill }}>{unlimited ? '∞' : `${pct}%`}</div>
         <div style={{ fontSize: 11, color: C.muted }}>
-          {data.used.toLocaleString()} / {data.limit.toLocaleString()}
+          {unlimited
+            ? `${data.used.toLocaleString()} used · Unlimited`
+            : `${data.used.toLocaleString()} / ${(data.limit as number).toLocaleString()}`}
         </div>
       </div>
     </div>

@@ -619,6 +619,46 @@ export const authenticateDeveloperJWT = catchAsync(async (req: Request, res: Res
   }
 });
 
+// Flexible middleware for webhook self-management: accepts EITHER a developer
+// portal JWT (idswyft_token cookie / Bearer) OR a SERVICE API key (isk_*) via
+// the X-API-Key header.
+//
+// Why: a keyless server-to-server integration authenticates only with an isk_*
+// service key — it has no portal session — so it otherwise can't list, create,
+// or read the signing secret for its own webhook. This middleware opens that
+// door on the webhook-management routes without touching the JWT-portal flow.
+//
+// Scope rules enforced here:
+//   - X-API-Key present → must resolve to a SERVICE key (is_service === true).
+//     Regular ik_* developer keys are rejected: they already have portal access,
+//     and accepting them would let a leaked dev key read/set webhook signing
+//     secrets it otherwise cannot. Direct callers to the portal instead.
+//   - No X-API-Key → fall back to the developer JWT.
+//
+// Per-KEY isolation (api_key_id scoping) is enforced in the route handlers, not
+// here: many service keys share one shadow developer row, so developer_id alone
+// is not a tenant boundary between keys.
+export const authenticateDeveloperJWTOrServiceKey = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    if (req.headers['x-api-key']) {
+      // Delegate to the existing API-key auth, then gate on is_service.
+      return authenticateAPIKey(req, res, (err?: any) => {
+        if (err) return next(err);
+        if (!req.apiKey?.is_service) {
+          return next(
+            new AuthorizationError(
+              'This endpoint accepts the developer portal session or a service API key (isk_*). ' +
+                'Regular API keys must manage webhooks via the developer portal.',
+            ),
+          );
+        }
+        return next();
+      });
+    }
+    return authenticateDeveloperJWT(req, res, next);
+  },
+);
+
 // HMAC-SHA256 hash a handoff token — same secret as API keys.
 // Used by handoff routes (storage/lookup) and authenticateHandoffToken (auth).
 export const hashHandoffToken = (token: string): string => {
@@ -743,6 +783,174 @@ export const authenticateReviewerJWT = catchAsync(async (req: Request, res: Resp
   }
 });
 
+// ─── Service-operator session (Phase 2) ──────────────────────────────────────
+// A human bound to a single service key via api_keys.operator_email logs in by
+// email OTP and receives this api_key_id-scoped session. The dashboard + review
+// endpoints (Phase 3+) accept it and scope all queries to req.operatorKeyId.
+
+export const generateServiceOperatorToken = (p: {
+  apiKeyId: string;
+  email: string;
+  developerId: string;
+  serviceProduct?: string | null;
+  serviceEnvironment?: string | null;
+}): string => {
+  return jwt.sign(
+    {
+      api_key_id: p.apiKeyId,
+      email: p.email,
+      developer_id: p.developerId,
+      service_product: p.serviceProduct ?? null,
+      service_environment: p.serviceEnvironment ?? null,
+      type: 'service-operator',
+    },
+    config.jwtSecret,
+    { expiresIn: '7d', issuer: 'idswyft-api', audience: 'idswyft-service-operator' },
+  );
+};
+
+// Short-lived token issued when one email operates >1 key, so the picker can
+// finalize a key choice without a second OTP.
+export const generateServiceOperatorSelectionToken = (email: string): string => {
+  return jwt.sign(
+    { email, type: 'service-operator-select' },
+    config.jwtSecret,
+    { expiresIn: '10m', issuer: 'idswyft-api', audience: 'idswyft-service-operator-select' },
+  );
+};
+
+export const verifyServiceOperatorSelectionToken = (token: string): string => {
+  let decoded: { email: string; type: string };
+  try {
+    decoded = jwt.verify(token, config.jwtSecret, {
+      issuer: 'idswyft-api',
+      audience: 'idswyft-service-operator-select',
+    }) as { email: string; type: string };
+  } catch (error) {
+    if (error instanceof jwt.TokenExpiredError) {
+      throw new AuthenticationError('Selection token has expired');
+    }
+    throw new AuthenticationError('Invalid selection token');
+  }
+  if (decoded.type !== 'service-operator-select') {
+    throw new AuthenticationError('Invalid selection token');
+  }
+  return decoded.email;
+};
+
+export const authenticateServiceOperatorJWT = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const token = req.headers.authorization?.replace('Bearer ', '') || req.cookies?.idswyft_token;
+    if (!token) {
+      throw new AuthenticationError('Access token is required');
+    }
+
+    let decoded: any;
+    try {
+      decoded = jwt.verify(token, config.jwtSecret, {
+        issuer: 'idswyft-api',
+        audience: 'idswyft-service-operator',
+      });
+    } catch (error) {
+      if (error instanceof jwt.TokenExpiredError) {
+        throw new AuthenticationError('Token has expired');
+      }
+      throw new AuthenticationError('Invalid token');
+    }
+
+    if (decoded.type !== 'service-operator') {
+      throw new AuthenticationError('Invalid service operator token');
+    }
+
+    // Reload the key every request: revocation / re-bind takes effect immediately.
+    const { data: apiKeyRecord, error } = await supabase
+      .from('api_keys')
+      .select('*, developer:developers(*)')
+      .eq('id', decoded.api_key_id)
+      .eq('is_service', true)
+      .eq('is_active', true)
+      .single();
+
+    if (error || !apiKeyRecord) {
+      throw new AuthenticationError('Service key is no longer active');
+    }
+    if (!decoded.email || (apiKeyRecord.operator_email ?? null) !== decoded.email) {
+      throw new AuthenticationError('Operator is no longer bound to this service key');
+    }
+
+    req.apiKey = apiKeyRecord as APIKey;
+    req.developer = apiKeyRecord.developer as Developer;
+    req.operatorKeyId = apiKeyRecord.id;
+    req.operatorEmail = decoded.email;
+
+    logger.info('Service operator authenticated', {
+      operatorEmail: decoded.email,
+      apiKeyId: apiKeyRecord.id,
+      serviceProduct: apiKeyRecord.service_product,
+    });
+
+    next();
+  },
+);
+
+// Flexible auth for the reused developer dashboard: accepts a developer portal
+// JWT, a service-operator cookie, OR a service key (X-API-Key). A cookie/bearer
+// is routed to the correct verifier by its UNVERIFIED audience (jwt.decode) —
+// the chosen verifier then cryptographically verifies it. The decoded audience
+// is used only for routing, never as a trusted claim.
+export const authenticateDashboard = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    if (req.headers['x-api-key']) {
+      return authenticateAPIKey(req, res, (err?: any) => {
+        if (err) return next(err);
+        if (!req.apiKey?.is_service) {
+          return next(new AuthorizationError(
+            'This endpoint accepts the developer portal session or a service principal. ' +
+            'Regular API keys must use the developer portal.',
+          ));
+        }
+        return next();
+      });
+    }
+
+    const token = req.headers.authorization?.replace('Bearer ', '') || req.cookies?.idswyft_token;
+    if (!token) {
+      throw new AuthenticationError('Access token is required');
+    }
+
+    let aud: string | undefined;
+    try {
+      aud = (jwt.decode(token) as any)?.aud;
+    } catch {
+      aud = undefined;
+    }
+
+    if (aud === 'idswyft-service-operator') {
+      return authenticateServiceOperatorJWT(req, res, next);
+    }
+    return authenticateDeveloperJWT(req, res, next);
+  },
+);
+
+// Ownership scope for a dashboard request. apiKeyId is set ONLY for principals
+// that must be isolated to one key (service operators, service keys); it is null
+// for developer-portal sessions, which keeps their queries identical to today.
+// Every operator-scoped query MUST apply `.eq('api_key_id', apiKeyId)` when set —
+// the shared shadow developer is not a tenant boundary; api_key_id is.
+export function scopeForRequest(req: Request): { developerId: string; apiKeyId: string | null } {
+  const developer = req.developer;
+  if (!developer) {
+    throw new AuthenticationError('Authentication required');
+  }
+  if (req.operatorKeyId) {
+    return { developerId: developer.id, apiKeyId: req.operatorKeyId };
+  }
+  if (req.apiKey?.is_service) {
+    return { developerId: developer.id, apiKeyId: req.apiKey.id };
+  }
+  return { developerId: developer.id, apiKeyId: null };
+}
+
 // Flexible middleware: accepts admin JWT OR reviewer JWT
 // Sets req.user (admin) or req.reviewer (reviewer with developer_id scope)
 export const authenticateAdminOrReviewer = catchAsync(async (req: Request, res: Response, next: NextFunction) => {
@@ -806,6 +1014,34 @@ export const authenticateAdminOrReviewer = catchAsync(async (req: Request, res: 
   throw new AuthenticationError('Invalid or expired token');
 });
 
+// Flexible middleware for the REVIEW SURFACE ONLY (queue, dashboard, detail,
+// review action). Accepts the same admin/reviewer principals as
+// authenticateAdminOrReviewer, PLUS the service-operator cookie/bearer.
+//
+// This is deliberately SEPARATE from authenticateAdminOrReviewer: that
+// middleware also gates audit-export and GDPR-erasure routes, which operators
+// must never reach. Applying a distinct middleware only to the review routes
+// keeps operator access fail-safe (opt-in per route) rather than fail-open.
+export const authenticateReviewPrincipal = catchAsync(
+  async (req: Request, res: Response, next: NextFunction) => {
+    const token = req.headers.authorization?.replace('Bearer ', '') || req.cookies?.idswyft_token;
+
+    let aud: string | undefined;
+    if (token) {
+      try {
+        aud = (jwt.decode(token) as any)?.aud;
+      } catch {
+        aud = undefined;
+      }
+    }
+
+    if (aud === 'idswyft-service-operator') {
+      return authenticateServiceOperatorJWT(req, res, next);
+    }
+    return authenticateAdminOrReviewer(req, res, next);
+  },
+);
+
 // Middleware to log authentication events
 export const logAuthEvent = (event: string) => {
   return (req: Request, res: Response, next: NextFunction) => {
@@ -826,6 +1062,8 @@ declare global {
       isSandbox?: boolean;
       isPremium?: boolean;
       serviceAuthenticated?: boolean;
+      operatorKeyId?: string;
+      operatorEmail?: string;
     }
   }
 }
@@ -838,8 +1076,16 @@ export default {
   authenticateAPIKeyOrHandoff,
   authenticateJWT,
   authenticateDeveloperJWT,
+  authenticateDeveloperJWTOrServiceKey,
   authenticateReviewerJWT,
+  authenticateServiceOperatorJWT,
+  authenticateDashboard,
+  scopeForRequest,
+  generateServiceOperatorToken,
+  generateServiceOperatorSelectionToken,
+  verifyServiceOperatorSelectionToken,
   authenticateAdminOrReviewer,
+  authenticateReviewPrincipal,
   authenticateUser,
   requireAdminRole,
   requireOrgAdminOrPlatformAdmin,

@@ -46,13 +46,20 @@ router.post('/register',
       throw new ValidationError('Webhook already exists for this URL', 'url', url);
     }
     
-    // Create webhook
+    // Create webhook.
+    // Hard-set api_key_id for service (isk_*) keys: they share one shadow
+    // developer row per product, so developer_id is NOT a tenant boundary.
+    // Leaving api_key_id NULL would create a product-wide webhook that receives
+    // sibling keys' verification PII (delivery matches api_key_id IS NULL OR =
+    // <key>). Scoping to the calling key isolates it. Regular developer keys
+    // keep NULL — developer_id is their real boundary. Mirrors developer/webhooks.ts.
     const webhook = await webhookService.createWebhook({
       developer_id: developerId,
       url,
       is_sandbox,
       secret_token,
       events: WEBHOOK_EVENT_NAMES,
+      api_key_id: req.apiKey?.is_service ? req.apiKey.id : null,
     });
     
     logger.info('Webhook registered', {
