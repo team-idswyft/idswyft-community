@@ -208,7 +208,7 @@ router.post('/avatar',
 
 // POST /api/developer/branding/logo — upload branding logo image
 router.post('/branding/logo',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   (avatarUpload.single('file') as any),
   catchAsync(async (req: Request, res: Response) => {
     const developer = req.developer;

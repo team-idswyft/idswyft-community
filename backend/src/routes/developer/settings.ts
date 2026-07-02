@@ -290,7 +290,7 @@ router.get('/settings/page-builder',
     const developerId = (req as any).developer.id;
     const { data } = await supabase
       .from('developers')
-      .select('page_builder_config, verification_slug')
+      .select('page_builder_config, verification_slug, branding_logo_url')
       .eq('id', developerId)
       .single();
 
@@ -298,6 +298,7 @@ router.get('/settings/page-builder',
       configured: !!data?.page_builder_config,
       config: data?.page_builder_config || null,
       slug: data?.verification_slug || null,
+      logo_url: data?.branding_logo_url ? resolvePublicAssetUrl(data.branding_logo_url) : null,
     });
   })
 );

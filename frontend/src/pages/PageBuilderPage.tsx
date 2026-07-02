@@ -71,6 +71,8 @@ export default function PageBuilderPage() {
   const [savingSlug, setSavingSlug] = useState(false)
   const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile')
   const [previewScreen, setPreviewScreen] = useState<'landing' | 'complete'>('landing')
+  const [logo, setLogo] = useState<string | null>(null)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
 
   const mutationHeaders = useCallback(() => ({
     'Content-Type': 'application/json',
@@ -99,6 +101,7 @@ export default function PageBuilderPage() {
         if (!data) return
         if (data.config) setConfig({ ...DEFAULT_CONFIG, ...data.config })
         if (data.slug) setSlug(data.slug)
+        if (data.logo_url) setLogo(data.logo_url)
       })
       .catch(() => toast.error('Failed to load page builder config'))
       .finally(() => setLoading(false))
@@ -154,6 +157,27 @@ export default function PageBuilderPage() {
       toast.error(e.message || 'Failed to save slug')
     } finally {
       setSavingSlug(false)
+    }
+  }
+
+  const uploadLogo = async (file: File) => {
+    if (!/\.(png|jpe?g)$/i.test(file.name)) { toast.error('Logo must be a PNG or JPEG'); return }
+    if (file.size > 2 * 1024 * 1024) { toast.error('Logo must be under 2MB'); return }
+    setUploadingLogo(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const r = await fetch(`${API_BASE_URL}/api/developer/branding/logo`, {
+        method: 'POST', credentials: 'include', headers: { ...csrfHeader() }, body: fd,
+      })
+      const data = await r.json()
+      if (!r.ok) throw new Error(data.error || data.message || 'Upload failed')
+      setLogo(data.data?.logo_url || null)
+      toast.success('Logo uploaded')
+    } catch (e: any) {
+      toast.error(e.message || 'Logo upload failed')
+    } finally {
+      setUploadingLogo(false)
     }
   }
 
@@ -244,7 +268,7 @@ export default function PageBuilderPage() {
   // CSS-var overrides; the preview does the same so it matches production and
   // re-themes as the operator edits. resolveThemeVars keeps them in one place.
   const themeVars = resolveThemeVars(config) as React.CSSProperties
-  const previewBranding = { logo_url: null, accent_color: config.accentColor || null, company_name: null }
+  const previewBranding = { logo_url: logo, accent_color: config.accentColor || null, company_name: null }
   const enabledSteps = (['front', 'back', 'liveness'] as const).filter(s => config.steps[s].enabled)
 
   // ─── Render ─────────────────────────────────────────────────
@@ -304,6 +328,34 @@ export default function PageBuilderPage() {
               <label style={label}>Subtitle</label>
               <input style={input} value={config.headerSubtitle}
                 onChange={e => updateConfig('headerSubtitle', e.target.value)} maxLength={300} />
+            </div>
+          </div>
+
+          {/* Logo section */}
+          <div style={{ marginBottom: 28 }}>
+            <div style={sectionTitle}>Logo</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: 10, flexShrink: 0,
+                border: `1px solid ${C.border}`, background: '#0a0e17',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+              }}>
+                {logo
+                  ? <img src={logo} alt="Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                  : <span style={{ fontSize: 10, color: '#8896aa' }}>None</span>}
+              </div>
+              <label style={{
+                padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                border: `1px solid ${C.cyan}`, color: C.cyan, cursor: uploadingLogo ? 'wait' : 'pointer',
+                opacity: uploadingLogo ? 0.6 : 1,
+              }}>
+                {uploadingLogo ? 'Uploading…' : logo ? 'Replace logo' : 'Upload logo'}
+                <input type="file" accept="image/png,image/jpeg" style={{ display: 'none' }} disabled={uploadingLogo}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) uploadLogo(f); e.target.value = '' }} />
+              </label>
+            </div>
+            <div style={{ fontSize: 11, color: '#8896aa', marginTop: 8 }}>
+              PNG or JPEG, under 2MB. Shown on your verification pages. Saves immediately (this is your shared branding logo).
             </div>
           </div>
 
@@ -505,6 +557,7 @@ export default function PageBuilderPage() {
                     <span style={{ color: 'var(--accent)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Secure Session</span>
                     <span>●●●</span>
                   </div>
+                  {logo && <div style={{ textAlign: 'center', padding: '6px 0 2px' }}><img src={logo} alt="" style={{ height: 22, objectFit: 'contain' }} /></div>}
                   <div style={{ display: 'flex', gap: 4, padding: '8px 18px' }}>
                     {[...enabledSteps.map(s => config.steps[s].label), 'Complete'].map((lbl, i) => (
                       <div key={i} style={{ flex: 1, minWidth: 0 }}>
@@ -529,6 +582,7 @@ export default function PageBuilderPage() {
               ) : (
                 /* Desktop landing — mirrors the choice screen */
                 <div style={{ padding: '36px 28px', textAlign: 'center' }}>
+                  {logo && <img src={logo} alt="" style={{ height: 30, objectFit: 'contain', marginBottom: 18 }} />}
                   <h2 style={{ fontSize: 24, fontWeight: 600, color: 'var(--ink)', margin: '0 0 8px' }}>{config.headerTitle || 'Verify Your Identity'}</h2>
                   <p style={{ fontSize: 14, color: 'var(--mid)', margin: '0 0 24px' }}>{config.headerSubtitle || 'Choose how you\'d like to verify'}</p>
                   <div style={{ display: 'flex', gap: 12 }}>
