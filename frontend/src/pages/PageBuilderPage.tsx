@@ -557,7 +557,7 @@ export default function PageBuilderPage() {
                     <span style={{ color: 'var(--accent)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Secure Session</span>
                     <span>●●●</span>
                   </div>
-                  {logo && <div style={{ textAlign: 'center', padding: '6px 0 2px' }}><img src={logo} alt="" style={{ height: 22, objectFit: 'contain' }} /></div>}
+                  {logo && <div style={{ textAlign: 'center', padding: '6px 18px 2px' }}><img src={logo} alt="" style={{ height: 22, maxWidth: '60%', objectFit: 'contain', display: 'inline-block' }} /></div>}
                   <div style={{ display: 'flex', gap: 4, padding: '8px 18px' }}>
                     {[...enabledSteps.map(s => config.steps[s].label), 'Complete'].map((lbl, i) => (
                       <div key={i} style={{ flex: 1, minWidth: 0 }}>
@@ -582,7 +582,7 @@ export default function PageBuilderPage() {
               ) : (
                 /* Desktop landing — mirrors the choice screen */
                 <div style={{ padding: '36px 28px', textAlign: 'center' }}>
-                  {logo && <img src={logo} alt="" style={{ height: 30, objectFit: 'contain', marginBottom: 18 }} />}
+                  {logo && <img src={logo} alt="" style={{ height: 30, maxWidth: '55%', objectFit: 'contain', display: 'block', margin: '0 auto 18px' }} />}
                   <h2 style={{ fontSize: 24, fontWeight: 600, color: 'var(--ink)', margin: '0 0 8px' }}>{config.headerTitle || 'Verify Your Identity'}</h2>
                   <p style={{ fontSize: 14, color: 'var(--mid)', margin: '0 0 24px' }}>{config.headerSubtitle || 'Choose how you\'d like to verify'}</p>
                   <div style={{ display: 'flex', gap: 12 }}>
