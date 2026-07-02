@@ -557,7 +557,7 @@ export default function PageBuilderPage() {
                     <span style={{ color: 'var(--accent)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Secure Session</span>
                     <span>●●●</span>
                   </div>
-                  {logo && <div style={{ textAlign: 'center', padding: '6px 18px 2px' }}><img src={logo} alt="" style={{ height: 22, maxWidth: '60%', objectFit: 'contain', display: 'inline-block' }} /></div>}
+                  {logo && <div style={{ padding: '6px 18px 2px' }}><img src={logo} alt="" style={{ height: 22, maxWidth: '60%', objectFit: 'contain', display: 'block', margin: '0 auto' }} /></div>}
                   <div style={{ display: 'flex', gap: 4, padding: '8px 18px' }}>
                     {[...enabledSteps.map(s => config.steps[s].label), 'Complete'].map((lbl, i) => (
                       <div key={i} style={{ flex: 1, minWidth: 0 }}>

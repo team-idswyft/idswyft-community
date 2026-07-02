@@ -1188,8 +1188,8 @@ const MobileVerificationPage: React.FC = () => {
 
       {/* Branding logo — centered under the status bar */}
       {brandingLogo && (
-        <div style={{ textAlign: 'center', padding: '6px 24px 0' }}>
-          <img src={brandingLogo} alt={brandingCompany || 'Logo'} style={{ height: 24, objectFit: 'contain' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+        <div style={{ padding: '6px 24px 0' }}>
+          <img src={brandingLogo} alt={brandingCompany || 'Logo'} style={{ height: 24, maxWidth: '60%', objectFit: 'contain', display: 'block', margin: '0 auto' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
         </div>
       )}
 
