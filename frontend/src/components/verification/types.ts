@@ -12,6 +12,9 @@ export interface PageBuilderConfig {
   backgroundColor: string
   cardBackgroundColor: string
   textColor: string
+  accentColor: string
+  mutedTextColor: string
+  borderColor: string
   fontFamily: 'dm-sans' | 'inter' | 'system'
   steps: {
     front: { enabled: boolean; label: string }

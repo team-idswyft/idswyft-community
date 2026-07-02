@@ -17,6 +17,22 @@ describe('resolveThemeVars', () => {
     })
   })
 
+  it('maps accentColor, mutedTextColor, and borderColor to their CSS var pairs', () => {
+    const vars = resolveThemeVars({
+      accentColor: '#abcdef',
+      mutedTextColor: '#123456',
+      borderColor: '#654321',
+    })
+    expect(vars).toEqual({
+      '--accent': '#abcdef',
+      '--accent-ink': '#abcdef',
+      '--mid': '#123456',
+      '--soft': '#123456',
+      '--rule': '#654321',
+      '--rule-strong': '#654321',
+    })
+  })
+
   it('omits unset fields so the global defaults apply', () => {
     expect(resolveThemeVars({ textColor: '#eee' })).toEqual({ '--ink': '#eee' })
     expect(resolveThemeVars({})).toEqual({})

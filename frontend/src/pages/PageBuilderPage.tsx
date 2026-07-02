@@ -16,6 +16,9 @@ interface PageBuilderConfig {
   backgroundColor: string
   cardBackgroundColor: string
   textColor: string
+  accentColor: string
+  mutedTextColor: string
+  borderColor: string
   fontFamily: 'dm-sans' | 'inter' | 'system'
   steps: {
     front: { enabled: boolean; label: string }
@@ -35,6 +38,9 @@ const DEFAULT_CONFIG: PageBuilderConfig = {
   backgroundColor: '#080c14',
   cardBackgroundColor: '#0f1420',
   textColor: '#dde2ec',
+  accentColor: '#00F0FF',
+  mutedTextColor: '#8a8a90',
+  borderColor: '#1e1e22',
   fontFamily: 'dm-sans',
   steps: {
     front: { enabled: true, label: 'Front of ID' },
@@ -178,11 +184,17 @@ export default function PageBuilderPage() {
       updateConfig('backgroundColor', '#080c14')
       updateConfig('cardBackgroundColor', '#0f1420')
       updateConfig('textColor', '#dde2ec')
+      updateConfig('accentColor', '#00F0FF')
+      updateConfig('mutedTextColor', '#8a8a90')
+      updateConfig('borderColor', '#1e1e22')
     } else {
       updateConfig('theme', 'light')
       updateConfig('backgroundColor', '#f8fafc')
       updateConfig('cardBackgroundColor', '#ffffff')
       updateConfig('textColor', '#1e293b')
+      updateConfig('accentColor', '#00d4d4')
+      updateConfig('mutedTextColor', '#6b6b70')
+      updateConfig('borderColor', '#e4e2dc')
     }
   }
 
@@ -317,6 +329,24 @@ export default function PageBuilderPage() {
                 ['backgroundColor', 'Background'],
                 ['cardBackgroundColor', 'Card'],
                 ['textColor', 'Text'],
+              ] as const).map(([key, lbl]) => (
+                <div key={key}>
+                  <label style={label}>{lbl}</label>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <input style={{ ...input, flex: 1 }} value={config[key]}
+                      onChange={e => updateConfig(key, e.target.value)} maxLength={7} />
+                    <input type="color" value={HEX_RE.test(config[key]) ? config[key] : '#000000'}
+                      onChange={e => updateConfig(key, e.target.value)}
+                      style={{ width: 28, height: 28, border: 'none', padding: 0, cursor: 'pointer', background: 'transparent' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginTop: 10 }}>
+              {([
+                ['accentColor', 'Accent / Button'],
+                ['mutedTextColor', 'Muted Text'],
+                ['borderColor', 'Borders'],
               ] as const).map(([key, lbl]) => (
                 <div key={key}>
                   <label style={label}>{lbl}</label>

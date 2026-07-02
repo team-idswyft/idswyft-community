@@ -22,6 +22,18 @@ export function resolveThemeVars(config: Partial<PageBuilderConfig>): Record<str
   if (config.backgroundColor) vars['--paper'] = config.backgroundColor
   if (config.textColor) vars['--ink'] = config.textColor
   if (config.cardBackgroundColor) vars['--panel'] = config.cardBackgroundColor
+  if (config.accentColor) {
+    vars['--accent'] = config.accentColor
+    vars['--accent-ink'] = config.accentColor
+  }
+  if (config.mutedTextColor) {
+    vars['--mid'] = config.mutedTextColor
+    vars['--soft'] = config.mutedTextColor
+  }
+  if (config.borderColor) {
+    vars['--rule'] = config.borderColor
+    vars['--rule-strong'] = config.borderColor
+  }
   if (config.fontFamily && PB_FONT_MAP[config.fontFamily]) {
     vars['--sans'] = PB_FONT_MAP[config.fontFamily]
   }

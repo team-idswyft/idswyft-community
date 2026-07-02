@@ -256,6 +256,7 @@ router.put('/settings/branding',
 const ALLOWED_PB_KEYS = new Set([
   'headerTitle', 'headerSubtitle', 'showPoweredBy',
   'theme', 'backgroundColor', 'cardBackgroundColor', 'textColor',
+  'accentColor', 'mutedTextColor', 'borderColor',
   'fontFamily', 'steps', 'completionTitle', 'completionMessage', 'showConfetti',
 ]);
 
@@ -272,7 +273,7 @@ function validatePageBuilderConfig(cfg: any): string | null {
     return 'theme must be "dark" or "light"';
   if (cfg.fontFamily && !['dm-sans', 'inter', 'system'].includes(cfg.fontFamily))
     return 'fontFamily must be "dm-sans", "inter", or "system"';
-  for (const colorKey of ['backgroundColor', 'cardBackgroundColor', 'textColor']) {
+  for (const colorKey of ['backgroundColor', 'cardBackgroundColor', 'textColor', 'accentColor', 'mutedTextColor', 'borderColor']) {
     if (cfg[colorKey] && !HEX_COLOR_RE.test(cfg[colorKey]))
       return `${colorKey} must be a 6-digit hex color`;
   }
