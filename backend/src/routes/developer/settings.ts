@@ -15,7 +15,7 @@ const router = express.Router();
 const VALID_LLM_PROVIDERS = ['openai', 'anthropic', 'custom'];
 
 router.get('/settings/llm',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   catchAsync(async (req: Request, res: Response) => {
     const developerId = (req as any).developer.id;
 
@@ -49,7 +49,7 @@ router.get('/settings/llm',
 );
 
 router.put('/settings/llm',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   [
     body('provider').isIn([...VALID_LLM_PROVIDERS, null, '']).withMessage(`Provider must be one of: ${VALID_LLM_PROVIDERS.join(', ')}`),
     body('api_key').optional({ nullable: true }).isString().isLength({ min: 10 }).withMessage('API key must be at least 10 characters'),
@@ -104,7 +104,7 @@ router.put('/settings/llm',
 const VALID_SMS_PROVIDERS = ['twilio', 'vonage'];
 
 router.get('/settings/sms',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   catchAsync(async (req: Request, res: Response) => {
     const developerId = (req as any).developer.id;
 
@@ -138,7 +138,7 @@ router.get('/settings/sms',
 );
 
 router.put('/settings/sms',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   [
     body('provider').isIn([...VALID_SMS_PROVIDERS, null, '']).withMessage(`Provider must be one of: ${VALID_SMS_PROVIDERS.join(', ')}`),
     body('api_key').optional({ nullable: true }).isString().isLength({ min: 10 }).withMessage('API key / Account SID must be at least 10 characters'),
@@ -190,7 +190,7 @@ router.put('/settings/sms',
 // ─── Page Branding Settings ────────────────────────────────────
 
 router.get('/settings/branding',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   catchAsync(async (req: Request, res: Response) => {
     const developerId = (req as any).developer.id;
 
@@ -214,7 +214,7 @@ router.get('/settings/branding',
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
 router.put('/settings/branding',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   [
     body('logo_url').optional({ nullable: true }).isURL({ protocols: ['https', 'http'] }).withMessage('Logo URL must be a valid HTTP(S) URL'),
     body('accent_color').optional({ nullable: true }).matches(HEX_COLOR_RE).withMessage('Accent color must be a 6-digit hex (e.g. #22d3ee)'),
@@ -358,7 +358,7 @@ router.put('/settings/page-builder/slug',
 // ─── AML / Sanctions Screening Settings ─────────────────────
 
 router.get('/settings/aml',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   catchAsync(async (req: Request, res: Response) => {
     const developerId = (req as any).developer.id;
 
@@ -375,7 +375,7 @@ router.get('/settings/aml',
 );
 
 router.put('/settings/aml',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   [
     body('enabled').isBoolean().withMessage('enabled must be a boolean'),
   ],

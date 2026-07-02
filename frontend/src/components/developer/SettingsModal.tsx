@@ -37,9 +37,12 @@ interface SettingsModalProps {
   token: string
   onClose: () => void
   onAccountDeleted: () => void
+  /** Service operators get a scoped subset: Branding, Team, Integrations
+   *  (no Profile/Account — those are developer-owner surfaces). */
+  isOperator?: boolean
 }
 
-export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModalProps) {
+export function SettingsModal({ token, onClose, onAccountDeleted, isOperator = false }: SettingsModalProps) {
   const authHeaders = (token === 'session' ? {} : { Authorization: `Bearer ${token}` }) as Record<string, string>
   // Profile settings
   const [profileName, setProfileName] = useState('')
@@ -112,18 +115,20 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
   const [deleteAccountLoading, setDeleteAccountLoading] = useState(false)
 
   // Active settings tab
-  const [activeTab, setActiveTab] = useState<SettingsTab>('profile')
+  const [activeTab, setActiveTab] = useState<SettingsTab>(isOperator ? 'branding' : 'profile')
 
   // Fetch data on mount
   useEffect(() => {
     if (!token) return
-    fetchProfile()
+    // Operators get a scoped subset; skip developer-only fetches (profile,
+    // dedup/voice/vc) whose endpoints are developer-JWT-only and would 401.
+    if (!isOperator) fetchProfile()
     fetchLLMSettings()
     fetchSMSSettings()
     fetchAmlSettings()
-    fetchDedupSettings()
-    fetchVoiceAuthSettings()
-    if (isCloud) fetchVcSettings()
+    if (!isOperator) fetchDedupSettings()
+    if (!isOperator) fetchVoiceAuthSettings()
+    if (isCloud && !isOperator) fetchVcSettings()
     fetchBrandingSettings()
     fetchReviewers()
   }, [token])
@@ -652,7 +657,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
             {/* Sidebar */}
             <nav style={{ width: 220, flexShrink: 0, background: C.surface, borderRight: `1px solid ${C.border}`, display: 'flex', flexDirection: 'column', paddingTop: 8 }}>
               {/* Main tabs */}
-              {tabs.filter(t => !t.bottom).map(tab => {
+              {tabs.filter(t => !t.bottom && !(isOperator && t.id === 'profile')).map(tab => {
                 const isActive = activeTab === tab.id
                 const Icon = tab.icon
                 return (
@@ -686,7 +691,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
               <div style={{ borderTop: `1px solid ${C.border}`, margin: '0 16px' }} />
 
               {/* Bottom tabs (Account) */}
-              {tabs.filter(t => t.bottom).map(tab => {
+              {tabs.filter(t => t.bottom && !isOperator).map(tab => {
                 const isActive = activeTab === tab.id
                 const Icon = tab.icon
                 return (
