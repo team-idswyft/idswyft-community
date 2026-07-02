@@ -1166,13 +1166,6 @@ const MobileVerificationPage: React.FC = () => {
     <div style={shellStyle}>
       <style>{css}{brandingAccent && /^#[0-9a-fA-F]{6}$/.test(brandingAccent) ? `:root { --accent: ${brandingAccent}; --accent-ink: ${brandingAccent}; }` : ''}{pageConfig ? `:root, html[data-theme] { ${Object.entries(resolveThemeVars(pageConfig)).map(([k, v]) => `${k}: ${v};`).join(' ')} }` : ''}</style>
 
-      {/* Branding logo header */}
-      {brandingLogo && (
-        <div style={{ textAlign: 'center', padding: '12px 24px 0' }}>
-          <img src={brandingLogo} alt={brandingCompany || 'Logo'} style={{ height: 24, objectFit: 'contain' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-        </div>
-      )}
-
       {/* Status bar */}
       <div style={{
         display: 'flex', justifyContent: 'space-between', alignItems: 'center',
@@ -1192,6 +1185,13 @@ const MobileVerificationPage: React.FC = () => {
           <span style={{ opacity: 0.4 }}>●</span>
         </span>
       </div>
+
+      {/* Branding logo — centered under the status bar */}
+      {brandingLogo && (
+        <div style={{ textAlign: 'center', padding: '6px 24px 0' }}>
+          <img src={brandingLogo} alt={brandingCompany || 'Logo'} style={{ height: 24, objectFit: 'contain' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+        </div>
+      )}
 
       {/* Step progress */}
       <StepTracker
