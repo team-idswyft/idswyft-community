@@ -466,7 +466,7 @@ router.post('/webhooks/:webhookId/deliveries/:deliveryId/resend',
     );
 
     logger.info('Webhook delivery resent', {
-      developerId: developer.id,
+      developerId,
       webhookId,
       originalDeliveryId: deliveryId,
       newDeliveryId: newDelivery.id,
