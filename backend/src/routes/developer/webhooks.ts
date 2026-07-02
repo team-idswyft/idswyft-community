@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { body, param } from 'express-validator';
 import { supabase } from '@/config/database.js';
-import { authenticateDeveloperJWT, authenticateDashboard, scopeForRequest } from '@/middleware/auth.js';
+import { authenticateDashboard, scopeForRequest } from '@/middleware/auth.js';
 import { catchAsync, ValidationError, NotFoundError, AuthenticationError } from '@/middleware/errorHandler.js';
 import { validate } from '@/middleware/validate.js';
 import { logger } from '@/utils/logger.js';
@@ -262,7 +262,7 @@ router.get('/webhooks/:webhookId/secret',
 // List recent webhook deliveries for a specific webhook
 router.get('/webhooks/:webhookId/deliveries',
   apiKeyRateLimit,
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   [
     param('webhookId')
       .isUUID()
@@ -270,20 +270,21 @@ router.get('/webhooks/:webhookId/deliveries',
   ],
   validate,
   catchAsync(async (req: Request, res: Response) => {
-    const developer = req.developer;
-    if (!developer) {
-      throw new AuthenticationError('Developer authentication required');
-    }
+    const { developerId, apiKeyId } = scopeForRequest(req);
 
     const { webhookId } = req.params;
 
-    // Verify webhook belongs to this developer
-    const { data: webhook, error: whError } = await supabase
+    // Verify the webhook belongs to the calling principal. Service keys /
+    // operators may only see deliveries for their OWN key's webhook.
+    let query = supabase
       .from('webhooks')
       .select('id')
       .eq('id', webhookId)
-      .eq('developer_id', developer.id)
-      .single();
+      .eq('developer_id', developerId);
+    if (apiKeyId) {
+      query = query.eq('api_key_id', apiKeyId);
+    }
+    const { data: webhook, error: whError } = await query.single();
 
     if (whError || !webhook) {
       throw new NotFoundError('Webhook');
@@ -311,7 +312,7 @@ router.get('/webhooks/:webhookId/deliveries',
 // Send a test webhook delivery
 router.post('/webhooks/:webhookId/test',
   apiKeyRateLimit,
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   [
     param('webhookId')
       .isUUID()
@@ -319,19 +320,20 @@ router.post('/webhooks/:webhookId/test',
   ],
   validate,
   catchAsync(async (req: Request, res: Response) => {
-    const developer = req.developer;
-    if (!developer) {
-      throw new AuthenticationError('Developer authentication required');
-    }
+    const { developerId, apiKeyId } = scopeForRequest(req);
 
     const { webhookId } = req.params;
 
-    const { data: webhook, error: whError } = await supabase
+    // Service keys / operators may only test their OWN key's webhook.
+    let whQuery = supabase
       .from('webhooks')
       .select('*')
       .eq('id', webhookId)
-      .eq('developer_id', developer.id)
-      .single();
+      .eq('developer_id', developerId);
+    if (apiKeyId) {
+      whQuery = whQuery.eq('api_key_id', apiKeyId);
+    }
+    const { data: webhook, error: whError } = await whQuery.single();
 
     if (whError || !webhook) {
       throw new NotFoundError('Webhook');
@@ -417,27 +419,27 @@ router.post('/webhooks/:webhookId/test',
 // Resend a failed/pending webhook delivery with the original payload
 router.post('/webhooks/:webhookId/deliveries/:deliveryId/resend',
   apiKeyRateLimit,
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   [
     param('webhookId').isUUID().withMessage('Invalid webhook ID format'),
     param('deliveryId').isUUID().withMessage('Invalid delivery ID format'),
   ],
   validate,
   catchAsync(async (req: Request, res: Response) => {
-    const developer = req.developer;
-    if (!developer) {
-      throw new AuthenticationError('Developer authentication required');
-    }
+    const { developerId, apiKeyId } = scopeForRequest(req);
 
     const { webhookId, deliveryId } = req.params;
 
-    // Verify webhook belongs to this developer
-    const { data: webhook, error: whError } = await supabase
+    // Service keys / operators may only resend deliveries for their OWN key's webhook.
+    let whQuery = supabase
       .from('webhooks')
       .select('*')
       .eq('id', webhookId)
-      .eq('developer_id', developer.id)
-      .single();
+      .eq('developer_id', developerId);
+    if (apiKeyId) {
+      whQuery = whQuery.eq('api_key_id', apiKeyId);
+    }
+    const { data: webhook, error: whError } = await whQuery.single();
 
     if (whError || !webhook) {
       throw new NotFoundError('Webhook');
