@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { body } from 'express-validator';
 import { supabase } from '@/config/database.js';
-import { authenticateDeveloperJWT } from '@/middleware/auth.js';
+import { authenticateDeveloperJWT, authenticateDashboard } from '@/middleware/auth.js';
 import { catchAsync, ValidationError } from '@/middleware/errorHandler.js';
 import { validate } from '@/middleware/validate.js';
 import { config } from '@/config/index.js';
@@ -284,7 +284,7 @@ function validatePageBuilderConfig(cfg: any): string | null {
 }
 
 router.get('/settings/page-builder',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   catchAsync(async (req: Request, res: Response) => {
     const developerId = (req as any).developer.id;
     const { data } = await supabase
@@ -302,7 +302,7 @@ router.get('/settings/page-builder',
 );
 
 router.put('/settings/page-builder',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   catchAsync(async (req: Request, res: Response) => {
     const developerId = (req as any).developer.id;
     const { config: pbConfig } = req.body;
@@ -321,7 +321,7 @@ router.put('/settings/page-builder',
 );
 
 router.put('/settings/page-builder/slug',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   [
     body('slug').optional({ nullable: true }).isString().matches(/^[a-z0-9][a-z0-9-]{2,48}[a-z0-9]$/)
       .withMessage('Slug must be 4-50 chars: lowercase letters, numbers, and hyphens'),
