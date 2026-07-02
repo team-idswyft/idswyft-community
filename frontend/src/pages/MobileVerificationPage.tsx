@@ -6,6 +6,8 @@ import IDCameraCapture from '../components/IDCameraCapture';
 import SelfieCameraCapture from '../components/SelfieCameraCapture';
 import { ActiveLivenessCapture } from '../components/liveness/ActiveLivenessCapture';
 import type { LivenessMetadata } from '../hooks/useActiveLiveness';
+import { resolveThemeVars } from '../components/verification/theme';
+import type { PageBuilderConfig } from '../components/verification/types';
 
 // ─── Design system CSS (v2 — technical editorial) ─────────────────────────
 const css = `
@@ -419,6 +421,7 @@ const MobileVerificationPage: React.FC = () => {
   const [brandingLogo, setBrandingLogo] = useState<string | null>(null);
   const [brandingCompany, setBrandingCompany] = useState<string | null>(null);
   const [brandingAccent, setBrandingAccent] = useState<string | null>(null);
+  const [pageConfig, setPageConfig] = useState<Partial<PageBuilderConfig> | null>(null);
 
   const mountedRef = useRef(true);
   const redirectTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -461,6 +464,11 @@ const MobileVerificationPage: React.FC = () => {
           setBrandingLogo(data.branding.logo_url);
           setBrandingCompany(data.branding.company_name);
           setBrandingAccent(data.branding.accent_color);
+        }
+        // Page-builder config themes the mobile flow (colors + font). Partial —
+        // unset fields fall back to the global defaults via resolveThemeVars.
+        if (data.page_builder_config) {
+          setPageConfig(data.page_builder_config);
         }
         // If the handoff session carries an existing verification_id (session-token
         // flow), reuse it instead of creating a duplicate via initialize.
@@ -1113,7 +1121,7 @@ const MobileVerificationPage: React.FC = () => {
   if (loading) {
     return (
       <div style={shellStyle}>
-        <style>{css}{brandingAccent && /^#[0-9a-fA-F]{6}$/.test(brandingAccent) ? `:root { --accent: ${brandingAccent}; --accent-ink: ${brandingAccent}; }` : ''}</style>
+        <style>{css}{brandingAccent && /^#[0-9a-fA-F]{6}$/.test(brandingAccent) ? `:root { --accent: ${brandingAccent}; --accent-ink: ${brandingAccent}; }` : ''}{pageConfig ? `:root { ${Object.entries(resolveThemeVars(pageConfig)).map(([k, v]) => `${k}: ${v};`).join(' ')} }` : ''}</style>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
           <div style={{
             width: 56, height: 56, border: '2px solid var(--rule)',
@@ -1156,7 +1164,7 @@ const MobileVerificationPage: React.FC = () => {
   // ─── Verification flow ────────────────────────────────────────────────
   return (
     <div style={shellStyle}>
-      <style>{css}{brandingAccent && /^#[0-9a-fA-F]{6}$/.test(brandingAccent) ? `:root { --accent: ${brandingAccent}; --accent-ink: ${brandingAccent}; }` : ''}</style>
+      <style>{css}{brandingAccent && /^#[0-9a-fA-F]{6}$/.test(brandingAccent) ? `:root { --accent: ${brandingAccent}; --accent-ink: ${brandingAccent}; }` : ''}{pageConfig ? `:root { ${Object.entries(resolveThemeVars(pageConfig)).map(([k, v]) => `${k}: ${v};`).join(' ')} }` : ''}</style>
 
       {/* Branding logo header */}
       {brandingLogo && (
