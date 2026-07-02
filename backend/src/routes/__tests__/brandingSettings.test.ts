@@ -58,6 +58,11 @@ vi.mock('@/middleware/auth.js', () => ({
     req.developer = { id: 'dev-001' };
     next();
   },
+  // Branding routes now use authenticateDashboard (developer JWT | operator | service key).
+  authenticateDashboard: (req: any, _res: any, next: any) => {
+    req.developer = { id: 'dev-001' };
+    next();
+  },
 }));
 
 // ── Tests ────────────────────────────────────────────────────────────────────
