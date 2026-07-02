@@ -5,6 +5,46 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.17] - 2026-07-02
+
+Page Builder theming completeness + live preview, and Settings access for service
+operators.
+
+### Added
+- **Page Builder — full-token theming controls:** new Accent/Button, Muted Text,
+  and Border color controls. `resolveThemeVars` now maps the complete design-token
+  set (`--accent`/`--accent-ink`, `--mid`/`--soft`, `--rule`/`--rule-strong`) in
+  addition to background/card/text/font, so secondary text and borders adapt to a
+  custom palette instead of clashing.
+- **Page Builder — device-accurate live preview:** replaces the static mock with a
+  Mobile⇄Desktop and Landing⇄Completion toggle that re-themes as you edit and
+  reuses the real shared `CompletionScreen` (no drift). No demo run needed.
+- **Page Builder — logo upload:** upload control reusing the branding-logo pipeline
+  (magic-byte validation, public bucket); renders in the live preview.
+- **Mobile verification page consumes the page-builder config:** the handoff session
+  response now returns `page_builder_config`; the mobile page themes every screen
+  via the config (colors + font) and shows the branding logo centered under the
+  status bar.
+- **Shared `CompletionScreen`** component with completion-field wiring
+  (`completionTitle`/`completionMessage`/`showConfetti`) used by both devices.
+- **Settings access for operators:** service operators get a scoped Settings modal —
+  Branding (logo), Team (reviewer invitations), and Integrations (LLM/SMS/AML).
+  Profile/Account remain developer-owner only.
+
+### Changed
+- Page-builder config load/save and the branding logo, branding settings, reviewer,
+  and integration (LLM/SMS/AML) endpoints now use `authenticateDashboard` so
+  operators can manage them (each still scoped by `req.developer.id`). These live on
+  the developer row, so for service keys they are shared across sibling keys of the
+  product.
+
+### Fixed
+- Mobile config theme override now beats `html[data-theme]` specificity (Tailwind
+  strips `@layer`, so plain specificity governs) — the mobile page now reflects the
+  configured theme.
+- Branding logo centering uses `display:block; margin:0 auto` (Tailwind sets
+  `img{display:block}`, so `text-align:center` did not center it).
+
 ## [1.12.16] - 2026-07-01
 
 Service Operator Access — a bound human operator can log into the existing
