@@ -1121,7 +1121,7 @@ const MobileVerificationPage: React.FC = () => {
   if (loading) {
     return (
       <div style={shellStyle}>
-        <style>{css}{brandingAccent && /^#[0-9a-fA-F]{6}$/.test(brandingAccent) ? `:root { --accent: ${brandingAccent}; --accent-ink: ${brandingAccent}; }` : ''}{pageConfig ? `:root { ${Object.entries(resolveThemeVars(pageConfig)).map(([k, v]) => `${k}: ${v};`).join(' ')} }` : ''}</style>
+        <style>{css}{brandingAccent && /^#[0-9a-fA-F]{6}$/.test(brandingAccent) ? `:root { --accent: ${brandingAccent}; --accent-ink: ${brandingAccent}; }` : ''}{pageConfig ? `:root, html[data-theme] { ${Object.entries(resolveThemeVars(pageConfig)).map(([k, v]) => `${k}: ${v};`).join(' ')} }` : ''}</style>
         <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 16 }}>
           <div style={{
             width: 56, height: 56, border: '2px solid var(--rule)',
@@ -1164,7 +1164,7 @@ const MobileVerificationPage: React.FC = () => {
   // ─── Verification flow ────────────────────────────────────────────────
   return (
     <div style={shellStyle}>
-      <style>{css}{brandingAccent && /^#[0-9a-fA-F]{6}$/.test(brandingAccent) ? `:root { --accent: ${brandingAccent}; --accent-ink: ${brandingAccent}; }` : ''}{pageConfig ? `:root { ${Object.entries(resolveThemeVars(pageConfig)).map(([k, v]) => `${k}: ${v};`).join(' ')} }` : ''}</style>
+      <style>{css}{brandingAccent && /^#[0-9a-fA-F]{6}$/.test(brandingAccent) ? `:root { --accent: ${brandingAccent}; --accent-ink: ${brandingAccent}; }` : ''}{pageConfig ? `:root, html[data-theme] { ${Object.entries(resolveThemeVars(pageConfig)).map(([k, v]) => `${k}: ${v};`).join(' ')} }` : ''}</style>
 
       {/* Branding logo header */}
       {brandingLogo && (
