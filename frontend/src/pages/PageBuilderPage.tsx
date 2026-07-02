@@ -5,6 +5,8 @@ import toast from 'react-hot-toast'
 import { API_BASE_URL } from '../config/api'
 import { fetchCsrfToken, csrfHeader } from '../lib/csrf'
 import { C, injectFonts } from '../theme'
+import { resolveThemeVars } from '../components/verification/theme'
+import { CompletionScreen } from '../components/verification/CompletionScreen'
 
 // ─── Types ────────────────────────────────────────────────────
 
@@ -16,6 +18,9 @@ interface PageBuilderConfig {
   backgroundColor: string
   cardBackgroundColor: string
   textColor: string
+  accentColor: string
+  mutedTextColor: string
+  borderColor: string
   fontFamily: 'dm-sans' | 'inter' | 'system'
   steps: {
     front: { enabled: boolean; label: string }
@@ -35,6 +40,9 @@ const DEFAULT_CONFIG: PageBuilderConfig = {
   backgroundColor: '#080c14',
   cardBackgroundColor: '#0f1420',
   textColor: '#dde2ec',
+  accentColor: '#00F0FF',
+  mutedTextColor: '#8a8a90',
+  borderColor: '#1e1e22',
   fontFamily: 'dm-sans',
   steps: {
     front: { enabled: true, label: 'Front of ID' },
@@ -44,12 +52,6 @@ const DEFAULT_CONFIG: PageBuilderConfig = {
   completionTitle: 'Verification Complete',
   completionMessage: 'Your identity has been successfully verified.',
   showConfetti: false,
-}
-
-const FONT_MAP: Record<string, string> = {
-  'dm-sans': '"DM Sans", system-ui, sans-serif',
-  'inter': '"Inter", system-ui, sans-serif',
-  'system': 'system-ui, -apple-system, sans-serif',
 }
 
 const HEX_RE = /^#[0-9a-fA-F]{6}$/
@@ -67,6 +69,10 @@ export default function PageBuilderPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [savingSlug, setSavingSlug] = useState(false)
+  const [previewDevice, setPreviewDevice] = useState<'mobile' | 'desktop'>('mobile')
+  const [previewScreen, setPreviewScreen] = useState<'landing' | 'complete'>('landing')
+  const [logo, setLogo] = useState<string | null>(null)
+  const [uploadingLogo, setUploadingLogo] = useState(false)
 
   const mutationHeaders = useCallback(() => ({
     'Content-Type': 'application/json',
@@ -95,6 +101,7 @@ export default function PageBuilderPage() {
         if (!data) return
         if (data.config) setConfig({ ...DEFAULT_CONFIG, ...data.config })
         if (data.slug) setSlug(data.slug)
+        if (data.logo_url) setLogo(data.logo_url)
       })
       .catch(() => toast.error('Failed to load page builder config'))
       .finally(() => setLoading(false))
@@ -153,6 +160,27 @@ export default function PageBuilderPage() {
     }
   }
 
+  const uploadLogo = async (file: File) => {
+    if (!/\.(png|jpe?g)$/i.test(file.name)) { toast.error('Logo must be a PNG or JPEG'); return }
+    if (file.size > 2 * 1024 * 1024) { toast.error('Logo must be under 2MB'); return }
+    setUploadingLogo(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const r = await fetch(`${API_BASE_URL}/api/developer/branding/logo`, {
+        method: 'POST', credentials: 'include', headers: { ...csrfHeader() }, body: fd,
+      })
+      const data = await r.json()
+      if (!r.ok) throw new Error(data.error || data.message || 'Upload failed')
+      setLogo(data.data?.logo_url || null)
+      toast.success('Logo uploaded')
+    } catch (e: any) {
+      toast.error(e.message || 'Logo upload failed')
+    } finally {
+      setUploadingLogo(false)
+    }
+  }
+
   const resetConfig = () => {
     setConfig(DEFAULT_CONFIG)
     toast.success('Reset to defaults (save to apply)')
@@ -178,11 +206,17 @@ export default function PageBuilderPage() {
       updateConfig('backgroundColor', '#080c14')
       updateConfig('cardBackgroundColor', '#0f1420')
       updateConfig('textColor', '#dde2ec')
+      updateConfig('accentColor', '#00F0FF')
+      updateConfig('mutedTextColor', '#8a8a90')
+      updateConfig('borderColor', '#1e1e22')
     } else {
       updateConfig('theme', 'light')
       updateConfig('backgroundColor', '#f8fafc')
       updateConfig('cardBackgroundColor', '#ffffff')
       updateConfig('textColor', '#1e293b')
+      updateConfig('accentColor', '#00d4d4')
+      updateConfig('mutedTextColor', '#6b6b70')
+      updateConfig('borderColor', '#e4e2dc')
     }
   }
 
@@ -230,11 +264,11 @@ export default function PageBuilderPage() {
 
   // ─── Preview derived values ─────────────────────────────────
 
-  const previewFont = FONT_MAP[config.fontFamily] || FONT_MAP['dm-sans']
-  const previewBg = HEX_RE.test(config.backgroundColor) ? config.backgroundColor : '#080c14'
-  const previewCard = HEX_RE.test(config.cardBackgroundColor) ? config.cardBackgroundColor : '#0f1420'
-  const previewText = HEX_RE.test(config.textColor) ? config.textColor : '#dde2ec'
-  const previewMuted = config.theme === 'light' ? '#64748b' : '#8896aa'
+  // Live preview theming: the real verification pages theme by spreading these
+  // CSS-var overrides; the preview does the same so it matches production and
+  // re-themes as the operator edits. resolveThemeVars keeps them in one place.
+  const themeVars = resolveThemeVars(config) as React.CSSProperties
+  const previewBranding = { logo_url: logo, accent_color: config.accentColor || null, company_name: null }
   const enabledSteps = (['front', 'back', 'liveness'] as const).filter(s => config.steps[s].enabled)
 
   // ─── Render ─────────────────────────────────────────────────
@@ -297,6 +331,34 @@ export default function PageBuilderPage() {
             </div>
           </div>
 
+          {/* Logo section */}
+          <div style={{ marginBottom: 28 }}>
+            <div style={sectionTitle}>Logo</div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 14 }}>
+              <div style={{
+                width: 56, height: 56, borderRadius: 10, flexShrink: 0,
+                border: `1px solid ${C.border}`, background: '#0a0e17',
+                display: 'flex', alignItems: 'center', justifyContent: 'center', overflow: 'hidden',
+              }}>
+                {logo
+                  ? <img src={logo} alt="Logo" style={{ maxWidth: '100%', maxHeight: '100%', objectFit: 'contain' }} />
+                  : <span style={{ fontSize: 10, color: '#8896aa' }}>None</span>}
+              </div>
+              <label style={{
+                padding: '8px 16px', borderRadius: 8, fontSize: 13, fontWeight: 600,
+                border: `1px solid ${C.cyan}`, color: C.cyan, cursor: uploadingLogo ? 'wait' : 'pointer',
+                opacity: uploadingLogo ? 0.6 : 1,
+              }}>
+                {uploadingLogo ? 'Uploading…' : logo ? 'Replace logo' : 'Upload logo'}
+                <input type="file" accept="image/png,image/jpeg" style={{ display: 'none' }} disabled={uploadingLogo}
+                  onChange={e => { const f = e.target.files?.[0]; if (f) uploadLogo(f); e.target.value = '' }} />
+              </label>
+            </div>
+            <div style={{ fontSize: 11, color: '#8896aa', marginTop: 8 }}>
+              PNG or JPEG, under 2MB. Shown on your verification pages. Saves immediately (this is your shared branding logo).
+            </div>
+          </div>
+
           {/* Theme section */}
           <div style={{ marginBottom: 28 }}>
             <div style={sectionTitle}>Theme</div>
@@ -317,6 +379,24 @@ export default function PageBuilderPage() {
                 ['backgroundColor', 'Background'],
                 ['cardBackgroundColor', 'Card'],
                 ['textColor', 'Text'],
+              ] as const).map(([key, lbl]) => (
+                <div key={key}>
+                  <label style={label}>{lbl}</label>
+                  <div style={{ display: 'flex', gap: 6, alignItems: 'center' }}>
+                    <input style={{ ...input, flex: 1 }} value={config[key]}
+                      onChange={e => updateConfig(key, e.target.value)} maxLength={7} />
+                    <input type="color" value={HEX_RE.test(config[key]) ? config[key] : '#000000'}
+                      onChange={e => updateConfig(key, e.target.value)}
+                      style={{ width: 28, height: 28, border: 'none', padding: 0, cursor: 'pointer', background: 'transparent' }} />
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 10, marginTop: 10 }}>
+              {([
+                ['accentColor', 'Accent / Button'],
+                ['mutedTextColor', 'Muted Text'],
+                ['borderColor', 'Borders'],
               ] as const).map(([key, lbl]) => (
                 <div key={key}>
                   <label style={label}>{lbl}</label>
@@ -419,71 +499,103 @@ export default function PageBuilderPage() {
           </div>
         </div>
 
-        {/* ── Right: Live Preview ── */}
+        {/* ── Right: Live Preview (device-accurate, re-themes as you edit) ── */}
         <div style={{
           width: '45%', overflowY: 'auto', padding: 24,
           background: '#0a0e17',
-          display: 'flex', alignItems: 'flex-start', justifyContent: 'center',
+          display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 16,
         }}>
+          {/* Device + screen toggles */}
+          <div style={{ display: 'flex', gap: 6, alignItems: 'center', flexWrap: 'wrap', justifyContent: 'center' }}>
+            {(['mobile', 'desktop'] as const).map(d => (
+              <button key={d} onClick={() => setPreviewDevice(d)} style={{
+                padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                border: `1px solid ${previewDevice === d ? C.cyan : C.border}`,
+                background: previewDevice === d ? C.cyan : 'transparent',
+                color: previewDevice === d ? C.bg : '#8896aa',
+              }}>{d === 'mobile' ? 'Mobile' : 'Desktop'}</button>
+            ))}
+            <span style={{ width: 1, height: 20, background: C.border, margin: '0 4px' }} />
+            {(['landing', 'complete'] as const).map(s => (
+              <button key={s} onClick={() => setPreviewScreen(s)} style={{
+                padding: '6px 14px', borderRadius: 8, fontSize: 12, fontWeight: 600, cursor: 'pointer',
+                border: `1px solid ${previewScreen === s ? C.cyan : C.border}`,
+                background: previewScreen === s ? C.cyan : 'transparent',
+                color: previewScreen === s ? C.bg : '#8896aa',
+              }}>{s === 'landing' ? 'Landing' : 'Completion'}</button>
+            ))}
+          </div>
+
+          {/* Device frame — the inner container spreads themeVars so children
+              resolve var(--paper)/var(--ink)/var(--accent)/… to the draft config,
+              exactly like the real verification pages. */}
           <div style={{
-            width: '100%', maxWidth: 400,
-            background: previewBg, borderRadius: 16, overflow: 'hidden',
-            border: `1px solid ${C.border}`, fontFamily: previewFont,
+            background: '#000', borderRadius: previewDevice === 'mobile' ? 36 : 12,
+            padding: previewDevice === 'mobile' ? 10 : 8,
+            width: previewDevice === 'mobile' ? 300 : '100%',
+            maxWidth: previewDevice === 'mobile' ? 300 : 460,
+            boxShadow: '0 24px 60px rgba(0,0,0,0.5)',
           }}>
-            {/* Preview header */}
-            <div style={{ padding: '28px 24px 20px', textAlign: 'center' }}>
-              <h2 style={{ fontSize: 20, fontWeight: 600, color: previewText, margin: '0 0 6px' }}>
-                {config.headerTitle || 'Verify Your Identity'}
-              </h2>
-              <p style={{ fontSize: 13, color: previewMuted, margin: 0 }}>
-                {config.headerSubtitle || 'Complete the steps below'}
-              </p>
-            </div>
-
-            {/* Steps */}
-            <div style={{ padding: '0 24px 20px' }}>
-              {enabledSteps.map((step, i) => (
-                <div key={step} style={{
-                  background: previewCard, borderRadius: 10, padding: '14px 16px',
-                  marginBottom: 8, display: 'flex', alignItems: 'center', gap: 12,
-                  border: `1px solid ${config.theme === 'light' ? '#e2e8f0' : 'rgba(255,255,255,0.06)'}`,
-                }}>
-                  <div style={{
-                    width: 28, height: 28, borderRadius: '50%', flexShrink: 0,
-                    background: i === 0 ? C.cyan : 'transparent',
-                    border: i === 0 ? 'none' : `1.5px solid ${previewMuted}`,
-                    color: i === 0 ? C.bg : previewMuted,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    fontSize: 12, fontWeight: 600,
-                  }}>
-                    {i + 1}
-                  </div>
-                  <span style={{ fontSize: 14, color: previewText, fontWeight: 500 }}>
-                    {config.steps[step].label}
-                  </span>
-                </div>
-              ))}
-            </div>
-
-            {/* Completion preview (dimmed) */}
             <div style={{
-              padding: '16px 24px', borderTop: `1px solid ${config.theme === 'light' ? '#e2e8f0' : 'rgba(255,255,255,0.06)'}`,
-              textAlign: 'center', opacity: 0.5,
+              ...themeVars,
+              background: 'var(--paper)', color: 'var(--ink)', fontFamily: 'var(--sans)',
+              borderRadius: previewDevice === 'mobile' ? 28 : 6, overflow: 'hidden',
+              minHeight: previewDevice === 'mobile' ? 540 : 420,
             }}>
-              <div style={{ fontSize: 14, fontWeight: 600, color: previewText, marginBottom: 4 }}>
-                {config.completionTitle}
-              </div>
-              <div style={{ fontSize: 12, color: previewMuted }}>
-                {config.completionMessage}
-              </div>
+              {previewScreen === 'complete' ? (
+                <CompletionScreen
+                  device={previewDevice}
+                  config={config}
+                  branding={previewBranding}
+                  result={{ status: 'verified', confidence_score: 0.97, face_match_score: 0.96, liveness_score: 0.98 }}
+                />
+              ) : previewDevice === 'mobile' ? (
+                /* Mobile landing — mirrors the /verify/mobile first screen */
+                <div style={{ paddingBottom: 20 }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', padding: '12px 18px 8px', fontFamily: 'var(--mono)', fontSize: 10, color: 'var(--mid)' }}>
+                    <span>9:41</span>
+                    <span style={{ color: 'var(--accent)', letterSpacing: '0.1em', textTransform: 'uppercase' }}>Secure Session</span>
+                    <span>●●●</span>
+                  </div>
+                  {logo && <div style={{ padding: '6px 18px 2px' }}><img src={logo} alt="" style={{ height: 22, maxWidth: '60%', objectFit: 'contain', display: 'block', margin: '0 auto' }} /></div>}
+                  <div style={{ display: 'flex', gap: 4, padding: '8px 18px' }}>
+                    {[...enabledSteps.map(s => config.steps[s].label), 'Complete'].map((lbl, i) => (
+                      <div key={i} style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ height: 3, background: i === 0 ? 'var(--accent)' : 'var(--rule)', borderRadius: 2 }} />
+                        <div style={{ fontSize: 8, marginTop: 4, fontFamily: 'var(--mono)', color: i === 0 ? 'var(--ink)' : 'var(--mid)', textTransform: 'uppercase', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{lbl}</div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ padding: '16px 18px 0' }}>
+                    <div style={{ fontFamily: 'var(--mono)', fontSize: 9, color: 'var(--accent)', letterSpacing: '0.08em', marginBottom: 8 }}>STEP 1 OF {enabledSteps.length + 1}</div>
+                    <h2 style={{ fontSize: 22, fontWeight: 600, color: 'var(--ink)', margin: '0 0 6px', lineHeight: 1.15 }}>{config.headerTitle || 'Verify Your Identity'}</h2>
+                    <p style={{ fontSize: 13, color: 'var(--mid)', margin: 0 }}>{config.headerSubtitle || 'Complete the steps below'}</p>
+                  </div>
+                  <div style={{ margin: '16px 18px', padding: '30px 16px', background: 'var(--panel)', border: '2px solid var(--accent)', borderRadius: 12, textAlign: 'center' }}>
+                    <div style={{ fontSize: 11, color: 'var(--mid)', fontFamily: 'var(--mono)', letterSpacing: '0.04em' }}>Camera preview</div>
+                  </div>
+                  <div style={{ padding: '0 18px' }}>
+                    <div style={{ background: 'var(--accent)', color: 'var(--paper)', textAlign: 'center', padding: 14, borderRadius: 10, fontWeight: 600, fontSize: 13, fontFamily: 'var(--mono)', letterSpacing: '0.04em', textTransform: 'uppercase' }}>Take Photo of {config.steps.front.label || 'Front'}</div>
+                  </div>
+                  {config.showPoweredBy && <div style={{ textAlign: 'center', padding: '18px 0 0', fontSize: 10, color: 'var(--mid)' }}>Powered by Idswyft</div>}
+                </div>
+              ) : (
+                /* Desktop landing — mirrors the choice screen */
+                <div style={{ padding: '36px 28px', textAlign: 'center' }}>
+                  {logo && <img src={logo} alt="" style={{ height: 30, maxWidth: '55%', objectFit: 'contain', display: 'block', margin: '0 auto 18px' }} />}
+                  <h2 style={{ fontSize: 24, fontWeight: 600, color: 'var(--ink)', margin: '0 0 8px' }}>{config.headerTitle || 'Verify Your Identity'}</h2>
+                  <p style={{ fontSize: 14, color: 'var(--mid)', margin: '0 0 24px' }}>{config.headerSubtitle || 'Choose how you\'d like to verify'}</p>
+                  <div style={{ display: 'flex', gap: 12 }}>
+                    {['Continue on this device', 'Scan QR code'].map((t, i) => (
+                      <div key={i} style={{ flex: 1, padding: '22px 16px', background: 'var(--panel)', border: `1.5px solid ${i === 0 ? 'var(--accent)' : 'var(--rule)'}`, borderRadius: 12 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--ink)' }}>{t}</div>
+                      </div>
+                    ))}
+                  </div>
+                  {config.showPoweredBy && <div style={{ padding: '24px 0 0', fontSize: 11, color: 'var(--mid)' }}>Powered by Idswyft</div>}
+                </div>
+              )}
             </div>
-
-            {/* Powered by */}
-            {config.showPoweredBy && (
-              <div style={{ textAlign: 'center', padding: '12px 0 16px', fontSize: 10, color: previewMuted }}>
-                Powered by Idswyft
-              </div>
-            )}
           </div>
         </div>
       </div>

@@ -148,8 +148,9 @@ router.get('/:token/session', catchAsync(async (req: Request, res: Response) => 
     return res.status(409).json({ error: 'Session already used' });
   }
 
-  // Resolve branding via separate lookups (avoids 2-level nested join)
+  // Resolve branding + page-builder config via separate lookups (avoids 2-level nested join)
   let branding = null;
+  let pageBuilderConfig = null;
   if (data.api_key_id) {
     const { data: apiKey } = await supabase
       .from('api_keys')
@@ -160,7 +161,7 @@ router.get('/:token/session', catchAsync(async (req: Request, res: Response) => 
     if (apiKey?.developer_id) {
       const { data: dev } = await supabase
         .from('developers')
-        .select('branding_logo_url, branding_accent_color, branding_company_name, company')
+        .select('branding_logo_url, branding_accent_color, branding_company_name, company, page_builder_config')
         .eq('id', apiKey.developer_id)
         .single();
 
@@ -170,6 +171,7 @@ router.get('/:token/session', catchAsync(async (req: Request, res: Response) => 
           accent_color: dev.branding_accent_color || null,
           company_name: dev.branding_company_name || dev.company || null,
         };
+        pageBuilderConfig = (dev as any).page_builder_config || null;
       }
     }
   }
@@ -178,6 +180,7 @@ router.get('/:token/session', catchAsync(async (req: Request, res: Response) => 
     user_id: data.user_id,
     source: data.source || 'api',
     branding,
+    page_builder_config: pageBuilderConfig,
     ...(data.verification_id && { verification_id: data.verification_id }),
   });
 }));

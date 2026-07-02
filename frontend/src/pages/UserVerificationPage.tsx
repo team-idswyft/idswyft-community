@@ -2,10 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { useSearchParams, useNavigate, useParams } from 'react-router-dom';
 import { ArrowLeftIcon } from '@heroicons/react/24/outline';
 import EndUserVerification from '../components/verification/EndUserVerification';
+import { CompletionScreen } from '../components/verification/CompletionScreen';
 import { ContinueOnPhone } from '../components/ContinueOnPhone';
 import { C, injectFonts } from '../theme';
 import { API_BASE_URL, buildApiUrl, shouldUseSandbox } from '../config/api';
 import { sanitizeRedirectUrl, buildRedirectUrl } from '../utils/redirect';
+import { PB_FONT_MAP } from '../components/verification/theme';
+import type { PageBuilderConfig, PageBranding } from '../components/verification/types';
 
 // ─── State machine ─────────────────────────────────────────────────
 // 'choice'     → user picks mobile or desktop
@@ -14,37 +17,6 @@ import { sanitizeRedirectUrl, buildRedirectUrl } from '../utils/redirect';
 // 'address'    → optional address verification (when address_verif=true)
 // ────────────────────────────────────────────────────────────────────
 type Phase = 'choice' | 'mobile-qr' | 'desktop' | 'address' | 'completed';
-
-interface PageBranding {
-  logo_url: string | null;
-  accent_color: string | null;
-  company_name: string | null;
-}
-
-interface PageBuilderConfig {
-  headerTitle?: string;
-  headerSubtitle?: string;
-  showPoweredBy?: boolean;
-  theme?: 'dark' | 'light';
-  backgroundColor?: string;
-  cardBackgroundColor?: string;
-  textColor?: string;
-  fontFamily?: 'dm-sans' | 'inter' | 'system';
-  steps?: {
-    front?: { enabled?: boolean; label?: string };
-    back?: { enabled?: boolean; label?: string };
-    liveness?: { enabled?: boolean; label?: string };
-  };
-  completionTitle?: string;
-  completionMessage?: string;
-  showConfetti?: boolean;
-}
-
-const PB_FONT_MAP: Record<string, string> = {
-  'dm-sans': '"DM Sans", system-ui, sans-serif',
-  'inter': '"Inter", system-ui, sans-serif',
-  'system': 'system-ui, -apple-system, sans-serif',
-};
 
 const UserVerificationPage: React.FC = () => {
   const [searchParams] = useSearchParams();
@@ -92,7 +64,7 @@ const UserVerificationPage: React.FC = () => {
 
   // Page branding — fetched from developer config
   const [branding, setBranding] = useState<PageBranding | null>(null);
-  const [pageConfig, setPageConfig] = useState<PageBuilderConfig | null>(null);
+  const [pageConfig, setPageConfig] = useState<Partial<PageBuilderConfig> | null>(null);
   const accentBorder = branding?.accent_color ? `${branding.accent_color}40` : C.cyanBorder;
   const hasCustomBranding = !!(branding?.logo_url || branding?.company_name || branding?.accent_color);
 
@@ -452,72 +424,72 @@ const UserVerificationPage: React.FC = () => {
 
   // ── Phase: completed — terminal state when no redirect/iframe ───────
   if (!viewOnly && phase === 'completed') {
-    const statusLabel = verificationResult?.status === 'verified' || verificationResult?.status === 'completed'
-      ? 'Verified' : verificationResult?.status === 'failed' ? 'Failed' : 'Under Review';
-    const isSuccess = statusLabel === 'Verified';
-    const isFailed = statusLabel === 'Failed';
-    return (
-      <div style={{ background: 'var(--paper)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
-        <div style={{ maxWidth: 440, width: '100%', textAlign: 'center' }}>
-          {branding?.logo_url ? (
-            <img src={branding.logo_url} alt={branding.company_name || 'Logo'} style={{ height: 36, margin: '0 auto 32px', objectFit: 'contain' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-          ) : (
-            <img src="/idswyft-logo.png" alt="Idswyft" style={{ height: 36, margin: '0 auto 32px' }} />
-          )}
-          <div className={isSuccess ? 'result-badge badge-success' : isFailed ? 'result-badge badge-error' : 'result-badge badge-warning'} style={{
-            margin: '0 auto 16px', display: 'inline-flex', padding: '8px 16px',
-            fontFamily: C.mono, fontSize: 12, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
-          }}>
-            {isSuccess ? 'PASS' : isFailed ? 'FAIL' : 'REVIEW'}
-          </div>
-          <h1 style={{ fontFamily: C.sans, fontSize: '1.4rem', fontWeight: 600, color: 'var(--ink)', margin: '16px 0 8px' }}>
-            {verificationMode === 'age_only'
-              ? isSuccess ? 'Age Verified' : 'Age Verification Failed'
-              : `Verification ${statusLabel}`}
-          </h1>
-          <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: 'var(--mid)', margin: '0 0 24px' }}>
-            {verificationMode === 'age_only'
-              ? isSuccess
-                ? `You meet the minimum age requirement of ${ageThreshold ?? 18}.`
-                : 'Age verification could not be completed.'
-              : isSuccess
-              ? 'Your identity has been successfully verified.'
-              : statusLabel === 'Failed'
-                ? 'Verification could not be completed. Please try again.'
-                : 'Your verification is being reviewed. You will be notified of the result.'}
-          </p>
-          {verificationResult && (
-            <div className="result-grid" style={{ textAlign: 'left' }}>
-              {verificationResult.confidence_score != null && (
-                <>
-                  <div>Confidence</div>
-                  <div style={{ color: 'var(--ink)', fontWeight: 600 }}>{Math.round(verificationResult.confidence_score * 100)}%</div>
-                </>
-              )}
-              {verificationResult.face_match_score != null && (
-                <>
-                  <div>Face Match</div>
-                  <div style={{ color: 'var(--ink)', fontWeight: 600 }}>{Math.round(verificationResult.face_match_score * 100)}%</div>
-                </>
-              )}
-              {verificationResult.liveness_score != null && (
-                <>
-                  <div>Liveness</div>
-                  <div style={{ color: 'var(--ink)', fontWeight: 600 }}>{Math.round(verificationResult.liveness_score * 100)}%</div>
-                </>
-              )}
+    // Age-only verification has page-specific copy (age threshold) that
+    // doesn't generalize to the shared CompletionScreen — kept inline.
+    if (verificationMode === 'age_only') {
+      const statusLabel = verificationResult?.status === 'verified' || verificationResult?.status === 'completed'
+        ? 'Verified' : verificationResult?.status === 'failed' ? 'Failed' : 'Under Review';
+      const isSuccess = statusLabel === 'Verified';
+      const isFailed = statusLabel === 'Failed';
+      return (
+        <div style={{ background: 'var(--paper)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
+          <div style={{ maxWidth: 440, width: '100%', textAlign: 'center' }}>
+            {branding?.logo_url ? (
+              <img src={branding.logo_url} alt={branding.company_name || 'Logo'} style={{ height: 36, margin: '0 auto 32px', objectFit: 'contain' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
+            ) : (
+              <img src="/idswyft-logo.png" alt="Idswyft" style={{ height: 36, margin: '0 auto 32px' }} />
+            )}
+            <div className={isSuccess ? 'result-badge badge-success' : isFailed ? 'result-badge badge-error' : 'result-badge badge-warning'} style={{
+              margin: '0 auto 16px', display: 'inline-flex', padding: '8px 16px',
+              fontFamily: C.mono, fontSize: 12, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
+            }}>
+              {isSuccess ? 'PASS' : isFailed ? 'FAIL' : 'REVIEW'}
             </div>
-          )}
-          <p style={{ fontFamily: C.mono, fontSize: '0.72rem', color: 'var(--soft)', marginTop: 24, letterSpacing: '0.04em' }}>
-            You can close this window.
-          </p>
-          {hasCustomBranding && showPoweredBy && (
-            <p style={{ fontFamily: C.mono, fontSize: '0.68rem', color: 'var(--soft)', marginTop: 12, letterSpacing: '0.04em' }}>
-              Powered by Idswyft
+            <h1 style={{ fontFamily: C.sans, fontSize: '1.4rem', fontWeight: 600, color: 'var(--ink)', margin: '16px 0 8px' }}>
+              {isSuccess ? 'Age Verified' : 'Age Verification Failed'}
+            </h1>
+            <p style={{ fontFamily: C.sans, fontSize: '0.88rem', color: 'var(--mid)', margin: '0 0 24px' }}>
+              {isSuccess
+                ? `You meet the minimum age requirement of ${ageThreshold ?? 18}.`
+                : 'Age verification could not be completed.'}
             </p>
-          )}
+            {verificationResult && (
+              <div className="result-grid" style={{ textAlign: 'left' }}>
+                {verificationResult.confidence_score != null && (
+                  <>
+                    <div>Confidence</div>
+                    <div style={{ color: 'var(--ink)', fontWeight: 600 }}>{Math.round(verificationResult.confidence_score * 100)}%</div>
+                  </>
+                )}
+                {verificationResult.face_match_score != null && (
+                  <>
+                    <div>Face Match</div>
+                    <div style={{ color: 'var(--ink)', fontWeight: 600 }}>{Math.round(verificationResult.face_match_score * 100)}%</div>
+                  </>
+                )}
+                {verificationResult.liveness_score != null && (
+                  <>
+                    <div>Liveness</div>
+                    <div style={{ color: 'var(--ink)', fontWeight: 600 }}>{Math.round(verificationResult.liveness_score * 100)}%</div>
+                  </>
+                )}
+              </div>
+            )}
+            <p style={{ fontFamily: C.mono, fontSize: '0.72rem', color: 'var(--soft)', marginTop: 24, letterSpacing: '0.04em' }}>
+              You can close this window.
+            </p>
+            {hasCustomBranding && showPoweredBy && (
+              <p style={{ fontFamily: C.mono, fontSize: '0.68rem', color: 'var(--soft)', marginTop: 12, letterSpacing: '0.04em' }}>
+                Powered by Idswyft
+              </p>
+            )}
+          </div>
         </div>
-      </div>
+      );
+    }
+
+    return (
+      <CompletionScreen device="desktop" result={verificationResult} config={pageConfig ?? {}} branding={branding} />
     );
   }
 

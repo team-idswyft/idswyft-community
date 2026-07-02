@@ -208,7 +208,7 @@ router.post('/avatar',
 
 // POST /api/developer/branding/logo — upload branding logo image
 router.post('/branding/logo',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   (avatarUpload.single('file') as any),
   catchAsync(async (req: Request, res: Response) => {
     const developer = req.developer;
@@ -247,7 +247,7 @@ router.post('/branding/logo',
 
 // POST /api/developer/reviewers/invite — invite a reviewer or org admin
 router.post('/reviewers/invite',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   [
     body('email').isEmail().normalizeEmail().withMessage('Valid email is required'),
     body('name').optional().trim().escape().isLength({ max: 100 }).withMessage('Name must be less than 100 characters'),
@@ -321,7 +321,7 @@ router.post('/reviewers/invite',
 
 // GET /api/developer/reviewers — list all reviewers for this developer
 router.get('/reviewers',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   catchAsync(async (req: Request, res: Response) => {
     const developer = req.developer;
     if (!developer) throw new AuthenticationError('Developer authentication required');
@@ -340,7 +340,7 @@ router.get('/reviewers',
 
 // DELETE /api/developer/reviewers/:id — revoke a reviewer
 router.delete('/reviewers/:id',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   [param('id').isUUID().withMessage('Invalid reviewer ID format')],
   validate,
   catchAsync(async (req: Request, res: Response) => {

@@ -1,7 +1,7 @@
 import express, { Request, Response } from 'express';
 import { body } from 'express-validator';
 import { supabase } from '@/config/database.js';
-import { authenticateDeveloperJWT } from '@/middleware/auth.js';
+import { authenticateDeveloperJWT, authenticateDashboard } from '@/middleware/auth.js';
 import { catchAsync, ValidationError } from '@/middleware/errorHandler.js';
 import { validate } from '@/middleware/validate.js';
 import { config } from '@/config/index.js';
@@ -15,7 +15,7 @@ const router = express.Router();
 const VALID_LLM_PROVIDERS = ['openai', 'anthropic', 'custom'];
 
 router.get('/settings/llm',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   catchAsync(async (req: Request, res: Response) => {
     const developerId = (req as any).developer.id;
 
@@ -49,7 +49,7 @@ router.get('/settings/llm',
 );
 
 router.put('/settings/llm',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   [
     body('provider').isIn([...VALID_LLM_PROVIDERS, null, '']).withMessage(`Provider must be one of: ${VALID_LLM_PROVIDERS.join(', ')}`),
     body('api_key').optional({ nullable: true }).isString().isLength({ min: 10 }).withMessage('API key must be at least 10 characters'),
@@ -104,7 +104,7 @@ router.put('/settings/llm',
 const VALID_SMS_PROVIDERS = ['twilio', 'vonage'];
 
 router.get('/settings/sms',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   catchAsync(async (req: Request, res: Response) => {
     const developerId = (req as any).developer.id;
 
@@ -138,7 +138,7 @@ router.get('/settings/sms',
 );
 
 router.put('/settings/sms',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   [
     body('provider').isIn([...VALID_SMS_PROVIDERS, null, '']).withMessage(`Provider must be one of: ${VALID_SMS_PROVIDERS.join(', ')}`),
     body('api_key').optional({ nullable: true }).isString().isLength({ min: 10 }).withMessage('API key / Account SID must be at least 10 characters'),
@@ -190,7 +190,7 @@ router.put('/settings/sms',
 // ─── Page Branding Settings ────────────────────────────────────
 
 router.get('/settings/branding',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   catchAsync(async (req: Request, res: Response) => {
     const developerId = (req as any).developer.id;
 
@@ -214,7 +214,7 @@ router.get('/settings/branding',
 const HEX_COLOR_RE = /^#[0-9a-fA-F]{6}$/;
 
 router.put('/settings/branding',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   [
     body('logo_url').optional({ nullable: true }).isURL({ protocols: ['https', 'http'] }).withMessage('Logo URL must be a valid HTTP(S) URL'),
     body('accent_color').optional({ nullable: true }).matches(HEX_COLOR_RE).withMessage('Accent color must be a 6-digit hex (e.g. #22d3ee)'),
@@ -256,6 +256,7 @@ router.put('/settings/branding',
 const ALLOWED_PB_KEYS = new Set([
   'headerTitle', 'headerSubtitle', 'showPoweredBy',
   'theme', 'backgroundColor', 'cardBackgroundColor', 'textColor',
+  'accentColor', 'mutedTextColor', 'borderColor',
   'fontFamily', 'steps', 'completionTitle', 'completionMessage', 'showConfetti',
 ]);
 
@@ -272,7 +273,7 @@ function validatePageBuilderConfig(cfg: any): string | null {
     return 'theme must be "dark" or "light"';
   if (cfg.fontFamily && !['dm-sans', 'inter', 'system'].includes(cfg.fontFamily))
     return 'fontFamily must be "dm-sans", "inter", or "system"';
-  for (const colorKey of ['backgroundColor', 'cardBackgroundColor', 'textColor']) {
+  for (const colorKey of ['backgroundColor', 'cardBackgroundColor', 'textColor', 'accentColor', 'mutedTextColor', 'borderColor']) {
     if (cfg[colorKey] && !HEX_COLOR_RE.test(cfg[colorKey]))
       return `${colorKey} must be a 6-digit hex color`;
   }
@@ -284,12 +285,12 @@ function validatePageBuilderConfig(cfg: any): string | null {
 }
 
 router.get('/settings/page-builder',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   catchAsync(async (req: Request, res: Response) => {
     const developerId = (req as any).developer.id;
     const { data } = await supabase
       .from('developers')
-      .select('page_builder_config, verification_slug')
+      .select('page_builder_config, verification_slug, branding_logo_url')
       .eq('id', developerId)
       .single();
 
@@ -297,12 +298,13 @@ router.get('/settings/page-builder',
       configured: !!data?.page_builder_config,
       config: data?.page_builder_config || null,
       slug: data?.verification_slug || null,
+      logo_url: data?.branding_logo_url ? resolvePublicAssetUrl(data.branding_logo_url) : null,
     });
   })
 );
 
 router.put('/settings/page-builder',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   catchAsync(async (req: Request, res: Response) => {
     const developerId = (req as any).developer.id;
     const { config: pbConfig } = req.body;
@@ -321,7 +323,7 @@ router.put('/settings/page-builder',
 );
 
 router.put('/settings/page-builder/slug',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   [
     body('slug').optional({ nullable: true }).isString().matches(/^[a-z0-9][a-z0-9-]{2,48}[a-z0-9]$/)
       .withMessage('Slug must be 4-50 chars: lowercase letters, numbers, and hyphens'),
@@ -356,7 +358,7 @@ router.put('/settings/page-builder/slug',
 // ─── AML / Sanctions Screening Settings ─────────────────────
 
 router.get('/settings/aml',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   catchAsync(async (req: Request, res: Response) => {
     const developerId = (req as any).developer.id;
 
@@ -373,7 +375,7 @@ router.get('/settings/aml',
 );
 
 router.put('/settings/aml',
-  authenticateDeveloperJWT,
+  authenticateDashboard,
   [
     body('enabled').isBoolean().withMessage('enabled must be a boolean'),
   ],
