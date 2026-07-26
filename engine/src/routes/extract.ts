@@ -20,7 +20,7 @@ import { logger } from '@/utils/logger.js';
 import { OCRService } from '@/services/ocr.js';
 import { BarcodeService } from '@/services/barcode.js';
 import { FaceRecognitionService } from '@/services/faceRecognition.js';
-import { extractMRZFromText, alpha3ToAlpha2 } from '@/services/mrz.js';
+import { extractMRZFromText, detectMRZInText, alpha3ToAlpha2 } from '@/services/mrz.js';
 import {
   createLivenessProvider, verifyHeadTurnLiveness,
   HeadTurnLivenessMetadataSchema,
@@ -53,6 +53,119 @@ const upload = multer({
   },
 });
 
+// ─── Orientation handling ────────────────────────────────────────
+
+/**
+ * Rank an OCR result so competing page orientations can be compared.
+ *
+ * Text recognition on a sideways document does not fail loudly — it returns short,
+ * garbled fragments. Counting populated fields, a detected MRZ block and the mean
+ * per-field confidence separates a correct orientation from a wrong one reliably.
+ */
+function scoreExtraction(ocr: { [key: string]: any } | null): number {
+  if (!ocr) return 0;
+  let score = 0;
+
+  for (const field of ['name', 'date_of_birth', 'document_number', 'expiration_date']) {
+    if (ocr[field]) score += 2;
+  }
+
+  // A well-formed MRZ block is decisive — it only parses at the correct orientation
+  if (ocr.raw_text && detectMRZInText(ocr.raw_text)) score += 6;
+
+  const values = Object.values(ocr.confidence_scores || {})
+    .filter((v): v is number => typeof v === 'number');
+  if (values.length > 0) {
+    score += (values.reduce((a, b) => a + b, 0) / values.length) * 3;
+  }
+
+  // Text-shape signal — the tie-breaker when no field parses at any orientation.
+  // Without it every rotation scores zero and the winner is decided by iteration
+  // order rather than by legibility. A correctly oriented page yields many lines of
+  // mostly document-like characters; a rotated one yields few lines of noise, and an
+  // upside-down one yields mirrored glyphs that fall outside the expected alphabet.
+  const text: string = ocr.raw_text || '';
+  if (text.length > 0) {
+    const lines = text.split('\n').filter(l => l.trim().length > 2);
+    const expected = (text.match(/[A-Z0-9<>.,\/ :-]/gi) || []).length;
+    score += Math.min(lines.length, 8) * 0.5;
+    score += (expected / text.length) * 4;
+  }
+
+  return score;
+}
+
+// Two populated fields plus a detected MRZ — no need to try further rotations
+const ORIENTATION_GOOD_ENOUGH = 8;
+
+interface OrientedExtraction {
+  ocr: any;
+  buffer: Buffer;
+  angle: number;
+  score: number;
+}
+
+/**
+ * Run OCR, correcting page orientation when the image is rotated.
+ *
+ * EXIF orientation is honoured first, but phone cameras frequently write no such tag,
+ * so the upright result is scored and, if weak, the remaining 90° rotations are tried.
+ * The winning buffer is returned and reused for face detection and tamper analysis —
+ * those fail on a sideways image just as OCR does.
+ *
+ * Cost: a single OCR pass in the common case thanks to the early exit; at most four
+ * on the failure path, which is far cheaper than rejecting a valid document.
+ */
+async function extractWithOrientation(
+  original: Buffer,
+  documentType: string,
+  issuingCountry: string | undefined,
+  llmConfig: LLMProviderConfig | undefined,
+): Promise<OrientedExtraction> {
+  let base = original;
+  try {
+    // sharp().rotate() with no argument applies the EXIF orientation tag, if present
+    base = await sharp(original).rotate().toBuffer();
+  } catch {
+    base = original;
+  }
+
+  // 270° first among the rotations: portrait photos of landscape documents are the
+  // common real-world case and land here.
+  const angles = [0, 270, 90, 180];
+  let best: OrientedExtraction | null = null;
+
+  for (const angle of angles) {
+    let candidate = base;
+    if (angle !== 0) {
+      try {
+        candidate = await sharp(base).rotate(angle).toBuffer();
+      } catch {
+        continue;
+      }
+    }
+
+    let ocr: any = null;
+    try {
+      ocr = await ocrService.processDocumentFromBuffer(candidate, documentType, issuingCountry, llmConfig);
+    } catch {
+      continue;
+    }
+
+    const score = scoreExtraction(ocr);
+    if (!best || score > best.score) best = { ocr, buffer: candidate, angle, score };
+    if (score >= ORIENTATION_GOOD_ENOUGH) break;
+  }
+
+  if (best && best.angle !== 0) {
+    logger.info('Corrected document orientation before extraction', {
+      rotatedBy: best.angle, score: Number(best.score.toFixed(2)),
+    });
+  }
+
+  return best ?? { ocr: null, buffer: base, angle: 0, score: 0 };
+}
+
 // ─── POST /extract/front ─────────────────────────────────────────
 
 router.post('/front', upload.single('file'), async (req: Request, res: Response) => {
@@ -62,7 +175,6 @@ router.post('/front', upload.single('file'), async (req: Request, res: Response)
       return res.status(400).json({ success: false, error: 'Image file is required (field: "file")' });
     }
 
-    const imageBuffer = req.file.buffer;
     const documentType = req.body.document_type || 'auto';
     const issuingCountry = req.body.issuing_country || undefined;
     const documentId = req.body.document_id || 'unknown';
@@ -80,15 +192,14 @@ router.post('/front', upload.single('file'), async (req: Request, res: Response)
       }
     }
 
-    // 1. Run OCR on the document buffer
-    const ocrData = await ocrService.processDocumentFromBuffer(
-      imageBuffer, documentType, issuingCountry, llmConfig,
-    );
+    // 1. Run OCR, correcting page orientation when the photo is rotated.
+    //    The winning buffer is reused below for face detection and tamper analysis.
+    const oriented = await extractWithOrientation(req.file.buffer, documentType, issuingCountry, llmConfig);
+    const imageBuffer = oriented.buffer;
+    const ocrData = oriented.ocr;
 
-    // Calculate average confidence
-    const confidenceScores = ocrData?.confidence_scores || {};
-    const values = Object.values(confidenceScores).filter((v): v is number => typeof v === 'number');
-    const avgConfidence = values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0.5;
+    // NOTE: average confidence is computed further below, after MRZ enrichment —
+    // MRZ-sourced fields contribute their own scores and must be counted.
 
     // 2. Detect face from buffer
     let faceConfidence = 0;
@@ -116,16 +227,49 @@ router.post('/front', upload.single('file'), async (req: Request, res: Response)
       const mrzResult = extractMRZFromText(ocrData.raw_text);
       if (mrzResult) {
         mrzFromFront = mrzResult.raw_lines;
-        if (!ocrData.name && mrzResult.fields.full_name) ocrData.name = mrzResult.fields.full_name;
-        if (!ocrData.document_number && mrzResult.fields.document_number) ocrData.document_number = mrzResult.fields.document_number;
-        if (!ocrData.date_of_birth && mrzResult.fields.date_of_birth) ocrData.date_of_birth = mrzResult.fields.date_of_birth;
-        if (!ocrData.expiration_date && mrzResult.fields.expiry_date) ocrData.expiration_date = mrzResult.fields.expiry_date;
+
+        // A MRZ whose check digits validate is the most trustworthy source in the
+        // pipeline — it is checksum-protected, unlike free-text OCR. Fields taken from
+        // it must carry a matching confidence, otherwise they leave confidence_scores
+        // empty and the downstream average collapses to its 0.5 fallback, which sits
+        // below Gate 1's minimum and rejects an otherwise perfect read.
+        const mrzConfidence = mrzResult.check_digits_valid ? 0.99 : 0.75;
+        ocrData.confidence_scores = ocrData.confidence_scores || {};
+        const takeFromMRZ = (key: string, value: string | null | undefined): boolean => {
+          if (!value) return false;
+          ocrData.confidence_scores![key] = mrzConfidence;
+          return true;
+        };
+
+        if (!ocrData.name && takeFromMRZ('name', mrzResult.fields.full_name)) {
+          ocrData.name = mrzResult.fields.full_name!;
+        }
+        if (!ocrData.document_number && takeFromMRZ('document_number', mrzResult.fields.document_number)) {
+          ocrData.document_number = mrzResult.fields.document_number!;
+        }
+        if (!ocrData.date_of_birth && takeFromMRZ('date_of_birth', mrzResult.fields.date_of_birth)) {
+          ocrData.date_of_birth = mrzResult.fields.date_of_birth!;
+        }
+        if (!ocrData.expiration_date && takeFromMRZ('expiration_date', mrzResult.fields.expiry_date)) {
+          ocrData.expiration_date = mrzResult.fields.expiry_date!;
+        }
         if (!detectedCountry && mrzResult.fields.issuing_country) {
           detectedCountry = alpha3ToAlpha2(mrzResult.fields.issuing_country) || null;
         }
         if (detectedCountry) ocrData.issuing_country = detectedCountry;
+
+        logger.info('MRZ enrichment applied', {
+          checkDigitsValid: mrzResult.check_digits_valid,
+          format: mrzResult.format,
+          confidence: mrzConfidence,
+        });
       }
     }
+
+    // Calculate average confidence — after MRZ enrichment, so MRZ-sourced fields count
+    const confidenceScores = ocrData?.confidence_scores || {};
+    const values = Object.values(confidenceScores).filter((v): v is number => typeof v === 'number');
+    const avgConfidence = values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0.5;
 
     // Resolve document type: use auto-classified type if available, otherwise raw input
     const resolvedDocType = ocrData?.detected_document_type || documentType;

@@ -266,10 +266,8 @@ async function extractFrontDocument(
 ): Promise<FrontExtractionResult> {
   const ocrData = await ocrService.processDocument(documentId, documentPath, documentType, issuingCountry, verificationId, llmConfig);
 
-  // Calculate average confidence from per-field confidence scores
-  const confidenceScores = ocrData?.confidence_scores || {};
-  const values = Object.values(confidenceScores).filter((v): v is number => typeof v === 'number');
-  const avgConfidence = values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0.5;
+  // NOTE: average confidence is computed further below, after MRZ enrichment —
+  // MRZ-sourced fields contribute their own scores and must be counted.
 
   // Detect face — use buffer-based detection to get bounding box for zone validation
   let faceConfidence = 0;
@@ -299,18 +297,51 @@ async function extractFrontDocument(
     const mrzResult = extractMRZFromText(ocrData.raw_text);
     if (mrzResult) {
       mrzFromFront = mrzResult.raw_lines;
+
+      // A MRZ whose check digits validate is the most trustworthy source in the
+      // pipeline — it is checksum-protected, unlike free-text OCR. Fields taken from
+      // it must carry a matching confidence, otherwise they leave confidence_scores
+      // empty and the average below collapses to its 0.5 fallback, which sits under
+      // Gate 1's minimum and rejects an otherwise perfect read.
+      const mrzConfidence = mrzResult.check_digits_valid ? 0.99 : 0.75;
+      ocrData.confidence_scores = ocrData.confidence_scores || {};
+      const takeFromMRZ = (key: string, value: string | null | undefined): boolean => {
+        if (!value) return false;
+        ocrData.confidence_scores![key] = mrzConfidence;
+        return true;
+      };
+
       // Use MRZ fields as high-confidence overrides if OCR missed them
-      if (!ocrData.name && mrzResult.fields.full_name) ocrData.name = mrzResult.fields.full_name;
-      if (!ocrData.document_number && mrzResult.fields.document_number) ocrData.document_number = mrzResult.fields.document_number;
-      if (!ocrData.date_of_birth && mrzResult.fields.date_of_birth) ocrData.date_of_birth = mrzResult.fields.date_of_birth;
-      if (!ocrData.expiration_date && mrzResult.fields.expiry_date) ocrData.expiration_date = mrzResult.fields.expiry_date;
+      if (!ocrData.name && takeFromMRZ('name', mrzResult.fields.full_name)) {
+        ocrData.name = mrzResult.fields.full_name!;
+      }
+      if (!ocrData.document_number && takeFromMRZ('document_number', mrzResult.fields.document_number)) {
+        ocrData.document_number = mrzResult.fields.document_number!;
+      }
+      if (!ocrData.date_of_birth && takeFromMRZ('date_of_birth', mrzResult.fields.date_of_birth)) {
+        ocrData.date_of_birth = mrzResult.fields.date_of_birth!;
+      }
+      if (!ocrData.expiration_date && takeFromMRZ('expiration_date', mrzResult.fields.expiry_date)) {
+        ocrData.expiration_date = mrzResult.fields.expiry_date!;
+      }
       // Auto-detect issuing_country from MRZ if not provided
       if (!detectedCountry && mrzResult.fields.issuing_country) {
         detectedCountry = alpha3ToAlpha2(mrzResult.fields.issuing_country) || null;
       }
       if (detectedCountry) ocrData.issuing_country = detectedCountry;
+
+      logger.info('MRZ enrichment applied', {
+        checkDigitsValid: mrzResult.check_digits_valid,
+        format: mrzResult.format,
+        confidence: mrzConfidence,
+      });
     }
   }
+
+  // Calculate average confidence — after MRZ enrichment, so MRZ-sourced fields count
+  const confidenceScores = ocrData?.confidence_scores || {};
+  const values = Object.values(confidenceScores).filter((v): v is number => typeof v === 'number');
+  const avgConfidence = values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0.5;
 
   // ── Tamper detection + zone validation (soft flags — Phase 1) ──────
   let authenticity: FrontExtractionResult['authenticity'] = undefined;

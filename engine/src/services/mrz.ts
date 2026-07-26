@@ -91,8 +91,8 @@ export function parseMRZLines(lines: string[]): MRZParseResult | null {
         first_name: fields.firstName ?? null,
         last_name: fields.lastName ?? null,
         full_name: [fields.firstName, fields.lastName].filter(Boolean).join(' ') || null,
-        date_of_birth: normalizeMRZDate(fields.birthDate ?? null),
-        expiry_date: normalizeMRZDate(fields.expirationDate ?? null),
+        date_of_birth: normalizeMRZDate(fields.birthDate ?? null, 'birth'),
+        expiry_date: normalizeMRZDate(fields.expirationDate ?? null, 'expiry'),
         nationality: fields.nationality ?? null,
         issuing_country: fields.issuingState ?? null,
         sex: fields.sex ?? null,
@@ -119,10 +119,39 @@ export function extractMRZFromText(rawText: string): MRZParseResult | null {
 }
 
 /**
+ * Resolve the century for a two-digit MRZ year.
+ *
+ * ICAO 9303 stores years as two digits, so the century must be inferred. A single
+ * fixed pivot cannot work for both field types — it is the semantics of the field
+ * that decide:
+ *
+ *   - Birth dates are always in the past. A year above the current two-digit year
+ *     must belong to the 1900s (in 2026: `60` → 1960, `05` → 2005).
+ *   - Expiry dates are overwhelmingly in the future or recent past. Treating them
+ *     with a birth-date pivot turns a valid document into a long-expired one
+ *     (in 2026: `31` → 1931 instead of 2031). Only years that would land absurdly
+ *     far ahead are read as 1900s, which keeps genuinely ancient documents parseable.
+ */
+function resolveCentury(yy: number, fieldType: MRZDateField): '19' | '20' {
+  const currentYY = new Date().getFullYear() % 100;
+
+  if (fieldType === 'birth') {
+    return yy > currentYY ? '19' : '20';
+  }
+
+  // expiry: allow a wide forward window before falling back to the 1900s
+  return yy > currentYY + 70 ? '19' : '20';
+}
+
+type MRZDateField = 'birth' | 'expiry';
+
+/**
  * Convert MRZ date format (YYMMDD) to ISO (YYYY-MM-DD).
  * The `mrz` library returns dates already formatted, but sometimes as YYMMDD.
+ *
+ * `fieldType` selects the century rule — see resolveCentury().
  */
-function normalizeMRZDate(dateStr: string | null): string | null {
+function normalizeMRZDate(dateStr: string | null, fieldType: MRZDateField = 'birth'): string | null {
   if (!dateStr) return null;
 
   // Already ISO format
@@ -133,8 +162,7 @@ function normalizeMRZDate(dateStr: string | null): string | null {
     const yy = parseInt(dateStr.slice(0, 2));
     const mm = dateStr.slice(2, 4);
     const dd = dateStr.slice(4, 6);
-    // MRZ convention: years 00-30 → 2000s, 31-99 → 1900s
-    const century = yy <= 30 ? '20' : '19';
+    const century = resolveCentury(yy, fieldType);
     return `${century}${dateStr.slice(0, 2)}-${mm}-${dd}`;
   }
 

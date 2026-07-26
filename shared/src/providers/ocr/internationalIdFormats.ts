@@ -38,6 +38,60 @@ const ENGLISH_LABELS = {
   issuing_authority: [/issued\s*by/i, /issuing\s*authority/i, /authority/i],
 };
 
+const GERMAN_LABELS = {
+  name: [/name/i, /familienname/i, /nachname/i, /vorname/i, /zuname/i],
+  date_of_birth: [/geburtsdatum/i, /geburtsort/i, /geb\.?/i, /date\s*of\s*birth/i],
+  expiry_date: [/gültig\s*bis/i, /ablaufdatum/i, /ablauf/i, /expiry/i],
+  id_number: [/nummer/i, /\bnr\.?\b/i, /ausweis\s*nr/i, /führerschein\s*nr/i, /pass\s*nr/i],
+  nationality: [/staatsangehörigkeit/i, /nationality/i],
+  address: [/anschrift/i, /wohnort/i, /address/i],
+  issuing_authority: [/behörde/i, /ausstellende\s*behörde/i, /ausgestellt\s*von/i, /authority/i],
+};
+
+/**
+ * Generic EU document layouts.
+ *
+ * Used as a fallback when a country is not present in the registry below. Driving
+ * licences and ID cards across the EU follow harmonised layouts — numbered fields
+ * per Directive 2006/126/EC for licences, ICAO MRZ for ID cards and passports — so
+ * a country-specific entry is not required to extract them correctly.
+ *
+ * Without this fallback, any unregistered country falls through to the US-centric
+ * extraction path, which cannot read either layout.
+ */
+export const GENERIC_EU_FORMATS: Record<string, CountryDocFormat> = {
+  drivers_license: {
+    type: 'drivers_license',
+    // EU licence numbers vary widely by member state — accept any reasonable token
+    id_number_regex: /^[A-Z0-9\/\-]{4,20}$/i,
+    field_labels: GERMAN_LABELS,
+    date_format: 'DMY',
+    has_mrz: false,
+  },
+  national_id: {
+    type: 'national_id',
+    id_number_regex: /^[A-Z0-9]{4,15}$/i,
+    field_labels: GERMAN_LABELS,
+    date_format: 'DMY',
+    has_mrz: true,
+  },
+  passport: {
+    type: 'passport',
+    id_number_regex: /^[A-Z0-9]{6,12}$/i,
+    field_labels: GERMAN_LABELS,
+    date_format: 'DMY',
+    has_mrz: true,
+  },
+};
+
+/**
+ * Return a generic EU layout for a document type, or null if unsupported.
+ * Callers should use this only when getCountryFormat() yields no country entry.
+ */
+export function getGenericEUFormat(documentType: string): CountryDocFormat | null {
+  return GENERIC_EU_FORMATS[documentType] ?? null;
+}
+
 // --- Registry -----------------------------------------------------
 
 export const INTERNATIONAL_ID_FORMATS: Record<string, CountryIdFormat> = {
@@ -123,6 +177,34 @@ export const INTERNATIONAL_ID_FORMATS: Record<string, CountryIdFormat> = {
   },
 
   // -- EU --------------------------------------------------------
+
+  AT: {
+    country: 'AT',
+    document_types: [
+      {
+        type: 'drivers_license', // Führerschein (EU-Scheckkarte, Modell 2006/126/EG)
+        // Austrian licence numbers are typically 8 digits; older formats use "NNNN/NN"
+        id_number_regex: /^(\d{8}|\d{3,5}\/\d{2,4})$/,
+        field_labels: GERMAN_LABELS,
+        date_format: 'YMD', // Austrian licences print ISO-style 1960-09-08
+        has_mrz: false,
+      },
+      {
+        type: 'national_id', // Personalausweis (optional in Austria)
+        id_number_regex: /^[A-Z0-9]{7,10}$/i,
+        field_labels: GERMAN_LABELS,
+        date_format: 'DMY',
+        has_mrz: true,
+      },
+      {
+        type: 'passport', // Reisepass
+        id_number_regex: /^[A-Z]\s?\d{7}$/i,
+        field_labels: GERMAN_LABELS,
+        date_format: 'DMY',
+        has_mrz: true,
+      },
+    ],
+  },
 
   DE: {
     country: 'DE',

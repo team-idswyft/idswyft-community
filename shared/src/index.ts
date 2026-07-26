@@ -45,7 +45,9 @@ export { STATE_DL_FORMATS } from './providers/ocr/dlFormats.js';
 export {
   INTERNATIONAL_ID_FORMATS,
   INTERNATIONAL_HEADER_NOISE,
+  GENERIC_EU_FORMATS,
   getCountryFormat,
+  getGenericEUFormat,
   validateIdNumber,
 } from './providers/ocr/internationalIdFormats.js';
 export type { CountryDocFormat, CountryIdFormat } from './providers/ocr/internationalIdFormats.js';

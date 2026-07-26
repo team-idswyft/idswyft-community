@@ -210,7 +210,10 @@ export class InternationalExtractor extends BaseExtractor {
 
   // ── EU Driving License ──────────────────────────────────────
 
-  private static EU_DL_HEADER = /FÜHRERSCHEIN|F(?:Ü|U)HRERSCHEIN|PERMIS\s*DE\s*CONDUIRE|DRIVING\s*LICEN[CS]E|PATENTE|RIJBEWIJS|CARTA\s*DE\s*CONDU[CÇ][AÃ]O|PERMISO\s*DE\s*CONDUCIR|KÖRKORT|AJOKORTTI|PRAWO\s*JAZDY|ŘIDIČSKÝ\s*PRŮKAZ|VODIČSKÝ\s*PREUKAZ/i;
+  // Trailing characters are optional and diacritics are accepted in their plain form:
+  // worn cards, cropped photos and ordinary OCR slips routinely drop the final glyph
+  // or flatten an umlaut, and losing one character should not disable extraction.
+  private static EU_DL_HEADER = /F[ÜU]HRERSCHEIN?|PERMIS\s*DE\s*CONDUIRE?|DRIVING\s*LICEN[CS]E?|PATENTE?|RIJBEWIJS?|CARTA\s*DE\s*CONDU[CÇ][AÃ]O?|PERMISO\s*DE\s*CONDUCIR?|K[ÖO]RKORT?|AJOKORTTI?|PRAWO\s*JAZDY?|[ŘR]IDI[ČC]SK[ÝY]\s*PR[ŮU]KAZ?|VODI[ČC]SK[ÝY]\s*PREUKAZ?/i;
 
   private isEUDriversLicense(flatLines: FlatLine[], format: CountryDocFormat): boolean {
     if (format.type !== 'drivers_license') return false;

@@ -5,7 +5,7 @@ import {
 } from 'ppu-paddle-ocr';
 import type { OCRProvider, OCRData, CountryDocFormat, LLMProviderConfig, ClassificationResult } from '@idswyft/shared';
 import {
-  getCountryFormat, INTERNATIONAL_HEADER_NOISE, STATE_DL_FORMATS,
+  getCountryFormat, getGenericEUFormat, INTERNATIONAL_HEADER_NOISE, STATE_DL_FORMATS,
   findLowConfidenceFields, extractFieldsWithLLM, mergeLLMResults,
   classifyDocument,
 } from '@idswyft/shared';
@@ -335,8 +335,20 @@ export class PaddleOCRProvider implements OCRProvider {
     const country = issuingCountry?.toUpperCase();
     const countryFormat = country ? getCountryFormat(country, resolvedDocType) : null;
 
-    if (country && country !== 'US' && countryFormat) {
-      this.extractInternationalDocument(result.lines, ocrData, countryFormat, country);
+    // Countries absent from the registry previously fell through to the US-centric
+    // extraction path, which cannot read EU numbered-field licences or MRZ cards.
+    // Fall back to a harmonised EU layout instead — it is a far better match for any
+    // non-US document than the US one, and the EU/MRZ parsers self-detect anyway.
+    const effectiveFormat = countryFormat
+      ?? (country && country !== 'US' ? getGenericEUFormat(resolvedDocType) : null);
+
+    if (country && country !== 'US' && effectiveFormat) {
+      if (!countryFormat) {
+        logger.info('PaddleOCR: no country entry, using generic EU layout', {
+          country, documentType: resolvedDocType,
+        });
+      }
+      this.extractInternationalDocument(result.lines, ocrData, effectiveFormat, country);
     } else {
       // Default extraction (US or unknown country)
       switch (resolvedDocType) {
@@ -1798,7 +1810,10 @@ export class PaddleOCRProvider implements OCRProvider {
 
   // ── EU Driving License numbered-field extraction ────────────
 
-  private static EU_DL_HEADER = /FÜHRERSCHEIN|F(?:Ü|U)HRERSCHEIN|PERMIS\s*DE\s*CONDUIRE|DRIVING\s*LICEN[CS]E|PATENTE|RIJBEWIJS|CARTA\s*DE\s*CONDU[CÇ][AÃ]O|PERMISO\s*DE\s*CONDUCIR|KÖRKORT|AJOKORTTI|PRAWO\s*JAZDY|ŘIDIČSKÝ\s*PRŮKAZ|VODIČSKÝ\s*PREUKAZ/i;
+  // Trailing characters are optional and diacritics are accepted in their plain form:
+  // worn cards, cropped photos and ordinary OCR slips routinely drop the final glyph
+  // or flatten an umlaut, and losing one character should not disable extraction.
+  private static EU_DL_HEADER = /F[ÜU]HRERSCHEIN?|PERMIS\s*DE\s*CONDUIRE?|DRIVING\s*LICEN[CS]E?|PATENTE?|RIJBEWIJS?|CARTA\s*DE\s*CONDU[CÇ][AÃ]O?|PERMISO\s*DE\s*CONDUCIR?|K[ÖO]RKORT?|AJOKORTTI?|PRAWO\s*JAZDY?|[ŘR]IDI[ČC]SK[ÝY]\s*PR[ŮU]KAZ?|VODI[ČC]SK[ÝY]\s*PREUKAZ?/i;
 
   /** Detect whether the document is an EU-style numbered driving license */
   private isEUDriversLicense(flatLines: FlatLine[], format: CountryDocFormat): boolean {
