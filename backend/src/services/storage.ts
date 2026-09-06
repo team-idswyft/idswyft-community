@@ -326,7 +326,9 @@ export class StorageService {
       } else if (config.storage.provider === 'local') {
         // For local storage, return a relative path
         // In production, this should be served through a secure endpoint
-        return `/files/${filePath}`;
+        // serveLocalFile resolves the remainder inside the uploads/ base,
+        // so the stored path's own uploads/ prefix must not be repeated.
+        return `/api/files/${filePath.replace(/^uploads\//, '')}`;
       } else if (config.storage.provider === 's3') {
         const { S3Client, GetObjectCommand } = await import('@aws-sdk/client-s3');
         const { getSignedUrl } = await import('@aws-sdk/s3-request-presigner');

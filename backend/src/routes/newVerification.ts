@@ -231,7 +231,7 @@ async function getDeveloperLLMConfig(developerId: string): Promise<LLMProviderCo
   try {
     const { data } = await supabase
       .from('developers')
-      .select('llm_provider, llm_api_key_encrypted, llm_endpoint_url')
+      .select('llm_provider, llm_api_key_encrypted, llm_endpoint_url, llm_model')
       .eq('id', developerId)
       .single();
 
@@ -242,6 +242,7 @@ async function getDeveloperLLMConfig(developerId: string): Promise<LLMProviderCo
       provider: data.llm_provider as LLMProviderConfig['provider'],
       apiKey,
       endpointUrl: data.llm_endpoint_url || undefined,
+      model: data.llm_model || undefined,
     };
   } catch (err) {
     logger.debug('getDeveloperLLMConfig: failed to load LLM config', {

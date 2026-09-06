@@ -12,6 +12,7 @@
 
 import type { Pool } from 'pg';
 import { parseOrFilter, parseNotFilter } from './filterParser.js';
+import { jsonColumnsOf, serializeColumnValue } from './jsonColumns.js';
 import { parseSelect, resolveRelations, type ParsedRelation } from './selectParser.js';
 
 export interface SupabaseResponse<T = any> {
@@ -316,13 +317,14 @@ export class PgQueryBuilder {
     }
 
     const columns = Object.keys(rows[0]);
+    const jsonColumns = await jsonColumnsOf(this.pool, this.tableName);
     const params: unknown[] = [];
     const valueSets: string[] = [];
 
     for (const row of rows) {
       const placeholders: string[] = [];
       for (const col of columns) {
-        params.push(row[col] ?? null);
+        params.push(serializeColumnValue(col, row[col] ?? null, jsonColumns));
         placeholders.push(`$${params.length}`);
       }
       valueSets.push(`(${placeholders.join(', ')})`);
@@ -345,11 +347,12 @@ export class PgQueryBuilder {
       return { data: null, error: { message: 'No data provided for update' } };
     }
 
+    const jsonColumns = await jsonColumnsOf(this.pool, this.tableName);
     const params: unknown[] = [];
     const setClauses: string[] = [];
 
     for (const [key, value] of Object.entries(this.updateData)) {
-      params.push(value ?? null);
+      params.push(serializeColumnValue(key, value ?? null, jsonColumns));
       setClauses.push(`"${key}" = $${params.length}`);
     }
 
@@ -397,13 +400,14 @@ export class PgQueryBuilder {
     }
 
     const columns = Object.keys(rows[0]);
+    const jsonColumns = await jsonColumnsOf(this.pool, this.tableName);
     const params: unknown[] = [];
     const valueSets: string[] = [];
 
     for (const row of rows) {
       const placeholders: string[] = [];
       for (const col of columns) {
-        params.push(row[col] ?? null);
+        params.push(serializeColumnValue(col, row[col] ?? null, jsonColumns));
         placeholders.push(`$${params.length}`);
       }
       valueSets.push(`(${placeholders.join(', ')})`);

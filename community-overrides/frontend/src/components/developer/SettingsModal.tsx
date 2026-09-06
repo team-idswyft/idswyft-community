@@ -53,6 +53,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
   const [llmProvider, setLlmProvider] = useState<string>('')
   const [llmApiKey, setLlmApiKey] = useState<string>('')
   const [llmEndpointUrl, setLlmEndpointUrl] = useState<string>('')
+  const [llmModel, setLlmModel] = useState<string>('')
   const [llmKeyPreview, setLlmKeyPreview] = useState<string>('')
   const [llmConfigured, setLlmConfigured] = useState(false)
   const [llmSaving, setLlmSaving] = useState(false)
@@ -234,6 +235,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
         setLlmProvider(data.provider || '')
         setLlmKeyPreview(data.api_key_preview || '')
         setLlmEndpointUrl(data.endpoint_url || '')
+        setLlmModel(data.model || '')
         setLlmApiKey('')
         setShowLlmKey(false)
       }
@@ -248,6 +250,7 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
       const body: Record<string, string | null> = { provider: llmProvider || null }
       if (llmApiKey) body.api_key = llmApiKey
       if (llmProvider === 'custom') body.endpoint_url = llmEndpointUrl || null
+      body.model = llmModel || null
       const res = await fetch(`${API_BASE_URL}/api/developer/settings/llm`, {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json', ...authHeaders, ...csrfHeader() }, credentials: 'include' as RequestCredentials,
@@ -1025,14 +1028,27 @@ export function SettingsModal({ token, onClose, onAccountDeleted }: SettingsModa
                               </>
                             )}
 
+                            {/* Model — required for custom endpoints, optional
+                                override for the built-in providers */}
+                            <label style={labelStyle}>
+                              Model{llmProvider === 'custom' ? '' : ' (optional)'}
+                            </label>
+                            <input
+                              type="text"
+                              style={{ ...inputStyle, marginBottom: 12 }}
+                              value={llmModel}
+                              onChange={e => setLlmModel(e.target.value)}
+                              placeholder={llmProvider === 'anthropic' ? 'claude-sonnet-4-20250514' : llmProvider === 'openai' ? 'gpt-4o' : 'gemini-2.5-flash'}
+                            />
+
                             {/* Save / Clear buttons */}
                             <div style={{ display: 'flex', gap: 10, marginTop: 4 }}>
                               <button
                                 onClick={saveLLMSettings}
-                                disabled={llmSaving || (!llmApiKey && !llmConfigured)}
+                                disabled={llmSaving || (!llmApiKey && !llmConfigured) || (llmProvider === 'custom' && !llmModel)}
                                 className="btn-accent"
                                 style={{
-                                  opacity: (llmSaving || (!llmApiKey && !llmConfigured)) ? 0.5 : 1,
+                                  opacity: (llmSaving || (!llmApiKey && !llmConfigured) || (llmProvider === 'custom' && !llmModel)) ? 0.5 : 1,
                                 }}
                               >
                                 {llmSaving ? 'Saving...' : 'Save'}
