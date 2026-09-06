@@ -5,6 +5,39 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.21] - 2026-09-06
+
+Verification and OCR pipeline fixes ported from community PR #55 (lucasbenica),
+reviewed for the deterministic-decision boundary. The deepfake model swap from
+that PR was held back (sidecar/model mismatch); this release is the boundary-safe
+subset.
+
+### Fixed
+- **jsonb array writes were silently dropped** (`backend`): node-pg serialized a
+  JS array into a Postgres array literal, which json/jsonb columns reject with
+  `invalid input syntax for type json`. The pg adapter now looks up json/jsonb
+  columns from the catalog (cached per table) and stringifies array values only
+  for them; `text[]` columns keep the array literal. Restores lost
+  `duplicate_flags` writes and lets `addons` persist.
+- **Missing `verification_requests.addons` column** (migration 61): the pipeline
+  has always written and read `addons`, but no migration created it, so status
+  reads logged `column "addons" does not exist` and reported `verification_mode`
+  "full" for every verification (community #52).
+- **Broken local-storage document display** (`backend`): `/api/files/*` had no
+  matching route and the stored path repeated its `uploads/` prefix. The URL is
+  corrected, the endpoint now also accepts an admin/reviewer session cookie (the
+  admin panel renders documents in `<img>`/`<video>` tags that cannot send an
+  API key), and the nginx `/api/` prefix wins over the static-asset regex.
+
+### Added
+- **Developer LLM model configuration** (migration 62, `shared`, `backend`,
+  `frontend`): developers can pin the model sent to the LLM OCR provider. Custom
+  OpenAI-compatible endpoints (Gemini, OpenRouter, vLLM) require it — without a
+  model the gateway answers `400` and the OCR fallback silently never ran. LLM
+  use stays extraction-only; no decision logic (deterministic invariant intact).
+- **LLM provider smoke-test script** (`scripts/test-llm-provider.mjs`) with a
+  synthetic sample document, for verifying a key/endpoint/model reads a document.
+
 ## [1.12.20] - 2026-09-06
 
 Reliability and disclosure fixes reported by the community.

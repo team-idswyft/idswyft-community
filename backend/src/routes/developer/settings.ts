@@ -21,12 +21,12 @@ router.get('/settings/llm',
 
     const { data } = await supabase
       .from('developers')
-      .select('llm_provider, llm_api_key_encrypted, llm_endpoint_url')
+      .select('llm_provider, llm_api_key_encrypted, llm_endpoint_url, llm_model')
       .eq('id', developerId)
       .single();
 
     if (!data?.llm_provider) {
-      return res.json({ configured: false, provider: null, api_key_preview: null, endpoint_url: null });
+      return res.json({ configured: false, provider: null, api_key_preview: null, endpoint_url: null, model: null });
     }
 
     let apiKeyPreview: string | null = null;
@@ -44,6 +44,7 @@ router.get('/settings/llm',
       provider: data.llm_provider,
       api_key_preview: apiKeyPreview,
       endpoint_url: data.llm_endpoint_url || null,
+      model: data.llm_model || null,
     });
   })
 );
@@ -54,17 +55,18 @@ router.put('/settings/llm',
     body('provider').isIn([...VALID_LLM_PROVIDERS, null, '']).withMessage(`Provider must be one of: ${VALID_LLM_PROVIDERS.join(', ')}`),
     body('api_key').optional({ nullable: true }).isString().isLength({ min: 10 }).withMessage('API key must be at least 10 characters'),
     body('endpoint_url').optional({ nullable: true }).isURL().withMessage('Endpoint URL must be a valid URL'),
+    body('model').optional({ nullable: true }).isString().isLength({ max: 120 }).withMessage('Model must be a string of up to 120 characters'),
   ],
   validate,
   catchAsync(async (req: Request, res: Response) => {
     const developerId = (req as any).developer.id;
-    const { provider, api_key, endpoint_url } = req.body;
+    const { provider, api_key, endpoint_url, model } = req.body;
 
     // Allow clearing LLM config by sending provider: null or ''
     if (!provider) {
       await supabase
         .from('developers')
-        .update({ llm_provider: null, llm_api_key_encrypted: null, llm_endpoint_url: null })
+        .update({ llm_provider: null, llm_api_key_encrypted: null, llm_endpoint_url: null, llm_model: null })
         .eq('id', developerId);
 
       return res.json({ success: true, message: 'LLM configuration removed' });
@@ -72,6 +74,12 @@ router.put('/settings/llm',
 
     if (provider === 'custom' && !endpoint_url) {
       throw new ValidationError('Custom provider requires an endpoint URL', 'endpoint_url', null);
+    }
+
+    // A custom endpoint has no default model to fall back on: without it the
+    // gateway answers 400 and the OCR fallback silently never runs.
+    if (provider === 'custom' && !model) {
+      throw new ValidationError('Custom provider requires a model name', 'model', null);
     }
 
     if (!api_key) {
@@ -86,6 +94,7 @@ router.put('/settings/llm',
         llm_provider: provider,
         llm_api_key_encrypted: encryptedKey,
         llm_endpoint_url: provider === 'custom' ? endpoint_url : null,
+        llm_model: model || null,
       })
       .eq('id', developerId);
 
@@ -95,6 +104,7 @@ router.put('/settings/llm',
       provider,
       api_key_preview: maskApiKey(api_key),
       endpoint_url: provider === 'custom' ? endpoint_url : null,
+      model: model || null,
     });
   })
 );

@@ -14,7 +14,7 @@ import rateLimit from 'express-rate-limit';
 import config from './config/index.js';
 import { connectDB, supabase } from './config/database.js';
 import { verifyApiKeySecretStability } from './config/apiKeySecretGuard.js';
-import { generateAPIKey, authenticateAPIKey } from './middleware/auth.js';
+import { generateAPIKey, authenticateAPIKey, authenticateAdminOrReviewer } from './middleware/auth.js';
 import { apiActivityLogger } from './middleware/apiLogger.js';
 import { errorHandler } from './middleware/errorHandler.js';
 import { logger } from './utils/logger.js';
@@ -216,7 +216,18 @@ if (config.storage.provider === 'local' || config.storage.provider === 's3') {
 
 // Local file serving — authenticated with API key, path traversal blocked in serveLocalFile
 if (config.storage.provider === 'local') {
-  app.get('/api/files/*', authenticateAPIKey, serveLocalFile);
+  // Accepts an API key (server-to-server) OR an admin/reviewer session: the
+  // admin panel renders these paths in <img>/<video> tags, which cannot send
+  // an X-API-Key header and carry the idswyft_token cookie instead.
+  app.get(
+    '/api/files/*',
+    (req, res, next) => (
+      req.headers['x-api-key']
+        ? authenticateAPIKey(req, res, next)
+        : authenticateAdminOrReviewer(req, res, next)
+    ),
+    serveLocalFile,
+  );
 }
 
 // Health check endpoint (bare /health for Railway health checks + /api/health for API consumers)

@@ -19,7 +19,16 @@ export interface LLMProviderConfig {
   provider: 'openai' | 'anthropic' | 'custom';
   apiKey: string;
   endpointUrl?: string;
+  /** Model name. Optional for openai/anthropic (each has a default below);
+   *  required for custom endpoints, which reject a request without it. */
+  model?: string;
 }
+
+/** Defaults used when the developer didn't pin a model. */
+export const DEFAULT_LLM_MODELS = {
+  openai: 'gpt-4o',
+  anthropic: 'claude-sonnet-4-20250514',
+} as const;
 
 // -- Types ---------------------------------------------------------
 
@@ -102,7 +111,7 @@ async function callOpenAI(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o',
+        model: config.model || DEFAULT_LLM_MODELS.openai,
         messages: [{
           role: 'user',
           content: [
@@ -152,7 +161,7 @@ async function callAnthropic(
         'anthropic-version': '2023-06-01',
       },
       body: JSON.stringify({
-        model: 'claude-sonnet-4-20250514',
+        model: config.model || DEFAULT_LLM_MODELS.anthropic,
         max_tokens: 500,
         messages: [{
           role: 'user',
@@ -188,6 +197,10 @@ async function callCustomEndpoint(
   prompt: string,
 ): Promise<string> {
   if (!config.endpointUrl) throw new Error('Custom endpoint URL not configured');
+  // OpenAI-compatible gateways (Gemini, OpenRouter, vLLM, …) reject the request
+  // with `400 model is not specified` when the field is missing — there is no
+  // sensible default to guess, so the config has to carry it.
+  if (!config.model) throw new Error('Custom endpoint model not configured');
 
   // Custom endpoints use OpenAI-compatible chat completions format
   const controller = new AbortController();
@@ -202,6 +215,7 @@ async function callCustomEndpoint(
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
+        model: config.model,
         messages: [{
           role: 'user',
           content: [
