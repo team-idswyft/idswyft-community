@@ -5,6 +5,22 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.22] - 2026-09-06
+
+### Fixed
+- **`issuing_country` was accepted but never persisted** (`backend`):
+  `POST /verify/initialize` validated `issuing_country` and stored it only in
+  session state — the `verification_requests.issuing_country` column stayed
+  empty. The front-document handler then read the country from the request body
+  alone (despite a comment promising a session fallback), so a caller who set
+  the country once at init lost it on upload. Non-MRZ documents (Austrian
+  licences, French *permis*, etc.) fell through to the US extractor and returned
+  empty fields even though OCR read the text correctly. Now `/initialize`
+  persists the column (so status reads and reverification, which copies
+  `parentVerification.issuing_country`, stop inheriting an empty country) and the
+  front-document handler falls back to the session country when the request
+  omits it (community #54).
+
 ## [1.12.21] - 2026-09-06
 
 Verification and OCR pipeline fixes ported from community PR #55 (lucasbenica),

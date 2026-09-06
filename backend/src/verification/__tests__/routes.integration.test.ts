@@ -20,6 +20,15 @@ import { VerificationStatus } from '@idswyft/shared';
 
 // ─── Mock external deps before importing routes ───────────────
 
+// Additive capture for issuing_country tests (community #54): records the
+// arguments the OCR extractor receives and the verification_requests updates,
+// without changing any mock's return contract. Hoisted so the vi.mock factories
+// below can close over it.
+const captured = vi.hoisted(() => ({
+  ocrCalls: [] as any[][],
+  vrUpdates: [] as any[],
+}));
+
 // Supabase mock — in-memory store
 const contextStore = new Map<string, any>();
 const verificationStore = new Map<string, any>();
@@ -52,9 +61,10 @@ vi.mock('@/config/database.js', () => ({
           })),
         })),
         insert: vi.fn(async (row: any) => ({ data: row, error: null })),
-        update: vi.fn(() => ({
-          eq: vi.fn(async () => ({ data: null, error: null })),
-        })),
+        update: vi.fn((payload: any) => {
+          if (table === 'verification_requests') captured.vrUpdates.push(payload);
+          return { eq: vi.fn(async () => ({ data: null, error: null })) };
+        }),
         upsert: vi.fn(async (row: any) => ({ data: row, error: null })),
       };
     },
@@ -91,7 +101,8 @@ vi.mock('@/services/verification.js', () => ({
 // OCR service
 vi.mock('@/services/ocr.js', () => ({
   OCRService: class MockOCRService {
-    async processDocument() {
+    async processDocument(...args: any[]) {
+      captured.ocrCalls.push(args);
       return {
         name: 'JOHN DOE',
         date_of_birth: '1990-01-15',
@@ -337,6 +348,50 @@ describe('V2 Verification Routes — Integration', () => {
       expect(second.body.front_document_uploaded).toBe(true);
       // OCR result is preserved from the first call
       expect(second.body.ocr_data?.full_name).toBe('JOHN DOE');
+    });
+  });
+
+  describe('issuing_country persistence (community #54)', () => {
+    beforeEach(() => {
+      captured.ocrCalls.length = 0;
+      captured.vrUpdates.length = 0;
+    });
+
+    it('persists issuing_country to the verification_requests column at /initialize', async () => {
+      await request(app)
+        .post('/api/v2/verify/initialize')
+        .send({
+          user_id: '550e8400-e29b-41d4-a716-446655440000',
+          document_type: 'drivers_license',
+          issuing_country: 'AT',
+        });
+
+      // The column must be written, not just held in session state — otherwise
+      // status reads and reverification inherit an empty country.
+      const wroteCountry = captured.vrUpdates.some(u => u?.issuing_country === 'AT');
+      expect(wroteCountry).toBe(true);
+    });
+
+    it('front-document falls back to the session issuing_country when the request omits it', async () => {
+      await request(app)
+        .post('/api/v2/verify/initialize')
+        .send({
+          user_id: '550e8400-e29b-41d4-a716-446655440000',
+          document_type: 'drivers_license',
+          issuing_country: 'AT',
+        });
+
+      captured.ocrCalls.length = 0; // ignore anything before the front upload
+
+      await request(app)
+        .post('/api/v2/verify/a0a0a0a0-b1b1-c2c2-d3d3-e4e4e4e4e4e4/front-document')
+        .attach('document', fakeJpegBuffer(), 'front.jpg');
+
+      // extractFrontDocument → ocrService.processDocument(docId, path, type, issuingCountry, …)
+      // The 4th arg must resolve to the session country, not undefined.
+      expect(captured.ocrCalls.length).toBeGreaterThan(0);
+      const lastCall = captured.ocrCalls[captured.ocrCalls.length - 1];
+      expect(lastCall[3]).toBe('AT');
     });
   });
 
