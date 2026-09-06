@@ -896,6 +896,10 @@ router.post('/initialize',
       verification_mode: resolvedMode,
       client_ip: req.ip || req.socket?.remoteAddress || null,
       step_timestamps: { init: new Date().toISOString() },
+      // Persist the country so later steps, status reads, and reverification
+      // (which copies parentVerification.issuing_country) don't inherit an empty
+      // column (community #54).
+      ...(issuing_country && { issuing_country: issuing_country.toUpperCase() }),
       ...((req as any).apiKey?.id && { api_key_id: (req as any).apiKey.id }),
       ...(resolvedAgeThreshold !== null && { age_threshold: resolvedAgeThreshold }),
       ...((resolvedAddons as any).compliance_force_manual_review && {
@@ -1220,8 +1224,11 @@ router.post('/:verification_id/front-document',
       document_id: document.id,
     } as any);
 
-    // Resolve issuing_country: per-request override > session state
-    const resolvedCountry = issuing_country?.toUpperCase() || undefined;
+    // Resolve issuing_country: per-request override > session state (stored at
+    // /initialize). Without the session fallback, a caller who set the country
+    // only at init loses it here and non-MRZ documents fall through to the US
+    // extractor (community #54).
+    const resolvedCountry = issuing_country?.toUpperCase() || earlyState?.issuing_country || undefined;
 
     // Look up developer's LLM config for enhanced OCR extraction
     const developerId = (req as any).developer.id;
