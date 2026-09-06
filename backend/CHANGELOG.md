@@ -5,6 +5,26 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.20] - 2026-09-06
+
+Reliability and disclosure fixes reported by the community.
+
+### Fixed
+- **OCR no longer stays dead after a transient init failure** (`engine`, `backend`):
+  the PaddleOCR ONNX models download on the first extraction, so a brief network
+  blip at that moment threw from `svc.initialize()`. `ensureInitialized()` cached
+  the rejected `initPromise` and the `if (!this.initPromise)` guard then blocked
+  every retry, leaving OCR dead for the life of the container while `/health` still
+  reported `ok`. The `catch` now clears `initPromise` and logs the error, so the
+  next request re-attempts the download — mirroring `faceRecognition.ts`. Applied to
+  both the engine provider and the backend local-fallback copy, with a regression
+  test (community #57).
+
+### Added
+- **Security policy** (`SECURITY.md`): documents private vulnerability reporting
+  (GitHub private reporting, now enabled on the community mirror, plus
+  `team@idswyft.app`), reporting guidance, and response expectations (community #56).
+
 ## [1.12.19] - 2026-07-26
 
 UK (DVLA) driving-licence recognition — deterministic extraction hardening so UK

@@ -30,14 +30,26 @@ export class PaddleOCRProvider implements OCRProvider {
     if (!this.initPromise) {
       this.initPromise = (async () => {
         logger.info('PaddleOCRProvider: initializing ONNX models…');
-        if (!PaddleOcrService) {
-          const mod = await import('ppu-paddle-ocr');
-          PaddleOcrService = mod.PaddleOcrService;
+        try {
+          if (!PaddleOcrService) {
+            const mod = await import('ppu-paddle-ocr');
+            PaddleOcrService = mod.PaddleOcrService;
+          }
+          const svc = new PaddleOcrService({ debugging: { verbose: false } });
+          await svc.initialize();
+          this.service = svc;
+          logger.info('PaddleOCRProvider: ready');
+        } catch (error) {
+          // Don't cache a failed init. The ONNX models are downloaded on the
+          // first request, so a transient network blip here would otherwise
+          // disable OCR for the life of the process (community #57). Clear the
+          // promise so the next call retries the download.
+          this.initPromise = null;
+          logger.error('PaddleOCRProvider: failed to initialize ONNX models', {
+            error: error instanceof Error ? error.message : String(error),
+          });
+          throw error;
         }
-        const svc = new PaddleOcrService({ debugging: { verbose: false } });
-        await svc.initialize();
-        this.service = svc;
-        logger.info('PaddleOCRProvider: ready');
       })();
     }
     await this.initPromise;
