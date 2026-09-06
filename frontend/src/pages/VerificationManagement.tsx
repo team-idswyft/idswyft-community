@@ -2,11 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { API_BASE_URL } from '../config/api'
 import { fetchCsrfToken, getCsrfToken, csrfHeader, clearCsrfToken } from '../lib/csrf'
-import { fetchDashboardProfile } from '../lib/operatorSession'
-import { deriveReviewRole } from '../lib/reviewRole'
 import { C, injectFonts } from '../theme'
-import { isCloud } from '../config/edition'
-import { ComplianceSection } from '../components/admin/ComplianceSection'
 import '../styles/patterns.css'
 import {
   ShieldCheckIcon,
@@ -73,18 +69,6 @@ interface DuplicateFlag {
   type: string
   matched_verification_id: string
   hamming_distance: number
-}
-
-interface LinkedVerification {
-  id: string
-  status: string
-  created_at: string
-  user_id: string
-  document_type?: string | null
-  document_thumbnail?: string | null
-  selfie_thumbnail?: string | null
-  full_name?: string | null
-  document_number?: string | null
 }
 
 interface VerificationDetail {
@@ -210,11 +194,9 @@ export function VerificationManagement() {
   const [actionReason, setActionReason] = useState('')
   const [overrideStatus, setOverrideStatus] = useState('verified')
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
-  const [duplicateRefs, setDuplicateRefs] = useState<Record<string, LinkedVerification[]>>({})
   const [authReady, setAuthReady] = useState(() => !!getCsrfToken())
-  const [userRole, setUserRole] = useState<'admin' | 'reviewer' | 'platform' | 'operator'>('reviewer')
+  const [userRole, setUserRole] = useState<'admin' | 'reviewer' | 'platform'>('reviewer')
   const [isMobile, setIsMobile] = useState(false)
-  const [activeTab, setActiveTab] = useState<'verifications' | 'compliance'>('verifications')
 
   const LIMIT = 25
 
@@ -237,19 +219,22 @@ export function VerificationManagement() {
       .catch(() => { clearCsrfToken(); navigate('/admin/login') })
   }, [navigate])
 
-  // ── Detect user role (operator / org admin / reviewer / platform admin) ──
+  // ── Detect user role (org admin vs reviewer vs platform admin) ──
   useEffect(() => {
     if (!authReady) return
-    // Probe operator signal (developer/profile) AND existing admin probes in parallel.
-    // An operator 401s on admin probes → analyticsOk/developersOk false → deriveReviewRole
-    // returns 'operator' because isOperator wins first.
-    Promise.all([
-      fetchDashboardProfile().then(p => p.authed && p.isOperator).catch(() => false),
-      fetch(`${API_BASE_URL}/api/admin/analytics?period=7d`, { credentials: 'include' }).then(r => r.ok).catch(() => false),
-      fetch(`${API_BASE_URL}/api/admin/developers?limit=1`, { credentials: 'include' }).then(r => r.ok).catch(() => false),
-    ]).then(([isOperator, analyticsOk, developersOk]) => {
-      setUserRole(deriveReviewRole({ isOperator, analyticsOk, developersOk }))
-    }).catch(() => { /* keep default 'reviewer' on unexpected error */ })
+    // Probe analytics — org admins and platform admins get 200, regular reviewers get 403
+    fetch(`${API_BASE_URL}/api/admin/analytics?period=7d`, { credentials: 'include' })
+      .then(res => {
+        if (res.ok) {
+          // Could be org admin or platform admin — try developers list to distinguish
+          fetch(`${API_BASE_URL}/api/admin/developers?limit=1`, { credentials: 'include' })
+            .then(r => setUserRole(r.ok ? 'platform' : 'admin'))
+            .catch(() => setUserRole('admin'))
+        } else {
+          setUserRole('reviewer')
+        }
+      })
+      .catch(() => setUserRole('reviewer'))
   }, [authReady])
 
   // ── Toast auto-dismiss ──
@@ -269,7 +254,7 @@ export function VerificationManagement() {
 
       const res = await fetch(`${API_BASE_URL}/api/admin/verifications?${params}`, authFetchOpts())
       if (res.status === 401) {
-        navigate(userRole === 'operator' ? '/operator/login' : '/admin/login')
+        navigate('/admin/login')
         return
       }
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -282,7 +267,7 @@ export function VerificationManagement() {
     } finally {
       setLoading(false)
     }
-  }, [page, statusFilter, navigate, userRole])
+  }, [page, statusFilter, navigate])
 
   // ── Fetch stats ──
   const fetchStats = useCallback(async () => {
@@ -308,14 +293,6 @@ export function VerificationManagement() {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       const data = await res.json()
       setDetail(data.verification)
-      // Fetch duplicate reference records if flags exist
-      const flags = data.verification?.duplicate_flags
-      if (flags && flags.length > 0 && !duplicateRefs[id]) {
-        fetch(`${API_BASE_URL}/api/admin/verification/${id}/duplicates`, authFetchOpts())
-          .then(r => r.ok ? r.json() : null)
-          .then(d => { if (d?.linked_verifications) setDuplicateRefs(prev => ({ ...prev, [id]: d.linked_verifications })) })
-          .catch(() => {})
-      }
     } catch { setDetail(null) }
     finally { setDetailLoading(false) }
   }
@@ -358,12 +335,6 @@ export function VerificationManagement() {
         v.user_id.toLowerCase().includes(searchQuery.toLowerCase())
       )
     : verifications
-
-  // Compliance rulesets are per-dev-organization and managed by the org admin.
-  // Platform admins (Idswyft operators) do not manage tenant compliance — they
-  // oversee the Idswyft platform itself. Regular reviewers are read-only on
-  // verifications and have no compliance role. Cloud edition only.
-  const canManageCompliance = isCloud && userRole === 'admin'
 
   // ── Mobile guard ──
   if (isMobile) {
@@ -410,9 +381,9 @@ export function VerificationManagement() {
         <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 32 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 16 }}>
             <button
-              onClick={() => navigate(userRole === 'operator' ? '/developer' : '/admin/login')}
+              onClick={() => navigate('/admin/login')}
               style={{ background: 'none', border: 'none', cursor: 'pointer', color: C.muted, display: 'flex', padding: 4 }}
-              title={userRole === 'operator' ? 'Back to dashboard' : 'Back'}
+              title="Back"
             >
               <ArrowLeftIcon style={{ width: 20, height: 20 }} />
             </button>
@@ -441,11 +412,11 @@ export function VerificationManagement() {
             )}
             {/* Role badge */}
             <span className="badge" style={{
-              background: userRole === 'platform' ? C.purpleDim : userRole === 'admin' ? C.cyanDim : userRole === 'operator' ? C.greenDim : C.surface,
-              color: userRole === 'platform' ? C.purple : userRole === 'admin' ? C.cyan : userRole === 'operator' ? C.green : C.muted,
-              borderColor: userRole === 'platform' ? 'rgba(167,139,250,0.3)' : userRole === 'admin' ? C.cyanBorder : userRole === 'operator' ? 'rgba(52,211,153,0.3)' : C.border,
+              background: userRole === 'platform' ? C.purpleDim : userRole === 'admin' ? C.cyanDim : C.surface,
+              color: userRole === 'platform' ? C.purple : userRole === 'admin' ? C.cyan : C.muted,
+              borderColor: userRole === 'platform' ? 'rgba(167,139,250,0.3)' : userRole === 'admin' ? C.cyanBorder : C.border,
             }}>
-              {userRole === 'platform' ? 'Platform Admin' : userRole === 'admin' ? 'Org Admin' : userRole === 'operator' ? 'Operator' : 'Reviewer'}
+              {userRole === 'platform' ? 'Platform Admin' : userRole === 'admin' ? 'Org Admin' : 'Reviewer'}
             </span>
             <button
               onClick={() => { fetchVerifications(); fetchStats() }}
@@ -459,7 +430,7 @@ export function VerificationManagement() {
               onClick={() => {
                 fetch(`${API_BASE_URL}/api/auth/logout`, { method: 'POST', credentials: 'include', headers: csrfHeader() }).catch(() => {})
                 clearCsrfToken()
-                navigate(userRole === 'operator' ? '/operator/login' : '/admin/login')
+                navigate('/admin/login')
               }}
               className="btn-outline"
               style={{ padding: '8px 16px', fontSize: 13 }}
@@ -493,44 +464,6 @@ export function VerificationManagement() {
           ))}
         </div>
 
-        {/* ── Tab Switcher (org admin + cloud only) ── */}
-        {canManageCompliance && (
-          <div style={{
-            display: 'flex',
-            gap: 0,
-            borderBottom: `1px solid ${C.border}`,
-            marginBottom: 24,
-            fontFamily: C.mono,
-            fontSize: 13,
-          }}>
-            {(['verifications', 'compliance'] as const).map(tab => (
-              <button
-                key={tab}
-                onClick={() => setActiveTab(tab)}
-                style={{
-                  padding: '12px 20px',
-                  background: 'transparent',
-                  color: activeTab === tab ? C.cyan : C.muted,
-                  border: 'none',
-                  borderBottom: activeTab === tab ? `2px solid ${C.cyan}` : '2px solid transparent',
-                  marginBottom: -1,
-                  cursor: 'pointer',
-                  fontFamily: C.mono,
-                  fontSize: 13,
-                  fontWeight: activeTab === tab ? 600 : 400,
-                  textTransform: 'uppercase',
-                  letterSpacing: 0.5,
-                }}
-              >
-                {tab === 'verifications' ? 'Verifications' : 'Compliance Rules'}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* ── Verifications Tab Content (default) ── */}
-        {(!canManageCompliance || activeTab === 'verifications') && (
-        <>
         {/* ── Filter Bar ── */}
         <div style={{
           display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16,
@@ -752,7 +685,7 @@ export function VerificationManagement() {
                           onClick={() => setConfirmAction({ verificationId: v.id, decision: 'approve' })}
                           title="Approve"
                           style={{
-                            background: C.greenDim, border: `1px solid rgba(52,211,153,0.3)`, color: C.green, padding: '4px 8px', cursor: 'pointer', fontSize: 11, fontWeight: 500,
+                            background: C.greenDim, border: `1px solid rgba(52,211,153,0.3)`,                             color: C.green, padding: '4px 8px', cursor: 'pointer', fontSize: 11, fontWeight: 500,
                             fontFamily: C.mono, transition: 'all 0.15s',
                           }}
                         >
@@ -762,7 +695,7 @@ export function VerificationManagement() {
                           onClick={() => setConfirmAction({ verificationId: v.id, decision: 'reject' })}
                           title="Reject"
                           style={{
-                            background: C.redDim, border: `1px solid rgba(248,113,113,0.3)`, color: C.red, padding: '4px 8px', cursor: 'pointer', fontSize: 11, fontWeight: 500,
+                            background: C.redDim, border: `1px solid rgba(248,113,113,0.3)`,                             color: C.red, padding: '4px 8px', cursor: 'pointer', fontSize: 11, fontWeight: 500,
                             fontFamily: C.mono, transition: 'all 0.15s',
                           }}
                         >
@@ -775,7 +708,7 @@ export function VerificationManagement() {
                         onClick={() => setConfirmAction({ verificationId: v.id, decision: 'override' })}
                         title="Override status"
                         style={{
-                          background: C.amberDim, border: `1px solid rgba(251,191,36,0.2)`, color: C.amber, padding: '4px 8px', cursor: 'pointer', fontSize: 11, fontWeight: 500,
+                          background: C.amberDim, border: `1px solid rgba(251,191,36,0.2)`,                           color: C.amber, padding: '4px 8px', cursor: 'pointer', fontSize: 11, fontWeight: 500,
                           fontFamily: C.mono, transition: 'all 0.15s', display: 'flex', alignItems: 'center', gap: 3,
                         }}
                       >
@@ -919,7 +852,7 @@ export function VerificationManagement() {
                             <button
                               onClick={() => setConfirmAction({ verificationId: v.id, decision: 'approve' })}
                               style={{
-                                flex: 1, background: C.greenDim, border: `1px solid rgba(52,211,153,0.3)`, color: C.green, padding: '10px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                                flex: 1, background: C.greenDim, border: `1px solid rgba(52,211,153,0.3)`,                                 color: C.green, padding: '10px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
                                 fontFamily: C.mono, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                               }}
                             >
@@ -929,7 +862,7 @@ export function VerificationManagement() {
                             <button
                               onClick={() => setConfirmAction({ verificationId: v.id, decision: 'reject' })}
                               style={{
-                                flex: 1, background: C.redDim, border: `1px solid rgba(248,113,113,0.3)`, color: C.red, padding: '10px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                                flex: 1, background: C.redDim, border: `1px solid rgba(248,113,113,0.3)`,                                 color: C.red, padding: '10px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
                                 fontFamily: C.mono, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                               }}
                             >
@@ -940,7 +873,7 @@ export function VerificationManagement() {
                               <button
                                 onClick={() => setConfirmAction({ verificationId: v.id, decision: 'override' })}
                                 style={{
-                                  flex: 1, background: C.amberDim, border: `1px solid rgba(251,191,36,0.2)`, color: C.amber, padding: '10px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
+                                  flex: 1, background: C.amberDim, border: `1px solid rgba(251,191,36,0.2)`,                                   color: C.amber, padding: '10px 16px', cursor: 'pointer', fontSize: 13, fontWeight: 600,
                                   fontFamily: C.mono, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6,
                                 }}
                               >
@@ -953,109 +886,44 @@ export function VerificationManagement() {
                       </div>
 
                       {/* ── Duplicate Detection Warning ── */}
-                      {detail.duplicate_flags && detail.duplicate_flags.length > 0 && (() => {
-                        const refs = duplicateRefs[detail.id] || []
-                        const refMap = new Map(refs.map(r => [r.id, r]))
-                        return (
-                          <div style={{
-                            marginTop: 16, padding: 14,                             background: C.amberDim, border: `1px solid rgba(251,191,36,0.3)`,
-                          }}>
-                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10 }}>
-                              <ExclamationTriangleIcon style={{ width: 18, height: 18, color: C.amber }} />
-                              <span style={{ color: C.amber, fontSize: 13, fontWeight: 600 }}>
-                                Duplicate Detected ({detail.duplicate_flags.length} match{detail.duplicate_flags.length !== 1 ? 'es' : ''})
-                              </span>
-                            </div>
-                            <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                              {detail.duplicate_flags.map((flag, i) => {
-                                const ref = refMap.get(flag.matched_verification_id)
-                                const sc = ref ? getStatusConfig(ref.status) : null
-                                return (
-                                  <div key={i} style={{
-                                    background: C.codeBg, border: `1px solid ${C.border}`, padding: 10,
-                                  }}>
-                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: ref ? 8 : 0, fontSize: 12 }}>
-                                      <span style={{
-                                        padding: '2px 6px', fontSize: 10, fontWeight: 600,
-                                        background: flag.type === 'document_phash' ? C.cyanDim : C.purpleDim,
-                                        color: flag.type === 'document_phash' ? C.cyan : C.purple,
-                                      }}>
-                                        {flag.type === 'document_phash' ? 'Document' : 'Face'}
-                                      </span>
-                                      <span style={{ color: C.muted }}>matches</span>
-                                      <button
-                                        onClick={() => toggleExpand(flag.matched_verification_id)}
-                                        style={{
-                                          background: 'none', border: 'none', color: C.cyan, cursor: 'pointer',
-                                          fontFamily: C.mono, fontSize: 11, textDecoration: 'underline', padding: 0,
-                                        }}
-                                      >
-                                        {truncateId(flag.matched_verification_id)}
-                                      </button>
-                                      <span style={{ color: C.dim, fontSize: 10 }}>
-                                        (distance: {flag.hamming_distance})
-                                      </span>
-                                    </div>
-                                    {ref && (
-                                      <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                                        {/* Thumbnails */}
-                                        <div style={{ display: 'flex', gap: 4, flexShrink: 0 }}>
-                                          {ref.document_thumbnail ? (
-                                            <img src={ref.document_thumbnail} alt="Doc" style={{
-                                              width: 36, height: 36, objectFit: 'cover', border: `1px solid ${C.border}`,
-                                            }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                                          ) : (
-                                            <div style={{
-                                              width: 36, height: 36, background: C.bg, border: `1px solid ${C.border}`,
-                                              display: 'flex', alignItems: 'center', justifyContent: 'center',
-                                            }}>
-                                              <PhotoIcon style={{ width: 14, height: 14, color: C.dim }} />
-                                            </div>
-                                          )}
-                                          {ref.selfie_thumbnail && (
-                                            <img src={ref.selfie_thumbnail} alt="Live" style={{
-                                              width: 36, height: 36, objectFit: 'cover', border: `1px solid ${C.border}`,
-                                            }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
-                                          )}
-                                        </div>
-                                        {/* Details */}
-                                        <div style={{ flex: 1, minWidth: 0 }}>
-                                          {ref.full_name && (
-                                            <div style={{ color: C.text, fontSize: 12, fontWeight: 600, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                                              {ref.full_name}
-                                            </div>
-                                          )}
-                                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 2, fontSize: 11 }}>
-                                            {ref.document_number && (
-                                              <span style={{ color: C.muted, fontFamily: C.mono }}>{ref.document_number}</span>
-                                            )}
-                                            {ref.document_type && (
-                                              <span style={{ color: C.dim }}>{ref.document_type}</span>
-                                            )}
-                                          </div>
-                                        </div>
-                                        {/* Status + Date */}
-                                        <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                                          {sc && (
-                                            <span style={{
-                                              fontSize: 10, fontWeight: 600, padding: '2px 6px',                                               background: sc.bg, color: sc.color, border: `1px solid ${sc.border}`,
-                                            }}>
-                                              {sc.label}
-                                            </span>
-                                          )}
-                                          <div style={{ color: C.dim, fontSize: 10, marginTop: 3 }}>
-                                            {formatDate(ref.created_at)}
-                                          </div>
-                                        </div>
-                                      </div>
-                                    )}
-                                  </div>
-                                )
-                              })}
-                            </div>
+                      {detail.duplicate_flags && detail.duplicate_flags.length > 0 && (
+                        <div style={{
+                          marginTop: 16, padding: 14,                           background: C.amberDim, border: `1px solid rgba(251,191,36,0.3)`,
+                        }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                            <ExclamationTriangleIcon style={{ width: 18, height: 18, color: C.amber }} />
+                            <span style={{ color: C.amber, fontSize: 13, fontWeight: 600 }}>
+                              Duplicate Detected ({detail.duplicate_flags.length} match{detail.duplicate_flags.length !== 1 ? 'es' : ''})
+                            </span>
                           </div>
-                        )
-                      })()}
+                          <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                            {detail.duplicate_flags.map((flag, i) => (
+                              <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: 12 }}>
+                                <span style={{
+                                  padding: '2px 6px', fontSize: 10, fontWeight: 600,
+                                  background: flag.type === 'document_phash' ? C.cyanDim : C.purpleDim,
+                                  color: flag.type === 'document_phash' ? C.cyan : C.purple,
+                                }}>
+                                  {flag.type === 'document_phash' ? 'Document' : 'Face'}
+                                </span>
+                                <span style={{ color: C.muted }}>matches</span>
+                                <button
+                                  onClick={() => toggleExpand(flag.matched_verification_id)}
+                                  style={{
+                                    background: 'none', border: 'none', color: C.cyan, cursor: 'pointer',
+                                    fontFamily: C.mono, fontSize: 11, textDecoration: 'underline', padding: 0,
+                                  }}
+                                >
+                                  {truncateId(flag.matched_verification_id)}
+                                </button>
+                                <span style={{ color: C.dim, fontSize: 10 }}>
+                                  (distance: {flag.hamming_distance})
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
 
                       {/* Also show duplicate flags from debug.duplicates if available */}
                       {detail.debug?.duplicates?.flags && detail.debug.duplicates.flags.length > 0 && !detail.duplicate_flags?.length && (
@@ -1254,7 +1122,7 @@ export function VerificationManagement() {
               disabled={page <= 1}
               onClick={() => setPage(p => Math.max(1, p - 1))}
               style={{
-                background: C.surface, border: `1px solid ${C.border}`, color: page <= 1 ? C.dim : C.muted, padding: '6px 14px', cursor: page <= 1 ? 'default' : 'pointer',
+                background: C.surface, border: `1px solid ${C.border}`,                 color: page <= 1 ? C.dim : C.muted, padding: '6px 14px', cursor: page <= 1 ? 'default' : 'pointer',
                 fontSize: 12, fontFamily: C.mono, opacity: page <= 1 ? 0.5 : 1,
               }}
             >
@@ -1267,7 +1135,7 @@ export function VerificationManagement() {
               disabled={page >= totalPages}
               onClick={() => setPage(p => Math.min(totalPages, p + 1))}
               style={{
-                background: C.surface, border: `1px solid ${C.border}`, color: page >= totalPages ? C.dim : C.muted, padding: '6px 14px', cursor: page >= totalPages ? 'default' : 'pointer',
+                background: C.surface, border: `1px solid ${C.border}`,                 color: page >= totalPages ? C.dim : C.muted, padding: '6px 14px', cursor: page >= totalPages ? 'default' : 'pointer',
                 fontSize: 12, fontFamily: C.mono, opacity: page >= totalPages ? 0.5 : 1,
               }}
             >
@@ -1275,21 +1143,13 @@ export function VerificationManagement() {
             </button>
           </div>
         )}
-        </>
-        )}
-
-        {/* ── Compliance Tab Content (org admin + cloud only) ── */}
-        {canManageCompliance && activeTab === 'compliance' && (
-          <ComplianceSection token="session" />
-        )}
       </div>
 
       {/* ── Confirmation Modal ── */}
       {confirmAction && (
         <div style={{
           position: 'fixed', inset: 0, zIndex: 100,
-          background: 'rgba(0,0,0,0.7)',
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          background: 'rgba(0,0,0,0.7)',           display: 'flex', alignItems: 'center', justifyContent: 'center',
         }} onClick={() => { if (!actionLoading) { setConfirmAction(null); setActionReason('') } }}>
           <div
             onClick={e => e.stopPropagation()}
@@ -1386,27 +1246,30 @@ export function VerificationManagement() {
               <button
                 onClick={() => { setConfirmAction(null); setActionReason('') }}
                 disabled={actionLoading}
-                className="btn-secondary"
-                style={{ padding: '10px 20px', fontSize: 13 }}
+                style={{
+                  background: C.surface, border: `1px solid ${C.border}`,                   color: C.muted, padding: '10px 20px', cursor: 'pointer', fontSize: 13,
+                  fontFamily: C.mono, fontWeight: 500,
+                }}
               >
                 Cancel
               </button>
               <button
                 onClick={executeAction}
                 disabled={actionLoading}
-                className="btn"
                 style={{
                   background: confirmAction.decision === 'approve' ? C.greenDim
                     : confirmAction.decision === 'reject' ? C.redDim
                     : C.amberDim,
-                  borderColor: confirmAction.decision === 'approve' ? 'rgba(52,211,153,0.4)'
+                  border: `1px solid ${
+                    confirmAction.decision === 'approve' ? 'rgba(52,211,153,0.4)'
                     : confirmAction.decision === 'reject' ? 'rgba(248,113,113,0.4)'
-                    : 'rgba(251,191,36,0.4)',
-                  color: confirmAction.decision === 'approve' ? C.green
+                    : 'rgba(251,191,36,0.4)'
+                  }`,
+                                    color: confirmAction.decision === 'approve' ? C.green
                     : confirmAction.decision === 'reject' ? C.red
                     : C.amber,
                   padding: '10px 24px', cursor: actionLoading ? 'wait' : 'pointer',
-                  fontSize: 13, fontWeight: 600,
+                  fontSize: 13, fontFamily: C.mono, fontWeight: 600,
                   opacity: actionLoading ? 0.6 : 1,
                 }}
               >
