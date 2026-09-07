@@ -33,7 +33,7 @@ import {
 
 interface Verification {
   id: string
-  user_id: string
+  user_id: string | null
   status: string
   document_type?: string
   created_at: string
@@ -133,7 +133,10 @@ const STATUS_CONFIG: Record<string, { color: string; bg: string; border: string;
 
 const getStatusConfig = (status: string) => STATUS_CONFIG[status] || STATUS_CONFIG.pending
 
-const truncateId = (id: string) => id.length > 12 ? `${id.slice(0, 6)}...${id.slice(-4)}` : id
+export const truncateId = (id: string | null | undefined) => {
+  if (!id) return '—'
+  return id.length > 12 ? `${id.slice(0, 6)}...${id.slice(-4)}` : id
+}
 
 const formatDate = (iso: string) => {
   const d = new Date(iso)
@@ -355,7 +358,7 @@ export function VerificationManagement() {
   const filtered = searchQuery
     ? verifications.filter(v =>
         v.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        v.user_id.toLowerCase().includes(searchQuery.toLowerCase())
+        (v.user_id?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false)
       )
     : verifications
 
@@ -702,7 +705,7 @@ export function VerificationManagement() {
 
                   {/* User ID */}
                   <div style={{ display: 'flex', alignItems: 'center' }}>
-                    <span style={{ color: C.muted, fontSize: 13, fontFamily: C.mono }} title={v.user_id}>
+                    <span style={{ color: C.muted, fontSize: 13, fontFamily: C.mono }} title={v.user_id ?? undefined}>
                       {truncateId(v.user_id)}
                     </span>
                   </div>

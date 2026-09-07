@@ -5,6 +5,19 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.23] - 2026-09-06
+
+### Fixed
+- **Verification management page crashed on anonymized records** (`frontend`):
+  the page threw `TypeError: Cannot read properties of null (reading 'length')`
+  to the error boundary whenever a row had a null `user_id`.
+  `verification_requests.user_id` is nulled by GDPR anonymization (and absent on
+  some handoff/reverification rows), but the `Verification` type declared it
+  `string`, so `truncateId(v.user_id)` ran `null.length` and the search filter
+  ran `null.toLowerCase()`. `truncateId` is now null-safe (renders an em-dash
+  placeholder — also covering the nullable `matched_verification_id`), the search
+  filter guards null, and the type is corrected to `string | null`.
+
 ## [1.12.22] - 2026-09-06
 
 ### Fixed
