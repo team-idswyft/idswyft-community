@@ -5,6 +5,18 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.27] - 2026-09-11
+
+### Changed
+- **Reverted the migrate-on-boot experiment** (`backend`): removed the Dockerfile
+  step that bundled `supabase/migrations/` into the image (1.12.25) and the
+  non-fatal entrypoint change (1.12.26). The image and entrypoint are back to
+  their pre-1.12.25 state — the cloud image ships no migrations directory, so the
+  entrypoint skips auto-migrate and the API boots via `SUPABASE_URL` as it always
+  has. Migrations are applied out-of-band as before. Self-hosted docker-compose is
+  unchanged (it still bind-mounts migrations and auto-applies them on boot).
+  Kazivio (1.12.24) and migration 63 are retained.
+
 ## [1.12.26] - 2026-09-11
 
 ### Fixed
