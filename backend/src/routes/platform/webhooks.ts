@@ -43,12 +43,13 @@ const router = Router();
 
 router.use(authenticatePlatformServiceToken);
 
-const SERVICE_PRODUCTS = ['gatepass', 'idswyft-internal'] as const;
+const SERVICE_PRODUCTS = ['gatepass', 'idswyft-internal', 'kazivio'] as const;
 type ServiceProduct = (typeof SERVICE_PRODUCTS)[number];
 
 const SHADOW_DEVELOPER_EMAIL: Record<ServiceProduct, string> = {
   gatepass: 'service+gatepass@idswyft.app',
   'idswyft-internal': 'service+internal@idswyft.app',
+  kazivio: 'service+kazivio@idswyft.app',
 };
 
 async function resolveShadowDeveloperId(product: ServiceProduct): Promise<string> {
@@ -115,7 +116,7 @@ function maskSecret(secret: string): string {
  * POST /api/platform/webhooks
  *
  * Body:
- *   service_product: 'gatepass' | 'idswyft-internal'
+ *   service_product: 'gatepass' | 'idswyft-internal' | 'kazivio'
  *   url: HTTPS URL (SSRF-validated)
  *   events?: string[] (default: all WEBHOOK_EVENT_NAMES)
  *   is_sandbox?: boolean (default false)

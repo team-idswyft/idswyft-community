@@ -42,7 +42,7 @@ import * as readline from 'node:readline/promises';
 // Config + constants
 // ───────────────────────────────────────────────────────────────
 
-const VALID_PRODUCTS = ['gatepass', 'idswyft-internal'] as const;
+const VALID_PRODUCTS = ['gatepass', 'idswyft-internal', 'kazivio'] as const;
 const VALID_ENVS = ['development', 'staging', 'production'] as const;
 
 type Product = (typeof VALID_PRODUCTS)[number];

@@ -5,6 +5,19 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.24] - 2026-09-11
+
+### Added
+- **`kazivio` as a first-class service product** (`backend`, cloud-only): service
+  keys can now be minted for the Kazivio internal product, with its own telemetry
+  bucket (`api_activity_logs.service_product = 'kazivio'`) instead of riding under
+  `idswyft-internal`. Adds `kazivio` to the product allow-lists in the service-key
+  and platform-webhook routes and the mint CLI, and to the `ApiKey.service_product`
+  type. Migration 63 widens the `api_keys_service_product_valid` CHECK constraint
+  and inserts the `service+kazivio@idswyft.app` shadow developer row. The
+  constraint rejects a `kazivio` key until migration 63 runs on the target
+  environment.
+
 ## [1.12.23] - 2026-09-06
 
 ### Fixed
