@@ -1,6 +1,6 @@
 {
   "name": "idswyft-backend",
-  "version": "1.12.24",
+  "version": "1.12.25",
   "description": "Backend API for Idswyft identity verification platform",
   "type": "module",
   "main": "dist/server.js",

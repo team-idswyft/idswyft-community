@@ -5,6 +5,20 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.25] - 2026-09-11
+
+### Fixed
+- **Migrations now auto-apply on Railway deploys** (`backend`): the Docker image
+  did not contain the migration SQL files — the Dockerfile assumed a
+  docker-compose bind mount that Railway does not provide — so the entrypoint's
+  auto-migrate step found no `MIGRATIONS_DIR` and silently skipped. Production
+  drifted three migrations behind (61, 62, 63 unapplied) as a result. The image
+  now bundles `supabase/migrations/` at `/app/backend/migrations`, so the
+  entrypoint runs `migrate.js` on every boot and applies pending migrations
+  (idempotent, tracked in `_migrations`, advisory-locked, `numReplicas: 1`).
+  Self-hosted docker-compose is unaffected — it still overlays the same path
+  read-only. This deploy also clears the 61/62/63 backlog on first boot.
+
 ## [1.12.24] - 2026-09-11
 
 ### Added

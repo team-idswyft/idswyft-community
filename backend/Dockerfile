@@ -69,7 +69,12 @@ RUN sed -i 's/\r$//' ./docker-entrypoint.sh && chmod +x ./docker-entrypoint.sh
 # with nodeuser ownership (Docker copies ownership from image on first mount)
 RUN mkdir -p ./uploads ./temp
 
-# Migrations are bind-mounted from supabase/migrations/ at runtime
+# Bundle migration SQL into the image so the entrypoint auto-migrates on boot.
+# Railway has no bind mount, so without this the auto-migrate step finds no
+# migrations directory and skips — which is how production drifted behind.
+# docker-compose still overlays the same path read-only (docker-compose.yml),
+# so both editions resolve /app/backend/migrations.
+COPY supabase/migrations/ /app/backend/migrations/
 ENV MIGRATIONS_DIR=/app/backend/migrations
 
 RUN chown -R nodeuser:nodeuser /app
