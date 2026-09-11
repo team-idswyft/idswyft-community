@@ -266,6 +266,23 @@ describe('POST /api/platform/api-keys/service — mint', () => {
     expect(inserted.key_hash).not.toBe(res.body.key);
   });
 
+  it('mints an isk_* key for the kazivio product', async () => {
+    const res = await request(app)
+      .post('/api/platform/api-keys/service')
+      .set('X-Platform-Service-Token', TEST_TOKEN)
+      .send({
+        service_product: 'kazivio',
+        service_environment: 'production',
+        label: 'Kazivio production',
+      });
+
+    expect(res.status).toBe(201);
+    expect(res.body.key).toMatch(/^isk_[0-9a-f]{64}$/);
+    expect(res.body.service_product).toBe('kazivio');
+    expect(state.insertedKeys[0].service_product).toBe('kazivio');
+    expect(state.insertedKeys[0].is_service).toBe(true);
+  });
+
   it('errors when shadow developer is missing (migration 58 not run)', async () => {
     state.shadowLookupError = { message: 'not found' };
 

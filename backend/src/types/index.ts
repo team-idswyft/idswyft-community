@@ -115,7 +115,7 @@ export interface APIKey {
   expires_at?: Date;
   // Service-key fields (cloud-only feature; null on developer ik_* keys)
   is_service?: boolean;
-  service_product?: 'gatepass' | 'idswyft-internal' | null;
+  service_product?: 'gatepass' | 'idswyft-internal' | 'kazivio' | null;
   service_environment?: 'production' | 'staging' | 'development' | null;
   service_label?: string | null;
 }

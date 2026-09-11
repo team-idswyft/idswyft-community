@@ -36,7 +36,7 @@ const router = Router();
 // All endpoints require platform service token auth
 router.use(authenticatePlatformServiceToken);
 
-const SERVICE_PRODUCTS = ['gatepass', 'idswyft-internal'] as const;
+const SERVICE_PRODUCTS = ['gatepass', 'idswyft-internal', 'kazivio'] as const;
 const SERVICE_ENVIRONMENTS = ['production', 'staging', 'development'] as const;
 
 type ServiceProduct = (typeof SERVICE_PRODUCTS)[number];
@@ -45,6 +45,7 @@ type ServiceEnvironment = (typeof SERVICE_ENVIRONMENTS)[number];
 const SHADOW_DEVELOPER_EMAIL: Record<ServiceProduct, string> = {
   gatepass: 'service+gatepass@idswyft.app',
   'idswyft-internal': 'service+internal@idswyft.app',
+  kazivio: 'service+kazivio@idswyft.app',
 };
 
 /**
@@ -90,7 +91,7 @@ function validate(req: Request): void {
  * Mint a new service key.
  *
  * Body:
- *   service_product: 'gatepass' | 'idswyft-internal'
+ *   service_product: 'gatepass' | 'idswyft-internal' | 'kazivio'
  *   service_environment: 'production' | 'staging' | 'development'
  *   label: string (3-100 chars, human-readable)
  *
