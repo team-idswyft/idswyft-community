@@ -5,6 +5,19 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.26] - 2026-09-11
+
+### Fixed
+- **Auto-migrate no longer crashes the API** (`backend`): v1.12.25 bundled the
+  migration files, so the entrypoint started running `migrate.js` on boot. On
+  Railway the API service has no `DATABASE_URL` (it connects via `SUPABASE_URL`),
+  so `migrate.js` exited 1 and `set -e` killed the container — the production API
+  crash-looped. The entrypoint now runs the migration inside an `if` that
+  consumes the exit code: it logs a warning and starts the server regardless. A
+  missing `DATABASE_URL` or a failed migration can no longer take the API down.
+  To enable auto-migration, set `DATABASE_URL` on the Railway API service; until
+  then the server boots and migrations are skipped, matching pre-1.12.25 behavior.
+
 ## [1.12.25] - 2026-09-11
 
 ### Fixed
