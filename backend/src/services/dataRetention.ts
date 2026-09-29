@@ -231,6 +231,47 @@ export class DataRetentionService {
   }
 
   /**
+   * Deletes the stored files of every document and selfie row of one
+   * verification, ahead of the caller deleting those rows (the restart flow).
+   * Returns false if any file could not be deleted, so the caller can keep
+   * the rows and not lose track of the file.
+   */
+  async deleteVerificationFiles(verificationId: string): Promise<boolean> {
+    let allDeleted = true;
+    for (const table of ['documents', 'selfies'] as const) {
+      const { data: rows, error } = await supabase
+        .from(table).select('file_path')
+        .eq('verification_request_id', verificationId)
+        .not('file_path', 'is', null);
+
+      if (error) {
+        allDeleted = false;
+        logger.warn('Failed to list verification files for deletion', {
+          table,
+          verificationId,
+          error: error.message,
+        });
+        continue;
+      }
+
+      for (const row of rows ?? []) {
+        try {
+          await this.storageService.deleteFile(row.file_path);
+        } catch (err) {
+          allDeleted = false;
+          logger.warn('Failed to delete a verification file', {
+            table,
+            verificationId,
+            filePath: row.file_path,
+            error: err instanceof Error ? err.message : String(err),
+          });
+        }
+      }
+    }
+    return allDeleted;
+  }
+
+  /**
    * Nullify PII in webhook_deliveries payloads older than `retentionDays`.
    * Preserves the delivery audit trail (status, timestamps, attempts) but
    * removes OCR data, names, DOB, and document numbers from the payload.

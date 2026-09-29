@@ -197,3 +197,69 @@ describe('DataRetentionService.runIdempotencyKeyCleanup', () => {
     expect(fromMock).toHaveBeenCalledTimes(1);
   });
 });
+
+describe('DataRetentionService.deleteVerificationFiles', () => {
+  const rowsByTable: Record<string, any[]> = {
+    documents: [{ file_path: 'documents/front.jpg' }, { file_path: 'documents/back.jpg' }],
+    selfies: [{ file_path: 'selfies/selfie.jpg' }],
+  };
+
+  function mockTables(overrides: Record<string, any> = {}) {
+    const fromMock = supabase.from as any as ReturnType<typeof vi.fn>;
+    const chains: Array<{ table: string; chain: ReturnType<typeof chainable> }> = [];
+    fromMock.mockImplementation((table: string) => {
+      const chain = chainable(overrides[table] ?? { data: rowsByTable[table] ?? [], error: null });
+      chains.push({ table, chain });
+      return chain;
+    });
+    return chains;
+  }
+
+  it('deletes every document and selfie file of the verification', async () => {
+    const chains = mockTables();
+    const service = new DataRetentionService();
+    const deleteFile = vi.spyOn((service as any).storageService, 'deleteFile');
+
+    const allDeleted = await service.deleteVerificationFiles('v1');
+
+    expect(allDeleted).toBe(true);
+    expect(deleteFile.mock.calls.map((c) => c[0])).toEqual([
+      'documents/front.jpg',
+      'documents/back.jpg',
+      'selfies/selfie.jpg',
+    ]);
+    for (const { chain } of chains) {
+      expect(chain.__calls).toContainEqual({ method: 'eq', args: ['verification_request_id', 'v1'] });
+    }
+  });
+
+  it('never deletes a row itself, only files', async () => {
+    const chains = mockTables();
+
+    await new DataRetentionService().deleteVerificationFiles('v1');
+
+    const methods = chains.flatMap(({ chain }) => chain.__calls.map((c) => c.method));
+    expect(methods).not.toContain('delete');
+  });
+
+  it('returns false when a file fails to delete, and still tries the rest', async () => {
+    mockTables();
+    const service = new DataRetentionService();
+    const deleteFile = vi
+      .spyOn((service as any).storageService, 'deleteFile')
+      .mockRejectedValueOnce(new Error('AccessDenied'));
+
+    const allDeleted = await service.deleteVerificationFiles('v1');
+
+    expect(allDeleted).toBe(false);
+    expect(deleteFile).toHaveBeenCalledTimes(3);
+  });
+
+  it('returns false when the files cannot be listed', async () => {
+    mockTables({ selfies: { data: null, error: { message: 'connection lost' } } });
+
+    const allDeleted = await new DataRetentionService().deleteVerificationFiles('v1');
+
+    expect(allDeleted).toBe(false);
+  });
+});

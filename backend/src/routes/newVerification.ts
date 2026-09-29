@@ -8,6 +8,7 @@ import { idempotencyMiddleware } from '@/middleware/idempotency.js';
 import { catchAsync, ValidationError, FileUploadError } from '@/middleware/errorHandler.js';
 import { validate } from '@/middleware/validate.js';
 import { StorageService } from '@/services/storage.js';
+import { DataRetentionService } from '@/services/dataRetention.js';
 import { VerificationService } from '@/services/verification.js';
 import { OCRService } from '@/services/ocr.js';
 import { BarcodeService } from '@/services/barcode.js';
@@ -82,6 +83,7 @@ const INLINE_FLOW_FALLBACKS: Partial<Record<string, FlowConfig>> = {
 };
 
 const storageService = new StorageService();
+const dataRetentionService = new DataRetentionService();
 const verificationService = new VerificationService();
 const ocrService = new OCRService();
 const barcodeService = new BarcodeService();
@@ -2333,6 +2335,18 @@ router.post('/:verification_id/restart',
         success: false,
         message: 'Maximum retry attempts reached (3)',
         retry_count: currentRetryCount,
+      });
+    }
+
+    // The failed attempt's documents and selfie rows are deleted below, and
+    // they hold the only reference to its image files, so the files go
+    // first. If any cannot be deleted, nothing is reset: the rows keep
+    // pointing at the file and the applicant can simply try again.
+    const filesDeleted = await dataRetentionService.deleteVerificationFiles(verification_id);
+    if (!filesDeleted) {
+      return res.status(503).json({
+        success: false,
+        message: 'Could not restart the verification. Please try again.',
       });
     }
 

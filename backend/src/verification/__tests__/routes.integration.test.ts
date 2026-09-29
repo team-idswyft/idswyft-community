@@ -79,6 +79,16 @@ vi.mock('@/services/storage.js', () => ({
   },
 }));
 
+// Data retention — the restart route deletes a failed attempt's files first
+const retention = vi.hoisted(() => ({
+  deleteVerificationFiles: vi.fn(async (_verificationId: string) => true),
+}));
+vi.mock('@/services/dataRetention.js', () => ({
+  DataRetentionService: class MockDataRetentionService {
+    deleteVerificationFiles = retention.deleteVerificationFiles;
+  },
+}));
+
 // Verification service
 vi.mock('@/services/verification.js', () => ({
   VerificationService: class MockVerificationService {
@@ -517,6 +527,72 @@ describe('V2 Verification Routes — Integration', () => {
       expect(res.status).toBe(200);
       expect(res.body.success).toBe(true);
       expect(res.body.message).toContain('deprecated');
+    });
+  });
+
+  describe('POST /api/v2/verify/:id/restart', () => {
+    const verificationId = 'a0a0a0a0-b1b1-c2c2-d3d3-e4e4e4e4e4e4';
+
+    function storeSession(currentStep: VerificationStatus) {
+      contextStore.set(verificationId, {
+        verification_id: verificationId,
+        context: {
+          session_id: verificationId,
+          current_step: currentStep,
+          issuing_country: null,
+          rejection_reason: currentStep === VerificationStatus.HARD_REJECTED ? 'FACE_MATCH_FAILED' : null,
+          rejection_detail: null,
+          front_extraction: null,
+          back_extraction: null,
+          cross_validation: null,
+          face_match: null,
+          created_at: new Date().toISOString(),
+          completed_at: null,
+        },
+      });
+    }
+
+    function pendingResets() {
+      return captured.vrUpdates.filter((u) => u.status === 'pending');
+    }
+
+    beforeEach(() => {
+      captured.vrUpdates.length = 0;
+    });
+
+    it('returns 503 and resets nothing when a file cannot be deleted', async () => {
+      storeSession(VerificationStatus.HARD_REJECTED);
+      retention.deleteVerificationFiles.mockResolvedValueOnce(false);
+
+      const res = await request(app).post(`/api/v2/verify/${verificationId}/restart`).send();
+
+      expect(res.status).toBe(503);
+      expect(res.body.success).toBe(false);
+      expect(retention.deleteVerificationFiles).toHaveBeenCalledWith(verificationId);
+      expect(pendingResets()).toHaveLength(0);
+    });
+
+    it('deletes the files before resetting the verification', async () => {
+      storeSession(VerificationStatus.HARD_REJECTED);
+      let resetsWhenFilesDeleted = -1;
+      retention.deleteVerificationFiles.mockImplementationOnce(async () => {
+        resetsWhenFilesDeleted = pendingResets().length;
+        return true;
+      });
+
+      await request(app).post(`/api/v2/verify/${verificationId}/restart`).send();
+
+      expect(resetsWhenFilesDeleted).toBe(0);
+      expect(pendingResets()).toHaveLength(1);
+    });
+
+    it('does not touch any files when the verification has not failed', async () => {
+      storeSession(VerificationStatus.AWAITING_FRONT);
+
+      const res = await request(app).post(`/api/v2/verify/${verificationId}/restart`).send();
+
+      expect(res.status).toBe(400);
+      expect(retention.deleteVerificationFiles).not.toHaveBeenCalled();
     });
   });
 
