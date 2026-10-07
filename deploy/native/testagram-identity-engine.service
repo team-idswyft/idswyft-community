@@ -1,0 +1,24 @@
+[Unit]
+Description=Testagram Native Identity ML Engine
+After=network.target
+PartOf=testagram-identity-api.service
+
+[Service]
+Type=simple
+User=testagram-id
+Group=testagram-id
+WorkingDirectory=/opt/testagram-identity
+EnvironmentFile=/etc/testagram-identity/engine.env
+ExecStart=/usr/bin/node /opt/testagram-identity/engine/dist/server.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryMax=2G
+
+[Install]
+WantedBy=multi-user.target

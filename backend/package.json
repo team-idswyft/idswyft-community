@@ -12,9 +12,7 @@
     "lint": "eslint src --ext .ts,.js",
     "type-check": "tsc --noEmit",
     "migrate": "tsx src/scripts/migrate.ts",
-    "benchmark": "tsx scripts/benchmark/benchmark-ocr.ts --specimens-dir scripts/benchmark/specimens --output scripts/benchmark/benchmark-results.json",
-    "railway:build": "npm run build",
-    "railway:start": "npm run start"
+    "benchmark": "tsx scripts/benchmark/benchmark-ocr.ts --specimens-dir scripts/benchmark/specimens --output scripts/benchmark/benchmark-results.json"
   },
   "dependencies": {
     "@aws-sdk/client-s3": "^3.1062.0",

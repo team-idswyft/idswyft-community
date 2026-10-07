@@ -21,6 +21,10 @@ import type { OCRData } from '@/types/index.js';
 
 const ENGINE_URL = process.env.ENGINE_URL || '';
 const ENGINE_TIMEOUT = parseInt(process.env.ENGINE_TIMEOUT || '60000'); // 60s default
+const ENGINE_SERVICE_TOKEN = process.env.ENGINE_SERVICE_TOKEN || '';
+if (process.env.NODE_ENV === 'production' && !ENGINE_SERVICE_TOKEN) {
+  throw new Error('ENGINE_SERVICE_TOKEN is required in production');
+}
 
 // ─── Retry / circuit breaker config ─────────────────────────────
 const MAX_ATTEMPTS = 3;
@@ -155,6 +159,7 @@ async function callEngineOnce<T>(
   try {
     const response = await fetch(url, {
       method: 'POST',
+      headers: ENGINE_SERVICE_TOKEN ? { 'X-Engine-Service-Token': ENGINE_SERVICE_TOKEN } : undefined,
       body: formData,
       signal: controller.signal,
     });

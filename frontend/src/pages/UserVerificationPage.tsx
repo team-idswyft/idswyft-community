@@ -35,7 +35,7 @@ const UserVerificationPage: React.FC = () => {
 
   // Deprecation warning for api_key in URL
   if (apiKey && !sessionParam) {
-    console.warn('[Idswyft] Passing api_key in the URL is deprecated. Use session tokens instead. See: https://docs.idswyft.app/session-tokens');
+    console.warn('[Testagram Identity] Passing api_key in the URL is deprecated. Use session tokens instead. See: https://testagram.site/docs/session-tokens');
   }
 
   // Session-based auth state (populated from session-info endpoint)
@@ -199,7 +199,7 @@ const UserVerificationPage: React.FC = () => {
     return (
       <div style={{ background: 'var(--paper)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
         <div style={{ maxWidth: 440, width: '100%', textAlign: 'center' }}>
-          <img src="/idswyft-logo.png" alt="Idswyft" style={{ height: 36, margin: '0 auto 32px' }} />
+          <img src="/favicon.ico" alt="Idswyft" style={{ height: 36, margin: '0 auto 32px' }} />
           <div style={{
             width: 56, height: 56, margin: '0 auto 16px',
             display: 'flex', alignItems: 'center', justifyContent: 'center',
@@ -437,7 +437,7 @@ const UserVerificationPage: React.FC = () => {
             {branding?.logo_url ? (
               <img src={branding.logo_url} alt={branding.company_name || 'Logo'} style={{ height: 36, margin: '0 auto 32px', objectFit: 'contain' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
             ) : (
-              <img src="/idswyft-logo.png" alt="Idswyft" style={{ height: 36, margin: '0 auto 32px' }} />
+              <img src="/favicon.ico" alt="Idswyft" style={{ height: 36, margin: '0 auto 32px' }} />
             )}
             <div className={isSuccess ? 'result-badge badge-success' : isFailed ? 'result-badge badge-error' : 'result-badge badge-warning'} style={{
               margin: '0 auto 16px', display: 'inline-flex', padding: '8px 16px',
@@ -499,7 +499,7 @@ const UserVerificationPage: React.FC = () => {
       <div style={{ background: 'var(--paper)', minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 16 }}>
         <div style={{ maxWidth: 480, width: '100%' }}>
           <div style={{ textAlign: 'center', marginBottom: 32 }}>
-            <img src="/idswyft-logo.png" alt="Idswyft" style={{ height: 36, margin: '0 auto 24px' }} />
+            <img src="/favicon.ico" alt="Idswyft" style={{ height: 36, margin: '0 auto 24px' }} />
             <div className="badge-success" style={{
               margin: '0 auto 16px', display: 'inline-flex', padding: '6px 14px',
               fontFamily: C.mono, fontSize: 11, fontWeight: 600, letterSpacing: '0.06em', textTransform: 'uppercase',
@@ -611,7 +611,7 @@ const UserVerificationPage: React.FC = () => {
           {branding?.logo_url ? (
             <img src={branding.logo_url} alt={branding.company_name || 'Logo'} style={{ height: 36, margin: '0 auto', objectFit: 'contain' }} onError={e => { (e.target as HTMLImageElement).style.display = 'none' }} />
           ) : (
-            <img src="/idswyft-logo.png" alt="Idswyft" style={{ height: 36, margin: '0 auto' }} />
+            <img src="/favicon.ico" alt="Idswyft" style={{ height: 36, margin: '0 auto' }} />
           )}
         </div>
 

@@ -1,449 +1,113 @@
-# Idswyft — Open-Source Identity Verification
+# Testagram Native Identity
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-22d3ee.svg)](https://opensource.org/licenses/MIT)
-[![GitHub Stars](https://img.shields.io/github/stars/team-idswyft/idswyft-community)](https://github.com/team-idswyft/idswyft-community/stargazers)
-[![GitHub Issues](https://img.shields.io/github/issues/team-idswyft/idswyft-community)](https://github.com/team-idswyft/idswyft-community/issues)
+Self-owned identity verification infrastructure for Testagram, derived from the MIT-licensed Idswyft Community codebase and heavily tailored for Testagram.
 
-Self-hostable identity verification platform for developers. Document OCR, barcode/MRZ parsing, cross-validation, liveness detection, and face matching — all in one API, running on your infrastructure.
+This fork is designed to run directly on an operator-owned Linux host. **Docker is not part of the runtime. Managed KYC providers are not part of the runtime.**
 
-**[Website](https://idswyft.app)** | **[Documentation](https://idswyft.app/docs)** | **[Demo](https://idswyft.app/demo)** | **[Pricing](https://idswyft.app/pricing)**
+## What the native stack does
 
----
+Front of Kenyan national ID → local OCR → back of ID/barcode parsing → cross-validation → live camera capture → local liveness analysis → local face match → verified / failed / manual review.
 
-## Self-Host in One Command
+The browser flow is served by Testagram. The ML engine is private to the host.
 
-```bash
-git clone https://github.com/team-idswyft/idswyft-community.git && cd idswyft-community && docker compose up -d
-```
+## Native architecture
 
-That's it — pre-built images are pulled from GitHub Container Registry in ~2 minutes. Visit `http://localhost` to access the developer portal.
+Browser
+  → nginx
+  → Testagram Identity API (127.0.0.1:3001)
+      → operator-owned PostgreSQL
+      → encrypted local identity storage
+      → Testagram Identity ML Engine (127.0.0.1:3002)
 
-The Community Edition is **free forever** — unlimited verifications, full source code, MIT license. Your data stays on your servers.
+The ML engine requires a dedicated ENGINE_SERVICE_TOKEN and is not exposed by nginx.
 
-### Prerequisites
+## Hard exclusions
 
-| Dependency | Minimum Version | Check |
-|------------|----------------|-------|
-| **Docker** | 20.10+ | `docker --version` |
-| **Docker Compose** | V2 (plugin) | `docker compose version` |
-| **Git** | Any | `git --version` |
+The native production profile rejects configuration for:
 
-Docker Compose V2 ships as a plugin with Docker Desktop and recent Docker Engine installs. If `docker compose` doesn't work, install the [compose plugin](https://docs.docker.com/compose/install/).
+- Didit
+- Persona
+- Onfido
+- AWS Rekognition / S3
+- hosted OCR
+- hosted face matching
+- Resend as a required runtime dependency
+- Supabase runtime credentials
 
-**OS support:** Any Linux distribution (Debian, Ubuntu, RHEL, Alpine), macOS, or Windows with Docker Desktop. Production deployments are recommended on Linux.
+The source still contains compatibility adapters inherited from upstream, but TESTAGRAM_NATIVE_SELF_HOSTED=true prevents them from being selected.
 
-### Interactive Setup (Recommended)
+## Build without Docker
 
-For a guided installation with secrets generation and optional HTTPS:
+Prerequisites: Linux, Node.js 20+, npm, PostgreSQL, nginx, build-essential.
 
-```bash
-git clone https://github.com/team-idswyft/idswyft-community.git
-cd idswyft-community
-./install.sh
-```
+  npm ci
+  npm run build
+  npm run test:backend
+  npm run type-check
 
-The install script will:
-- Verify Docker and Docker Compose are installed
-- Pull pre-built Docker images from `ghcr.io/team-idswyft/`
-- Generate secure random values for `JWT_SECRET`, `API_KEY_SECRET`, `ENCRYPTION_KEY`
-- Create a `.env` file with your configuration
-- Optionally configure HTTPS with automatic Let's Encrypt certificates
-- Start all services and wait for health checks
+The engine build downloads its local ML model assets when they are not already present.
 
-### Build from Source
+## Native installation
 
-If you prefer to build images locally (e.g., for auditing, custom modifications, or ARM64 hosts):
+Use:
 
-```bash
-# Via install script
-./install.sh --build
+  sudo bash deploy/native/install-native.sh
 
-# Or manually
-docker compose -f docker-compose.yml -f docker-compose.build.yml up -d --build
-```
+Then configure:
 
-> **Note:** Pre-built images are x86_64 (amd64) only. On ARM64 hosts (Apple Silicon, AWS Graviton), use `--build` to compile from source.
+- /etc/testagram-identity/backend.env
+- /etc/testagram-identity/engine.env
 
-### What Gets Deployed
+Create the PostgreSQL database and user on the same host, run migrations, then enable:
 
-| Service    | Description                              | Port  | Image Size |
-|------------|------------------------------------------|-------|------------|
-| `postgres` | PostgreSQL 16 database                   | 5432  | ~80MB      |
-| `engine`   | ML verification engine (OCR, face, liveness) | 3002 | ~1.5GB    |
-| `api`      | Core API (lightweight orchestrator)      | 3001  | ~250MB     |
-| `frontend` | Developer portal (React)                 | 80    | ~100MB     |
-| `caddy`    | HTTPS reverse proxy (optional)           | 80/443 | ~50MB     |
+  sudo systemctl enable --now testagram-identity-engine
+  sudo systemctl enable --now testagram-identity-api
+  sudo systemctl enable --now nginx
 
-### Server Requirements
+Health checks:
 
-The ML engine is the most resource-intensive component. Minimum and recommended specs:
+  curl http://127.0.0.1:3001/health
+  curl http://127.0.0.1:3002/health
 
-| | Minimum | Recommended | High Volume |
-|---|---|---|---|
-| **CPU** | 2 vCPUs | 4 vCPUs | 8+ vCPUs |
-| **RAM** | 4 GB | 8 GB | 16 GB |
-| **Disk** | 20 GB | 50 GB | 100+ GB |
-| **Throughput** | ~10 req/s | ~30 req/s | ~80+ req/s |
-| **Use case** | Dev/testing, low traffic | Small-to-medium production | High-traffic production |
+Unauthorized engine extraction requests must return 401.
 
-**Minimum (2 vCPU / 4GB)** — Handles ~10 concurrent verifications/sec with comfortable headroom. The engine uses ~1.5GB RAM at idle and spikes during ML inference. Suitable for startups processing up to a few hundred verifications per day.
+## Testagram integration boundary
 
-**Recommended (4 vCPU / 8GB)** — Comfortable for production workloads. Extra cores significantly improve OCR and face detection throughput since these operations parallelize well.
+Testagram should receive only the verification outcome and the minimum identity-enforcement data it actually needs.
 
-**Storage note:** Disk usage grows with verification volume. Each verification stores uploaded documents (~2-5MB per session). Configure `RETENTION_DAYS` to auto-delete expired data.
+Raw ID images and live captures belong to the dedicated encrypted identity storage. Do not copy raw identity documents into the normal Testagram application database.
 
-> **Tested on:** 2 vCPU / 4GB RAM (AMD EPYC, Hetzner CX22) — sustained 15 req/s with p95 < 400ms, rate limiter engaged at higher loads, clean recovery under stress.
+For the one-person/one-account policy, the integration should consume a protected uniqueness fingerprint and the final verification decision rather than a raw national-ID number.
 
-### HTTPS (Optional)
+## Kenyan document handling
 
-For public-facing deployments, enable automatic TLS via the built-in Caddy reverse proxy:
+The flow is explicitly designed to accept national_id with front + back + live capture. No invented checksum or undocumented Kenyan ID rule is added. Country-specific document rules should be promoted into the engine only after they are backed by verified specimen/test fixtures.
 
-```bash
-./install.sh    # Select "Enable HTTPS" when prompted, enter your domain
-```
+## Green gates
 
-Or configure manually:
+1. Native source build green.
+2. Shared/backend/engine/frontend type checks green.
+3. Backend tests green.
+4. Production dependency audit has no high/critical regression.
+5. API health green.
+6. ML engine health green.
+7. Engine rejects unauthenticated extraction calls.
+8. API-to-engine authenticated extraction path green.
+9. PostgreSQL migrations green.
+10. Encrypted local storage read/write/delete green.
+11. Android camera → front/back document → liveness → face match → final Testagram identity enforcement green.
 
-```bash
-# 1. Copy the Caddyfile template
-cp caddy/Caddyfile.acme caddy/Caddyfile    # Let's Encrypt (automatic)
-# or
-cp caddy/Caddyfile.manual caddy/Caddyfile  # Your own certificate
+The final real-device gate cannot honestly be marked green from GitHub CI alone; it requires an actual Testagram browser session and camera/liveness capture.
 
-# 2. Set environment variables in .env
-ENABLE_HTTPS=true
-DOMAIN=verify.example.com
-IDSWYFT_PORT=127.0.0.1:8080
-CORS_ORIGINS=https://verify.example.com
+## Project layout
 
-# 3. Start with the HTTPS profile
-docker compose --profile https up -d
-```
+- backend/ — Testagram identity API and verification state machine
+- engine/ — local OCR, barcode/MRZ, liveness and face processing
+- frontend/ — verification/admin UI
+- shared/ — shared contracts and utilities
+- deploy/native/ — systemd, nginx, environment templates and native installer
+- docs/testagram-native-identity.md — operating model and security boundary
 
-Caddy automatically obtains and renews Let's Encrypt certificates. Requirements: ports 80 + 443 open, DNS A record pointing to your server.
+## License
 
-### Custom Ports
-
-If you run the stack on a non-standard port (e.g. `IDSWYFT_PORT=8081:8080` so the frontend is reachable at `http://yourhost:8081`), you also need to set `FRONTEND_URL` to that exact origin so the backend generates outbound links — verification page URLs, credential verify links, and reset links — that include the port:
-
-```bash
-# In .env
-IDSWYFT_PORT=8081:8080
-FRONTEND_URL=http://yourhost:8081
-```
-
-The `install.sh` script does not auto-populate `FRONTEND_URL` when you choose a custom port — set it yourself or your `verification_url` responses will point at a port the client can't reach. Standard ports (80, 443) work without `FRONTEND_URL` if `DOMAIN` is set.
-
-### Email (OTP login, credential delivery)
-
-Idswyft sends developer-portal login codes and verified credential emails through **Resend** — there is no SMTP path. Self-hosters need a Resend account (free tier covers small deployments) to receive OTP codes; without it, OTP codes are logged to the API container's stdout for testing-only use.
-
-```bash
-# In .env — required for email-based OTP login on self-host
-RESEND_API_KEY=re_your_key_here
-EMAIL_FROM=noreply@yourdomain.com
-```
-
-Steps:
-1. Sign up at <https://resend.com> (free tier covers small self-hosts).
-2. Verify a sending domain in the Resend dashboard.
-3. Set `RESEND_API_KEY` and `EMAIL_FROM` in `.env`, then `docker compose up -d` to restart the API.
-4. To inspect logged OTPs while Resend is not yet configured: `docker compose logs api | grep -i OTP`.
-
-There is no built-in registration allowlist (no `ALLOWED_ADMIN_EMAILS` / `AUTH_WHITELIST_EMAILS` — those don't exist; AI assistants sometimes hallucinate these). To restrict who can register, front the API with a reverse proxy that allowlists by IP or basic-auth, or open a feature request if a built-in allowlist would help your deployment.
-
-### Backup & Restore
-
-For production self-hosted deployments, see the dedicated runbook at
-[`backend/scripts/self-hosted-backups.md`](backend/scripts/self-hosted-backups.md).
-Covers daily database snapshots, uploads volume backup, `.env`
-preservation, monthly restore drills, and RTO/RPO targets. Skip if
-you're running this in a sandbox where data loss is acceptable.
-
-### Uninstall
-
-To cleanly remove Idswyft from your server:
-
-```bash
-cd idswyft-community
-bash uninstall.sh
-```
-
-The uninstall script will:
-- Stop and remove all containers and networks
-- Remove database volumes (all verification data)
-- Remove Docker images (`ghcr.io/team-idswyft/*`)
-- Clean up generated config files (`.env`, `Caddyfile`)
-- Optionally delete the installation directory
-
-**Options:**
-
-| Flag | Description |
-|------|-------------|
-| `--yes` | Skip confirmation prompts (non-interactive) |
-| `--keep-data` | Remove containers but preserve the database volume |
-
-```bash
-# Non-interactive full removal
-bash uninstall.sh --yes
-
-# Remove containers but keep your database for reinstall
-bash uninstall.sh --keep-data
-```
-
----
-
-## How It Works
-
-```
-Front of ID ──► OCR + Barcode ──► Cross-Validation ──► Live Capture ──► Face Match ──► Result
-```
-
-1. **Create a session** — `POST /api/v2/verify/initialize`
-2. **Upload front of ID** — OCR extracts name, DOB, document number, expiry
-3. **Upload back of ID** — Barcode (PDF417) or MRZ parsed and cross-validated against front
-4. **Live capture** — Real-time liveness detection confirms a real person is present
-5. **Face match** — Live capture compared against document photo
-6. **Result** — `verified`, `failed`, or `manual_review` delivered via API and webhook
-
----
-
-## Features
-
-**Core Verification**
-- Document OCR via PaddleOCR (passports, driver's licenses, national IDs)
-- PDF417 barcode parsing (US) and MRZ parsing (TD1/TD2/TD3 international)
-- Cross-validation engine — front OCR vs back barcode/MRZ, inconsistencies flagged
-- Liveness detection with anti-spoof scoring
-- Face matching with configurable confidence thresholds
-- 19-country format registry with country-aware extraction
-
-**Integration**
-- REST API with API key authentication
-- JavaScript SDK (`npm install @idswyft/sdk`) with drop-in embed component
-- Hosted verification page — redirect users, zero frontend work
-- Webhooks with retry logic (up to 3 attempts) and delivery status
-- Batch API for bulk verification processing
-
-**Security & Compliance**
-- Encryption at rest for documents stored via S3-compatible providers (server-side AES256). For `STORAGE_PROVIDER=local`, rely on filesystem-level encryption (LUKS, dm-crypt, EBS).
-- GDPR/CCPA compliant data handling with configurable retention
-- HTTPS-only communication
-- Audit logging for verification activities
-- Sandbox mode for safe testing
-
-**Developer Experience**
-- Full API integration in under 30 minutes
-- Developer portal with API key management
-- Admin dashboard for monitoring and manual review
-- Rate limiting and abuse protection
-
----
-
-## Quick Start (API)
-
-### JavaScript
-
-```javascript
-const BASE = 'https://api.idswyft.app'  // or http://localhost:3001
-const h = { 'X-API-Key': 'your-api-key' }
-
-// 1. Create session
-const { verification_id } = await fetch(`${BASE}/api/v2/verify/initialize`, {
-  method: 'POST',
-  headers: { ...h, 'Content-Type': 'application/json' },
-  body: JSON.stringify({ document_type: 'drivers_license' }),
-}).then(r => r.json())
-
-// 2. Upload front of ID
-const front = new FormData()
-front.append('document', frontFile)
-await fetch(`${BASE}/api/v2/verify/${verification_id}/front-document`, {
-  method: 'POST', headers: h, body: front
-})
-
-// 3. Upload back of ID
-const back = new FormData()
-back.append('document', backFile)
-await fetch(`${BASE}/api/v2/verify/${verification_id}/back-document`, {
-  method: 'POST', headers: h, body: back
-})
-
-// 4. Live capture for liveness + face match
-const capture = new FormData()
-capture.append('image', captureFile)
-await fetch(`${BASE}/api/v2/verify/${verification_id}/live-capture`, {
-  method: 'POST', headers: h, body: capture
-})
-
-// 5. Get results
-const result = await fetch(`${BASE}/api/v2/verify/${verification_id}/status`, {
-  headers: h
-}).then(r => r.json())
-console.log(result.status) // 'verified' | 'failed' | 'manual_review'
-```
-
-### Python
-
-```python
-import requests
-
-BASE = "https://api.idswyft.app"  # or http://localhost:3001
-H = {"X-API-Key": "your-api-key"}
-
-# 1. Create session
-r = requests.post(f"{BASE}/api/v2/verify/initialize",
-    json={"document_type": "drivers_license"}, headers={**H, "Content-Type": "application/json"})
-verification_id = r.json()["verification_id"]
-
-# 2-4. Upload documents and live capture
-requests.post(f"{BASE}/api/v2/verify/{verification_id}/front-document",
-    files={"document": open("front.jpg", "rb")}, headers=H)
-requests.post(f"{BASE}/api/v2/verify/{verification_id}/back-document",
-    files={"document": open("back.jpg", "rb")}, headers=H)
-requests.post(f"{BASE}/api/v2/verify/{verification_id}/live-capture",
-    files={"image": open("capture.jpg", "rb")}, headers=H)
-
-# 5. Get results
-result = requests.get(f"{BASE}/api/v2/verify/{verification_id}/status", headers=H).json()
-print(result["status"])  # 'verified' | 'failed' | 'manual_review'
-```
-
----
-
-## Architecture
-
-```
-frontend/          React + Vite developer portal
-backend/           Node.js + TypeScript core API (lightweight orchestrator)
-  src/
-    routes/        API endpoints (v2)
-    services/      Webhook delivery, API key management, engine client
-    verification/  Session state machine, cross-validation, face matching
-    config/        Dynamic thresholds, verification config
-engine/            ML verification engine (separate microservice)
-  src/
-    routes/        Extraction endpoints (front, back, live)
-    services/      OCR, barcode, face recognition
-    providers/     PaddleOCR, liveness, tampering, deepfake detection
-docker-compose.yml One-command self-hosted deployment (4 containers)
-install.sh         Interactive setup script
-```
-
-The core API (~250MB) handles routing, sessions, webhooks, and API key management. Heavy ML operations (OCR, face detection, liveness, deepfake analysis) run in a separate Engine Worker container (~1.5GB), called via HTTP only during verifications.
-
-**Tech stack:** Node.js, TypeScript, Express, React, Vite, PostgreSQL, PaddleOCR, TensorFlow (face detection), ONNX Runtime, Tailwind CSS
-
----
-
-## Configuration
-
-### Environment Variables
-
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `DB_NAME` | PostgreSQL database name | `idswyft` |
-| `DB_USER` | PostgreSQL username | `idswyft` |
-| `DB_PASSWORD` | PostgreSQL password | required |
-| `DATABASE_URL` | PostgreSQL connection string (auto-built in Docker) | required |
-| `JWT_SECRET` | Secret for auth tokens | required |
-| `API_KEY_SECRET` | Secret for API key generation | required |
-| `ENCRYPTION_KEY` | 32-byte hex master key — encrypts stored secrets (LLM API keys, webhook secrets) at the application layer | required |
-| `PORT` | API server port | `3001` |
-| `NODE_ENV` | `development` or `production` | `development` |
-| `STORAGE_PROVIDER` | `local`, `s3`, or `supabase`. `s3` is the only provider with built-in encryption at rest today. | `local` |
-| `SANDBOX_MODE` | Enable sandbox for testing | `false` |
-| `ENGINE_URL` | Engine worker URL (auto-set in Docker) | `http://engine:3002` |
-
-### Database Migrations
-
-The backend includes a lightweight migration runner:
-
-```bash
-cd backend
-npm run migrate
-```
-
-This creates a `_migrations` tracking table, applies pending SQL files in order, and skips already-applied migrations.
-
----
-
-## Development Setup
-
-If you want to run from source (without Docker):
-
-```bash
-# Prerequisites: Node.js 20+, PostgreSQL
-
-# Install dependencies
-cd backend && npm install
-cd ../frontend && npm install
-
-# Configure environment
-cp backend/.env.example backend/.env
-# Edit backend/.env with your DATABASE_URL, JWT_SECRET, etc.
-
-# Run migrations
-cd backend && npm run migrate
-
-# Start dev servers
-cd backend && npm run dev      # API on :3001
-cd frontend && npm run dev     # Portal on :5173
-```
-
-### Testing
-
-```bash
-cd backend && npm test         # Vitest test suite
-cd backend && npm run type-check  # TypeScript check
-```
-
----
-
-## Editions
-
-| | Community (Self-Hosted) | Cloud |
-|---|---|---|
-| **Price** | Free forever | From $0/mo |
-| **Verifications** | Unlimited | 50 - 2,000/mo |
-| **Hosting** | Your infrastructure | Managed by Idswyft |
-| **Support** | GitHub issues | Email / Priority |
-| **Source code** | Full access (MIT) | N/A |
-
-**Cloud** is available at [idswyft.app](https://idswyft.app) — same engine, managed infrastructure.
-
-See the [full pricing comparison](https://idswyft.app/pricing).
-
----
-
-## Contributing
-
-Contributions are welcome. Please:
-
-1. Fork the repository
-2. Create a branch from `dev`: `git checkout -b feature/my-feature`
-3. Make your changes with clear commit messages
-4. Run `npm test` and `npm run type-check` in the backend
-5. Open a Pull Request targeting `dev` (not `main`)
-
-For large features, open an issue first to discuss the approach.
-
----
-
-## License & Trademarks
-
-**Code:** MIT License. See [LICENSE](./LICENSE). Use it commercially, modify it, distribute it.
-
-**Brand:** The Idswyft name and logo are trademarks. Self-hosted deployments of the default UI must retain the "Powered by Idswyft" footer. See [TRADEMARK.md](./TRADEMARK.md) for the full policy.
-
-**White-label:** Want to remove Idswyft branding? [Enterprise licenses](https://enterprise.idswyft.app) are available.
-
----
-
-## Links
-
-- **Website:** [idswyft.app](https://idswyft.app)
-- **Documentation:** [idswyft.app/docs](https://idswyft.app/docs)
-- **Demo:** [idswyft.app/demo](https://idswyft.app/demo)
-- **Issues:** [github.com/team-idswyft/idswyft-community/issues](https://github.com/team-idswyft/idswyft-community/issues)
-- **Enterprise:** [enterprise.idswyft.app](https://enterprise.idswyft.app)
+The upstream code is MIT licensed. Review LICENSE and TRADEMARK.md before distributing modified public builds or branding.

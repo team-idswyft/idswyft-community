@@ -13,13 +13,6 @@ import {
   EyeIcon,
 } from '@heroicons/react/24/outline';
 
-// OpenCV types
-declare global {
-  interface Window {
-    cv: any;
-  }
-}
-
 interface LiveCaptureSession {
   live_capture_token: string;
   expires_at: string;
@@ -75,9 +68,8 @@ export const LiveCapturePage: React.FC = () => {
   const [faceStability, setFaceStability] = useState(0);
   const [useFallbackCapture, setUseFallbackCapture] = useState(false);
   
-  // OpenCV refs
+  // Local browser capture state; no remote runtime vision library is loaded.
   const animationRef = useRef<number | null>(null);
-  const faceClassifierRef = useRef<any>(null);
   const videoElementRef = useRef<HTMLVideoElement | null>(null);
 
   // URL params
@@ -85,24 +77,12 @@ export const LiveCapturePage: React.FC = () => {
   const verificationId = searchParams.get('verification_id');
   const apiKey = searchParams.get('api_key');
 
-  // Initialize OpenCV
+  // Native browser capture initialization. Face/liveness decisions are made by
+  // the local verification engine; the browser only provides camera frames.
   useEffect(() => {
-    const initOpenCV = () => {
-      if (window.cv && window.cv.Mat) {
-        console.log('🔧 OpenCV ready');
-        setOpencvReady(true);
-        setDebugInfo('OpenCV loaded');
-        loadFaceClassifier();
-      } else {
-        console.log('🔧 Waiting for OpenCV...');
-        setTimeout(initOpenCV, 100);
-      }
-    };
-    initOpenCV();
-
-    return () => {
-      cleanup();
-    };
+    setOpencvReady(true);
+    setDebugInfo('Local camera capture ready');
+    return () => cleanup();
   }, []);
 
   // Load session data
@@ -202,20 +182,6 @@ export const LiveCapturePage: React.FC = () => {
     
     // Start polling immediately
     poll();
-  };
-
-  const loadFaceClassifier = async () => {
-    try {
-      // For production deployment, we'll use a simplified face detection
-      // that doesn't require external cascade files
-      if (window.cv && window.cv.CascadeClassifier) {
-        const classifier = new window.cv.CascadeClassifier();
-        faceClassifierRef.current = classifier;
-        console.log('🔧 Face classifier initialized');
-      }
-    } catch (error) {
-      console.warn('🔧 Face classifier load failed, using basic detection:', error);
-    }
   };
 
   const initializeCamera = async () => {
@@ -815,14 +781,6 @@ export const LiveCapturePage: React.FC = () => {
       videoElementRef.current = null;
     }
     
-    if (faceClassifierRef.current) {
-      try {
-        faceClassifierRef.current.delete();
-      } catch (e) {
-        console.log('🔧 Classifier cleanup error:', e);
-      }
-      faceClassifierRef.current = null;
-    }
   };
 
   const retryCamera = () => {

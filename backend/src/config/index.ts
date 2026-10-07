@@ -1,19 +1,19 @@
 import { AppConfig } from '../types/index.js';
 
 export const config: AppConfig = {
+  nativeSelfHosted: process.env.TESTAGRAM_NATIVE_SELF_HOSTED !== 'false',
   port: parseInt(process.env.PORT || '3001'),
   nodeEnv: process.env.NODE_ENV || 'development',
-  corsOrigins: [
-    ...new Set([
-      ...(process.env.CORS_ORIGINS?.split(',').map(s => s.trim()) || ['http://localhost:5173', 'http://localhost:5174', 'http://localhost:5175', 'http://localhost:5176', 'http://localhost:3000']),
-      // Always allow production, staging, and Docker self-hosted origins
-      'http://localhost',
-      'https://idswyft.app',
-      'https://www.idswyft.app',
-      'https://staging.idswyft.app',
-    ]),
-  ],
-  railwayAllowedOrigins: process.env.RAILWAY_ALLOWED_ORIGINS?.split(',').map(s => s.trim()).filter(Boolean) ?? [],
+  corsOrigins: process.env.TESTAGRAM_NATIVE_SELF_HOSTED !== 'false'
+    ? ['https://testagram.site', 'http://localhost', 'http://localhost:5173']
+    : [...new Set([
+        ...(process.env.CORS_ORIGINS?.split(',').map(s => s.trim()).filter(Boolean) || ['http://localhost:5173', 'http://localhost:3000']),
+        'http://localhost',
+        'https://idswyft.app',
+        'https://www.idswyft.app',
+        'https://staging.idswyft.app',
+      ])],
+  railwayAllowedOrigins: [],
   jwtSecret: process.env.JWT_SECRET || 'your-super-secret-jwt-key',
   apiKeySecret: process.env.API_KEY_SECRET || 'your-api-key-encryption-secret',
   serviceToken: process.env.SERVICE_TOKEN || 'your-service-to-service-token',
@@ -35,7 +35,7 @@ export const config: AppConfig = {
   },
   
   storage: {
-    provider: (process.env.STORAGE_PROVIDER as 'supabase' | 'local' | 's3') || 'supabase',
+    provider: (process.env.STORAGE_PROVIDER as 'supabase' | 'local' | 's3') || 'local',
     // Absolute base URL for public-asset paths returned by storePublicAsset.
     // Set this in cloud deployments where the frontend and API live on
     // different origins (e.g. www.idswyft.app vs api.idswyft.app) so
@@ -106,17 +106,46 @@ export const config: AppConfig = {
 
   email: {
     resendApiKey: process.env.RESEND_API_KEY || '',
-    fromAddress: process.env.EMAIL_FROM || 'Idswyft <team@mail.idswyft.app>',
+    fromAddress: process.env.EMAIL_FROM || '',
   },
 
   github: {
     clientId: process.env.GITHUB_CLIENT_ID || '',
     clientSecret: process.env.GITHUB_CLIENT_SECRET || '',
-    redirectUri: process.env.GITHUB_REDIRECT_URI || 'https://www.idswyft.app/developer',
+    redirectUri: process.env.GITHUB_REDIRECT_URI || '',
   }
 };
 
 export default config;
+
+// Native Testagram mode is deliberately closed to managed KYC/cloud storage.
+if (config.nativeSelfHosted) {
+  const forbidden = [
+    ['SUPABASE_URL', process.env.SUPABASE_URL],
+    ['SUPABASE_SERVICE_ROLE_KEY', process.env.SUPABASE_SERVICE_ROLE_KEY],
+    ['AWS_ACCESS_KEY_ID', process.env.AWS_ACCESS_KEY_ID],
+    ['AWS_SECRET_ACCESS_KEY', process.env.AWS_SECRET_ACCESS_KEY],
+    ['AWS_S3_BUCKET', process.env.AWS_S3_BUCKET],
+    ['PERSONA_API_KEY', process.env.PERSONA_API_KEY],
+    ['ONFIDO_API_KEY', process.env.ONFIDO_API_KEY],
+    ['RESEND_API_KEY', process.env.RESEND_API_KEY],
+  ].filter(([, value]) => Boolean(value));
+  if (forbidden.length) {
+    throw new Error('TESTAGRAM_NATIVE_SELF_HOSTED=true forbids managed/cloud identity dependencies: ' + forbidden.map(([name]) => name).join(', '));
+  }
+  if (config.storage.provider !== 'local') {
+    throw new Error('TESTAGRAM_NATIVE_SELF_HOSTED=true requires STORAGE_PROVIDER=local');
+  }
+  if (config.providers.ocr !== 'auto' && config.providers.ocr !== 'tesseract') {
+    throw new Error('Native self-hosted OCR must use local providers (auto/tesseract); remote OCR is disabled.');
+  }
+  if (config.providers.face !== 'tensorflow') {
+    throw new Error('Native self-hosted face matching must use the local TensorFlow provider.');
+  }
+  if (config.providers.liveness !== 'enhanced-heuristic') {
+    throw new Error('Native self-hosted liveness must use the local enhanced-heuristic provider.');
+  }
+}
 
 // Validate secrets at startup — throws in production if placeholder values are present
 import { validateSecrets } from './validateSecrets.js';

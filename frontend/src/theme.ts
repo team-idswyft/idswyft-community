@@ -73,8 +73,8 @@ export const C = {
   codeBg:       '#0e0e10',
 
   // Font stacks
-  mono:         '"JetBrains Mono", ui-monospace, SFMono-Regular, Menlo, monospace',
-  sans:         '"Geist", "Inter", -apple-system, BlinkMacSystemFont, "Helvetica Neue", Arial, sans-serif',
+  mono:         'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
+  sans:         '-apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif',
 
   // Light/dark mode sets (for components that need explicit mode tokens)
   light,
@@ -83,16 +83,9 @@ export const C = {
 
 export type ColorTokens = typeof C;
 
-/** Inject Geist + JetBrains Mono from Google Fonts once per page. */
+/** Fonts are intentionally local/system-only in the Testagram native build. */
 export function injectFonts() {
-  const id = 'idswyft-fonts';
-  if (document.getElementById(id)) return;
-  const link = document.createElement('link');
-  link.id = id;
-  link.rel = 'stylesheet';
-  link.href =
-    'https://fonts.googleapis.com/css2?family=Geist:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap';
-  document.head.appendChild(link);
+  // Kept as a compatibility no-op for existing pages.
 }
 
 /** Get the current theme from <html> data-theme attribute */
@@ -105,12 +98,12 @@ export function toggleTheme(): 'light' | 'dark' {
   const current = getTheme();
   const next = current === 'dark' ? 'light' : 'dark';
   document.documentElement.setAttribute('data-theme', next);
-  localStorage.setItem('idswyft-theme', next);
+  localStorage.setItem('testagram-identity-theme', next);
   return next;
 }
 
 /** Initialize theme from localStorage or default to dark */
 export function initTheme() {
-  const stored = localStorage.getItem('idswyft-theme') as 'light' | 'dark' | null;
+  const stored = localStorage.getItem('testagram-identity-theme') as 'light' | 'dark' | null;
   document.documentElement.setAttribute('data-theme', stored || 'dark');
 }

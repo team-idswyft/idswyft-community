@@ -675,6 +675,43 @@ async function lookupServiceKeyContext(apiKeyId?: string): Promise<{
  * Called AFTER res.json() so it never delays the HTTP response.
  * Errors are caught and logged — never thrown.
  */
+async function notifyTestagramNativeTerminal(
+  verificationId: string,
+  registrationIntentId: string,
+  state: SessionState,
+  finalResult: string,
+): Promise<void> {
+  const callbackUrl = (process.env.TESTAGRAM_IDENTITY_WEBHOOK_URL || '').trim();
+  const secret = process.env.TESTAGRAM_IDENTITY_WEBHOOK_SECRET || '';
+  if (!callbackUrl || !secret) return;
+  const idNumber = String(state.front_extraction?.ocr?.id_number || '').replace(/\D/g, '');
+  const birthDate = String(state.front_extraction?.ocr?.date_of_birth || '').trim();
+  const payload = {
+    event: finalResult === 'verified' ? 'identity.verified' : finalResult === 'failed' ? 'identity.failed' : 'identity.manual_review',
+    registration_intent_id: registrationIntentId,
+    verification_id: verificationId,
+    status: finalResult,
+    id_number: finalResult === 'verified' ? (idNumber || null) : null,
+    date_of_birth: finalResult === 'verified' ? (birthDate || null) : null,
+    timestamp: new Date().toISOString(),
+  };
+  const raw = JSON.stringify(payload);
+  const key = await crypto.subtle.importKey('raw', new TextEncoder().encode(secret), { name: 'HMAC', hash: 'SHA-256' }, false, ['sign']);
+  const bytes = new Uint8Array(await crypto.subtle.sign('HMAC', key, new TextEncoder().encode(raw)));
+  const signature = Array.from(bytes, b => b.toString(16).padStart(2, '0')).join('');
+  try {
+    const response = await fetch(callbackUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', 'X-Testagram-Identity-Signature': 'sha256=' + signature },
+      body: raw,
+      signal: AbortSignal.timeout(10000),
+    });
+    if (!response.ok) logger.error('Testagram native identity callback rejected', { verificationId, status: response.status });
+  } catch (error) {
+    logger.error('Testagram native identity callback failed', { verificationId, error: error instanceof Error ? error.message : String(error) });
+  }
+}
+
 async function fireWebhooksIfTerminal(
   verificationId: string,
   developerId: string,
@@ -685,6 +722,7 @@ async function fireWebhooksIfTerminal(
   apiKeyId?: string
 ): Promise<void> {
   if (mapped.final_result === null) return; // not terminal yet
+  await notifyTestagramNativeTerminal(verificationId, userId, state, mapped.final_result);
 
   // Map terminal result to webhook event type
   const eventType = mapped.final_result === 'verified' ? 'verification.completed'

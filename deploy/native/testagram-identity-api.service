@@ -1,0 +1,25 @@
+[Unit]
+Description=Testagram Native Identity API
+After=network.target postgresql.service
+Wants=postgresql.service
+
+[Service]
+Type=simple
+User=testagram-id
+Group=testagram-id
+WorkingDirectory=/opt/testagram-identity
+EnvironmentFile=/etc/testagram-identity/backend.env
+ExecStart=/usr/bin/node /opt/testagram-identity/backend/dist/server.js
+Restart=on-failure
+RestartSec=5
+TimeoutStopSec=20
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+ReadWritePaths=/opt/testagram-identity/backend/uploads /opt/testagram-identity/backend/temp
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+MemoryMax=1G
+
+[Install]
+WantedBy=multi-user.target

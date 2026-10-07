@@ -12,6 +12,7 @@
  */
 
 import './instrument.js';
+import crypto from 'node:crypto';
 import 'dotenv/config';
 import * as Sentry from '@sentry/node';
 import express from 'express';
@@ -24,13 +25,28 @@ const app = express();
 // Wire shared-package logger to engine's logger instance
 configureSharedLogger(logger);
 const PORT = parseInt(process.env.PORT || '3002');
+const HOST = process.env.HOST || '127.0.0.1';
+const SERVICE_TOKEN = process.env.ENGINE_SERVICE_TOKEN || '';
+if (!SERVICE_TOKEN) throw new Error('ENGINE_SERVICE_TOKEN is required for the native identity engine');
 
 // JSON body parsing (for metadata fields)
 app.use(express.json({ limit: '1mb' }));
 
+// The ML engine is an internal trust boundary. It is never exposed directly
+// to browsers; only the Testagram API may call extraction endpoints.
+app.use('/extract', (req, res, next) => {
+  const supplied = req.header('X-Engine-Service-Token') || '';
+  const a = Buffer.from(supplied);
+  const b = Buffer.from(SERVICE_TOKEN);
+  if (a.length !== b.length || !crypto.timingSafeEqual(a, b)) {
+    return res.status(401).json({ success: false, error: 'Unauthorized engine client' });
+  }
+  next();
+});
+
 // Health check
 app.get('/health', (_req, res) => {
-  res.json({ status: 'ok', service: 'idswyft-engine', uptime: process.uptime() });
+  res.json({ status: 'ok', service: 'testagram-identity-engine', uptime: process.uptime() });
 });
 
 // Extraction routes
@@ -52,7 +68,7 @@ app.use((err: Error, _req: express.Request, res: express.Response, _next: expres
   });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
+app.listen(PORT, HOST, () => {
   logger.info(`Engine worker listening on port ${PORT}`, {
     nodeEnv: process.env.NODE_ENV || 'development',
   });

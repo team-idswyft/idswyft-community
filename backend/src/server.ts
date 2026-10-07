@@ -44,6 +44,7 @@ import systemRoutes from './routes/system.js';
 import { APP_VERSION } from './utils/version.js';
 
 const app = express();
+const HOST = process.env.HOST || '127.0.0.1';
 
 // Wire shared-package logger to backend's Winston instance
 configureSharedLogger(logger);
@@ -373,7 +374,7 @@ const startServer = async () => {
     }
 
     // Start HTTP server
-    const server = app.listen(config.port, async () => {
+    const server = app.listen(config.port, HOST, async () => {
       console.log(`🚀 Idswyft API server running on port ${config.port}`);
       console.log(`📚 API Documentation: http://localhost:${config.port}/api/docs`);
       console.log(`💻 Environment: ${config.nodeEnv}`);
