@@ -561,7 +561,7 @@ describe('V2 Verification Routes — Integration', () => {
       const expectedFields = [
         'success', 'verification_id', 'status', 'current_step', 'total_steps',
         'front_document_uploaded', 'back_document_uploaded', 'live_capture_uploaded',
-        'ocr_data', 'barcode_data', 'cross_validation_results', 'face_match_results',
+        'ocr_data', 'document_authenticity', 'barcode_data', 'cross_validation_results', 'face_match_results',
         'final_result', 'rejection_reason', 'rejection_detail',
         'created_at', 'updated_at',
       ];

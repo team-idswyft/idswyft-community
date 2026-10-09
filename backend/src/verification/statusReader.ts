@@ -177,6 +177,9 @@ export function buildVerificationResponse(input: VerificationResponseInput) {
     back_document_uploaded: !!state.back_extraction,
     live_capture_uploaded: !!state.face_match,
     ocr_data: isAgeOnly ? undefined : (state.front_extraction?.ocr ?? null),
+    // Tamper scoring of the front document; computed on every upload, but
+    // until now only logged.
+    document_authenticity: state.front_extraction?.authenticity ?? null,
     barcode_data: state.back_extraction?.qr_payload ?? null,
     cross_validation_results: state.cross_validation ?? null,
     face_match_results: state.face_match ?? null,
