@@ -3,6 +3,23 @@ import { StorageService } from './storage.js';
 import { logger } from '@/utils/logger.js';
 
 /**
+ * How long past session expiry runAbandonedCaptureCleanup waits before
+ * purging, so an upload that started just before expiry can finish first.
+ */
+export const ABANDONED_CAPTURE_GRACE_MINUTES = 15;
+
+/** Ids of rows whose file was deleted but whose verification had a failure. */
+function rowIdsFor(
+  rows: Array<{ id: string; verification_request_id: string }>,
+  deletedIds: Set<string>,
+  failedIds: Set<string>,
+): string[] {
+  return rows
+    .filter((row) => failedIds.has(row.verification_request_id) && deletedIds.has(row.id))
+    .map((row) => row.id);
+}
+
+/**
  * DataRetentionService handles GDPR right-to-erasure requests and automated
  * data retention enforcement.
  *
@@ -186,48 +203,95 @@ export class DataRetentionService {
 
   /**
    * Purge document/selfie images (and session/biometric state) for a capture
-   * abandoned mid-flow, once its session token has expired. Only touches
-   * pending/processing verifications; the verification_requests row itself
-   * is left alone.
+   * abandoned mid-flow, once its session token has been expired for longer
+   * than ABANDONED_CAPTURE_GRACE_MINUTES. Only touches pending/processing
+   * verifications; the verification_requests row itself is left alone.
+   *
+   * The grace period keeps an upload that started just before the session
+   * expired from having its files purged while it is still running.
+   *
+   * A file that fails to delete keeps its row, and its verification keeps
+   * its session state, so the next run retries it instead of losing track
+   * of the file. Returns the number of verifications fully purged.
    */
   async runAbandonedCaptureCleanup(): Promise<number> {
+    const cutoff = new Date(Date.now() - ABANDONED_CAPTURE_GRACE_MINUTES * 60 * 1000);
     const { data: abandoned } = await supabase
       .from('verification_requests')
       .select('id')
       .in('status', ['pending', 'processing'])
       .not('session_token_expires_at', 'is', null)
-      .lt('session_token_expires_at', new Date().toISOString());
+      .lt('session_token_expires_at', cutoff.toISOString());
 
     if (!abandoned?.length) return 0;
-    const ids = abandoned.map((v: any) => v.id);
+    const ids: string[] = abandoned.map((v: any) => v.id);
 
     const { data: docs } = await supabase
-      .from('documents').select('file_path')
+      .from('documents').select('id, verification_request_id, file_path')
       .in('verification_request_id', ids)
       .not('file_path', 'is', null);
-
-    for (const doc of docs ?? []) {
-      await this.storageService.deleteFile(doc.file_path).catch(() => {});
-    }
 
     const { data: selfies } = await supabase
-      .from('selfies').select('file_path')
+      .from('selfies').select('id, verification_request_id, file_path')
       .in('verification_request_id', ids)
       .not('file_path', 'is', null);
 
-    for (const s of selfies ?? []) {
-      await this.storageService.deleteFile(s.file_path).catch(() => {});
+    const failedIds = new Set<string>();
+    const deletedDocIds = await this.deleteStoredFiles('documents', docs ?? [], failedIds);
+    const deletedSelfieIds = await this.deleteStoredFiles('selfies', selfies ?? [], failedIds);
+
+    const purgedIds = ids.filter((id) => !failedIds.has(id));
+    if (purgedIds.length > 0) {
+      await supabase.from('documents').delete().in('verification_request_id', purgedIds);
+      await supabase.from('selfies').delete().in('verification_request_id', purgedIds);
+      await supabase.from('verification_contexts').delete().in('verification_id', purgedIds);
     }
 
-    await supabase.from('documents').delete().in('verification_request_id', ids);
-    await supabase.from('selfies').delete().in('verification_request_id', ids);
-    await supabase.from('verification_contexts').delete().in('verification_id', ids);
+    // For a verification with a failed delete, drop only the rows whose
+    // file is already gone; the failed rows and the session state stay.
+    const retryDocIds = rowIdsFor(docs ?? [], deletedDocIds, failedIds);
+    const retrySelfieIds = rowIdsFor(selfies ?? [], deletedSelfieIds, failedIds);
+    if (retryDocIds.length > 0) {
+      await supabase.from('documents').delete().in('id', retryDocIds);
+    }
+    if (retrySelfieIds.length > 0) {
+      await supabase.from('selfies').delete().in('id', retrySelfieIds);
+    }
 
-    logger.info(`Abandoned capture cleanup: ${ids.length} verifications purged`, {
-      count: ids.length,
+    logger.info(`Abandoned capture cleanup: ${purgedIds.length} verifications purged`, {
+      count: purgedIds.length,
+      retryCount: failedIds.size,
     });
 
-    return ids.length;
+    return purgedIds.length;
+  }
+
+  /**
+   * Deletes each row's file from storage. Returns the ids of the rows whose
+   * file was deleted; a failure is logged and its verification id added to
+   * failedIds.
+   */
+  private async deleteStoredFiles(
+    table: 'documents' | 'selfies',
+    rows: Array<{ id: string; verification_request_id: string; file_path: string }>,
+    failedIds: Set<string>,
+  ): Promise<Set<string>> {
+    const deleted = new Set<string>();
+    for (const row of rows) {
+      try {
+        await this.storageService.deleteFile(row.file_path);
+        deleted.add(row.id);
+      } catch (error) {
+        failedIds.add(row.verification_request_id);
+        logger.warn('Abandoned capture cleanup: failed to delete file, keeping its row for the next run', {
+          table,
+          verificationId: row.verification_request_id,
+          filePath: row.file_path,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+    return deleted;
   }
 
   /**
