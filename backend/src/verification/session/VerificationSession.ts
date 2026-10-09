@@ -306,6 +306,14 @@ export class VerificationSession {
     this.transition(VerificationStatus.LIVE_PROCESSING);
 
     const liveResult = await this.deps.processLiveCapture(imageBuffer);
+
+    // Save the liveness result before Gate 4, so a rejected capture keeps its score.
+    this.state.liveness = {
+      passed: liveResult.liveness_passed,
+      score: liveResult.liveness_score,
+    };
+    this.state.deepfake_check = liveResult.deepfake_check ?? null;
+
     const gate4 = evaluateGate4(liveResult);
 
     if (!gate4.passed) {
@@ -347,11 +355,6 @@ export class VerificationSession {
       );
     }
     this.state.face_match = faceMatchResult;
-    this.state.liveness = {
-      passed: liveResult.liveness_passed,
-      score: liveResult.liveness_score,
-    };
-    this.state.deepfake_check = liveResult.deepfake_check ?? null;
 
     const gate5 = evaluateGate5(faceMatchResult);
     if (!gate5.passed) {

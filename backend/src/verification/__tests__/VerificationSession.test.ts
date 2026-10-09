@@ -260,6 +260,58 @@ describe('VerificationSession — Hard Rejection', () => {
     expect(session.getState().current_step).toBe(VerificationStatus.HARD_REJECTED);
   });
 
+  it('keeps the liveness result when Gate 4 fails (liveness)', async () => {
+    const deepfake = { isReal: false, realProbability: 0.1, fakeProbability: 0.9 };
+    mockProcessLiveCapture.mockResolvedValue({
+      ...mockLiveResult,
+      liveness_passed: false,
+      liveness_score: 0.20,
+      deepfake_check: deepfake,
+    });
+
+    const session = createSession();
+    await session.submitFront(Buffer.from('front'));
+    await session.submitBack(Buffer.from('back'));
+    await session.submitLiveCapture(Buffer.from('selfie'));
+
+    const state = session.getState();
+    expect(state.liveness).toEqual({ passed: false, score: 0.20 });
+    expect(state.deepfake_check).toEqual(deepfake);
+    expect(state.face_match).toBeNull();
+    expect(mockComputeFaceMatch).not.toHaveBeenCalled();
+  });
+
+  it('keeps the liveness result when Gate 4 fails (no face detected)', async () => {
+    mockProcessLiveCapture.mockResolvedValue({
+      ...mockLiveResult,
+      face_embedding: [],
+      face_confidence: 0.10,
+    });
+
+    const session = createSession();
+    await session.submitFront(Buffer.from('front'));
+    await session.submitBack(Buffer.from('back'));
+    const result = await session.submitLiveCapture(Buffer.from('selfie'));
+
+    expect(result.rejection_reason).toBe('FACE_NOT_DETECTED');
+    expect(session.getState().liveness).toEqual({ passed: true, score: 0.88 });
+  });
+
+  it('keeps the liveness result when Gate 5 fails (face match)', async () => {
+    mockComputeFaceMatch.mockReturnValue({
+      similarity_score: 0.30,
+      passed: false,
+      threshold_used: 0.60,
+    });
+
+    const session = createSession();
+    await session.submitFront(Buffer.from('front'));
+    await session.submitBack(Buffer.from('back'));
+    await session.submitLiveCapture(Buffer.from('selfie'));
+
+    expect(session.getState().liveness).toEqual({ passed: true, score: 0.88 });
+  });
+
   it('transitions to HARD_REJECTED when Gate 5 fails (face match)', async () => {
     mockComputeFaceMatch.mockReturnValue({
       similarity_score: 0.30,
