@@ -21,6 +21,8 @@ const AUTO_CAPTURE_HOLD_MS = 1500;   // Must stay sharp for 1.5s before auto-cap
 const WARMUP_DELAY_MS = 3000;        // Ignore auto-capture for first 3s so user can position ID
 const ANALYSIS_INTERVAL_MS = 200;
 const ID_ASPECT_RATIO = 1.586; // Standard credit card / driver's license
+// A document only needs to be legible, not full sensor resolution.
+const MAX_CROP_WIDTH = 1600;
 
 const FOCUS_COLORS: Record<FocusLevel, string> = {
   blurry: '#ef4444',
@@ -52,6 +54,7 @@ const IDCameraCapture: React.FC<IDCameraCaptureProps> = ({
   const rollingRef = useRef<number[]>([]);
   const sharpSinceRef = useRef<number | null>(null);
   const capturedBlobRef = useRef<Blob | null>(null);
+  const capturedUrlRef = useRef<string | null>(null);
   const lastAnalysisRef = useRef<number>(0);
   const streamStartRef = useRef<number>(0);    // Tracks when streaming began (for warm-up)
   const mountedRef = useRef(true);
@@ -62,7 +65,10 @@ const IDCameraCapture: React.FC<IDCameraCaptureProps> = ({
     return () => {
       mountedRef.current = false;
       stopStream();
-      if (capturedUrl) URL.revokeObjectURL(capturedUrl);
+      // capturedUrlRef, not the closed-over capturedUrl state (this effect
+      // has empty deps, so that would always be the initial null and never
+      // actually revoke the real URL).
+      if (capturedUrlRef.current) URL.revokeObjectURL(capturedUrlRef.current);
     };
   }, []);
 
@@ -192,53 +198,69 @@ const IDCameraCapture: React.FC<IDCameraCaptureProps> = ({
   }, [state]);
 
   // ── Capture logic ────────────────────────────────────────────────────────
+  // Wrapped in try/catch end-to-end: any failure here (a null blob or a
+  // thrown exception) must surface the error state, otherwise the stream is
+  // already stopped and the user is left on a frozen preview with no retry.
+  //
+  // Scales straight from the video to a capped output size in one drawImage
+  // call, so no full-sensor-resolution canvas is ever allocated - some phone
+  // cameras report resolutions well above the requested 1920x1080.
   const doCapture = useCallback(() => {
     const video = videoRef.current;
     const canvas = captureCanvasRef.current;
     if (!video || !canvas || state === 'captured') return;
 
-    // Full resolution
-    const vw = video.videoWidth;
-    const vh = video.videoHeight;
-    canvas.width = vw;
-    canvas.height = vh;
-    const ctx = canvas.getContext('2d');
-    if (!ctx) return;
+    try {
+      const vw = video.videoWidth;
+      const vh = video.videoHeight;
 
-    // Draw full frame
-    ctx.drawImage(video, 0, 0, vw, vh);
+      // Crop region in the source video's native pixel space (center 85%
+      // width, matching aspect ratio).
+      const srcCropW = vw * 0.85;
+      const srcCropH = srcCropW / ID_ASPECT_RATIO;
+      const srcCropX = (vw - srcCropW) / 2;
+      const srcCropY = (vh - srcCropH) / 2;
 
-    // Crop to the ID overlay region (center 85% width, matching aspect ratio)
-    const cropW = Math.floor(vw * 0.85);
-    const cropH = Math.floor(cropW / ID_ASPECT_RATIO);
-    const cropX = Math.floor((vw - cropW) / 2);
-    const cropY = Math.floor((vh - cropH) / 2);
+      // Output size, capped well below native resolution.
+      const outW = Math.min(MAX_CROP_WIDTH, Math.floor(srcCropW));
+      const outH = Math.floor(outW / ID_ASPECT_RATIO);
 
-    // Create a crop canvas
-    const cropCanvas = document.createElement('canvas');
-    cropCanvas.width = cropW;
-    cropCanvas.height = cropH;
-    const cropCtx = cropCanvas.getContext('2d');
-    if (!cropCtx) return;
-    cropCtx.drawImage(canvas, cropX, cropY, cropW, cropH, 0, 0, cropW, cropH);
+      canvas.width = outW;
+      canvas.height = outH;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('2d context unavailable');
 
-    // Auto-contrast: normalize pixel histogram
-    applyAutoContrast(cropCtx, cropW, cropH);
+      // Scale straight from the video's native resolution to the capped
+      // output size - no full-resolution intermediate canvas.
+      ctx.drawImage(video, srcCropX, srcCropY, srcCropW, srcCropH, 0, 0, outW, outH);
 
-    // Shutter flash effect
-    setShowFlash(true);
-    setTimeout(() => { if (mountedRef.current) setShowFlash(false); }, 300);
+      // Auto-contrast: normalize pixel histogram
+      applyAutoContrast(ctx, outW, outH);
 
-    // Stop the stream and analysis
-    stopStream();
+      // Shutter flash effect
+      setShowFlash(true);
+      setTimeout(() => { if (mountedRef.current) setShowFlash(false); }, 300);
 
-    // Convert to JPEG blob
-    cropCanvas.toBlob(blob => {
-      if (!blob || !mountedRef.current) return;
-      capturedBlobRef.current = blob;
-      setCapturedUrl(URL.createObjectURL(blob));
-      setState('captured');
-    }, 'image/jpeg', 0.92);
+      // Stop the stream and analysis
+      stopStream();
+
+      // Convert to JPEG blob
+      canvas.toBlob(blob => {
+        if (!mountedRef.current) return;
+        if (!blob) {
+          setError('Could not process the photo. Please try again.');
+          return;
+        }
+        capturedBlobRef.current = blob;
+        const url = URL.createObjectURL(blob);
+        capturedUrlRef.current = url;
+        setCapturedUrl(url);
+        setState('captured');
+      }, 'image/jpeg', 0.92);
+    } catch {
+      stopStream();
+      if (mountedRef.current) setError('Could not process the photo. Please try again.');
+    }
   }, [state, stopStream]);
 
   // ── Auto-contrast preprocessing ──────────────────────────────────────────
@@ -278,6 +300,7 @@ const IDCameraCapture: React.FC<IDCameraCaptureProps> = ({
 
   const handleRetake = useCallback(() => {
     if (capturedUrl) URL.revokeObjectURL(capturedUrl);
+    capturedUrlRef.current = null;
     setCapturedUrl(null);
     capturedBlobRef.current = null;
     rollingRef.current = [];
@@ -356,6 +379,15 @@ const IDCameraCapture: React.FC<IDCameraCaptureProps> = ({
         <img
           src={capturedUrl}
           alt="Captured ID"
+          onError={() => {
+            // The blob URL was created but the browser couldn't decode it -
+            // same silent-dead-end failure mode as toBlob() returning null
+            // above, just discovered later. Surface it the same way instead
+            // of leaving a permanently broken image on screen.
+            if (mountedRef.current) {
+              setError('The captured photo could not be loaded. Please try again.');
+            }
+          }}
           style={{
             position: 'absolute', inset: 0,
             width: '100%', height: '100%',
