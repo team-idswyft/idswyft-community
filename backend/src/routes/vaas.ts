@@ -1,5 +1,5 @@
 import express, { Request, Response } from 'express';
-import { param } from 'express-validator';
+import { body, param } from 'express-validator';
 import { authenticateServiceToken } from '@/middleware/auth.js';
 import { catchAsync } from '@/middleware/errorHandler.js';
 import { validate } from '@/middleware/validate.js';
@@ -10,7 +10,21 @@ import { resolvePublicAssetUrl } from '@/services/storage.js';
 const router = express.Router();
 
 // VaaS service endpoint - create user
-router.post('/users', authenticateServiceToken, catchAsync(async (req: Request, res: Response) => {
+router.post('/users',
+  authenticateServiceToken,
+  [
+    body('email')
+      .isEmail()
+      .withMessage('Valid email is required')
+      .normalizeEmail(),
+    body('phone').optional().isString(),
+    body('first_name').optional().isString(),
+    body('last_name').optional().isString(),
+    body('external_id').optional().isString(),
+    body('metadata').optional().isObject(),
+  ],
+  validate,
+  catchAsync(async (req: Request, res: Response) => {
   const { email, phone, first_name, last_name, external_id, metadata } = req.body;
   
   logger.info('VaaS user creation request received', {
@@ -60,7 +74,27 @@ router.post('/users', authenticateServiceToken, catchAsync(async (req: Request, 
 }));
 
 // VaaS service endpoint - submit verification request
-router.post('/verify', authenticateServiceToken, catchAsync(async (req: Request, res: Response) => {
+router.post('/verify',
+  authenticateServiceToken,
+  [
+    body('user_id')
+      .isUUID()
+      .withMessage('user_id must be a valid UUID'),
+    body('document_url')
+      .notEmpty()
+      .withMessage('document_url is required')
+      .bail()
+      .isURL()
+      .withMessage('document_url must be a valid URL'),
+    body('selfie_url')
+      .optional()
+      .isURL()
+      .withMessage('selfie_url must be a valid URL'),
+    body('organization_id').optional().isString(),
+    body('addons').optional().isObject(),
+  ],
+  validate,
+  catchAsync(async (req: Request, res: Response) => {
   const { user_id, document_url, selfie_url, organization_id, addons } = req.body;
 
   logger.info('VaaS verification request received', {
