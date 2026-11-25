@@ -24,6 +24,11 @@ router.post('/create', basicRateLimit, catchAsync(async (req: Request, res: Resp
 
   let resolvedApiKeyId: string;
   let resolvedUserId: string;
+  // The verification this handoff is bound to. From a session token it is the
+  // session's own verification (authoritative); from API-key auth it is the
+  // optional body value. authenticateHandoffToken reads it back to enforce
+  // per-verification access (GHSA-6fwm).
+  let resolvedVerificationId: string | undefined;
 
   if (sessionToken) {
     // Session token auth — resolve api_key_id from the verification request
@@ -52,6 +57,8 @@ router.post('/create', basicRateLimit, catchAsync(async (req: Request, res: Resp
 
     resolvedApiKeyId = verification.session_api_key_id;
     resolvedUserId = user_id || verification.user_id;
+    // The session's own verification is authoritative — ignore any body value.
+    resolvedVerificationId = verification.id;
   } else {
     // Traditional api_key auth
     if (!api_key || !user_id) {
@@ -80,6 +87,8 @@ router.post('/create', basicRateLimit, catchAsync(async (req: Request, res: Resp
 
     resolvedApiKeyId = apiKeyRecord.id;
     resolvedUserId = user_id;
+    // Integrator path: honor the optional body-supplied verification_id.
+    resolvedVerificationId = verification_id;
   }
 
   const validSource = ['api', 'vaas', 'demo'].includes(source) ? source : 'api';
@@ -95,7 +104,7 @@ router.post('/create', basicRateLimit, catchAsync(async (req: Request, res: Resp
       user_id: resolvedUserId,
       source: validSource,
       expires_at: expiresAt.toISOString(),
-      ...(verification_id && { verification_id }),
+      ...(resolvedVerificationId && { verification_id: resolvedVerificationId }),
     });
 
   if (error) {

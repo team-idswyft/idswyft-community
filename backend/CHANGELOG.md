@@ -5,6 +5,25 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.41] - 2026-11-25
+
+### Security
+- **Session and handoff tokens are now bound to their verification and expire
+  with it** (`backend`): three coordinated-disclosure reports against the
+  hosted-verification flow.
+  - Handoff tokens (GHSA-6fwm): `authenticateHandoffToken` never bound the token
+    to a verification, so a "continue on phone" token worked on any verification
+    under the same developer (IDOR). The token now carries and enforces its
+    session's verification id. Unbound API-key-minted tokens keep the existing
+    developer-scoped fallback (documented residual).
+  - Address routes (GHSA-hvgx): the two `addressVerification.ts` routes skipped
+    the per-verification binding check every other route enforces. Added it.
+  - Token lifetime (GHSA-rrm9): a hosted-page session token stayed valid for its
+    full TTL after the verification finished. Terminal transitions now expire the
+    session token, and `authenticateHandoffToken` rejects a bound handoff token
+    once its verification is terminal or its token expired — except `/restart`,
+    which an applicant uses to retry after a failure.
+
 ## [1.12.40] - 2026-11-25
 
 ### Fixed

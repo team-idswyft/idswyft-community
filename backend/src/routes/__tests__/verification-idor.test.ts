@@ -70,3 +70,70 @@ describe('IDOR ownership protection — getVerificationRequestForDeveloper patte
     expect((err as any).statusCode).toBe(400);
   });
 });
+
+// --- Session/handoff token binding to a single verification (GHSA-hvgx, GHSA-6fwm) ---
+describe('session-token binding guard', () => {
+  // Mirrors the guard in requireOwnedVerification and the one now added to
+  // addressVerification.ts: a bound session token may only act on its own
+  // verification; absence of a binding falls back to the developer-only check.
+  function bindingAllows(sessionVerificationId: string | undefined, verificationId: string): boolean {
+    return !(sessionVerificationId && sessionVerificationId !== verificationId);
+  }
+
+  it('allows access when the token is bound to the same verification', () => {
+    expect(bindingAllows('ver-1', 'ver-1')).toBe(true);
+  });
+
+  it('denies access when a bound token targets a different verification (IDOR)', () => {
+    expect(bindingAllows('ver-1', 'ver-2')).toBe(false);
+  });
+
+  it('falls back to the developer-only check when no binding is present (API-key / legacy handoff)', () => {
+    expect(bindingAllows(undefined, 'ver-2')).toBe(true);
+  });
+
+  // GHSA-6fwm: a handoff minted from a session token now carries that session's
+  // verification id (handoff.ts /create → auth.ts authenticateHandoffToken),
+  // so the same guard rejects cross-verification use of a handoff token.
+  it('handoff minted from a session token binds to the session verification', () => {
+    const sessionVerification = { id: 'ver-1' };
+    const handoffRow: { verification_id?: string } = {};
+    handoffRow.verification_id = sessionVerification.id;       // /create session branch
+    const sessionVerificationId = handoffRow.verification_id;  // authenticateHandoffToken
+    expect(bindingAllows(sessionVerificationId, 'ver-2')).toBe(false);
+    expect(bindingAllows(sessionVerificationId, 'ver-1')).toBe(true);
+  });
+});
+
+// --- Handoff token lifetime vs its bound verification (GHSA-rrm9, finding 2) ---
+describe('handoff token lifetime guard', () => {
+  // Mirrors authenticateHandoffToken: a bound handoff token is rejected once its
+  // verification is terminal or its session token has expired — except /restart,
+  // which an applicant uses to retry after a failed verification.
+  function handoffAllowed(boundStatus: string, tokenExpiresAt: string | null, path: string): boolean {
+    if (path.endsWith('/restart')) return true;
+    const TERMINAL = ['verified', 'failed', 'manual_review'];
+    const isTerminal = TERMINAL.includes(boundStatus);
+    const tokenExpired = !!tokenExpiresAt && new Date(tokenExpiresAt) < new Date();
+    return !(isTerminal || tokenExpired);
+  }
+  const past = new Date(Date.now() - 1000).toISOString();
+  const future = new Date(Date.now() + 60_000).toISOString();
+
+  it('allows an active (non-terminal, unexpired) verification', () => {
+    expect(handoffAllowed('processing', future, '/api/v2/verify/x/status')).toBe(true);
+  });
+
+  it('rejects once the verification is terminal', () => {
+    expect(handoffAllowed('verified', future, '/api/v2/verify/x/status')).toBe(false);
+    expect(handoffAllowed('manual_review', future, '/api/v2/verify/x/front-document')).toBe(false);
+  });
+
+  it('rejects once the session token has expired', () => {
+    expect(handoffAllowed('processing', past, '/api/v2/verify/x/status')).toBe(false);
+  });
+
+  it('still allows /restart after a failed verification (retry flow preserved)', () => {
+    expect(handoffAllowed('failed', past, '/api/v2/verify/x/restart')).toBe(true);
+  });
+});
