@@ -40,6 +40,7 @@ function chainable(resolveValue: any) {
     in: vi.fn(function (this: any, ...args: any[]) { calls.push({ method: 'in', args }); return this; }),
     eq: vi.fn(function (this: any, ...args: any[]) { calls.push({ method: 'eq', args }); return this; }),
     not: vi.fn(function (this: any, ...args: any[]) { calls.push({ method: 'not', args }); return this; }),
+    neq: vi.fn(function (this: any, ...args: any[]) { calls.push({ method: 'neq', args }); return this; }),
     lt: vi.fn(function (this: any, ...args: any[]) { calls.push({ method: 'lt', args }); return this; }),
     then: (resolve: any) => resolve(resolveValue),
     __calls: calls,
@@ -92,6 +93,31 @@ describe('DataRetentionService.deleteUserData', () => {
     const inCall = amlChain.__calls.find((c) => c.method === 'in');
     expect(inCall?.args[0]).toBe('verification_request_id');
     expect(inCall?.args[1]).toEqual(verificationIds);
+  });
+
+  it('scrubs webhook_deliveries payloads to {} not null (payload is NOT NULL) — issue #75', async () => {
+    const verificationIds = ['v1', 'v2'];
+    const fromMock = supabase.from as any as ReturnType<typeof vi.fn>;
+    const tableInvocations: Array<{ table: string; chain: ReturnType<typeof chainable> }> = [];
+
+    fromMock.mockImplementation((table: string) => {
+      const resolveValue = (table === 'verification_requests'
+        && tableInvocations.filter(t => t.table === 'verification_requests').length === 0)
+        ? { data: verificationIds.map((id) => ({ id, documents: [], selfies: [] })), error: null }
+        : { data: null, error: null };
+      const chain = chainable(resolveValue);
+      tableInvocations.push({ table, chain });
+      return chain;
+    });
+
+    await new DataRetentionService().deleteUserData('user-abc', 'test');
+
+    const whInvocations = tableInvocations.filter((t) => t.table === 'webhook_deliveries');
+    expect(whInvocations).toHaveLength(1);
+    const updateCall = whInvocations[0].chain.__calls.find((c) => c.method === 'update');
+    // The regression: writing null here fails the NOT NULL constraint and leaves PII in place
+    expect(updateCall?.args[0]).toEqual({ payload: {} });
+    expect(updateCall?.args[0]).not.toEqual({ payload: null });
   });
 
   it('does not call .from("aml_screenings") when the user has no verifications', async () => {
@@ -195,6 +221,43 @@ describe('DataRetentionService.runIdempotencyKeyCleanup', () => {
 
     expect(deleted).toBe(0);
     // Only the count query ran — no delete.
+    expect(fromMock).toHaveBeenCalledTimes(1);
+  });
+});
+
+describe('DataRetentionService.runWebhookPayloadCleanup', () => {
+  it('scrubs stale payloads to {} and filters on the {} sentinel — issue #75', async () => {
+    const fromMock = supabase.from as any as ReturnType<typeof vi.fn>;
+    let invocation = 0;
+    const chains: any[] = [];
+    fromMock.mockImplementation((table: string) => {
+      expect(table).toBe('webhook_deliveries');
+      invocation++;
+      // First call counts rows to clean; second performs the update.
+      const chain = chainable(invocation === 1 ? { count: 3, error: null } : { data: null, error: null });
+      chains.push(chain);
+      return chain;
+    });
+
+    const scrubbed = await new DataRetentionService().runWebhookPayloadCleanup(30);
+
+    expect(scrubbed).toBe(3);
+    expect(fromMock).toHaveBeenCalledTimes(2);
+
+    const updateChain = chains[1];
+    const updateCall = updateChain.__calls.find((c: any) => c.method === 'update');
+    expect(updateCall?.args[0]).toEqual({ payload: {} }); // not null — NOT NULL column
+    const neqCall = updateChain.__calls.find((c: any) => c.method === 'neq');
+    expect(neqCall?.args).toEqual(['payload', '{}']); // skip already-scrubbed rows
+  });
+
+  it('returns 0 and runs no update when nothing is stale', async () => {
+    const fromMock = supabase.from as any as ReturnType<typeof vi.fn>;
+    fromMock.mockImplementationOnce(() => chainable({ count: 0, error: null }));
+
+    const scrubbed = await new DataRetentionService().runWebhookPayloadCleanup(30);
+
+    expect(scrubbed).toBe(0);
     expect(fromMock).toHaveBeenCalledTimes(1);
   });
 });
