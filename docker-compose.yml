@@ -91,6 +91,11 @@ services:
       SERVICE_TOKEN: ${SERVICE_TOKEN:-change-this-service-token}
       CORS_ORIGINS: "${CORS_ORIGINS:-}"
       STORAGE_PROVIDER: "${STORAGE_PROVIDER:-local}"
+      # Encrypt stored documents at rest (AES-256-GCM under ENCRYPTION_KEY).
+      # Default off so a bare `docker compose up` with the placeholder
+      # ENCRYPTION_KEY still boots; install.sh sets this to true with a real
+      # generated key. (community GHSA-f8c2)
+      STORAGE_ENCRYPTION: "${STORAGE_ENCRYPTION:-false}"
       AWS_ACCESS_KEY_ID: "${AWS_ACCESS_KEY_ID:-}"
       AWS_SECRET_ACCESS_KEY: "${AWS_SECRET_ACCESS_KEY:-}"
       AWS_REGION: "${AWS_REGION:-us-east-1}"
