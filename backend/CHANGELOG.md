@@ -5,6 +5,17 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.42] - 2026-11-25
+
+### Security
+- **OCR result cache disabled** (`engine`, community GHSA-f8c2): the engine
+  called `ppu-paddle-ocr`'s `recognize()` without options, leaving its result
+  cache active. The cache keys on a hash of the first 1024 bytes plus byte
+  length (LRU, size 10), so two documents sharing that prefix and length could
+  receive each other's OCR result — a cross-applicant data leak. Pass
+  `{ noCache: true }` so each verification reads its own image. Reported via the
+  Preuvid fork.
+
 ## [1.12.41] - 2026-11-25
 
 ### Security
