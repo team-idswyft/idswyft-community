@@ -323,7 +323,11 @@ export class PaddleOCRProvider implements OCRProvider {
   async processDocument(buffer: Buffer, documentType: string, issuingCountry?: string, llmConfig?: LLMProviderConfig): Promise<OCRData> {
     const svc         = await this.ensureInitialized();
     const arrayBuffer = new Uint8Array(buffer).buffer;
-    const result: PaddleOcrResult = await svc.recognize(arrayBuffer);
+    // Disable ppu-paddle-ocr's result cache. It keys on hash(first 1024 bytes)
+    // + byteLength (LRU, size 10), so two documents that share that byte prefix
+    // and length could receive each other's OCR result — a cross-applicant data
+    // leak. Each verification must OCR its own image. (community GHSA-f8c2)
+    const result: PaddleOcrResult = await svc.recognize(arrayBuffer, { noCache: true });
 
     const ocrData: OCRData = {
       raw_text:          result.text,
