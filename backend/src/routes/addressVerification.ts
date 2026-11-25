@@ -52,6 +52,15 @@ router.post(
   validate,
   catchAsync(async (req: Request, res: Response) => {
     const { verification_id } = req.params;
+
+    // Session tokens are scoped to one verification — reject cross-verification
+    // access (GHSA-hvgx), mirroring requireOwnedVerification in newVerification.ts.
+    if (req.sessionVerificationId && req.sessionVerificationId !== verification_id) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'Session token is not authorized for this verification',
+      });
+    }
     const documentType = req.body.document_type as AddressDocumentType;
     const file = req.file;
 
@@ -169,6 +178,15 @@ router.get(
   validate,
   catchAsync(async (req: Request, res: Response) => {
     const { verification_id } = req.params;
+
+    // Session tokens are scoped to one verification — reject cross-verification
+    // access (GHSA-hvgx), mirroring requireOwnedVerification in newVerification.ts.
+    if (req.sessionVerificationId && req.sessionVerificationId !== verification_id) {
+      return res.status(403).json({
+        error: 'Forbidden',
+        message: 'Session token is not authorized for this verification',
+      });
+    }
 
     const { data: verification, error } = await supabase
       .from('verification_requests')

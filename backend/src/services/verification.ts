@@ -92,12 +92,20 @@ export class VerificationService {
   }
   
   async updateVerificationRequest(
-    id: string, 
+    id: string,
     updates: Partial<VerificationRequest>
   ): Promise<VerificationRequest> {
+    // When a verification reaches a terminal state, expire its hosted-page
+    // session token in the same write so the token can't outlive the
+    // verification it was minted for (GHSA-rrm9).
+    const TERMINAL_STATUSES = ['verified', 'failed', 'manual_review'];
+    const finalUpdates: any = TERMINAL_STATUSES.includes(updates.status as any)
+      ? { ...updates, session_token_expires_at: new Date().toISOString() }
+      : updates;
+
     const { data: verification, error } = await supabase
       .from('verification_requests')
-      .update(updates)
+      .update(finalUpdates)
       .eq('id', id)
       .select('*')
       .single();
@@ -375,7 +383,9 @@ export class VerificationService {
         status: 'verified',
         reviewed_by: reviewedBy,
         reviewed_at: new Date().toISOString(),
-        manual_review_reason: `Manually approved by ${reviewedBy}`
+        manual_review_reason: `Manually approved by ${reviewedBy}`,
+        // Terminal state — expire the hosted-page session token (GHSA-rrm9).
+        session_token_expires_at: new Date().toISOString(),
       })
       .eq('id', verificationId)
       .select('*')
@@ -405,7 +415,9 @@ export class VerificationService {
         status: 'failed',
         reviewed_by: reviewedBy,
         reviewed_at: new Date().toISOString(),
-        manual_review_reason: `Manually rejected by ${reviewedBy}: ${reason}`
+        manual_review_reason: `Manually rejected by ${reviewedBy}: ${reason}`,
+        // Terminal state — expire the hosted-page session token (GHSA-rrm9).
+        session_token_expires_at: new Date().toISOString(),
       })
       .eq('id', verificationId)
       .select('*')

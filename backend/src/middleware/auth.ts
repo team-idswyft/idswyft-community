@@ -153,7 +153,7 @@ export const authenticateHandoffToken = catchAsync(async (req: Request, res: Res
     // Look up session (flat query — no nested joins for PgClient compatibility)
     const { data: session, error: sessionError } = await supabase
       .from('mobile_handoff_sessions')
-      .select('id, token, api_key_id, user_id, status, expires_at')
+      .select('id, token, api_key_id, user_id, status, expires_at, verification_id')
       .eq('token', tokenHash)
       .single();
 
@@ -214,6 +214,39 @@ export const authenticateHandoffToken = catchAsync(async (req: Request, res: Res
     // Attach API key and developer to request (same shape as authenticateAPIKey)
     req.apiKey = { ...apiKeyRecord, developer } as APIKey;
     req.developer = developer as Developer;
+
+    // Bind the token to its verification so requireOwnedVerification rejects
+    // cross-verification access (GHSA-6fwm). Legacy rows without a
+    // verification_id fall back to the developer-only check — no regression.
+    //
+    // Accepted residual: an API-key-minted handoff with no verification_id keeps
+    // developer-wide scope. The applicant "continue on phone" path mints from a
+    // session token and is always bound (above), so this is an integrator-only
+    // path, not applicant privilege escalation. Deny-by-default was declined to
+    // avoid breaking integrators that mint unbound tokens.
+    if (session.verification_id) {
+      // A handoff token must not outlive the verification it is bound to
+      // (GHSA-rrm9). Reject once that verification is terminal or its session
+      // token has expired — except /restart, which an applicant uses to retry
+      // after a failed verification (mirrors the failed-session rule above).
+      if (!req.path.endsWith('/restart')) {
+        const { data: boundVer } = await supabase
+          .from('verification_requests')
+          .select('status, session_token_expires_at')
+          .eq('id', session.verification_id)
+          .single();
+        if (boundVer) {
+          const TERMINAL_STATUSES = ['verified', 'failed', 'manual_review'];
+          const isTerminal = TERMINAL_STATUSES.includes(boundVer.status);
+          const tokenExpired = !!boundVer.session_token_expires_at
+            && new Date(boundVer.session_token_expires_at) < new Date();
+          if (isTerminal || tokenExpired) {
+            throw new AuthenticationError('Verification has finished; this handoff token is no longer valid');
+          }
+        }
+      }
+      req.sessionVerificationId = session.verification_id;
+    }
 
     // Check if developer account is suspended
     if (req.developer?.status === 'suspended') {
