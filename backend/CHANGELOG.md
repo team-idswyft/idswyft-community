@@ -5,6 +5,22 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.44] - 2026-11-25
+
+### Security
+- **Self-host CORS allowlist no longer hardcodes cloud origins** (`backend`,
+  community GHSA-f8c2): `config/index.ts` always added `idswyft.app`, `www`, and
+  `staging` to the allowed origins regardless of `CORS_ORIGINS`, so a self-hosted
+  instance trusted three origins its operator does not control. Removed them; the
+  cloud deployment supplies its own domains via `CORS_ORIGINS`.
+- **At-rest encryption enabled for self-host local storage** (`backend`/deploy,
+  community GHSA-f8c2): `docker-compose.yml` never passed `STORAGE_ENCRYPTION` and
+  `install.sh` never enabled it, so community `STORAGE_PROVIDER=local` deployments
+  wrote document images to disk in plaintext despite a real `ENCRYPTION_KEY` being
+  generated. Compose now passes the variable (default off so a bare
+  `docker compose up` still boots) and `install.sh` turns it on with the generated
+  key.
+
 ## [1.12.43] - 2026-11-25
 
 ### Security

@@ -532,8 +532,12 @@ OVERRIDE_EOF
     else
       ok "Using local filesystem storage"
     fi
-    warn "Local storage writes plaintext files to disk."
-    detail "For production: rely on filesystem-level encryption (LUKS, dm-crypt, EBS) or use STORAGE_PROVIDER=s3."
+    # Encrypt documents at rest under the ENCRYPTION_KEY generated above.
+    # storageCrypto.ts envelope-wraps each file with AES-256-GCM; the read path
+    # still serves any pre-encryption files. (community GHSA-f8c2)
+    _set_env_var "STORAGE_ENCRYPTION" "true"
+    ok "At-rest encryption enabled for local storage (AES-256-GCM under ENCRYPTION_KEY)"
+    detail "Defense in depth: also use filesystem-level encryption (LUKS, dm-crypt, EBS)."
   fi
 
   divider
