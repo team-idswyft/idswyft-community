@@ -101,10 +101,15 @@ export class DataRetentionService {
         .delete()
         .in('verification_request_id', verificationIds);
 
-      // Nullify webhook delivery payloads (preserve delivery audit trail, remove PII)
-      await supabase.from('webhook_deliveries')
-        .update({ payload: null })
+      // Scrub webhook delivery payloads: remove PII but keep the delivery audit
+      // trail. payload is NOT NULL, so write {} — writing null fails the
+      // constraint and silently leaves the PII in place.
+      const { error: webhookScrubError } = await supabase.from('webhook_deliveries')
+        .update({ payload: {} })
         .in('verification_request_id', verificationIds);
+      if (webhookScrubError) {
+        logger.error('GDPR webhook payload scrub failed', { error: webhookScrubError });
+      }
     }
 
     // 4. Anonymise verification requests (keep for audit, remove PII)
@@ -336,29 +341,37 @@ export class DataRetentionService {
   }
 
   /**
-   * Nullify PII in webhook_deliveries payloads older than `retentionDays`.
+   * Scrub PII from webhook_deliveries payloads older than `retentionDays`.
    * Preserves the delivery audit trail (status, timestamps, attempts) but
    * removes OCR data, names, DOB, and document numbers from the payload.
+   *
+   * payload is NOT NULL, so scrubbed rows are set to {} rather than null, and
+   * an already-scrubbed row ({}) is the "needs cleanup" sentinel we skip.
    */
   async runWebhookPayloadCleanup(retentionDays: number = 30): Promise<number> {
     const cutoff = new Date();
     cutoff.setDate(cutoff.getDate() - retentionDays);
 
-    // Count affected rows first
-    const { count } = await supabase
+    // Count affected rows first — rows not yet scrubbed to {}
+    const { count, error: countError } = await supabase
       .from('webhook_deliveries')
       .select('*', { count: 'exact', head: true })
       .lt('created_at', cutoff.toISOString())
-      .not('payload', 'is', null);
+      .neq('payload', '{}');
+
+    if (countError) {
+      logger.error('Webhook payload cleanup count failed', { error: countError });
+      return 0;
+    }
 
     const toClean = count ?? 0;
     if (toClean === 0) return 0;
 
     const { error } = await supabase
       .from('webhook_deliveries')
-      .update({ payload: null })
+      .update({ payload: {} })
       .lt('created_at', cutoff.toISOString())
-      .not('payload', 'is', null);
+      .neq('payload', '{}');
 
     if (error) {
       logger.error('Webhook payload cleanup failed', { error });
