@@ -5,6 +5,21 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.40] - 2026-11-25
+
+### Fixed
+- **Webhook delivery payloads are now actually scrubbed of PII** (`backend`,
+  reported in community #75): `webhook_deliveries.payload` is `JSONB NOT NULL`,
+  but both the 30-day cleanup (`runWebhookPayloadCleanup`) and GDPR erasure
+  (`deleteUserData`) set it to `null`, which Postgres rejects. The cleanup
+  caught the error and returned 0; the GDPR path ignored it. Both failed
+  silently, so names, DOB, document numbers, and OCR data in webhook payloads
+  were never removed — they persisted past the 30-day window and survived GDPR
+  erasure. Both paths now clear the payload to `{}`, which satisfies the
+  constraint and removes the PII. The cleanup filters unscrubbed rows with
+  `payload <> '{}'` and logs the count query's error instead of skipping
+  silently.
+
 ## [1.12.39] - 2026-10-20
 
 ### Fixed
