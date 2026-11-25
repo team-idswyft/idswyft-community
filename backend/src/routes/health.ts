@@ -1,5 +1,4 @@
 import express, { Request, Response } from 'express';
-import crypto from 'crypto';
 import { supabase } from '@/config/database.js';
 import config from '@/config/index.js';
 import { catchAsync } from '@/middleware/errorHandler.js';
@@ -104,76 +103,5 @@ router.get('/ready', catchAsync(async (req: Request, res: Response) => {
 router.get('/live', (req: Request, res: Response) => {
   res.status(200).json({ status: 'alive' });
 });
-
-// API Key diagnostic endpoint
-router.get('/api-key-diagnostic', catchAsync(async (req: Request, res: Response) => {
-  const testApiKey = req.query.key as string;
-  
-  if (!testApiKey) {
-    return res.status(400).json({ error: 'Please provide test API key as query parameter: ?key=ik_...' });
-  }
-  
-  const keyPrefix = testApiKey.substring(0, 8);
-  const keyHash = crypto
-    .createHmac('sha256', config.apiKeySecret)
-    .update(testApiKey)
-    .digest('hex');
-  
-  try {
-    // Check if API key exists in database
-    const { data: apiKeyRecord, error: keyError } = await supabase
-      .from('api_keys')
-      .select(`
-        *,
-        developer:developers(*)
-      `)
-      .eq('key_hash', keyHash)
-      .single();
-    
-    const diagnostics = {
-      timestamp: new Date().toISOString(),
-      testKey: {
-        prefix: keyPrefix,
-        hash: keyHash,
-        found: !!apiKeyRecord,
-        isActive: apiKeyRecord?.is_active || false,
-        isSandbox: apiKeyRecord?.is_sandbox || false,
-        expiresAt: apiKeyRecord?.expires_at || null,
-        lastUsedAt: apiKeyRecord?.last_used_at || null,
-        developerId: apiKeyRecord?.developer_id || null,
-        developerEmail: apiKeyRecord?.developer?.email || null
-      },
-      environment: {
-        NODE_ENV: config.nodeEnv,
-        API_KEY_SECRET: config.apiKeySecret.substring(0, 8) + '...',
-        DATABASE_URL_SET: !!process.env.DATABASE_URL,
-        SUPABASE_URL_SET: !!process.env.SUPABASE_URL,
-        SUPABASE_SERVICE_KEY_SET: !!process.env.SUPABASE_SERVICE_ROLE_KEY
-      },
-      database: {
-        connected: !keyError || keyError.code !== 'PGRST301', // Connection error
-        error: keyError ? {
-          code: keyError.code,
-          message: keyError.message,
-          details: keyError.details
-        } : null
-      }
-    };
-    
-    const statusCode = apiKeyRecord ? 200 : 404;
-    res.status(statusCode).json(diagnostics);
-    
-  } catch (error: any) {
-    res.status(500).json({
-      timestamp: new Date().toISOString(),
-      error: 'Diagnostic failed',
-      details: error.message,
-      environment: {
-        NODE_ENV: config.nodeEnv,
-        API_KEY_SECRET: config.apiKeySecret.substring(0, 8) + '...'
-      }
-    });
-  }
-}));
 
 export default router;

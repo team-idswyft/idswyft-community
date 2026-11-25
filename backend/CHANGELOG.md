@@ -5,6 +5,19 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.43] - 2026-11-25
+
+### Security
+- **Removed the unauthenticated API-key diagnostic route** (`backend`, community
+  GHSA-2rv5): `GET /api/health/api-key-diagnostic` had no authentication and
+  returned the first 8 characters of `API_KEY_SECRET`, the HMAC-SHA256 of any
+  supplied value under that secret (the exact value stored as `api_keys.key_hash`
+  and for handoff-token hashes), whether a supplied key was valid/active, the
+  owning developer's id and email, and raw database errors — a partial
+  secret-disclosure, keyed-hash oracle, and key-validity/identity oracle to
+  anonymous callers. Nothing in the backend, frontend, or tests used the route;
+  it is deleted.
+
 ## [1.12.42] - 2026-11-25
 
 ### Security
