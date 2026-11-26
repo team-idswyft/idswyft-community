@@ -8,6 +8,7 @@ import {
   getCountryFormat, getGenericEUFormat, INTERNATIONAL_HEADER_NOISE, STATE_DL_FORMATS,
   findLowConfidenceFields, extractFieldsWithLLM, mergeLLMResults,
   classifyDocument, applyUkDlCrossCheck, isLikelyUkDl,
+  findSpacedDmyDates, normalizeCommaSeparatedNames,
 } from '@idswyft/shared';
 import { logger } from '@/utils/logger.js';
 
@@ -210,6 +211,13 @@ function findAllDates(text: string, hint?: 'DMY' | 'MDY' | 'YMD'): string[] {
     const norm = standardizeDateFormat(m[0], hint);
     if (norm) results.push(norm);
   }
+  // Ported from the Preuvid fork (MIT): the 2021 French CNI recto prints dates
+  // space-separated ("08 01 1952"). Read them only under a DMY hint and only
+  // when day, month, and year are plausible. findSpacedDmyDates matches only a
+  // genuinely space-separated group, never a "/", "-", or "." date, so a
+  // document whose dates use those separators gains no new candidate. A DMY
+  // document that itself prints space-separated dates would have them read too.
+  if (hint === 'DMY') results.push(...findSpacedDmyDates(text));
   // Month-name dates: "1 JAN 1981", "JAN 1, 1981"
   const mnRe = /(\d{1,2})\s+(JAN|FEB|MAR|APR|MAY|JUN|JUL|AUG|SEP|OCT|NOV|DEC)\w*\s+(\d{4})/gi;
   while ((m = mnRe.exec(text)) !== null) {
@@ -1684,7 +1692,10 @@ export class PaddleOCRProvider implements OCRProvider {
         this.findField(flatLines, givenPatterns, (value, conf) => {
           const cleaned = this.stripTrailingLabelNoise(value);
           if (cleaned && !isHeaderNoise(cleaned) && !SPECIMEN_LABELS.test(cleaned) && !this.isLabelOrNoise(cleaned)) {
-            givenName = cleaned;
+            // Ported from the Preuvid fork (MIT): the 2021 CNI separates given
+            // names with commas ("JEAN, PIERRE"). normalizeCommaSeparatedNames
+            // collapses commas to spaces and is a no-op for names without one.
+            givenName = normalizeCommaSeparatedNames(cleaned);
             nameConf = Math.max(nameConf, conf);
             return; // accepted
           }
@@ -2069,7 +2080,11 @@ export class PaddleOCRProvider implements OCRProvider {
     if (monthName) return monthName;
     // Numeric dates (e.g., "01/01/1981")
     const m = text.match(/(\d{1,2})[\/\-\.](\d{1,2})[\/\-\.](\d{2,4})/);
-    return m ? standardizeDateFormat(m[0], hint) : null;
+    if (m) return standardizeDateFormat(m[0], hint);
+    // Ported from the Preuvid fork (MIT): fall back to a space-separated date
+    // ("08 01 1952", 2021 CNI) only under a DMY hint. This runs only when no
+    // separator-delimited date matched, so it cannot override a date already read.
+    return hint === 'DMY' ? (findSpacedDmyDates(text)[0] ?? null) : null;
   }
 
   /**
