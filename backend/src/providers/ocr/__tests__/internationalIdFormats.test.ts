@@ -99,4 +99,34 @@ describe('International ID Format Registry', () => {
       }
     });
   });
+
+  // French 2021 CNI reading adopted from the Preuvid fork (MIT).
+  describe('FR national_id (2021 CNI)', () => {
+    const fr = getCountryFormat('FR', 'national_id');
+    const matches = (labels: RegExp[], text: string) => labels.some(r => r.test(text));
+
+    it('id_number_regex accepts the 1995 (12-digit) and 2021 (9-char) forms', () => {
+      expect(fr!.id_number_regex.test('123456789012')).toBe(true); // 1995 card
+      expect(fr!.id_number_regex.test('4LPARD0AP')).toBe(true);    // 2021 card
+    });
+
+    it('id_number_regex rejects wrong-length or lowercase values', () => {
+      expect(fr!.id_number_regex.test('1234567890')).toBe(false); // 10 digits
+      expect(fr!.id_number_regex.test('4lpard0ap')).toBe(false);  // lowercase
+    });
+
+    it('reads the bilingual 2021 recto labels', () => {
+      expect(matches(fr!.field_labels.name, 'Surname')).toBe(true);
+      expect(matches(fr!.field_labels.name, 'Given names')).toBe(true);
+      expect(matches(fr!.field_labels.date_of_birth, 'DATE DE NAISS.')).toBe(true);
+      expect(matches(fr!.field_labels.expiry_date!, "DATE D'EXPIR.")).toBe(true);
+      expect(matches(fr!.field_labels.id_number!, 'N° du document')).toBe(true);
+      expect(matches(fr!.field_labels.id_number!, 'Document No')).toBe(true);
+    });
+
+    it('still reads the older French labels', () => {
+      expect(matches(fr!.field_labels.name, 'Nom')).toBe(true);
+      expect(matches(fr!.field_labels.date_of_birth, 'date de naissance')).toBe(true);
+    });
+  });
 });

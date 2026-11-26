@@ -5,6 +5,34 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.45] - 2026-11-26
+
+### Added
+- **French ID reading: 2021 CNI front-side fields** (`shared`/`engine`, adopted
+  from the Preuvid community fork, MIT): the engine now reads the 2021 French
+  national ID card's bilingual front-side labels and date format.
+  - `internationalIdFormats.ts`: the FR `national_id` entry gains the 2021
+    card's bilingual labels ("NOM / Surname", "Prénoms / Given names",
+    "DATE DE NAISS.", "DATE D'EXPIR.", "N° du document / Document No") and
+    accepts the 2021 card's 9-character document number alongside the 1995
+    card's 12 digits. `id_number_regex` is not read by any gate or risk score;
+    it only widens candidate matching.
+  - `findSpacedDmyDates()` (new, `@idswyft/shared`): reads space-separated
+    `DD MM YYYY` dates ("08 01 1952") that the standard separator-based regex
+    misses. Gated on the DMY hint and plausibility-checked (day 1–31, month
+    1–12, year 1900–2099). It matches only genuinely space-separated groups,
+    never a `/`, `-`, or `.` date, so documents whose dates use those separators
+    are unaffected (verified by a before/after on German and UK fixtures). A DMY
+    document that itself prints space-separated dates would have them read too.
+  - `normalizeCommaSeparatedNames()` (new, `@idswyft/shared`): collapses the
+    2021 card's comma-separated given names ("JEAN, PIERRE") to spaces; a no-op
+    for names without a comma.
+  - The fork's MRZ merge path (`mrzReader.ts`, `mrzMerge.ts`) and its
+    model-registry change are not adopted here. The MRZ confidence rework is
+    held for a separate, benchmarked change.
+  - The new helpers live in `@idswyft/shared` and are tested in the backend
+    vitest suite, the only suite CI runs.
+
 ## [1.12.44] - 2026-11-25
 
 ### Security

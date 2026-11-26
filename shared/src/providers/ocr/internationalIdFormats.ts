@@ -257,12 +257,20 @@ export const INTERNATIONAL_ID_FORMATS: Record<string, CountryIdFormat> = {
     document_types: [
       {
         type: 'national_id', // Carte nationale d'identite (CNI)
-        id_number_regex: /^\d{12}$/,
+        // 12 digits (1995 card) or 9 alphanumeric characters (2021 card).
+        // Ported from the Preuvid fork (MIT). This field is not read by any
+        // gate or risk score; it only widens candidate matching.
+        id_number_regex: /^(?:\d{12}|[A-Z0-9]{9})$/,
         field_labels: {
-          name: [/nom/i, /pr\u00e9nom/i, /name/i, /pr\u00e9noms/i],
-          date_of_birth: [/date\s*de\s*naissance/i, /n\u00e9\s*le/i, /date\s*of\s*birth/i],
-          expiry_date: [/date\s*d'expiration/i, /valable\s*jusqu/i, /expiry/i],
-          id_number: [/n\u00b0\s*carte/i, /num\u00e9ro/i, /carte\s*nationale/i, /id\s*no/i],
+          // "Surname" and "Given names" split the surname from the given names
+          // in the 2021 card's bilingual labels ("NOM / Surname",
+          // "Prenoms / Given names"). Without them only the first "nom" label
+          // was read, so the 2021 CNI recto gave the surname without given names.
+          name: [/surname/i, /given\s*names?/i, /nom/i, /pr\u00e9nom/i, /name/i, /pr\u00e9noms/i],
+          // 2021 recto labels: "DATE DE NAISS.", "DATE D'EXPIR.", "N du document".
+          date_of_birth: [/date\s*de\s*naissance/i, /date\s*de\s*naiss/i, /n\u00e9\s*le/i, /date\s*of\s*birth/i],
+          expiry_date: [/date\s*d'expiration/i, /date\s*d['\u2019]?\s*expir/i, /valable\s*jusqu/i, /expiry/i],
+          id_number: [/n\u00b0\s*carte/i, /n\u00b0\s*du\s*document/i, /document\s*no/i, /num\u00e9ro/i, /carte\s*nationale/i, /id\s*no/i],
           nationality: [/nationalit\u00e9/i, /nationality/i],
           address: [/adresse/i, /domicile/i, /address/i],
           issuing_authority: [/d\u00e9livr\u00e9\s*par/i, /autorit\u00e9/i, /authority/i],
