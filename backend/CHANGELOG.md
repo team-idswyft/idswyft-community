@@ -20,8 +20,10 @@ This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
   - `findSpacedDmyDates()` (new, `@idswyft/shared`): reads space-separated
     `DD MM YYYY` dates ("08 01 1952") that the standard separator-based regex
     misses. Gated on the DMY hint and plausibility-checked (day 1–31, month
-    1–12, year 1900–2099). It never matches a `/`, `-`, or `.` date, so
-    non-French documents gain no new candidate — covered by regression tests.
+    1–12, year 1900–2099). It matches only genuinely space-separated groups,
+    never a `/`, `-`, or `.` date, so documents whose dates use those separators
+    are unaffected (verified by a before/after on German and UK fixtures). A DMY
+    document that itself prints space-separated dates would have them read too.
   - `normalizeCommaSeparatedNames()` (new, `@idswyft/shared`): collapses the
     2021 card's comma-separated given names ("JEAN, PIERRE") to spaces; a no-op
     for names without a comma.
