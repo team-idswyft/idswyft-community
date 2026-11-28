@@ -5,6 +5,35 @@ All notable changes to the Idswyft Main API are documented in this file.
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 This project uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [1.12.46] - 2026-11-28
+
+### Added
+- **French ID reading: MRZ check-digit merge** (`shared`/`engine`, adopted from
+  the Preuvid community fork, MIT): the engine now verifies MRZ check digits on
+  French documents, trusts an identity field only when the MRZ confirms it, and
+  never reports a field as sure on a front-only read that the MRZ cannot verify.
+  - `mrzReader.ts` + `mrzMerge.ts` (new, `@idswyft/shared`): a tolerant MRZ
+    reader (passport TD3, ID TD1/TD2, old French CNI, driving licence) that
+    restores lost `<` filler, corrects common OCR confusions by check digit, and
+    a merge that folds the reading into the OCR result with per-field confidence.
+  - Wired into `engine/src/routes/extract.ts` (`/front` and `/back`), **gated to
+    French documents** — an `FR`/`FRA` issuing-country hint, an MRZ issuing state
+    of `FRA`, or the printed word `FRANÇAISE`. Non-French documents are
+    byte-identical to prior behaviour; the French-language documents of other
+    countries (Belgium, Switzerland, Luxembourg, Québec, francophone Africa) are
+    excluded by design.
+  - French MRZ formats map to `MRZ_TD1/TD2/TD3` by line count so the back-side
+    read reaches Gate 2 (a deliberate gate change for French documents only).
+  - The new modules live in `@idswyft/shared` and are tested in the backend
+    vitest suite, the only suite CI runs.
+
+### Security
+- **MRZ reader fails closed on ambiguity** (`shared`): an MRZ read with more than
+  one valid line-fitting that disagrees on a protected field no longer reports
+  `checksums_valid: true`; its protected fields are demoted to `unchecked`. The
+  tolerant reader runs only for plausibly-French documents and is bounded by a
+  fixed candidate-line cap.
+
 ## [1.12.45] - 2026-11-26
 
 ### Added
