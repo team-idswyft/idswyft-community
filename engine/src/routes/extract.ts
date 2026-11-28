@@ -26,7 +26,11 @@ import {
   HeadTurnLivenessMetadataSchema,
   SharpTamperDetector, DocumentZoneValidator,
   createDeepfakeDetector,
+  // French MRZ-merge path (Piece C, ported from the Preuvid fork, gated to
+  // French documents). isFrenchIdDocument is the gate; the rest is the merge.
+  isFrenchIdDocument, readMrzFromText, mergeMrzIntoOcr, capUncheckedConfidences,
 } from '@idswyft/shared';
+import type { MrzReading } from '@idswyft/shared';
 import type {
   HeadTurnLivenessMetadata,
   FrontExtractionResult, BackExtractionResult, LiveCaptureResult,
@@ -223,7 +227,33 @@ router.post('/front', upload.single('file'), async (req: Request, res: Response)
     // 3. MRZ detection on front document
     let mrzFromFront: string[] | null = null;
     let detectedCountry = issuingCountry || null;
-    if (ocrData?.raw_text) {
+    // Read the MRZ with the tolerant reader first, so the French gate can key on
+    // its issuing state (FRA). French documents take the ported Preuvid merge
+    // path (check-digit verification, printed-zone cross-check). Every other
+    // document keeps the existing fill-empty enrichment below, byte-for-byte
+    // unchanged — its reader result is discarded.
+    const frenchReading: MrzReading | null = ocrData?.raw_text ? readMrzFromText(ocrData.raw_text) : null;
+    const frenchDoc = isFrenchIdDocument(
+      ocrData?.raw_text, issuingCountry, frenchReading?.fields.issuing_country.value,
+    );
+    if (frenchDoc && ocrData?.raw_text) {
+      // French with a readable MRZ: merge. French with no MRZ (2021 CNI recto):
+      // nothing here — the confidence cap after the average handles it.
+      if (frenchReading) {
+        mrzFromFront = frenchReading.lines;
+        mergeMrzIntoOcr(ocrData, frenchReading);
+        const state = frenchReading.fields.issuing_country.value;
+        if (!detectedCountry && state && frenchReading.valid) {
+          detectedCountry = alpha3ToAlpha2(state) || null;
+        }
+        if (detectedCountry) ocrData.issuing_country = detectedCountry;
+        logger.info('French MRZ merge applied', {
+          checkDigitsValid: frenchReading.valid,
+          format: frenchReading.format,
+          corrections: frenchReading.corrections.length,
+        });
+      }
+    } else if (ocrData?.raw_text) {
       const mrzResult = extractMRZFromText(ocrData.raw_text);
       if (mrzResult) {
         mrzFromFront = mrzResult.raw_lines;
@@ -270,6 +300,14 @@ router.post('/front', upload.single('file'), async (req: Request, res: Response)
     const confidenceScores = ocrData?.confidence_scores || {};
     const values = Object.values(confidenceScores).filter((v): v is number => typeof v === 'number');
     const avgConfidence = values.length > 0 ? values.reduce((a, b) => a + b, 0) / values.length : 0.5;
+
+    // French front with no readable MRZ (2021 CNI recto, driving licence): no
+    // check digit backs the printed zone, so no identity field may read as
+    // "sure". Applied after the average so Gate 1's ocr_confidence is unchanged —
+    // only the per-field "sure" labels move.
+    if (frenchDoc && ocrData && !frenchReading) {
+      capUncheckedConfidences(ocrData);
+    }
 
     // Resolve document type: use auto-classified type if available, otherwise raw input
     const resolvedDocType = ocrData?.detected_document_type || documentType;
@@ -390,38 +428,99 @@ router.post('/back', upload.single('file'), async (req: Request, res: Response) 
 
     // 3. MRZ detection from raw OCR text
     const rawText = barcodeData?.raw_text || '';
-    const mrzResult = extractMRZFromText(rawText);
+    const backIssuingCountry = (req.body?.issuing_country as string | undefined) || undefined;
 
     let finalQrPayload = qrPayload;
     let barcodeFormat: 'PDF417' | 'QR_CODE' | 'DATA_MATRIX' | 'CODE_128' | 'MRZ_TD1' | 'MRZ_TD2' | 'MRZ_TD3' | null =
       barcodeData?.pdf417_data ? 'PDF417' : (barcodeData?.barcode_data ? 'QR_CODE' : null);
+    let mrzForGate: BackExtractionResult['mrz_result'] = null;
+    let hasMrz = false;
 
-    if (!qrPayload && mrzResult && mrzResult.fields) {
-      finalQrPayload = {
-        first_name: mrzResult.fields.first_name || '',
-        last_name: mrzResult.fields.last_name || '',
-        full_name: mrzResult.fields.full_name || '',
-        date_of_birth: mrzResult.fields.date_of_birth || '',
-        id_number: mrzResult.fields.document_number || '',
-        expiry_date: mrzResult.fields.expiry_date || '',
-        nationality: mrzResult.fields.nationality || '',
-        address: '',
+    // French documents take the ported Preuvid reader so French MRZ formats (old
+    // CNI, 2021 CNI TD1, driving licence) are read and check-digit verified. The
+    // French back often carries only the MRZ, so the FRA issuing country in the
+    // MRZ is a second gate signal on top of any printed French text. The reader
+    // is pure; for non-French documents its result is discarded and the existing
+    // path runs unchanged.
+    const frenchReading = rawText ? readMrzFromText(rawText) : null;
+    const frenchBack = isFrenchIdDocument(
+      rawText, backIssuingCountry, frenchReading?.fields.issuing_country.value,
+    );
+
+    if (frenchBack && frenchReading) {
+      hasMrz = true;
+      const f = frenchReading.fields;
+      // A field whose check digit failed is never passed on (the fork's literal
+      // was `'fausse'`; our union uses `'failed'`).
+      const usable = (x: { value: string | null; check: string }) =>
+        (x.value && x.check !== 'failed' ? x.value : '');
+      const fields: Record<string, string> = {};
+      const put = (k: string, v: string) => { if (v) fields[k] = v; };
+      put('document_number', usable(f.document_number));
+      put('last_name', usable(f.last_name));
+      put('first_name', usable(f.first_names));
+      put('full_name', [usable(f.first_names), usable(f.last_name)].filter(Boolean).join(' '));
+      put('date_of_birth', usable(f.date_of_birth));
+      put('expiry_date', usable(f.expiry_date));
+      put('nationality', usable(f.nationality));
+      put('sex', usable(f.sex));
+      put('issuing_country', usable(f.issuing_country));
+
+      mrzForGate = {
+        raw_lines: frenchReading.lines,
+        fields,
+        checksums_valid: frenchReading.valid,
       };
-      const mrzFormatMap: Record<string, 'MRZ_TD1' | 'MRZ_TD2' | 'MRZ_TD3'> = {
-        TD1: 'MRZ_TD1', TD2: 'MRZ_TD2', TD3: 'MRZ_TD3',
-      };
-      barcodeFormat = mrzFormatMap[mrzResult.format] || null;
+      if (!qrPayload) {
+        finalQrPayload = {
+          first_name: fields.first_name || '',
+          last_name: fields.last_name || '',
+          full_name: fields.full_name || '',
+          date_of_birth: fields.date_of_birth || '',
+          id_number: fields.document_number || '',
+          expiry_date: fields.expiry_date || '',
+          nationality: fields.nationality || '',
+          address: '',
+        };
+        // Line-count → ICAO format. The 2021 CNI (3×30) is TD1; the one-line
+        // driving licence and the old 2×36 CNI fall to TD2. Gate 2 only tests
+        // the MRZ_ prefix, so this is a deliberate change: French MRZ back sides
+        // now present as MRZ_ and reach Gate 2's MRZ cross-check.
+        barcodeFormat = frenchReading.lines.length === 3
+          ? 'MRZ_TD1'
+          : (frenchReading.lines[0]?.length === 44 ? 'MRZ_TD3' : 'MRZ_TD2');
+      }
+    } else {
+      // Non-French: existing extractMRZFromText path, byte-for-byte unchanged.
+      const mrzResult = extractMRZFromText(rawText);
+
+      if (!qrPayload && mrzResult && mrzResult.fields) {
+        finalQrPayload = {
+          first_name: mrzResult.fields.first_name || '',
+          last_name: mrzResult.fields.last_name || '',
+          full_name: mrzResult.fields.full_name || '',
+          date_of_birth: mrzResult.fields.date_of_birth || '',
+          id_number: mrzResult.fields.document_number || '',
+          expiry_date: mrzResult.fields.expiry_date || '',
+          nationality: mrzResult.fields.nationality || '',
+          address: '',
+        };
+        const mrzFormatMap: Record<string, 'MRZ_TD1' | 'MRZ_TD2' | 'MRZ_TD3'> = {
+          TD1: 'MRZ_TD1', TD2: 'MRZ_TD2', TD3: 'MRZ_TD3',
+        };
+        barcodeFormat = mrzFormatMap[mrzResult.format] || null;
+      }
+
+      hasMrz = mrzResult !== null;
+      mrzForGate = hasMrz ? {
+        raw_lines: mrzResult!.raw_lines,
+        fields: mrzResult!.fields as any,
+        checksums_valid: mrzResult!.check_digits_valid,
+      } : (rawText && /[A-Z<]{30,}/.test(rawText) ? {
+        raw_lines: rawText.split('\n').filter((l: string) => /^[A-Z0-9<]{30,}$/.test(l.trim())),
+        checksums_valid: true,
+      } : null);
     }
-
-    const hasMrz = mrzResult !== null;
-    const mrzForGate = hasMrz ? {
-      raw_lines: mrzResult!.raw_lines,
-      fields: mrzResult!.fields as any,
-      checksums_valid: mrzResult!.check_digits_valid,
-    } : (rawText && /[A-Z<]{30,}/.test(rawText) ? {
-      raw_lines: rawText.split('\n').filter((l: string) => /^[A-Z0-9<]{30,}$/.test(l.trim())),
-      checksums_valid: true,
-    } : null);
 
     const result: BackExtractionResult = {
       qr_payload: finalQrPayload,

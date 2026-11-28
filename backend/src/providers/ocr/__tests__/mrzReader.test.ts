@@ -166,3 +166,36 @@ describe('readMrzFromText', () => {
     expect(r.fields.document_number.confidence).toBeLessThan(0.95);
   });
 });
+
+// The French gate (isFrenchIdDocument) keys on the MRZ issuing state, so the
+// reader must report FRA for every French format and never for the ICAO
+// specimen country. It must also stay null-safe: it runs on every back document
+// (and every front), so non-MRZ text must return null, not throw a 500.
+describe('readMrzFromText — issuing state feeds the French gate', () => {
+  const PERMIT_IRFRA = [
+    'IRFRAHP5DGMGX78<<<<<<<<<<<<<<<',
+    '5410167F3511060BRA<<<<<<<<<<<4',
+    'CHEN<<WEI<<<<<<<<<<<<<<<<<<<<<',
+  ];
+
+  it('reports FRA for every French format', () => {
+    for (const lines of [PASSPORT, CNI_2021, CNI_OLD, LICENCE, PERMIT_IRFRA]) {
+      const r = readMrzFromText(text(lines))!;
+      expect(r).not.toBeNull();
+      expect(r.fields.issuing_country.value).toBe('FRA');
+    }
+  });
+
+  it('does not report FRA for ICAO specimen (UTO) documents', () => {
+    const UTO_TD3 = ['P<UTOERIKSSON<<ANNA<MARIA<<<<<<<<<<<<<<<<<<<', 'L898902C36UTO7408122F1204159ZE184226B<<<<<10'];
+    const UTO_TD1 = ['I<UTOD231458907<<<<<<<<<<<<<<<', '7408122F1204159UTO<<<<<<<<<<<6', 'ERIKSSON<<ANNA<MARIA<<<<<<<<<<'];
+    expect(readMrzFromText(['PASSPORT', ...UTO_TD3].join('\n'))!.fields.issuing_country.value).not.toBe('FRA');
+    expect(readMrzFromText(['ID', ...UTO_TD1].join('\n'))!.fields.issuing_country.value).not.toBe('FRA');
+  });
+
+  it('returns null, not throws, on long non-MRZ text (e.g. a US licence back)', () => {
+    const usBack = 'DRIVER LICENSE\nCALIFORNIA\n1234 MAIN STREET ANYTOWN CA 90001\nDOB 01/15/1990 EXP 01/15/2030 CLASS C END NONE';
+    expect(() => readMrzFromText(usBack)).not.toThrow();
+    expect(readMrzFromText(usBack)).toBeNull();
+  });
+});
