@@ -198,4 +198,12 @@ describe('readMrzFromText — issuing state feeds the French gate', () => {
     expect(() => readMrzFromText(usBack)).not.toThrow();
     expect(readMrzFromText(usBack)).toBeNull();
   });
+
+  it('still reads an MRZ at the end after many noise lines (candidate cap keeps the tail)', () => {
+    const noise = Array.from({ length: 60 }, () => 'X<<<<<<<<<<<<<<<<<<<<<<<<<<<<<');
+    const r = readMrzFromText([...noise, ...PASSPORT].join('\n'));
+    expect(r).not.toBeNull();
+    expect(r!.fields.document_number.value).toBe('59EG76437');
+    expect(r!.fields.issuing_country.value).toBe('FRA');
+  });
 });

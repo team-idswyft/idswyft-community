@@ -57,6 +57,20 @@ const upload = multer({
   },
 });
 
+// A French MRZ header at a line start: P<FRA, IDFRA, D1FRA, IRFRA, etc.
+const FRENCH_MRZ_HEADER = /(^|\n)[A-Z0-9<«‹≤([{]{0,3}FRA/;
+
+/**
+ * Cheap pre-filter: whether to run the tolerant MRZ reader at all. Run it only
+ * when a document is plausibly French — a French text/hint signal, or a French
+ * MRZ header. This keeps the reader (and its bounded but non-trivial cost) off
+ * the hot path for the common non-French document, which keeps the existing
+ * behaviour unchanged.
+ */
+function mightBeFrench(rawText: string, issuingCountry?: string): boolean {
+  return isFrenchIdDocument(rawText, issuingCountry) || FRENCH_MRZ_HEADER.test(rawText.toUpperCase());
+}
+
 // ─── Orientation handling ────────────────────────────────────────
 
 /**
@@ -232,7 +246,10 @@ router.post('/front', upload.single('file'), async (req: Request, res: Response)
     // path (check-digit verification, printed-zone cross-check). Every other
     // document keeps the existing fill-empty enrichment below, byte-for-byte
     // unchanged — its reader result is discarded.
-    const frenchReading: MrzReading | null = ocrData?.raw_text ? readMrzFromText(ocrData.raw_text) : null;
+    const frenchReading: MrzReading | null =
+      ocrData?.raw_text && mightBeFrench(ocrData.raw_text, issuingCountry)
+        ? readMrzFromText(ocrData.raw_text)
+        : null;
     const frenchDoc = isFrenchIdDocument(
       ocrData?.raw_text, issuingCountry, frenchReading?.fields.issuing_country.value,
     );
@@ -442,7 +459,7 @@ router.post('/back', upload.single('file'), async (req: Request, res: Response) 
     // MRZ is a second gate signal on top of any printed French text. The reader
     // is pure; for non-French documents its result is discarded and the existing
     // path runs unchanged.
-    const frenchReading = rawText ? readMrzFromText(rawText) : null;
+    const frenchReading = rawText && mightBeFrench(rawText, backIssuingCountry) ? readMrzFromText(rawText) : null;
     const frenchBack = isFrenchIdDocument(
       rawText, backIssuingCountry, frenchReading?.fields.issuing_country.value,
     );

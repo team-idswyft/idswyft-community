@@ -77,6 +77,13 @@ const MAX_LENGTH_GAP = 8;
 /** Caps on variants per line and combinations per block. */
 const MAX_VARIANTS_PER_LINE = 60;
 const MAX_COMBINATIONS = 6000;
+/**
+ * Cap on candidate MRZ-like lines scanned per call. A real MRZ is 1–3 lines at
+ * the document edge; this bounds total work when OCR (or a crafted upload)
+ * yields many MRZ-like lines. The band sits at the bottom, so the last lines are
+ * kept.
+ */
+const MAX_CANDIDATE_LINES = 20;
 
 // Characters the OCR returns in place of `<`.
 const FILLER_LOOKALIKES = /[«‹≤(\[{]/g;
@@ -338,7 +345,7 @@ function nameLineIndex(format: Format): number {
   return format.lines === 3 ? 2 : 0;
 }
 
-function readBlock(rawBlock: string[], format: Format): { lines: string[]; parsed: ParseResult; before: string[] } | null {
+function readBlock(rawBlock: string[], format: Format): { lines: string[]; parsed: ParseResult; before: string[]; ambiguous: boolean } | null {
   const block = repairHeader(rawBlock, format);
   const nameLine = nameLineIndex(format);
   const variants = block.map((l, i) => {
@@ -383,18 +390,20 @@ function readBlock(rawBlock: string[], format: Format): { lines: string[]; parse
 
   if (validBySignature.size === 1) {
     const v = [...validBySignature.values()][0];
-    return { ...v, before: v.lines };
+    return { ...v, before: v.lines, ambiguous: false };
   }
   if (validBySignature.size > 1) {
-    // Several valid, different readings: ambiguous, do not decide.
+    // Several valid, different readings: ambiguous. Return one for line-diffing
+    // but flag it; buildReading forces the reading invalid so it is never
+    // trusted (checksums_valid false, no field presented as sure).
     const first = [...validBySignature.values()][0];
-    return { lines: first.lines, parsed: { ...first.parsed, valid: false }, before: first.lines };
+    return { lines: first.lines, parsed: first.parsed, before: first.lines, ambiguous: true };
   }
   if (!best) return null;
 
   const fixed = repairByCheckDigits(best.lines, best.parsed);
-  if (fixed) return { ...fixed, before: best.lines };
-  return { lines: best.lines, parsed: best.parsed, before: best.lines };
+  if (fixed) return { ...fixed, before: best.lines, ambiguous: false };
+  return { lines: best.lines, parsed: best.parsed, before: best.lines, ambiguous: false };
 }
 
 function diffCorrections(before: string[], after: string[]) {
@@ -451,7 +460,7 @@ function toIsoDate(yymmdd: string | null | undefined, kind: 'birth' | 'expiry'):
   return `${century}${yymmdd.slice(0, 2)}-${yymmdd.slice(2, 4)}-${yymmdd.slice(4, 6)}`;
 }
 
-function buildReading(ocrLines: string[], lines: string[], parsed: ParseResult, extra: MrzReading['corrections']): MrzReading {
+function buildReading(ocrLines: string[], lines: string[], parsed: ParseResult, extra: MrzReading['corrections'], ambiguous: boolean): MrzReading {
   const libCorrections = parsed.details.flatMap(d => d.autocorrect ?? []).map(a => ({
     line: a.line, column: a.column, original: a.original, corrected: a.corrected,
   }));
@@ -479,11 +488,14 @@ function buildReading(ocrLines: string[], lines: string[], parsed: ParseResult, 
     docReading.confidence = CONFIDENCE[docReading.check];
   }
 
-  return {
+  const reading: MrzReading = {
     format: parsed.format,
     lines,
     ocr_lines: ocrLines,
-    valid: allChecksValid(parsed),
+    // Ambiguous readings (several valid line-fittings disagree on protected
+    // fields) are never reported valid, so a downstream checksum gate cannot
+    // fail open on one.
+    valid: allChecksValid(parsed) && !ambiguous,
     corrections,
     fields: {
       document_number: docReading,
@@ -496,6 +508,19 @@ function buildReading(ocrLines: string[], lines: string[], parsed: ParseResult, 
       sex: { ...fieldReading(parsed, 'sex', f.sex ?? null, corrected), value: sex },
     },
   };
+
+  if (ambiguous) {
+    // Demote every protected field so none is presented as sure: the printed
+    // zone must confirm it before the merge trusts it.
+    for (const fr of Object.values(reading.fields)) {
+      if (fr.value && fr.check !== 'failed') {
+        fr.check = 'unchecked';
+        fr.confidence = Math.min(fr.confidence, CONFIDENCE.unchecked);
+      }
+    }
+  }
+
+  return reading;
 }
 
 /**
@@ -506,7 +531,11 @@ export function readMrzFromText(rawText: string): MrzReading | null {
   if (!rawText) return null;
   // Lines that do not look like an MRZ (blank line, noise) are skipped: the OCR
   // sometimes inserts them between two lines of the band.
-  const candidates = rawText.split('\n').map(normalizeMrzLine).filter((l): l is string => l !== null);
+  const candidates = rawText
+    .split('\n')
+    .map(normalizeMrzLine)
+    .filter((l): l is string => l !== null)
+    .slice(-MAX_CANDIDATE_LINES);
 
   let best: { reading: MrzReading; score: number } | null = null;
   for (const format of FORMATS) {
@@ -521,7 +550,7 @@ export function readMrzFromText(rawText: string): MrzReading | null {
       const read = readBlock(lines, format);
       if (!read) continue;
       const extra = diffCorrections(read.before, read.lines);
-      const reading = buildReading(lines, read.lines, read.parsed, extra);
+      const reading = buildReading(lines, read.lines, read.parsed, extra, read.ambiguous);
       const score = (reading.valid ? 1000 : 0) + checkScore(read.parsed) * 10
         - lines.reduce((a, l) => a + Math.abs(l.length - format.length), 0);
       if (!best || score > best.score) best = { reading, score };
