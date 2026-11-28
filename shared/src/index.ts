@@ -51,7 +51,11 @@ export {
   validateIdNumber,
 } from './providers/ocr/internationalIdFormats.js';
 export { decodeUkDlNumber, applyUkDlCrossCheck, findUkDlNumber, normalizeUkDlNumber, isLikelyUkDl, findDatesInText, UK_DL_NUMBER_RE } from './providers/ocr/ukDlNumber.js';
-export { findSpacedDmyDates, normalizeCommaSeparatedNames } from './providers/ocr/frenchParsing.js';
+export { findSpacedDmyDates, normalizeCommaSeparatedNames, isFrenchIdDocument } from './providers/ocr/frenchParsing.js';
+export { readMrzFromText, normalizeMrzLine, fitLineVariants, cleanNameLine } from './providers/ocr/mrzReader.js';
+export type { MrzReading, MrzFieldReading, FieldCheck } from './providers/ocr/mrzReader.js';
+export { mergeMrzIntoOcr, capUncheckedConfidences, readPrintedZone, normalizeName, SURE_CONFIDENCE, UNCHECKED_CONFIDENCE } from './providers/ocr/mrzMerge.js';
+export type { MergedField, MergedFields, PrintedZone } from './providers/ocr/mrzMerge.js';
 export type { UkDlDecoded } from './providers/ocr/ukDlNumber.js';
 export type { CountryDocFormat, CountryIdFormat } from './providers/ocr/internationalIdFormats.js';
 export {
